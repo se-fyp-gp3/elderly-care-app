@@ -1,50 +1,64 @@
-# Welcome to your Expo app 👋
+![image]()
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
-## Get started
+---
 
-1. Install dependencies
 
-   ```bash
-   npm install
-   ```
+# Elderly Care App
+Target Audience: Elderly individuals living independently, their family members, and caregivers.
 
-2. Start the app
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Introduction
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Hong Kong's population is rapidly aging. A growing number of seniors choose to, or must, live independently. While technology offers many solutions, the market is fragmented. There are separate apps for video calls, medication reminders, and health tracking, but they are often not elderly-friendly, with complex interfaces and small text. This complexity creates a digital divide, leaving seniors unable to benefit from technological advancements. Furthermore, the lack of integration means critical information does not flow seamlessly to family members who provide care remotely. An all-in-one solution designed with large, simple buttons, voice interaction, and consolidated data is necessary to bridge this gap, promote aging in place, and provide peace of mind to families.
 
-## Get a fresh project
+We propose to develop "Elderly Care," a cross-platform application (for iOS, Android, and Web) with a user-centric design featuring large fonts, intuitive icons, and voice-guided navigation.
 
-When you're ready, run:
 
-```bash
-npm run reset-project
-```
+---
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
-## Learn more
+## Team
+- Marco, WONG Sai Lung
+    - Senior Project Manager & Full-Stack Developer
+    Responsibilities: Overall project coordination, backend development (database, API), and integration of the emergency SOS system.
+    
+- James, LEUNG Tze Shing
+    - AI & Mobile Developer
+    Research, implementation, and integration of the AI chat companion and the fall detection algorithm.
 
-To learn more about developing your project with Expo, look at the following resources:
+- Wilson, CHOI Yiu Shing
+    - Front-end Developer & UI/UX DesignerResponsibilities: Designing the elderly-friendly user interface, developing the front-end for the mobile app and web portal, and implementing the medication and health tracking modules.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
 
-## Join the community
+---
 
-Join our community of developers creating universal apps.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## General
+
+There is a lack of a simple, integrated, and intuitive application designed specifically for the elderly that addresses their core needs—companionship, medication management, health tracking, and emergency assistance—in a single platform.
+
+
+### For the Elderly User
+
+- Loneliness and Social Isolation: Many elderly individuals experience loneliness and lack constant companionship, which can impact their mental health.
+- Medication Non-Adherence: Difficulty remembering complex medication schedules leads to missed or incorrect doses, posing serious health risks.
+- Health Monitoring Difficulties: Manually tracking vital signs is cumbersome, and trends are hard to identify without visualization.
+- Fear of Emergencies: The anxiety of falling or having a medical emergency with no way to call for help is a significant concern.
+
+
+### For Family Members/Caregiver
+
+- Lack of Peace of Mind: Inability to easily check if their elderly relative has taken their medication or is safe.
+- Information Silos: Health data and medication logs are often kept on paper or in disparate apps, making it difficult to get a consolidated view of the elderly’s wellbeing.
+
+
+---
+
+
+## Licensing
+
+Elderly Care App is released under the [Apache License](http://www.apache.org/licenses/). Please see the [LICENSE](LICENSE.txt) file for more details.
