@@ -1,4 +1,4 @@
-![image]()
+![image](img/FullLogo.png)
 
 
 # Elderly Care App
