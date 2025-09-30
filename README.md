@@ -1,4 +1,4 @@
-![image]()
+![image](./img/FullLogo.png)
 
 
 # Elderly Care App
@@ -16,18 +16,18 @@ Hong Kong's population is rapidly aging. A growing number of seniors choose to, 
 We propose to develop "Elderly Care," a cross-platform application (for iOS, Android, and Web) with a user-centric design featuring large fonts, intuitive icons, and voice-guided navigation.
 
 
-## Team
-- Marco, WONG Sai Lung
-    - Senior Project Manager & Full-Stack Developer
-        Overall project coordination, backend development (database, API), and integration of the emergency SOS system.
-    
-- James, LEUNG Tze Shing
-    - AI & Mobile Developer
-        Research, implementation, and integration of the AI chat companion and the fall detection algorithm.
+## Team & Responsibilities
+- __Marco, WONG Sai Lung__ (Senior Project Manager & Full-Stack Developer)
 
-- Wilson, CHOI Yiu Shing
-    - Front-end Developer & UI/UX Designer
-        Designing the elderly-friendly user interface, developing the front-end for the mobile app and web portal, and implementing the medication and health tracking modules.
+    Overall project coordination, backend development (database, API), and integration of the emergency SOS system.
+    
+- __James, LEUNG Tze Shing__ (AI & Mobile Developer)
+
+    Research, implementation, and integration of the AI chat companion and the fall detection algorithm.
+
+- __Wilson, CHOI Yiu Shing__ (Front-end Developer & UI/UX Designer)
+
+    Designing the elderly-friendly user interface, developing the front-end for the mobile app and web portal, and implementing the medication and health tracking modules.
 
 
 ## General
