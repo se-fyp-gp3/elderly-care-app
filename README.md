@@ -1,14 +1,12 @@
 ![image]()
 
 
----
-
-
 # Elderly Care App
-Target Audience: Elderly individuals living independently, their family members, and caregivers.
 
 
----
+## Target Audience
+
+Elderly individuals living independently, their family members, and caregivers.
 
 
 ## Introduction
@@ -18,23 +16,18 @@ Hong Kong's population is rapidly aging. A growing number of seniors choose to, 
 We propose to develop "Elderly Care," a cross-platform application (for iOS, Android, and Web) with a user-centric design featuring large fonts, intuitive icons, and voice-guided navigation.
 
 
----
-
-
 ## Team
 - Marco, WONG Sai Lung
     - Senior Project Manager & Full-Stack Developer
-    Responsibilities: Overall project coordination, backend development (database, API), and integration of the emergency SOS system.
+    Overall project coordination, backend development (database, API), and integration of the emergency SOS system.
     
 - James, LEUNG Tze Shing
     - AI & Mobile Developer
     Research, implementation, and integration of the AI chat companion and the fall detection algorithm.
 
 - Wilson, CHOI Yiu Shing
-    - Front-end Developer & UI/UX DesignerResponsibilities: Designing the elderly-friendly user interface, developing the front-end for the mobile app and web portal, and implementing the medication and health tracking modules.
-
-
----
+    - Front-end Developer & UI/UX Designer
+    Designing the elderly-friendly user interface, developing the front-end for the mobile app and web portal, and implementing the medication and health tracking modules.
 
 
 ## General
@@ -54,9 +47,6 @@ There is a lack of a simple, integrated, and intuitive application designed spec
 
 - Lack of Peace of Mind: Inability to easily check if their elderly relative has taken their medication or is safe.
 - Information Silos: Health data and medication logs are often kept on paper or in disparate apps, making it difficult to get a consolidated view of the elderly’s wellbeing.
-
-
----
 
 
 ## Licensing
