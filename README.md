@@ -19,15 +19,15 @@ We propose to develop "Elderly Care," a cross-platform application (for iOS, And
 ## Team
 - Marco, WONG Sai Lung
     - Senior Project Manager & Full-Stack Developer
-    Overall project coordination, backend development (database, API), and integration of the emergency SOS system.
+        Overall project coordination, backend development (database, API), and integration of the emergency SOS system.
     
 - James, LEUNG Tze Shing
     - AI & Mobile Developer
-    Research, implementation, and integration of the AI chat companion and the fall detection algorithm.
+        Research, implementation, and integration of the AI chat companion and the fall detection algorithm.
 
 - Wilson, CHOI Yiu Shing
     - Front-end Developer & UI/UX Designer
-    Designing the elderly-friendly user interface, developing the front-end for the mobile app and web portal, and implementing the medication and health tracking modules.
+        Designing the elderly-friendly user interface, developing the front-end for the mobile app and web portal, and implementing the medication and health tracking modules.
 
 
 ## General
