@@ -33,7 +33,7 @@ We propose to develop "Elderly Care," a cross-platform application (for iOS, And
 - Wilson, CHOI Yiu Shing
     - Front-end Developer & UI/UX DesignerResponsibilities: Designing the elderly-friendly user interface, developing the front-end for the mobile app and web portal, and implementing the medication and health tracking modules.
 
-
+- Supervisor, Yau Ming Sum, Sam
 ---
 
 
