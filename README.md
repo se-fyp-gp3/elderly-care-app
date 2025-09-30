@@ -1,13 +1,10 @@
-![image](./img/FullLogo.png)
-
-
 # Elderly Care App
 
+![image](./img/FullLogo.png)
 
 ## Target Audience
 
 Elderly individuals living independently, their family members, and caregivers.
-
 
 ## Introduction
 
@@ -15,12 +12,12 @@ Hong Kong's population is rapidly aging. A growing number of seniors choose to, 
 
 We propose to develop "Elderly Care," a cross-platform application (for iOS, Android, and Web) with a user-centric design featuring large fonts, intuitive icons, and voice-guided navigation.
 
-
 ## Team & Responsibilities
+
 - __Marco, WONG Sai Lung__ (Senior Project Manager & Full-Stack Developer)
 
     Overall project coordination, backend development (database, API), and integration of the emergency SOS system.
-    
+
 - __James, LEUNG Tze Shing__ (AI & Mobile Developer)
 
     Research, implementation, and integration of the AI chat companion and the fall detection algorithm.
@@ -33,11 +30,9 @@ We propose to develop "Elderly Care," a cross-platform application (for iOS, And
 
     Providing technical guidance, ensuring project milestones are met, and assisting with testing and quality assurance.
 
-
 ## General
 
 There is a lack of a simple, integrated, and intuitive application designed specifically for the elderly that addresses their core needs—companionship, medication management, health tracking, and emergency assistance—in a single platform.
-
 
 ### For the Elderly User
 
@@ -46,12 +41,10 @@ There is a lack of a simple, integrated, and intuitive application designed spec
 - Health Monitoring Difficulties: Manually tracking vital signs is cumbersome, and trends are hard to identify without visualization.
 - Fear of Emergencies: The anxiety of falling or having a medical emergency with no way to call for help is a significant concern.
 
-
 ### For Family Members/Caregiver
 
 - Lack of Peace of Mind: Inability to easily check if their elderly relative has taken their medication or is safe.
 - Information Silos: Health data and medication logs are often kept on paper or in disparate apps, making it difficult to get a consolidated view of the elderly’s wellbeing.
-
 
 ## Licensing
 
