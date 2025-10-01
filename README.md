@@ -29,6 +29,10 @@ We propose to develop "Elderly Care," a cross-platform application (for iOS, And
 
     Designing the elderly-friendly user interface, developing the front-end for the mobile app and web portal, and implementing the medication and health tracking modules.
 
+- __Sam, YAU Ming Sum__ (Supervisor)
+
+    Providing technical guidance, ensuring project milestones are met, and assisting with testing and quality assurance.
+
 
 ## General
 
