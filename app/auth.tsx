@@ -1,7 +1,6 @@
-// app/auth.tsx
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import React, { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { OAuthProvider } from "react-native-appwrite";
 import { Button, Text, TextInput, useTheme } from "react-native-paper";
@@ -21,7 +20,7 @@ export default function AuthScreen() {
       setError("Please fill in all fields.");
       return;
     }
-  
+
     setError(null);
 
     if (isSignUp) {
@@ -29,14 +28,6 @@ export default function AuthScreen() {
         setError("Passwords must be at least 8 characters long.");
         return;
       }
-
-    // 设置默认偏好
-    const defaultPreferences = {
-      role: 'elderly', // 默认角色
-      fontSize: 'medium',
-      voiceTone: 'gentle',
-      notifications: true
-    };
 
       const error = await signUp(email, password);
       if (error) {
