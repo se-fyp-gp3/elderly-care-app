@@ -1,6 +1,5 @@
-// app/(tabs)/_layout.tsx
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "react-native-paper";
 
 export default function TabsLayout() {
@@ -29,45 +28,6 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="robot-happy-outline"
-              size={size}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="caregiver"
-        options={{ 
-          title: "Care panel",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="account-supervisor"
-              size={size}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="medication"
-        options={{
-          title: "Medication management",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="pill"
-              size={size}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: "settings",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="cog-outline"
               size={size}
               color={color}
             />

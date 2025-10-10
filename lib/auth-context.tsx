@@ -1,11 +1,11 @@
 // lib/auth-context.tsx
+import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { ID, Models, OAuthProvider } from "react-native-appwrite";
 import { UserPreferences } from "../types/user.types";
 import { account, accountWeb } from "./appwrite";
-import { makeRedirectUri } from "expo-auth-session";
 
 export class LoginError extends Error {
   constructor(message: string) {
@@ -46,31 +46,29 @@ export default function AuthProvider({
   );
   const [preferences, setPreferences] = useState<UserPreferences>({});
   const [isLoadingUser, setIsLoadingUser] = useState<boolean>(true);
-
   useEffect(() => {
     getUser();
   }, []);
 
   const getUser = async () => {
     try {
+<<<<<<< HEAD
       let session;
       if (Platform.OS === "web") {
         session = await accountWeb.get();
       } else {
         session = await account.get();
       }
-
+      
       setUser(session);
-      if (session.prefs) {
-        setPreferences(session.prefs as UserPreferences);
-      }
+>>>>>>> c71b75e (feat: update dependencies and add authentication context)
     } catch (error) {
       setUser(null);
     } finally {
       setIsLoadingUser(false);
-    }
   };
 
+<<<<<<< HEAD
   const signUp = async (
     email: string,
     password: string,
@@ -83,6 +81,19 @@ export default function AuthProvider({
     });
     if (userPreferences && Object.keys(userPreferences).length > 0) {
       await account.updatePrefs(userPreferences);
+=======
+  const signUp = async (email: string, password: string) => {
+    try {
+      await account.create({ userId: ID.unique(), email, password });
+      await signIn(email, password);
+      return null;
+    } catch (error) {
+      if (error instanceof Error) {
+        return error.message;
+      } else {
+        return "An error occurred during sign up";
+      }
+>>>>>>> c71b75e (feat: update dependencies and add authentication context)
     }
 
     await signIn(email, password);
@@ -96,32 +107,15 @@ export default function AuthProvider({
       session = await accountWeb.get();
     } else {
       await account.createEmailPasswordSession({ email, password });
+<<<<<<< HEAD
       session = await account.get();
-    }
-    setUser(session);
-
-    if (session.prefs) {
-      setPreferences(session.prefs as UserPreferences);
-    }
-
-    return null;
-  };
-
-  const updatePreferences = async (newPreferences: UserPreferences) => {
-    await account.updatePrefs(newPreferences);
-    const updatedUser = await account.get();
-    setUser(updatedUser);
-    setPreferences(newPreferences);
-    return null;
-  };
-
-  const setPreference = async (key: string, value: any) => {
-    const newPrefs = { ...preferences, [key]: value };
-    await account.updatePrefs(newPrefs);
-    setPreferences(newPrefs);
-    return null;
-  };
-
+=======
+      const session = await account.get();
+      setUser(session);
+      return null;
+    } catch (error) {
+      if (error instanceof Error) {
+        return error.message;
   const signInWithOAuth2 = async (provider: OAuthProvider) => {
     let session;
     if (Platform.OS === "web") {
