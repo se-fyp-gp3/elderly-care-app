@@ -1,8 +1,7 @@
-// app/(tabs)/more.tsx
-import { useAuth } from "@/lib/auth-context";
-import React from "react";
 import { StyleSheet, View } from "react-native";
-import { Button, Text, useTheme } from "react-native-paper";
+import React from "react";
+import { Text, Button, useTheme } from "react-native-paper";
+import { useAuth } from "@/lib/auth-context";
 
 export default function More() {
   const { signOut } = useAuth();

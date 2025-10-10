@@ -1,43 +1,26 @@
-// app/_layout.tsx
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { Stack, useRouter, useSegments } from "expo-router";
-// React and hooks
-import { useEffect, useState } from "react";
-import { useColorScheme } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { MD3DarkTheme, MD3LightTheme, PaperProvider } from "react-native-paper";
+import { useEffect } from "react";
+import { PaperProvider, MD3DarkTheme, MD3LightTheme } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import PinterestSplash from "../components/PinterestSplash";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useColorScheme } from "react-native";
 
 function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isLoadingUser } = useAuth();
   const segments = useSegments();
-  const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
     const inAuthGroup = segments[0] === "auth";
-    
-    if (!isLoadingUser && appReady) {
-      if (!user && !inAuthGroup) {
-        router.replace("/auth");
-      } else if (user && inAuthGroup) {
-        router.replace("/");
-      }
+    if (!user && !inAuthGroup && !isLoadingUser) {
+      router.replace("/auth");
+    } else if (user && inAuthGroup && !isLoadingUser) {
+      router.replace("/");
     }
-  }, [user, segments, isLoadingUser, appReady]);
+  }, [user, segments]);
 
-  return (
-    <>
-      {!appReady && (
-        <PinterestSplash onAnimationComplete={() => setAppReady(true)}>
-          {/* 这里传入实际的应用内容，但初始时会被动画覆盖 */}
-          {children}
-        </PinterestSplash>
-      )}
-      {appReady && children}
-    </>
-  );
+  return <>{children}</>;
 }
 
 export default function RootLayout() {
@@ -52,7 +35,6 @@ export default function RootLayout() {
             <RouteGuard>
               <Stack>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="auth" options={{ headerShown: false }} />
               </Stack>
             </RouteGuard>
           </SafeAreaProvider>
