@@ -1,3 +1,4 @@
+// lib/appwrite.ts
 import { Account, Client, Databases } from "react-native-appwrite";
 
 export const client = new Client()
