@@ -1,16 +1,32 @@
+// lib/auth-context.tsx
 import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ID, Models, OAuthProvider } from "react-native-appwrite";
 import { account, accountWeb } from "./appwrite";
 import { Platform } from "react-native";
+
+// 用户偏好设置的类型定义
+type UserPreferences = {
+  role?: 'elderly' | 'caregiver';
+  fontSize?: 'small' | 'medium' | 'large';
+  voiceTone?: 'gentle' | 'friendly' | 'professional';
+  notifications?: boolean;
+  [key: string]: any;
+};
 type AuthContextType = {
   user: Models.User<Models.Preferences> | null;
   isLoadingUser: boolean;
+
+  // 用户偏好设置
+  preferences: UserPreferences;
+
   signUp: (email: string, password: string) => Promise<string | null>;
   signIn: (email: string, password: string) => Promise<string | null>;
   signInWithOAuth2: (provider: OAuthProvider) => Promise<string | null>;
   signOut: () => Promise<void>;
+  updatePreferences: (newPreferences: UserPreferences) => Promise<string | null>;
+  setPreference: (key: string, value: any) => Promise<string | null>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,6 +39,8 @@ export default function AuthProvider({
   const [user, setUser] = useState<Models.User<Models.Preferences> | null>(
     null
   );
+  // 用户偏好设置状态
+  const [preferences, setPreferences] = useState<UserPreferences>({});
   const [isLoadingUser, setIsLoadingUser] = useState<boolean>(true);
 
   useEffect(() => {
@@ -39,6 +57,12 @@ export default function AuthProvider({
       }
 
       setUser(session);
+
+      // 获取用户偏好设置
+      if (session.prefs) {
+        setPreferences(session.prefs as UserPreferences);
+      }
+
     } catch (error) {
       setUser(null);
     } finally {
@@ -46,9 +70,20 @@ export default function AuthProvider({
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  // 注册新用户
+  const signUp = async (email: string, password: string, userPreferences?: UserPreferences) => {
     try {
-      await account.create({ userId: ID.unique(), email, password });
+      await account.create({ 
+        userId: ID.unique(), 
+        email, 
+        password
+      });
+
+      // 设置偏好
+      if (userPreferences && Object.keys(userPreferences).length > 0) {
+        await account.updatePrefs(userPreferences);
+      }
+
       await signIn(email, password);
       return null;
     } catch (error) {
@@ -71,12 +106,51 @@ export default function AuthProvider({
         session = await account.get();
       }
       setUser(session);
+
+      // 获取偏好设置
+      if (session.prefs) {
+        setPreferences(session.prefs as UserPreferences);
+      }
+
       return null;
     } catch (error) {
       if (error instanceof Error) {
         return error.message;
       } else {
         return "An error occurred during sign in";
+      }
+    }
+  };
+
+  // 更新偏好设置
+  const updatePreferences = async (newPreferences: UserPreferences) => {
+    try {
+      await account.updatePrefs(newPreferences);
+      const updatedUser = await account.get();
+      setUser(updatedUser);
+      setPreferences(newPreferences);
+      return null;
+    } catch (error) {
+      if (error instanceof Error) {
+        return error.message;
+      } else {
+        return "An error occurred while updating preferences";
+      }
+    }
+  };
+
+  // 设置单个偏好
+  const setPreference = async (key: string, value: any) => {
+    try {
+      const newPrefs = { ...preferences, [key]: value };
+      await account.updatePrefs(newPrefs);
+      setPreferences(newPrefs);
+      return null;
+    } catch (error) {
+      if (error instanceof Error) {
+        return error.message;
+      } else {
+        return "An error occurred while setting preference";
       }
     }
   };
@@ -168,7 +242,16 @@ export default function AuthProvider({
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoadingUser, signUp, signIn, signInWithOAuth2, signOut }}
+      value={{ 
+        user, 
+        isLoadingUser, 
+        preferences,
+        signUp, 
+        signIn, 
+        signInWithOAuth2, 
+        signOut ,
+        updatePreferences,
+        setPreference}}
     >
       {children}
     </AuthContext.Provider>
