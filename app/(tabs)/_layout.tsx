@@ -1,0 +1,92 @@
+// app/(tabs)/_layout.tsx
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import { useTheme } from "react-native-paper";
+
+export default function TabsLayout() {
+  const theme = useTheme();
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerStyle: { backgroundColor: theme.colors.surface },
+        headerTintColor: theme.colors.onSurface,
+        headerShadowVisible: false,
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface,
+          borderTopWidth: 0,
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.onSurface,
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "AI Chat Bot",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="robot-happy-outline"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="caregiver"
+        options={{ 
+          title: "Care panel",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="account-supervisor"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="medication"
+        options={{
+          title: "Medication management",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="pill"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "settings",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="cog-outline"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="more"
+        options={{
+          title: "More",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="dots-horizontal-circle-outline"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+    </Tabs>
+  );
+}

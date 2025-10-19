@@ -1,0 +1,7 @@
+# 启动
+npx expo start
+
+# 清理项目
+cd android
+./gradlew clean
+cd ..
