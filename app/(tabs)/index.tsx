@@ -1,5 +1,6 @@
-import { View, StyleSheet } from "react-native";
-import { Text, useTheme } from 'react-native-paper'
+// app/(tabs)/index.tsx
+import { StyleSheet, View } from "react-native";
+import { Text, useTheme } from 'react-native-paper';
 
 export default function Index() {
 
