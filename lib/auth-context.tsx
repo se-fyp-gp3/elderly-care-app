@@ -2,7 +2,8 @@ import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ID, Models, OAuthProvider } from "react-native-appwrite";
-import { account } from "./appwrite";
+import { account, accountWeb } from "./appwrite";
+import { Platform } from "react-native";
 type AuthContextType = {
   user: Models.User<Models.Preferences> | null;
   isLoadingUser: boolean;
@@ -30,9 +31,13 @@ export default function AuthProvider({
 
   const getUser = async () => {
     try {
-      const session = await account.get();
-      console.log(session);
-      
+      let session;
+      if (Platform.OS === "web") {
+        session = await accountWeb.get();
+      } else {
+        session = await account.get();
+      }
+
       setUser(session);
     } catch (error) {
       setUser(null);
@@ -57,8 +62,14 @@ export default function AuthProvider({
 
   const signIn = async (email: string, password: string) => {
     try {
-      await account.createEmailPasswordSession({ email, password });
-      const session = await account.get();
+      let session;
+      if (Platform.OS === "web") {
+        await accountWeb.createEmailPasswordSession({ email, password });
+        session = await accountWeb.get();
+      } else {
+        await account.createEmailPasswordSession({ email, password });
+        session = await account.get();
+      }
       setUser(session);
       return null;
     } catch (error) {
@@ -72,9 +83,9 @@ export default function AuthProvider({
 
   const signInWithOAuth2 = async (provider: OAuthProvider) => {
     try {
-      const redirectUri = makeRedirectUri({ 
+      const redirectUri = makeRedirectUri({
         preferLocalhost: true,
-        scheme: 'exp' 
+        scheme: "exp",
       });
       console.log("Deep link: ", redirectUri);
       console.log("Provider:", provider);
@@ -89,7 +100,7 @@ export default function AuthProvider({
 
       const result = await WebBrowser.openAuthSessionAsync(
         `${loginUrl}`,
-        redirectUri.split('://')[0] + '://'
+        redirectUri.split("://")[0] + "://"
       );
 
       console.log("WebBrowser result type:", result.type);
@@ -103,22 +114,29 @@ export default function AuthProvider({
 
       const url = new URL(result.url);
       console.log("Redirect URL:", result.url);
-      
+
       let secret = url.searchParams.get("secret");
       let userId = url.searchParams.get("userId");
-      
+
       if (!secret || !userId) {
         const hashParams = new URLSearchParams(url.hash.substring(1));
         secret = hashParams.get("secret") || secret;
         userId = hashParams.get("userId") || userId;
         console.log("Hash params:", Object.fromEntries(hashParams.entries()));
       }
-      
-      console.log("URL params:", Object.fromEntries(url.searchParams.entries()));
+
+      console.log(
+        "URL params:",
+        Object.fromEntries(url.searchParams.entries())
+      );
 
       if (!secret || !userId) {
         console.log("Available params:", Array.from(url.searchParams.keys()));
-        throw new Error(`Missing userId or secret from redirect URL. Available params: ${Array.from(url.searchParams.keys()).join(', ')}`);
+        throw new Error(
+          `Missing userId or secret from redirect URL. Available params: ${Array.from(
+            url.searchParams.keys()
+          ).join(", ")}`
+        );
       }
 
       await account.createSession({ userId, secret });
@@ -137,7 +155,11 @@ export default function AuthProvider({
 
   const signOut = async () => {
     try {
-      await account.deleteSession({ sessionId: "current" });
+      if (Platform.OS === "web") {
+        await accountWeb.deleteSession({ sessionId: "current" });
+      } else {
+        await account.deleteSession({ sessionId: "current" });
+      }
       setUser(null);
     } catch (error) {
       console.log(error);
