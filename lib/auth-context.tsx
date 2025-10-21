@@ -17,9 +17,7 @@ export class LoginError extends Error {
 type AuthContextType = {
   user: Models.User<Models.Preferences> | null;
   isLoadingUser: boolean;
-
   preferences: UserPreferences;
-
   signUp: (
     email: string,
     password: string,
@@ -28,72 +26,49 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<string | null>;
   signInWithOAuth2: (provider: OAuthProvider) => Promise<string | null>;
   signOut: () => Promise<void>;
-  updatePreferences: (
-    newPreferences: UserPreferences
-  ) => Promise<string | null>;
+  updatePreferences: (newPreferences: UserPreferences) => Promise<string | null>;
   setPreference: (key: string, value: any) => Promise<string | null>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export default function AuthProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [user, setUser] = useState<Models.User<Models.Preferences> | null>(
-    null
-  );
+export default function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
   const [preferences, setPreferences] = useState<UserPreferences>({});
   const [isLoadingUser, setIsLoadingUser] = useState<boolean>(true);
+
   useEffect(() => {
     getUser();
   }, []);
 
   const getUser = async () => {
     try {
-<<<<<<< HEAD
       let session;
       if (Platform.OS === "web") {
         session = await accountWeb.get();
       } else {
         session = await account.get();
       }
-      
+
       setUser(session);
->>>>>>> c71b75e (feat: update dependencies and add authentication context)
+      if (session.prefs) {
+        setPreferences(session.prefs as UserPreferences);
+      }
     } catch (error) {
       setUser(null);
     } finally {
       setIsLoadingUser(false);
+    }
   };
 
-<<<<<<< HEAD
   const signUp = async (
     email: string,
     password: string,
     userPreferences?: UserPreferences
   ) => {
-    await account.create({
-      userId: ID.unique(),
-      email,
-      password,
-    });
+    await account.create({ userId: ID.unique(), email, password });
     if (userPreferences && Object.keys(userPreferences).length > 0) {
       await account.updatePrefs(userPreferences);
-=======
-  const signUp = async (email: string, password: string) => {
-    try {
-      await account.create({ userId: ID.unique(), email, password });
-      await signIn(email, password);
-      return null;
-    } catch (error) {
-      if (error instanceof Error) {
-        return error.message;
-      } else {
-        return "An error occurred during sign up";
-      }
->>>>>>> c71b75e (feat: update dependencies and add authentication context)
     }
 
     await signIn(email, password);
@@ -107,21 +82,36 @@ export default function AuthProvider({
       session = await accountWeb.get();
     } else {
       await account.createEmailPasswordSession({ email, password });
-<<<<<<< HEAD
       session = await account.get();
-=======
-      const session = await account.get();
-      setUser(session);
-      return null;
-    } catch (error) {
-      if (error instanceof Error) {
-        return error.message;
+    }
+    setUser(session);
+
+    if (session.prefs) {
+      setPreferences(session.prefs as UserPreferences);
+    }
+
+    return null;
+  };
+
+  const updatePreferences = async (newPreferences: UserPreferences) => {
+    await account.updatePrefs(newPreferences);
+    const updatedUser = await account.get();
+    setUser(updatedUser);
+    setPreferences(newPreferences);
+    return null;
+  };
+
+  const setPreference = async (key: string, value: any) => {
+    const newPrefs = { ...preferences, [key]: value };
+    await account.updatePrefs(newPrefs);
+    setPreferences(newPrefs);
+    return null;
+  };
+
   const signInWithOAuth2 = async (provider: OAuthProvider) => {
     let session;
     if (Platform.OS === "web") {
-      accountWeb.createOAuth2Session({
-        provider,
-      });
+      accountWeb.createOAuth2Session({ provider });
       session = await accountWeb.get();
     } else {
       const deepLink = new URL(makeRedirectUri({ preferLocalhost: true }));
@@ -133,10 +123,7 @@ export default function AuthProvider({
         failure: `${deepLink}`,
       });
 
-      const result = await WebBrowser.openAuthSessionAsync(
-        `${loginUrl}`,
-        scheme
-      );
+      const result = await WebBrowser.openAuthSessionAsync(`${loginUrl}`, scheme);
 
       if (result.type === "success" && result.url) {
         const url = new URL(result.url);
@@ -144,9 +131,7 @@ export default function AuthProvider({
         const userId = url.searchParams.get("userId");
 
         if (!userId || !secret) {
-          throw new LoginError(
-            "OAuth2 sign-in failed: missing userId or secret"
-          );
+          throw new LoginError("OAuth2 sign-in failed: missing userId or secret");
         }
 
         await account.createSession({ userId, secret });

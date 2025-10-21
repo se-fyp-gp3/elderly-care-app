@@ -1,10 +1,9 @@
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, LoginError } from "@/lib/auth-context";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { OAuthProvider } from "react-native-appwrite";
 import { Button, Text, TextInput, useTheme } from "react-native-paper";
-import { LoginError } from "@/lib/auth-context";
 
 export default function AuthScreen() {
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
@@ -18,50 +17,22 @@ export default function AuthScreen() {
   const { signIn, signUp, signInWithOAuth2 } = useAuth();
 
   const handleAuth = async () => {
-<<<<<<< HEAD
     try {
       if (!email || !password) {
-        throw new LoginError("Email and password are required.");
-=======
-    if (!email || !password) {
-      setError("Please fill in all fields.");
-      return;
-    }
-
-    setError(null);
-
-    if (isSignUp) {
-      if (password.length < 8) {
-        setError("Passwords must be at least 8 characters long.");
+        setError("Please fill in all fields.");
         return;
->>>>>>> c71b75e (feat: update dependencies and add authentication context)
       }
+
       setError(null);
 
-<<<<<<< HEAD
       if (isSignUp) {
         if (password.length < 8) {
-          throw new LoginError("Password must be at least 8 characters long.");
+          setError("Passwords must be at least 8 characters long.");
+          return;
         }
         await signUp(email, password);
       } else {
         await signIn(email, password);
-=======
-            if (!email || !password) {
-              setError("Please fill in all fields.");
-              return;
-            }
-            setError(null);
-        setError(error);
-        return;
-      }
-                setError("Passwords must be at least 8 characters long.");
-                return;
-      const error = await signIn(email, password);
-      if (error) {
-        setError(error);
-        return;
->>>>>>> c71b75e (feat: update dependencies and add authentication context)
       }
 
       router.replace("/");
