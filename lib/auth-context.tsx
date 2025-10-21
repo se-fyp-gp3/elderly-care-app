@@ -2,9 +2,9 @@
 import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { Platform } from "react-native";
 import { ID, Models, OAuthProvider } from "react-native-appwrite";
 import { account, accountWeb } from "./appwrite";
-import { Platform } from "react-native";
 
 // 用户偏好设置的类型定义
 type UserPreferences = {
