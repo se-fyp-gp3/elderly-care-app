@@ -16,6 +16,8 @@ export default function AuthScreen() {
   const { signIn, signUp, signInWithOAuth2 } = useAuth();
 
   const handleAuth = async () => {
+    setEmail(process.env.EXPO_PUBLIC_APPWRITE_EMAIL!);
+    setPassword(process.env.EXPO_PUBLIC_APPWRITE_PASSWORD!);
     if (!email || !password) {
       setError("Please fill in all fields.");
       return;
