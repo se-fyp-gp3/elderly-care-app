@@ -1,3 +1,4 @@
+import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
@@ -7,6 +8,7 @@ export default function ElderlyDetailPage() {
     const { id } = useLocalSearchParams();
     const theme = useTheme();
     const router = useRouter();
+    const navigation = useNavigation();
 
     // 在真实应用中可根据 id 获取服务端数据；这里用占位内容
     const sample = {
@@ -25,6 +27,11 @@ export default function ElderlyDetailPage() {
         const url = `tel:${phone}`;
         Linking.canOpenURL(url).then((s) => s ? Linking.openURL(url) : Alert.alert('Cannot call'));
     };
+
+    React.useLayoutEffect(() => {
+        // 将导航栏标题改为当前老人姓名
+        navigation.setOptions?.({ title: sample.name });
+    }, [navigation, sample.name]);
 
     return (
         <View style={[styles.container, { backgroundColor: theme.colors.background }]}> 

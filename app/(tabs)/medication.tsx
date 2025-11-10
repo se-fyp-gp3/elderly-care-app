@@ -1,5 +1,6 @@
 // app/(tabs)/medication.tsx
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Notifications from 'expo-notifications';
 import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
@@ -15,6 +16,17 @@ import {
     TextInput,
     useTheme
 } from "react-native-paper";
+
+// Show notifications when app is foregrounded
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: false,
+    }),
+});
 
 export default function MedicationManagement() {
     const theme = useTheme();
@@ -107,6 +119,18 @@ export default function MedicationManagement() {
 
     useEffect(() => {
         loadMedsFromStorage();
+
+        // Request notification permissions on mount (if not granted)
+        (async () => {
+            try {
+                const { status } = await Notifications.getPermissionsAsync();
+                if (status !== 'granted') {
+                    await Notifications.requestPermissionsAsync();
+                }
+            } catch (e) {
+                console.warn('Notification permission request failed', e);
+            }
+        })();
     }, []);
 
     const nowFormatted = () => {
@@ -130,12 +154,45 @@ export default function MedicationManagement() {
     };
 
     const onRemindLater = (medId: number) => {
-        // A simple reminder: inform the user and schedule a short callback (simulated reminder)
-        Alert.alert('Reminder set', 'We will remind you in 10 minutes (simulated).');
-        // simulated callback (no background timers guaranteed)
-        setTimeout(() => {
-            Alert.alert('Reminder', `Reminder: please check medication #${medId}`);
-        }, 10 * 60 * 1000);
+        // Schedule a real local notification in 10 minutes using expo-notifications
+        (async () => {
+            try {
+                // Ensure permissions
+                const { status } = await Notifications.getPermissionsAsync();
+                let finalStatus = status;
+                if (finalStatus !== 'granted') {
+                    const { status: asked } = await Notifications.requestPermissionsAsync();
+                    finalStatus = asked;
+                }
+                if (finalStatus !== 'granted') {
+                    Alert.alert('Permission required', 'Please enable notifications to receive reminders.');
+                    return;
+                }
+
+                const med = medicationsState.find(m => m.id === medId);
+                const title = 'Medication reminder';
+                const body = med ? `Please check medication for ${med.elderly}: ${med.name}` : 'Please check medication';
+
+                const identifier = await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title,
+                        body,
+                        data: { medId },
+                    },
+                    trigger: { seconds: 10 * 60 } as any, // 10 minutes
+                });
+
+                // Save reminder id to medication (optional)
+                const updated = medicationsState.map(m => m.id === medId ? { ...m, reminderId: identifier } : m);
+                setMedicationsState(updated);
+                await saveMedsToStorage(updated);
+
+                Alert.alert('Reminder set', 'You will be reminded in 10 minutes.');
+            } catch (e) {
+                console.warn('Failed to schedule notification', e);
+                Alert.alert('Error', 'Unable to schedule reminder.');
+            }
+        })();
     };
 
     const onMarkProcessed = async (medId: number) => {
