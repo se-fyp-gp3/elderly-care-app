@@ -1,6 +1,7 @@
 // app/(tabs)/caregiver.tsx
 import { useAuth } from "@/lib/auth-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import {
@@ -53,11 +54,13 @@ export default function CaregiverDashboard() {
         },
     ];
 
+    const router = useRouter();
+
     const quickActions = [
-        { icon: "pill", label: "Medication Management", color: "#4CAF50" },
-        { icon: "heart-pulse", label: "Health Data", color: "#F44336" },
-        { icon: "calendar-clock", label: "Schedule", color: "#2196F3" },
-        { icon: "chat-alert", label: "Emergency Notification", color: "#FF9800" },
+        { icon: "pill", label: "Medication Management", color: "#4CAF50", route: "medication" },
+        { icon: "heart-pulse", label: "Health Data", color: "#F44336", route: "health-data" },
+        { icon: "calendar-clock", label: "Schedule", color: "#2196F3", route: "schedule" },
+        { icon: "chat-alert", label: "Emergency Notification", color: "#FF9800", route: "emergency" },
     ];
 
     const onRefresh = React.useCallback(() => {
@@ -130,11 +133,11 @@ export default function CaregiverDashboard() {
                             <Card
                                 key={index}
                                 style={styles.actionCard}
-                                onPress={() => console.log(action.label)}
+                                onPress={() => router.push(action.route as any)}
                             >
                                 <Card.Content style={styles.actionContent}>
                                     <MaterialCommunityIcons
-                                        IconName={action.icon}
+                                        name={action.icon as IconName}
                                         size={32}
                                         color={action.color}
                                     />
