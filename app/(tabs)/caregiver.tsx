@@ -1,9 +1,11 @@
 // app/(tabs)/caregiver.tsx
 import { useAuth } from "@/lib/auth-context";
+import { DATABASE_ID, databases, ELDERLY_COLLECTION_ID, ElderlyDocument } from "@/lib/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
 import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Query } from "react-native-appwrite";
 import {
     Avatar,
     Button,
@@ -20,44 +22,55 @@ import {
 // 定义图标名称类型
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
+// Extended elderly type with UI-specific fields
+interface ElderlyListItem extends ElderlyDocument {
+    lastCheck?: string;
+    medication?: string;
+    nextAppointment?: string;
+}
+
 export default function CaregiverDashboard() {
     const { preferences } = useAuth();
     const theme = useTheme();
     const [refreshing, setRefreshing] = React.useState(false);
+    const [elderlyList, setElderlyList] = React.useState<ElderlyListItem[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const [error, setError] = React.useState<string | null>(null);
 
-    // 模拟数据
-    const elderlyList = [
-        {
-            id: 1,
-            name: "Grandpa Zhang",
-            age: 78,
-            phone: '+8613812345678',
-            status: "normal",
-            lastCheck: "2 hours ago",
-            medication: "Completed",
-            nextAppointment: "Tomorrow 10:00"
-        },
-        {
-            id: 2,
-            name: "Grandma Li",
-            age: 82,
-            phone: '+8613912345678',
-            status: "warning",
-            lastCheck: "30 minutes ago",
-            medication: "Pending",
-            nextAppointment: "Today at 2:30 PM"
-        },
-        {
-            id: 3,
-            name: "Grandpa Wang",
-            age: 75,
-            phone: '+8615012345678',
-            status: "normal",
-            lastCheck: "1 hour ago",
-            medication: "Completed",
-            nextAppointment: "None"
-        },
-    ];
+    // Fetch elderly data from Appwrite
+    const fetchElderlyData = React.useCallback(async () => {
+        try {
+            setError(null);
+            const response = await databases.listDocuments(
+                DATABASE_ID,
+                ELDERLY_COLLECTION_ID,
+                [Query.limit(100), Query.orderDesc('$createdAt')]
+            );
+            
+            // Transform Appwrite documents to UI format
+            const transformedData: ElderlyListItem[] = response.documents.map((doc: any) => ({
+                ...doc,
+                // Add computed/default fields for UI
+                lastCheck: "Recently",
+                medication: "Pending",
+                nextAppointment: "None"
+            }));
+            
+            setElderlyList(transformedData);
+        } catch (err: any) {
+            console.error('Error fetching elderly data:', err);
+            setError(err.message || 'Failed to load elderly data');
+            // Fallback to empty list on error
+            setElderlyList([]);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Load data on mount
+    React.useEffect(() => {
+        fetchElderlyData();
+    }, [fetchElderlyData]);
 
     const router = useRouter();
 
@@ -68,10 +81,11 @@ export default function CaregiverDashboard() {
         { icon: "chat-alert", label: "Emergency Notification", color: "#FF9800", route: "emergency" },
     ];
 
-    const onRefresh = React.useCallback(() => {
+    const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 2000);
-    }, []);
+        await fetchElderlyData();
+        setRefreshing(false);
+    }, [fetchElderlyData]);
 
     // 实现通话、查看信息、查看健康数据的统一处理
     const handleCall = React.useCallback((phone?: string) => {
@@ -83,12 +97,12 @@ export default function CaregiverDashboard() {
         });
     }, []);
 
-    const handleViewInfo = React.useCallback((id: number) => {
+    const handleViewInfo = React.useCallback((id: string) => {
         // 导航到老人详情页面
         router.push(`/elderly/${id}` as any);
     }, [router]);
 
-    const handleViewHealth = React.useCallback((id: number) => {
+    const handleViewHealth = React.useCallback((id: string) => {
         router.push(`/health-data?elderlyId=${id}` as any);
     }, [router]);
 
@@ -146,18 +160,18 @@ export default function CaregiverDashboard() {
                     <Card style={styles.statsCard}>
                         <Card.Content style={styles.statsContent}>
                             <View style={styles.statItem}>
-                                <Text variant="headlineSmall" style={styles.statNumber}>3</Text>
+                                <Text variant="headlineSmall" style={styles.statNumber}>{elderlyList.length}</Text>
                                 <Text variant="bodyMedium">Elderly</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text variant="headlineSmall" style={styles.statNumber}>12</Text>
+                                <Text variant="headlineSmall" style={styles.statNumber}>{elderlyList.filter(e => e.medication === 'Pending').length}</Text>
                                 <Text variant="bodyMedium">Today's Reminder</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text variant="headlineSmall" style={styles.statNumber}>2</Text>
-                                <Text variant="bodyMedium">Pending</Text>
+                                <Text variant="headlineSmall" style={styles.statNumber}>{elderlyList.filter(e => e.status === 'warning').length}</Text>
+                                <Text variant="bodyMedium">Needs Attention</Text>
                             </View>
                         </Card.Content>
                     </Card>
@@ -199,8 +213,35 @@ export default function CaregiverDashboard() {
                         </Button>
                     </View>
 
-                    {elderlyList.map((elderly) => (
-                        <Card key={elderly.id} style={styles.elderlyCard}>
+                    {loading && (
+                        <Card style={styles.elderlyCard}>
+                            <Card.Content>
+                                <Text>Loading elderly data...</Text>
+                            </Card.Content>
+                        </Card>
+                    )}
+
+                    {error && (
+                        <Card style={styles.elderlyCard}>
+                            <Card.Content>
+                                <Text style={{ color: theme.colors.error }}>{error}</Text>
+                                <Button mode="outlined" onPress={fetchElderlyData} style={{ marginTop: 8 }}>
+                                    Retry
+                                </Button>
+                            </Card.Content>
+                        </Card>
+                    )}
+
+                    {!loading && !error && elderlyList.length === 0 && (
+                        <Card style={styles.elderlyCard}>
+                            <Card.Content>
+                                <Text>No elderly records found. Add some using the + button below.</Text>
+                            </Card.Content>
+                        </Card>
+                    )}
+
+                    {!loading && elderlyList.map((elderly) => (
+                        <Card key={elderly.$id} style={styles.elderlyCard}>
                             <Card.Content>
                                 <View style={styles.elderlyHeader}>
                                     <View style={styles.elderlyInfo}>
@@ -267,7 +308,7 @@ export default function CaregiverDashboard() {
                                         compact
                                         icon="chart-line"
                                         style={styles.smallButton}
-                                        onPress={() => handleViewHealth(elderly.id)}
+                                        onPress={() => handleViewHealth(elderly.$id)}
                                     >
                                         HealthData
                                     </Button>
@@ -333,7 +374,7 @@ export default function CaregiverDashboard() {
                             <Avatar.Text size={48} label={selectedElderly?.name?.substring(0,2) ?? ''} />
                             <View style={{ marginLeft: 12 }}>
                                 <Text variant="titleMedium">{selectedElderly?.name}</Text>
-                                <Text variant="bodySmall">ID: {selectedElderly?.id}</Text>
+                                <Text variant="bodySmall">ID: {selectedElderly?.$id}</Text>
                             </View>
                         </View>
 
@@ -346,7 +387,7 @@ export default function CaregiverDashboard() {
                     </Dialog.Content>
                     <Dialog.Actions>
                         <Button onPress={() => { handleCall(selectedElderly?.phone); closeInfoDialog(); }}>Call</Button>
-                        <Button onPress={() => { selectedElderly && handleViewHealth(selectedElderly.id); closeInfoDialog(); }}>Health Data</Button>
+                        <Button onPress={() => { selectedElderly && handleViewHealth(selectedElderly.$id); closeInfoDialog(); }}>Health Data</Button>
                         <Button onPress={closeInfoDialog}>Close</Button>
                     </Dialog.Actions>
                 </Dialog>
