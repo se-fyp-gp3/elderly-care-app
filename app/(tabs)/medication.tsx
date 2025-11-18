@@ -1,7 +1,8 @@
 // app/(tabs)/medication.tsx
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import * as Notifications from 'expo-notifications';
+import React, { useEffect, useState } from "react";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
     Button,
     Card,
@@ -16,13 +17,31 @@ import {
     useTheme
 } from "react-native-paper";
 
+// Show notifications when app is foregrounded
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: false,
+    }),
+});
+
 export default function MedicationManagement() {
     const theme = useTheme();
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState('all');
-    const [dialogVisible, setDialogVisible] = useState(false);
+    // dialogVisible will hold the id of the medication being confirmed, or null
+    const [dialogVisible, setDialogVisible] = useState<number | null>(null);
+    const [noteText, setNoteText] = useState('');
+    const [medicationsState, setMedicationsState] = useState<any[]>([]);
 
-    const medications = [
+    // persist key
+    const STORAGE_KEY = '@medications_v1';
+
+    // default data
+    const defaultMeds = [
         {
             id: 1,
             elderly: "Grandpa Zhang",
@@ -31,7 +50,8 @@ export default function MedicationManagement() {
             frequency: "Twice a day",
             time: "08:00, 20:00",
             status: "completed",
-            lastTaken: "Today 08:05"
+            lastTaken: "Today 08:05",
+            notes: ''
         },
         {
             id: 2,
@@ -41,7 +61,8 @@ export default function MedicationManagement() {
             frequency: "3 times a day",
             time: "08:00, 12:00, 18:00",
             status: "pending",
-            lastTaken: "Yesterday 18:30"
+            lastTaken: "Yesterday 18:30",
+            notes: ''
         },
         {
             id: 3,
@@ -51,16 +72,139 @@ export default function MedicationManagement() {
             frequency: "Once a day",
             time: "09:00",
             status: "overdue",
-            lastTaken: "Yesterday 09:15"
+            lastTaken: "Yesterday 09:15",
+            notes: ''
         },
     ];
 
-    const filteredMeds = medications.filter(med => {
+    // Filter meds from state
+    const filteredMeds = medicationsState.filter(med => {
         const matchesSearch = med.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             med.elderly.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesFilter = filter === 'all' || med.status === filter;
         return matchesSearch && matchesFilter;
     });
+
+    // derived stats
+    const totalCount = medicationsState.length;
+    const pendingCount = medicationsState.filter(m => m.status === 'pending').length;
+    const completedCount = medicationsState.filter(m => m.status === 'completed').length;
+    const overdueCount = medicationsState.filter(m => m.status === 'overdue').length;
+
+    // Handlers
+    const saveMedsToStorage = async (meds: any[]) => {
+        try {
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(meds));
+        } catch (e) {
+            console.warn('Failed to save meds', e);
+        }
+    };
+
+    const loadMedsFromStorage = async () => {
+        try {
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            const raw = await AsyncStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                setMedicationsState(JSON.parse(raw));
+            } else {
+                setMedicationsState(defaultMeds);
+                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(defaultMeds));
+            }
+        } catch (e) {
+            console.warn('Failed to load meds', e);
+            setMedicationsState(defaultMeds);
+        }
+    };
+
+    useEffect(() => {
+        loadMedsFromStorage();
+
+        // Request notification permissions on mount (if not granted)
+        (async () => {
+            try {
+                const { status } = await Notifications.getPermissionsAsync();
+                if (status !== 'granted') {
+                    await Notifications.requestPermissionsAsync();
+                }
+            } catch (e) {
+                console.warn('Notification permission request failed', e);
+            }
+        })();
+    }, []);
+
+    const nowFormatted = () => {
+        const d = new Date();
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        return `Today ${hh}:${mm}`;
+    };
+
+    const onConfirmTaking = async (medId: number) => {
+        const updated = medicationsState.map(m => {
+            if (m.id === medId) {
+                return { ...m, status: 'completed', lastTaken: nowFormatted(), notes: noteText };
+            }
+            return m;
+        });
+        setMedicationsState(updated);
+        await saveMedsToStorage(updated);
+        setDialogVisible(null);
+        setNoteText('');
+    };
+
+    const onRemindLater = (medId: number) => {
+        // Schedule a real local notification in 10 minutes using expo-notifications
+        (async () => {
+            try {
+                // Ensure permissions
+                const { status } = await Notifications.getPermissionsAsync();
+                let finalStatus = status;
+                if (finalStatus !== 'granted') {
+                    const { status: asked } = await Notifications.requestPermissionsAsync();
+                    finalStatus = asked;
+                }
+                if (finalStatus !== 'granted') {
+                    Alert.alert('Permission required', 'Please enable notifications to receive reminders.');
+                    return;
+                }
+
+                const med = medicationsState.find(m => m.id === medId);
+                const title = 'Medication reminder';
+                const body = med ? `Please check medication for ${med.elderly}: ${med.name}` : 'Please check medication';
+
+                const identifier = await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title,
+                        body,
+                        data: { medId },
+                    },
+                    trigger: { seconds: 10 * 60 } as any, // 10 minutes
+                });
+
+                // Save reminder id to medication (optional)
+                const updated = medicationsState.map(m => m.id === medId ? { ...m, reminderId: identifier } : m);
+                setMedicationsState(updated);
+                await saveMedsToStorage(updated);
+
+                Alert.alert('Reminder set', 'You will be reminded in 10 minutes.');
+            } catch (e) {
+                console.warn('Failed to schedule notification', e);
+                Alert.alert('Error', 'Unable to schedule reminder.');
+            }
+        })();
+    };
+
+    const onMarkProcessed = async (medId: number) => {
+        const updated = medicationsState.map(m => {
+            if (m.id === medId) {
+                return { ...m, status: 'completed', lastTaken: nowFormatted() };
+            }
+            return m;
+        });
+        setMedicationsState(updated);
+        await saveMedsToStorage(updated);
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -91,19 +235,19 @@ export default function MedicationManagement() {
                         <Card.Content>
                             <View style={styles.statsRow}>
                                 <View style={styles.stat}>
-                                    <Text variant="headlineSmall" style={styles.statNumber}>3</Text>
+                                    <Text variant="headlineSmall" style={styles.statNumber}>{totalCount}</Text>
                                     <Text variant="bodyMedium">Total drugs</Text>
                                 </View>
                                 <View style={styles.stat}>
-                                    <Text variant="headlineSmall" style={[styles.statNumber, styles.pending]}>1</Text>
+                                    <Text variant="headlineSmall" style={[styles.statNumber, styles.pending]}>{pendingCount}</Text>
                                     <Text variant="bodyMedium">Pending</Text>
                                 </View>
                                 <View style={styles.stat}>
-                                    <Text variant="headlineSmall" style={[styles.statNumber, styles.completed]}>1</Text>
+                                    <Text variant="headlineSmall" style={[styles.statNumber, styles.completed]}>{completedCount}</Text>
                                     <Text variant="bodyMedium">Completed</Text>
                                 </View>
                                 <View style={styles.stat}>
-                                    <Text variant="headlineSmall" style={[styles.statNumber, styles.overdue]}>1</Text>
+                                    <Text variant="headlineSmall" style={[styles.statNumber, styles.overdue]}>{overdueCount}</Text>
                                     <Text variant="bodyMedium">Expired</Text>
                                 </View>
                             </View>
@@ -167,11 +311,11 @@ export default function MedicationManagement() {
                                             <Button
                                                 mode="contained"
                                                 compact
-                                                onPress={() => setDialogVisible(true)}
+                                                onPress={() => { setDialogVisible(med.id); setNoteText(med.notes || ''); }}
                                             >
                                                 Confirm taking
                                             </Button>
-                                            <Button mode="outlined" compact>
+                                            <Button mode="outlined" compact onPress={() => onRemindLater(med.id)}>
                                                 Remind me later
                                             </Button>
                                         </>
@@ -182,7 +326,7 @@ export default function MedicationManagement() {
                                         </Button>
                                     )}
                                     {med.status === 'overdue' && (
-                                        <Button mode="contained" compact style={styles.overdueButton}>
+                                        <Button mode="contained" compact style={styles.overdueButton} onPress={() => onMarkProcessed(med.id)}>
                                             Mark Processed
                                         </Button>
                                     )}
@@ -200,7 +344,7 @@ export default function MedicationManagement() {
 
             {/* 确认用药对话框 */}
             <Portal>
-                <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
+                <Dialog visible={dialogVisible !== null} onDismiss={() => setDialogVisible(null)}>
                     <Dialog.Title>Confirm medication</Dialog.Title>
                     <Dialog.Content>
                         <Text>Please make sure the elderly have taken their medication on time.</Text>
@@ -210,11 +354,13 @@ export default function MedicationManagement() {
                             multiline
                             numberOfLines={3}
                             style={styles.dialogInput}
+                            value={noteText}
+                            onChangeText={setNoteText}
                         />
                     </Dialog.Content>
                     <Dialog.Actions>
-                        <Button onPress={() => setDialogVisible(false)}>Cancel</Button>
-                        <Button onPress={() => setDialogVisible(false)}>Confirm completion</Button>
+                        <Button onPress={() => { setDialogVisible(null); setNoteText(''); }}>Cancel</Button>
+                        <Button onPress={() => { if (dialogVisible !== null) onConfirmTaking(dialogVisible); }}>Confirm completion</Button>
                     </Dialog.Actions>
                 </Dialog>
             </Portal>

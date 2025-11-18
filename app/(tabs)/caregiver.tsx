@@ -1,15 +1,20 @@
 // app/(tabs)/caregiver.tsx
 import { useAuth } from "@/lib/auth-context";
+import { DATABASE_ID, databases, ELDERLY_COLLECTION_ID, ElderlyDocument } from "@/lib/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
-import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Query } from "react-native-appwrite";
 import {
     Avatar,
     Button,
     Card,
     Chip,
     DataTable,
+    Dialog,
     FAB,
+    Portal,
     Text,
     useTheme
 } from "react-native-paper";
@@ -17,53 +22,103 @@ import {
 // 定义图标名称类型
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
+// Extended elderly type with UI-specific fields
+interface ElderlyListItem extends ElderlyDocument {
+    lastCheck?: string;
+    medication?: string;
+    nextAppointment?: string;
+}
+
 export default function CaregiverDashboard() {
     const { preferences } = useAuth();
     const theme = useTheme();
     const [refreshing, setRefreshing] = React.useState(false);
+    const [elderlyList, setElderlyList] = React.useState<ElderlyListItem[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const [error, setError] = React.useState<string | null>(null);
 
-    // 模拟数据
-    const elderlyList = [
-        {
-            id: 1,
-            name: "Grandpa Zhang",
-            age: 78,
-            status: "normal",
-            lastCheck: "2 hours ago",
-            medication: "Completed",
-            nextAppointment: "Tomorrow 10:00"
-        },
-        {
-            id: 2,
-            name: "Grandma Li",
-            age: 82,
-            status: "warning",
-            lastCheck: "30 minutes ago",
-            medication: "Pending",
-            nextAppointment: "Today at 2:30 PM"
-        },
-        {
-            id: 3,
-            name: "Grandpa Wang",
-            age: 75,
-            status: "normal",
-            lastCheck: "1 hour ago",
-            medication: "Completed",
-            nextAppointment: "None"
-        },
-    ];
+    // Fetch elderly data from Appwrite
+    const fetchElderlyData = React.useCallback(async () => {
+        try {
+            setError(null);
+            const response = await databases.listDocuments(
+                DATABASE_ID,
+                ELDERLY_COLLECTION_ID,
+                [Query.limit(100), Query.orderDesc('$createdAt')]
+            );
+            
+            // Transform Appwrite documents to UI format
+            const transformedData: ElderlyListItem[] = response.documents.map((doc: any) => ({
+                ...doc,
+                // Add computed/default fields for UI
+                lastCheck: "Recently",
+                medication: "Pending",
+                nextAppointment: "None"
+            }));
+            
+            setElderlyList(transformedData);
+        } catch (err: any) {
+            console.error('Error fetching elderly data:', err);
+            setError(err.message || 'Failed to load elderly data');
+            // Fallback to empty list on error
+            setElderlyList([]);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Load data on mount
+    React.useEffect(() => {
+        fetchElderlyData();
+    }, [fetchElderlyData]);
+
+    const router = useRouter();
 
     const quickActions = [
-        { icon: "pill", label: "Medication Management", color: "#4CAF50" },
-        { icon: "heart-pulse", label: "Health Data", color: "#F44336" },
-        { icon: "calendar-clock", label: "Schedule", color: "#2196F3" },
-        { icon: "chat-alert", label: "Emergency Notification", color: "#FF9800" },
+        { icon: "pill", label: "Medication Management", color: "#4CAF50", route: "medication" },
+        { icon: "heart-pulse", label: "Health Data", color: "#F44336", route: "health-data" },
+        { icon: "calendar-clock", label: "Schedule", color: "#2196F3", route: "schedule" },
+        { icon: "chat-alert", label: "Emergency Notification", color: "#FF9800", route: "emergency" },
     ];
 
-    const onRefresh = React.useCallback(() => {
+    const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 2000);
+        await fetchElderlyData();
+        setRefreshing(false);
+    }, [fetchElderlyData]);
+
+    // 实现通话、查看信息、查看健康数据的统一处理
+    const handleCall = React.useCallback((phone?: string) => {
+        if (!phone) return Alert.alert('No phone number');
+        const url = `tel:${phone}`;
+        Linking.canOpenURL(url).then((supported) => {
+            if (supported) Linking.openURL(url);
+            else Alert.alert('Cannot make a call from this device');
+        });
     }, []);
+
+    const handleViewInfo = React.useCallback((id: string) => {
+        // 导航到老人详情页面
+        router.push(`/elderly/${id}` as any);
+    }, [router]);
+
+    const handleViewHealth = React.useCallback((id: string) => {
+        router.push(`/health-data?elderlyId=${id}` as any);
+    }, [router]);
+
+    // Info 弹窗相关 state
+    const [infoVisible, setInfoVisible] = React.useState(false);
+    const [selectedElderly, setSelectedElderly] = React.useState<any>(null);
+
+    const openInfoDialog = (elderly: any) => {
+        setSelectedElderly(elderly);
+        setInfoVisible(true);
+    };
+
+    const closeInfoDialog = () => {
+        setInfoVisible(false);
+        setSelectedElderly(null);
+    };
 
     // 如果用户不是护理员，显示提示
     if (preferences.role !== 'caregiver') {
@@ -105,18 +160,18 @@ export default function CaregiverDashboard() {
                     <Card style={styles.statsCard}>
                         <Card.Content style={styles.statsContent}>
                             <View style={styles.statItem}>
-                                <Text variant="headlineSmall" style={styles.statNumber}>3</Text>
+                                <Text variant="headlineSmall" style={styles.statNumber}>{elderlyList.length}</Text>
                                 <Text variant="bodyMedium">Elderly</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text variant="headlineSmall" style={styles.statNumber}>12</Text>
+                                <Text variant="headlineSmall" style={styles.statNumber}>{elderlyList.filter(e => e.medication === 'Pending').length}</Text>
                                 <Text variant="bodyMedium">Today's Reminder</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text variant="headlineSmall" style={styles.statNumber}>2</Text>
-                                <Text variant="bodyMedium">Pending</Text>
+                                <Text variant="headlineSmall" style={styles.statNumber}>{elderlyList.filter(e => e.status === 'warning').length}</Text>
+                                <Text variant="bodyMedium">Needs Attention</Text>
                             </View>
                         </Card.Content>
                     </Card>
@@ -130,11 +185,11 @@ export default function CaregiverDashboard() {
                             <Card
                                 key={index}
                                 style={styles.actionCard}
-                                onPress={() => console.log(action.label)}
+                                onPress={() => router.push(action.route as any)}
                             >
                                 <Card.Content style={styles.actionContent}>
                                     <MaterialCommunityIcons
-                                        IconName={action.icon}
+                                        name={action.icon as IconName}
                                         size={32}
                                         color={action.color}
                                     />
@@ -158,8 +213,35 @@ export default function CaregiverDashboard() {
                         </Button>
                     </View>
 
-                    {elderlyList.map((elderly) => (
-                        <Card key={elderly.id} style={styles.elderlyCard}>
+                    {loading && (
+                        <Card style={styles.elderlyCard}>
+                            <Card.Content>
+                                <Text>Loading elderly data...</Text>
+                            </Card.Content>
+                        </Card>
+                    )}
+
+                    {error && (
+                        <Card style={styles.elderlyCard}>
+                            <Card.Content>
+                                <Text style={{ color: theme.colors.error }}>{error}</Text>
+                                <Button mode="outlined" onPress={fetchElderlyData} style={{ marginTop: 8 }}>
+                                    Retry
+                                </Button>
+                            </Card.Content>
+                        </Card>
+                    )}
+
+                    {!loading && !error && elderlyList.length === 0 && (
+                        <Card style={styles.elderlyCard}>
+                            <Card.Content>
+                                <Text>No elderly records found. Add some using the + button below.</Text>
+                            </Card.Content>
+                        </Card>
+                    )}
+
+                    {!loading && elderlyList.map((elderly) => (
+                        <Card key={elderly.$id} style={styles.elderlyCard}>
                             <Card.Content>
                                 <View style={styles.elderlyHeader}>
                                     <View style={styles.elderlyInfo}>
@@ -208,24 +290,27 @@ export default function CaregiverDashboard() {
                                         compact
                                         icon="phone"
                                         style={styles.smallButton}
+                                        onPress={() => handleCall(elderly.phone)}
                                     >
-                                        call
+                                        Call
                                     </Button>
                                     <Button
                                         mode="outlined"
                                         compact
                                         icon="chat"
                                         style={styles.smallButton}
+                                        onPress={() => openInfoDialog(elderly)}
                                     >
-                                        information
+                                        Info
                                     </Button>
                                     <Button
                                         mode="contained"
                                         compact
                                         icon="chart-line"
                                         style={styles.smallButton}
+                                        onPress={() => handleViewHealth(elderly.$id)}
                                     >
-                                        health data
+                                        HealthData
                                     </Button>
                                 </View>
                             </Card.Content>
@@ -279,6 +364,34 @@ export default function CaregiverDashboard() {
                     </Card>
                 </View>
             </ScrollView>
+
+            {/* Info 弹窗 */}
+            <Portal>
+                <Dialog visible={infoVisible} onDismiss={closeInfoDialog}>
+                    <Dialog.Title>{selectedElderly?.name ?? 'Details'}</Dialog.Title>
+                    <Dialog.Content>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                            <Avatar.Text size={48} label={selectedElderly?.name?.substring(0,2) ?? ''} />
+                            <View style={{ marginLeft: 12 }}>
+                                <Text variant="titleMedium">{selectedElderly?.name}</Text>
+                                <Text variant="bodySmall">ID: {selectedElderly?.$id}</Text>
+                            </View>
+                        </View>
+
+                        <Text variant="bodyMedium">Age: {selectedElderly?.age ?? '—'}</Text>
+                        <Text variant="bodyMedium">Phone: {selectedElderly?.phone ?? '—'}</Text>
+                        <Text variant="bodyMedium">Status: {selectedElderly?.status ?? '—'}</Text>
+                        <Text variant="bodyMedium">Last Check: {selectedElderly?.lastCheck ?? '—'}</Text>
+                        <Text variant="bodyMedium">Medication: {selectedElderly?.medication ?? '—'}</Text>
+                        <Text variant="bodyMedium">Next Appointment: {selectedElderly?.nextAppointment ?? '—'}</Text>
+                    </Dialog.Content>
+                    <Dialog.Actions>
+                        <Button onPress={() => { handleCall(selectedElderly?.phone); closeInfoDialog(); }}>Call</Button>
+                        <Button onPress={() => { selectedElderly && handleViewHealth(selectedElderly.$id); closeInfoDialog(); }}>Health Data</Button>
+                        <Button onPress={closeInfoDialog}>Close</Button>
+                    </Dialog.Actions>
+                </Dialog>
+            </Portal>
 
             {/* 悬浮按钮 */}
             <FAB
