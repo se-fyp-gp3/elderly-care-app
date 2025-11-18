@@ -105,7 +105,7 @@ export default function AuthScreen() {
         <Button mode="contained" onPress={handleAuth} style={styles.button}>
           {isSignUp ? "Sign Up" : "Sign In"}
         </Button>
-        {/* <Button
+        <Button
           mode="outlined"
           onPress={() => handleOAuth2(OAuthProvider.Google)}
           style={styles.button}
@@ -113,7 +113,7 @@ export default function AuthScreen() {
         >
           {isSignUp ? "Sign Up" : "Sign In"}
           {" via Google"}
-        </Button> */}
+        </Button>
         <Button
           mode="text"
           onPress={handleSwitchMode}
