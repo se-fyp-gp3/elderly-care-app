@@ -5,7 +5,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
 import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { Query } from "react-native-appwrite";
+import { Databases, Query } from "react-native-appwrite";
 import {
     Avatar,
     Button,
@@ -41,7 +41,8 @@ export default function CaregiverDashboard() {
     const fetchElderlyData = React.useCallback(async () => {
         try {
             setError(null);
-            const response = await databases.listDocuments(
+            // Cast to Databases type to resolve union type issue
+            const response = await (databases as Databases).listDocuments(
                 DATABASE_ID,
                 ELDERLY_COLLECTION_ID,
                 [Query.limit(100), Query.orderDesc('$createdAt')]
