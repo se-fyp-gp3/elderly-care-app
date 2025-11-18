@@ -1,11 +1,11 @@
 // lib/appwrite.ts
-import { Account, Client, Databases } from "react-native-appwrite";
 import {
   Account as AccountWeb,
   Client as ClientWeb,
   Databases as DatabasesWeb,
 } from "appwrite";
 import { Platform } from "react-native";
+import { Account, Client, Databases } from "react-native-appwrite";
 
 export const clientWeb = new ClientWeb()
   .setEndpoint(process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!)

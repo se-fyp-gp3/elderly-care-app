@@ -1,6 +1,6 @@
 // app/(tabs)/caregiver.tsx
-import { useAuth } from "@/lib/auth-context";
 import { DATABASE_ID, databases, ELDERLY_COLLECTION_ID, ElderlyDocument } from "@/lib/appwrite";
+import { useAuth } from "@/lib/auth-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
