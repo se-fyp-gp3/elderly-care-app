@@ -13,7 +13,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isLoadingUser } = useAuth();
   const segments = useSegments();
-  const [appReady, setAppReady] = useState(false);
+  const [appReady, setAppReady] = useState(true);
 
   useEffect(() => {
     const inAuthGroup = segments[0] === "auth";
