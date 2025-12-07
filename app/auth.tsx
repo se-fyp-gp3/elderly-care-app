@@ -19,17 +19,16 @@ export default function AuthScreen() {
   const handleAuth = async () => {
     try {
       if (!email || !password) {
-        setError("Please fill in all fields.");
-        return;
+        throw new LoginError("Please fill in all fields.");
+      }
+
+      if (isSignUp && password.length < 8) {
+        throw new LoginError("Passwords must be at least 8 characters long.");
       }
 
       setError(null);
 
       if (isSignUp) {
-        if (password.length < 8) {
-          setError("Passwords must be at least 8 characters long.");
-          return;
-        }
         await signUp(email, password);
       } else {
         await signIn(email, password);
