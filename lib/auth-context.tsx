@@ -1,11 +1,18 @@
 // lib/auth-context.tsx
-import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { ID, Models, OAuthProvider } from "react-native-appwrite";
-import { account, accountWeb } from "./appwrite";
 import { UserPreferences } from "../types/user.types";
+import { account, accountWeb } from "./appwrite";
+import { makeRedirectUri } from "expo-auth-session";
+
+export class LoginError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LoginError";
+  }
+}
 
 type AuthContextType = {
   user: Models.User<Models.Preferences> | null;
@@ -13,7 +20,11 @@ type AuthContextType = {
 
   preferences: UserPreferences;
 
-  signUp: (email: string, password: string) => Promise<string | null>;
+  signUp: (
+    email: string,
+    password: string,
+    userPreferences?: UserPreferences
+  ) => Promise<string | null>;
   signIn: (email: string, password: string) => Promise<string | null>;
   signInWithOAuth2: (provider: OAuthProvider) => Promise<string | null>;
   signOut: () => Promise<void>;
@@ -50,7 +61,6 @@ export default function AuthProvider({
       }
 
       setUser(session);
-
       if (session.prefs) {
         setPreferences(session.prefs as UserPreferences);
       }
@@ -66,137 +76,102 @@ export default function AuthProvider({
     password: string,
     userPreferences?: UserPreferences
   ) => {
-    try {
-      await account.create({
-        userId: ID.unique(),
-        email,
-        password,
-      });
-
-      if (userPreferences && Object.keys(userPreferences).length > 0) {
-        await account.updatePrefs(userPreferences);
-      }
-
-      await signIn(email, password);
-      return null;
-    } catch (error) {
-      if (error instanceof Error) {
-        return error.message;
-      } else {
-        return "An error occurred during sign up";
-      }
+    await account.create({
+      userId: ID.unique(),
+      email,
+      password,
+    });
+    if (userPreferences && Object.keys(userPreferences).length > 0) {
+      await account.updatePrefs(userPreferences);
     }
+
+    await signIn(email, password);
+    return null;
   };
 
   const signIn = async (email: string, password: string) => {
-    try {
-      let session;
-      if (Platform.OS === "web") {
-        await accountWeb.createEmailPasswordSession({ email, password });
-        session = await accountWeb.get();
-      } else {
-        await account.createEmailPasswordSession({ email, password });
-        session = await account.get();
-      }
-      setUser(session);
-
-      if (session.prefs) {
-        setPreferences(session.prefs as UserPreferences);
-      }
-
-      return null;
-    } catch (error) {
-      if (error instanceof Error) {
-        return error.message;
-      } else {
-        return "An error occurred during sign in";
-      }
+    let session;
+    if (Platform.OS === "web") {
+      await accountWeb.createEmailPasswordSession({ email, password });
+      session = await accountWeb.get();
+    } else {
+      await account.createEmailPasswordSession({ email, password });
+      session = await account.get();
     }
+    setUser(session);
+
+    if (session.prefs) {
+      setPreferences(session.prefs as UserPreferences);
+    }
+
+    return null;
   };
 
   const updatePreferences = async (newPreferences: UserPreferences) => {
-    try {
-      await account.updatePrefs(newPreferences);
-      const updatedUser = await account.get();
-      setUser(updatedUser);
-      setPreferences(newPreferences);
-      return null;
-    } catch (error) {
-      if (error instanceof Error) {
-        return error.message;
-      } else {
-        return "An error occurred while updating preferences";
-      }
-    }
+    await account.updatePrefs(newPreferences);
+    const updatedUser = await account.get();
+    setUser(updatedUser);
+    setPreferences(newPreferences);
+    return null;
   };
 
   const setPreference = async (key: string, value: any) => {
-    try {
-      const newPrefs = { ...preferences, [key]: value };
-      await account.updatePrefs(newPrefs);
-      setPreferences(newPrefs);
-      return null;
-    } catch (error) {
-      if (error instanceof Error) {
-        return error.message;
-      } else {
-        return "An error occurred while setting preference";
-      }
-    }
+    const newPrefs = { ...preferences, [key]: value };
+    await account.updatePrefs(newPrefs);
+    setPreferences(newPrefs);
+    return null;
   };
 
   const signInWithOAuth2 = async (provider: OAuthProvider) => {
-    try {
+    let session;
+    if (Platform.OS === "web") {
+      accountWeb.createOAuth2Session({
+        provider,
+      });
+      session = await accountWeb.get();
+    } else {
       const deepLink = new URL(makeRedirectUri({ preferLocalhost: true }));
       const scheme = `${deepLink.protocol}//`;
-      const loginUrl = account.createOAuth2Session({
+
+      const loginUrl = await account.createOAuth2Token({
         provider,
         success: `${deepLink}`,
         failure: `${deepLink}`,
       });
 
-      const result = await WebBrowser.openAuthSessionAsync(`${loginUrl}`, scheme);
-      console.log(result);
-      if (result.type !== "success") {
-        throw new Error("OAuth session was not successful");
-      }
+      const result = await WebBrowser.openAuthSessionAsync(
+        `${loginUrl}`,
+        scheme
+      );
 
-      const url = new URL(result.url);
-      const secret = url.searchParams.get("secret");
-      const userId = url.searchParams.get("userId");
-      if (!secret || !userId) {
-        throw new Error(
-          `Missing userId or secret from redirect URL. Available params: ${Array.from(
-            url.searchParams.keys()
-          ).join(", ")}`
-        );
-      }
+      if (result.type === "success" && result.url) {
+        const url = new URL(result.url);
+        const secret = url.searchParams.get("secret");
+        const userId = url.searchParams.get("userId");
 
-      await account.createSession({ userId, secret });
-      const session = await account.get();
-      setUser(session);
-      return null;
-    } catch (error) {
-      console.error("OAuth2 sign-in error: ", error);
-      if (error instanceof Error) {
-        return error.message;
+        if (!userId || !secret) {
+          throw new LoginError(
+            "OAuth2 sign-in failed: missing userId or secret"
+          );
+        }
+
+        await account.createSession({ userId, secret });
+        session = await account.get();
       } else {
-        return "An error occurred during sign in with OAuth2";
+        throw new LoginError("OAuth2 sign-in was cancelled or failed");
       }
     }
+    setUser(session);
+    return null;
   };
 
   const signOut = async () => {
-    try {
-      if (Platform.OS === "web") {
-        await accountWeb.deleteSession({ sessionId: "current" });
-      } else {
-        await account.deleteSession({ sessionId: "current" });
-      }
-      setUser(null);
-    } catch (error) {
-      console.log(error);
+    if (Platform.OS === "web") {
+      await accountWeb.deleteSession({ sessionId: "current" });
+    } else {
+      await account.deleteSession({ sessionId: "current" });
     }
+    setUser(null);
   };
 
   return (

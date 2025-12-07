@@ -5,6 +5,8 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { OAuthProvider } from "react-native-appwrite";
 import { Button, Text, TextInput, useTheme } from "react-native-paper";
+import { LoginError } from "@/lib/auth-context";
+
 export default function AuthScreen() {
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [email, setEmail] = useState<string>("");
@@ -17,53 +19,42 @@ export default function AuthScreen() {
   const { signIn, signUp, signInWithOAuth2 } = useAuth();
 
   const handleAuth = async () => {
-    setEmail(process.env.EXPO_PUBLIC_APPWRITE_EMAIL!);
-    setPassword(process.env.EXPO_PUBLIC_APPWRITE_PASSWORD!);
-    if (!email || !password) {
-      setError("Please fill in all fields.");
-      return;
-    }
-  
-    setError(null);
-
-    if (isSignUp) {
-      if (password.length < 8) {
-        setError("Passwords must be at least 8 characters long.");
-        return;
+    try {
+      if (!email || !password) {
+        throw new LoginError("Email and password are required.");
       }
+      setError(null);
 
-    // 设置默认偏好
-    const defaultPreferences = {
-      role: 'elderly', // 默认角色
-      fontSize: 'medium',
-      voiceTone: 'gentle',
-      notifications: true
-    };
-
-      const error = await signUp(email, password);
-      if (error) {
-        setError(error);
-        return;
-      }
-    } else {
-      const error = await signIn(email, password);
-      if (error) {
-        setError(error);
-        return;
+      if (isSignUp) {
+        if (password.length < 8) {
+          throw new LoginError("Password must be at least 8 characters long.");
+        }
+        await signUp(email, password);
+      } else {
+        await signIn(email, password);
       }
 
       router.replace("/");
+    } catch (error) {
+      if (error instanceof LoginError) {
+        setError(error.message);
+      } else {
+        setError("An unexpected error occurred.");
+      }
     }
   };
 
   const handleOAuth2 = async (provider: OAuthProvider) => {
-    const error = await signInWithOAuth2(provider);
-    if (error) {
-      setError(error);
-      return;
+    try {
+      await signInWithOAuth2(provider);
+      router.replace("/");
+    } catch (error) {
+      if (error instanceof LoginError) {
+        setError(error.message);
+      } else {
+        setError("An unexpected error occurred.");
+      }
     }
-
-    router.replace("/");
   };
 
   const handleSwitchMode = () => {
