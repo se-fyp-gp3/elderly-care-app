@@ -4,8 +4,8 @@ import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { ID, Models, OAuthProvider } from "react-native-appwrite";
-import { account, accountWeb } from "./appwrite";
 import { UserPreferences } from "../types/user.types";
+import { account, accountWeb } from "./appwrite";
 
 export class LoginError extends Error {
   constructor(message: string) {
