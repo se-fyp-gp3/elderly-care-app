@@ -1,4 +1,3 @@
-// app/(tabs)/settings.tsx
 import { useAuth } from "@/lib/auth-context";
 import React, { useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -14,7 +13,6 @@ export default function Settings() {
   });
   const [customPreferences, setCustomPreferences] = useState<Record<string, any>>({});
 
-  // 包装函数来处理异步操作但不返回 Promise
   const handleSetPreference = async (key: string, value: any) => {
     try {
       await setPreference(key, value);
@@ -27,12 +25,10 @@ export default function Settings() {
     if (!newPreference.key.trim()) return;
     
     try {
-      // 尝试解析值（如果是JSON）
       let parsedValue: any = newPreference.value;
       try {
         parsedValue = JSON.parse(newPreference.value);
       } catch {
-        // 如果不是JSON，保持原样
       }
       
       await handleSetPreference(newPreference.key, parsedValue);
@@ -63,7 +59,6 @@ export default function Settings() {
           User Settings
         </Text>
 
-        {/* 角色选择 */}
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium">User Roles</Text>
@@ -79,7 +74,6 @@ export default function Settings() {
           </Card.Content>
         </Card>
 
-        {/* 字体大小设置 */}
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium">Font size</Text>
@@ -96,7 +90,6 @@ export default function Settings() {
           </Card.Content>
         </Card>
 
-        {/* AI语音语调 */}
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium">AI voice intonation</Text>
@@ -113,7 +106,6 @@ export default function Settings() {
           </Card.Content>
         </Card>
 
-        {/* 通知设置 */}
         <Card style={styles.card}>
           <Card.Content>
             <View style={styles.switchRow}>
@@ -126,7 +118,6 @@ export default function Settings() {
           </Card.Content>
         </Card>
 
-        {/* 添加自定义偏好 */}
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium">Add custom settings</Text>
@@ -155,7 +146,6 @@ export default function Settings() {
           </Card.Content>
         </Card>
 
-        {/* 显示当前偏好设置 */}
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium">Current Settings</Text>

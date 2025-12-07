@@ -14,7 +14,6 @@ export default function HealthDataPage() {
     const { elderlyId } = useLocalSearchParams();
     const theme = useTheme();
     const router = useRouter();
-    // 示例健康数据
     const [records, setRecords] = React.useState<HealthRecord[]>([
         { time: '2025-11-11 09:00', type: 'Blood Pressure', value: '120/78 mmHg' },
         { time: '2025-11-11 12:00', type: 'Heart Rate', value: '72 bpm' },
@@ -44,7 +43,6 @@ export default function HealthDataPage() {
         }).sort((a,b) => new Date(b.time).getTime() - new Date(a.time).getTime());
     }, [records, filterRange, searchType, now]);
 
-    // Pagination / virtual list settings
     const PAGE_SIZE = 10;
     const [page, setPage] = React.useState(1);
     const pagedRecords = React.useMemo(() => filteredRecords.slice(0, page * PAGE_SIZE), [filteredRecords, page]);
@@ -54,7 +52,6 @@ export default function HealthDataPage() {
         if (hasMore) setPage(p => p + 1);
     };
 
-    // 简单摘要：最新血压 & 心率（如果存在）
     const summary = React.useMemo(() => {
         const latestByType: Record<string, HealthRecord | undefined> = {};
         for (const r of records) {
@@ -94,7 +91,6 @@ export default function HealthDataPage() {
             <Card style={styles.card}>
                 <Card.Title title="Health Data" subtitle={`Elderly ID: ${elderlyId ?? '—'}`} />
                 <Card.Content>
-                    {/* Summary row */}
                     <View style={[styles.summaryRow, { marginBottom: 12 }]}> 
                         <View style={[styles.summaryItem, { backgroundColor: theme.colors.surface, borderRadius: 8 }]}> 
                             <Text variant="titleMedium">Latest BP</Text>
@@ -113,7 +109,6 @@ export default function HealthDataPage() {
                         </View>
                     </View>
 
-                    {/* Filters */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 8, gap: 8 }}>
                         <Chip compact mode={filterRange==='24h'?'flat':'outlined'} onPress={() => setFilterRange('24h')}>24h</Chip>
                         <Chip compact mode={filterRange==='7d'?'flat':'outlined'} onPress={() => setFilterRange('7d')}>7d</Chip>
@@ -134,7 +129,6 @@ export default function HealthDataPage() {
                             <DataTable.Title style={{ flex: 3 }}>Value / Note</DataTable.Title>
                         </DataTable.Header>
 
-                        {/* Virtualized list using FlatList with client-side pagination */}
                         <FlatList
                             data={pagedRecords}
                             keyExtractor={(_, idx) => String(idx)}
@@ -161,7 +155,6 @@ export default function HealthDataPage() {
                         />
                     </DataTable>
 
-                    {/* 添加备注 */}
                     <View style={{ marginTop: 12 }}>
                         <TextInput label="Add quick note" value={newNote} onChangeText={setNewNote} mode="outlined" />
                         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>

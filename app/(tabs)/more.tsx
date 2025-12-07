@@ -1,4 +1,3 @@
-// app/(tabs)/more.tsx
 import { useAuth } from "@/lib/auth-context";
 import React from "react";
 import { StyleSheet, View } from "react-native";

@@ -1,4 +1,3 @@
-// app/(tabs)/medication.tsx
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Notifications from 'expo-notifications';
 import React, { useEffect, useState } from "react";
@@ -17,7 +16,6 @@ import {
     useTheme
 } from "react-native-paper";
 
-// Show notifications when app is foregrounded
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
@@ -32,15 +30,12 @@ export default function MedicationManagement() {
     const theme = useTheme();
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState('all');
-    // dialogVisible will hold the id of the medication being confirmed, or null
     const [dialogVisible, setDialogVisible] = useState<number | null>(null);
     const [noteText, setNoteText] = useState('');
     const [medicationsState, setMedicationsState] = useState<any[]>([]);
 
-    // persist key
     const STORAGE_KEY = '@medications_v1';
 
-    // default data
     const defaultMeds = [
         {
             id: 1,
@@ -77,7 +72,6 @@ export default function MedicationManagement() {
         },
     ];
 
-    // Filter meds from state
     const filteredMeds = medicationsState.filter(med => {
         const matchesSearch = med.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             med.elderly.toLowerCase().includes(searchQuery.toLowerCase());
@@ -85,13 +79,11 @@ export default function MedicationManagement() {
         return matchesSearch && matchesFilter;
     });
 
-    // derived stats
     const totalCount = medicationsState.length;
     const pendingCount = medicationsState.filter(m => m.status === 'pending').length;
     const completedCount = medicationsState.filter(m => m.status === 'completed').length;
     const overdueCount = medicationsState.filter(m => m.status === 'overdue').length;
 
-    // Handlers
     const saveMedsToStorage = async (meds: any[]) => {
         try {
             const AsyncStorage = require('@react-native-async-storage/async-storage').default;
@@ -120,7 +112,6 @@ export default function MedicationManagement() {
     useEffect(() => {
         loadMedsFromStorage();
 
-        // Request notification permissions on mount (if not granted)
         (async () => {
             try {
                 const { status } = await Notifications.getPermissionsAsync();
@@ -154,10 +145,8 @@ export default function MedicationManagement() {
     };
 
     const onRemindLater = (medId: number) => {
-        // Schedule a real local notification in 10 minutes using expo-notifications
         (async () => {
             try {
-                // Ensure permissions
                 const { status } = await Notifications.getPermissionsAsync();
                 let finalStatus = status;
                 if (finalStatus !== 'granted') {
@@ -182,7 +171,6 @@ export default function MedicationManagement() {
                     trigger: { seconds: 10 * 60 } as any, // 10 minutes
                 });
 
-                // Save reminder id to medication (optional)
                 const updated = medicationsState.map(m => m.id === medId ? { ...m, reminderId: identifier } : m);
                 setMedicationsState(updated);
                 await saveMedsToStorage(updated);
@@ -209,7 +197,6 @@ export default function MedicationManagement() {
     return (
         <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <ScrollView>
-                {/* 搜索和筛选 */}
                 <View style={styles.header}>
                     <Searchbar
                         placeholder="Search for medicines or elderly..."
@@ -229,7 +216,6 @@ export default function MedicationManagement() {
                     />
                 </View>
 
-                {/* 用药统计 */}
                 <View style={styles.section}>
                     <Card>
                         <Card.Content>
@@ -255,7 +241,6 @@ export default function MedicationManagement() {
                     </Card>
                 </View>
 
-                {/* 用药列表 */}
                 <View style={styles.section}>
                     <Text variant="titleLarge" style={styles.sectionTitle}>Today's medication plan</Text>
 
@@ -342,7 +327,6 @@ export default function MedicationManagement() {
                 </View>
             </ScrollView>
 
-            {/* 确认用药对话框 */}
             <Portal>
                 <Dialog visible={dialogVisible !== null} onDismiss={() => setDialogVisible(null)}>
                     <Dialog.Title>Confirm medication</Dialog.Title>

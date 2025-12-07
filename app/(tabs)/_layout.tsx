@@ -1,4 +1,3 @@
-// app/(tabs)/_layout.tsx
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { useTheme } from "react-native-paper";
