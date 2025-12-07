@@ -1,4 +1,3 @@
-// app/(tabs)/caregiver.tsx
 import { DATABASE_ID, databases, ELDERLY_COLLECTION_ID, ElderlyDocument } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -19,10 +18,7 @@ import {
     useTheme
 } from "react-native-paper";
 
-// 定义图标名称类型
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-
-// Extended elderly type with UI-specific fields
 interface ElderlyListItem extends ElderlyDocument {
     lastCheck?: string;
     medication?: string;
@@ -37,21 +33,17 @@ export default function CaregiverDashboard() {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
 
-    // Fetch elderly data from Appwrite
     const fetchElderlyData = React.useCallback(async () => {
         try {
             setError(null);
-            // Cast to Databases type to resolve union type issue
             const response = await (databases as Databases).listDocuments(
                 DATABASE_ID,
                 ELDERLY_COLLECTION_ID,
                 [Query.limit(100), Query.orderDesc('$createdAt')]
             );
             
-            // Transform Appwrite documents to UI format
             const transformedData: ElderlyListItem[] = response.documents.map((doc: any) => ({
                 ...doc,
-                // Add computed/default fields for UI
                 lastCheck: "Recently",
                 medication: "Pending",
                 nextAppointment: "None"
@@ -68,7 +60,6 @@ export default function CaregiverDashboard() {
         }
     }, []);
 
-    // Load data on mount
     React.useEffect(() => {
         fetchElderlyData();
     }, [fetchElderlyData]);
@@ -88,7 +79,6 @@ export default function CaregiverDashboard() {
         setRefreshing(false);
     }, [fetchElderlyData]);
 
-    // 实现通话、查看信息、查看健康数据的统一处理
     const handleCall = React.useCallback((phone?: string) => {
         if (!phone) return Alert.alert('No phone number');
         const url = `tel:${phone}`;
@@ -99,7 +89,6 @@ export default function CaregiverDashboard() {
     }, []);
 
     const handleViewInfo = React.useCallback((id: string) => {
-        // 导航到老人详情页面
         router.push(`/elderly/${id}` as any);
     }, [router]);
 
@@ -107,7 +96,6 @@ export default function CaregiverDashboard() {
         router.push(`/health-data?elderlyId=${id}` as any);
     }, [router]);
 
-    // Info 弹窗相关 state
     const [infoVisible, setInfoVisible] = React.useState(false);
     const [selectedElderly, setSelectedElderly] = React.useState<any>(null);
 
@@ -121,7 +109,6 @@ export default function CaregiverDashboard() {
         setSelectedElderly(null);
     };
 
-    // 如果用户不是护理员，显示提示
     if (preferences.role !== 'caregiver') {
         return (
             <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -139,7 +126,7 @@ export default function CaregiverDashboard() {
                     </Text>
                     <Button
                         mode="contained"
-                        onPress={() => {/* 导航到设置 */ }}
+                        onPress={() => {}}
                         style={styles.button}
                     >
                         Go to Settings
@@ -156,7 +143,6 @@ export default function CaregiverDashboard() {
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
             >
-                {/* 头部统计 */}
                 <View style={styles.header}>
                     <Card style={styles.statsCard}>
                         <Card.Content style={styles.statsContent}>
@@ -178,7 +164,6 @@ export default function CaregiverDashboard() {
                     </Card>
                 </View>
 
-                {/* 快速操作 */}
                 <View style={styles.section}>
                     <Text variant="titleLarge" style={styles.sectionTitle}>Quick Actions</Text>
                     <View style={styles.quickActions}>
@@ -203,7 +188,6 @@ export default function CaregiverDashboard() {
                     </View>
                 </View>
 
-                {/* 老人列表 */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text variant="titleLarge" style={styles.sectionTitle}>
@@ -319,7 +303,6 @@ export default function CaregiverDashboard() {
                     ))}
                 </View>
 
-                {/* 今日提醒 */}
                 <View style={styles.section}>
                     <Text variant="titleLarge" style={styles.sectionTitle}>Today's Reminder</Text>
                     <Card>
@@ -366,7 +349,6 @@ export default function CaregiverDashboard() {
                 </View>
             </ScrollView>
 
-            {/* Info 弹窗 */}
             <Portal>
                 <Dialog visible={infoVisible} onDismiss={closeInfoDialog}>
                     <Dialog.Title>{selectedElderly?.name ?? 'Details'}</Dialog.Title>
@@ -394,7 +376,6 @@ export default function CaregiverDashboard() {
                 </Dialog>
             </Portal>
 
-            {/* 悬浮按钮 */}
             <FAB
                 icon="plus"
                 style={styles.fab}

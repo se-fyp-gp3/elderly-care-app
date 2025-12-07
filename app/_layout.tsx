@@ -1,7 +1,5 @@
-// app/_layout.tsx
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { Stack, useRouter, useSegments } from "expo-router";
-// React and hooks
 import { useEffect, useState } from "react";
 import { useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -31,7 +29,6 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     <>
       {!appReady && (
         <PinterestSplash onAnimationComplete={() => setAppReady(true)}>
-          {/* 这里传入实际的应用内容，但初始时会被动画覆盖 */}
           {children}
         </PinterestSplash>
       )}

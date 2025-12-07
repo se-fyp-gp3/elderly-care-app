@@ -1,4 +1,3 @@
-// app/(tabs)/index.tsx
 import { StyleSheet, View } from "react-native";
 import { Text, useTheme } from 'react-native-paper';
 
