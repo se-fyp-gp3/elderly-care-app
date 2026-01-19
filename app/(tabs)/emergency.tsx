@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
 import React, { useLayoutEffect, useState } from 'react';
 import { Alert, FlatList, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, Card, Chip, Dialog, Divider, Portal, Surface, Text, useTheme } from 'react-native-paper';
+import { Avatar, Button, Card, Chip, Dialog, Divider, Portal, Surface, Text, useTheme } from 'react-native-paper';
 
 type EmergencyLog = {
     id: string;
