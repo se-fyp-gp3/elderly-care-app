@@ -1,3 +1,4 @@
+import ElderlyCard, { ElderlyItem } from "@/components/ElderlyCard"; // Import the new component
 import { DATABASE_ID, databases, ELDERLY_COLLECTION_ID, ElderlyDocument } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -13,6 +14,7 @@ import {
     DataTable,
     Dialog,
     FAB,
+    List,
     Portal,
     Text,
     useTheme
@@ -93,11 +95,22 @@ export default function CaregiverDashboard() {
     }, [router]);
 
     const handleViewHealth = React.useCallback((id: string) => {
-        router.push(`/health-data?elderlyId=${id}` as any);
-    }, [router]);
+        const elderly = elderlyList.find(e => e.$id === id);
+        const nameParam = elderly ? `&elderlyName=${encodeURIComponent(elderly.name)}` : '';
+        router.push(`/health-data?elderlyId=${id}${nameParam}` as any);
+    }, [router, elderlyList]);
 
     const [infoVisible, setInfoVisible] = React.useState(false);
     const [selectedElderly, setSelectedElderly] = React.useState<any>(null);
+    const [selectionVisible, setSelectionVisible] = React.useState(false); // New State for Health Data Selection
+
+    const handleQuickAction = (route: string) => {
+        if (route === 'health-data') {
+            setSelectionVisible(true);
+        } else {
+            router.push(route as any);
+        }
+    };
 
     const openInfoDialog = (elderly: any) => {
         setSelectedElderly(elderly);
@@ -166,12 +179,24 @@ export default function CaregiverDashboard() {
 
                 <View style={styles.section}>
                     <Text variant="titleLarge" style={styles.sectionTitle}>Quick Actions</Text>
+                    
+                    {/* Temporary Demo Button - Removed as per request now that Info button works
+                    <Button 
+                        mode="contained-tonal" 
+                        onPress={() => router.push('/elderly/demo-user-001')}
+                        style={{ marginBottom: 16, borderColor: theme.colors.primary, borderWidth: 1 }}
+                        icon="eye"
+                    >
+                        Preview Detail Page DeshandleQuickAction(action.route
+                    </Button>
+                    */}
+
                     <View style={styles.quickActions}>
                         {quickActions.map((action, index) => (
                             <Card
                                 key={index}
                                 style={styles.actionCard}
-                                onPress={() => router.push(action.route as any)}
+                                onPress={() => handleQuickAction(action.route)}
                             >
                                 <Card.Content style={styles.actionContent}>
                                     <MaterialCommunityIcons
@@ -226,80 +251,13 @@ export default function CaregiverDashboard() {
                     )}
 
                     {!loading && elderlyList.map((elderly) => (
-                        <Card key={elderly.$id} style={styles.elderlyCard}>
-                            <Card.Content>
-                                <View style={styles.elderlyHeader}>
-                                    <View style={styles.elderlyInfo}>
-                                        <Avatar.Text
-                                            size={50}
-                                            label={elderly.name.substring(0, 2)}
-                                            style={[
-                                                styles.avatar,
-                                                elderly.status === 'warning' && styles.warningAvatar
-                                            ]}
-                                        />
-                                        <View style={styles.elderlyDetails}>
-                                            <Text variant="titleMedium">{elderly.name}</Text>
-                                            <Text variant="bodyMedium">{elderly.age} years old</Text>
-                                        </View>
-                                    </View>
-                                    <Chip
-                                        mode="outlined"
-                                        style={[
-                                            styles.statusChip,
-                                            elderly.status === 'warning' && styles.warningChip
-                                        ]}
-                                    >
-                                        {elderly.status === 'warning' ? 'Need attention' : 'normal'}
-                                    </Chip>
-                                </View>
-
-                                <View style={styles.elderlyStats}>
-                                    <View style={styles.statRow}>
-                                        <MaterialCommunityIcons name="clock-outline" size={16} />
-                                        <Text variant="bodySmall">Final Check: {elderly.lastCheck}</Text>
-                                    </View>
-                                    <View style={styles.statRow}>
-                                        <MaterialCommunityIcons name="pill" size={16} />
-                                        <Text variant="bodySmall">Medication: {elderly.medication}</Text>
-                                    </View>
-                                    <View style={styles.statRow}>
-                                        <MaterialCommunityIcons name="calendar" size={16} />
-                                        <Text variant="bodySmall">Next appointment: {elderly.nextAppointment}</Text>
-                                    </View>
-                                </View>
-
-                                <View style={styles.actionButtons}>
-                                    <Button
-                                        mode="outlined"
-                                        compact
-                                        icon="phone"
-                                        style={styles.smallButton}
-                                        onPress={() => handleCall(elderly.phone)}
-                                    >
-                                        Call
-                                    </Button>
-                                    <Button
-                                        mode="outlined"
-                                        compact
-                                        icon="chat"
-                                        style={styles.smallButton}
-                                        onPress={() => openInfoDialog(elderly)}
-                                    >
-                                        Info
-                                    </Button>
-                                    <Button
-                                        mode="contained"
-                                        compact
-                                        icon="chart-line"
-                                        style={styles.smallButton}
-                                        onPress={() => handleViewHealth(elderly.$id)}
-                                    >
-                                        HealthData
-                                    </Button>
-                                </View>
-                            </Card.Content>
-                        </Card>
+                        <ElderlyCard
+                            key={elderly.$id}
+                            elderly={elderly as ElderlyItem}
+                            onCall={handleCall}
+                            onViewInfo={() => handleViewInfo(elderly.$id)}
+                            onViewHealth={handleViewHealth}
+                        />
                     ))}
                 </View>
 
@@ -350,6 +308,42 @@ export default function CaregiverDashboard() {
             </ScrollView>
 
             <Portal>
+                {/* Health Data Selection Dialog */}
+                <Dialog visible={selectionVisible} onDismiss={() => setSelectionVisible(false)}>
+                    <Dialog.Title>Select Health Data</Dialog.Title>
+                    <Dialog.ScrollArea>
+                        <ScrollView style={{ maxHeight: 300 }}>
+                            {elderlyList.length > 0 ? (
+                                elderlyList.map((item) => (
+                                    <List.Item
+                                        key={item.$id}
+                                        title={item.name}
+                                        description={`Age: ${item.age || 'Unknown'}`}
+                                        left={(props) => (
+                                            <Avatar.Text 
+                                                {...props} 
+                                                size={40} 
+                                                label={item.name ? item.name.substring(0, 2) : "??"} 
+                                                style={{ backgroundColor: theme.colors.primary, marginRight: 10 }}
+                                            />
+                                        )}
+                                        onPress={() => {
+                                            setSelectionVisible(false);
+                                            router.push(`/health-data?elderlyId=${item.$id}&elderlyName=${encodeURIComponent(item.name)}` as any);
+                                        }}
+                                        right={(props) => <List.Icon {...props} icon="chevron-right" />}
+                                    />
+                                ))
+                            ) : (
+                                <Text style={{ padding: 20, textAlign: 'center' }}>No elderly records found.</Text>
+                            )}
+                        </ScrollView>
+                    </Dialog.ScrollArea>
+                    <Dialog.Actions>
+                        <Button onPress={() => setSelectionVisible(false)}>Cancel</Button>
+                    </Dialog.Actions>
+                </Dialog>
+
                 <Dialog visible={infoVisible} onDismiss={closeInfoDialog}>
                     <Dialog.Title>{selectedElderly?.name ?? 'Details'}</Dialog.Title>
                     <Dialog.Content>
@@ -462,47 +456,6 @@ const styles = StyleSheet.create({
     },
     elderlyCard: {
         marginBottom: 12,
-    },
-    elderlyHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 12,
-    },
-    elderlyInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    elderlyDetails: {
-        marginLeft: 12,
-    },
-    avatar: {
-        backgroundColor: '#2196F3',
-    },
-    warningAvatar: {
-        backgroundColor: '#FF9800',
-    },
-    statusChip: {
-        marginLeft: 8,
-    },
-    warningChip: {
-        backgroundColor: '#FFF3E0',
-    },
-    elderlyStats: {
-        marginBottom: 12,
-    },
-    statRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    actionButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    smallButton: {
-        flex: 1,
-        marginHorizontal: 4,
     },
     fab: {
         position: 'absolute',

@@ -1,13 +1,11 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import MedicationCard, { MedicationItem } from "@/components/MedicationCard"; // Import the new component
 import * as Notifications from 'expo-notifications';
 import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
     Button,
     Card,
-    Chip,
     Dialog,
-    IconButton,
     Portal,
     Searchbar,
     SegmentedButtons,
@@ -245,84 +243,13 @@ export default function MedicationManagement() {
                     <Text variant="titleLarge" style={styles.sectionTitle}>Today's medication plan</Text>
 
                     {filteredMeds.map((med) => (
-                        <Card key={med.id} style={styles.medicationCard}>
-                            <Card.Content>
-                                <View style={styles.medHeader}>
-                                    <View>
-                                        <Text variant="titleMedium">{med.name}</Text>
-                                        <Text variant="bodyMedium" style={styles.elderlyName}>
-                                            {med.elderly}
-                                        </Text>
-                                    </View>
-                                    <Chip
-                                        mode="outlined"
-                                        style={[
-                                            styles.statusChip,
-                                            med.status === 'completed' && styles.completedChip,
-                                            med.status === 'overdue' && styles.overdueChip,
-                                        ]}
-                                        textStyle={
-                                            med.status === 'completed' ? styles.completedText :
-                                                med.status === 'overdue' ? styles.overdueText : undefined
-                                        }
-                                    >
-                                        {med.status === 'completed' ? 'Completed' :
-                                            med.status === 'pending' ? 'Pending' : 'Expired'}
-                                    </Chip>
-                                </View>
-
-                                <View style={styles.medDetails}>
-                                    <View style={styles.detailRow}>
-                                        <MaterialCommunityIcons name="pill" size={16} />
-                                        <Text variant="bodySmall">Dose: {med.dosage}</Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <MaterialCommunityIcons name="repeat" size={16} />
-                                        <Text variant="bodySmall">Frequency: {med.frequency}</Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <MaterialCommunityIcons name="clock-outline" size={16} />
-                                        <Text variant="bodySmall">Time: {med.time}</Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <MaterialCommunityIcons name="history" size={16} />
-                                        <Text variant="bodySmall">Last taken: {med.lastTaken}</Text>
-                                    </View>
-                                </View>
-
-                                <View style={styles.actionRow}>
-                                    {med.status === 'pending' && (
-                                        <>
-                                            <Button
-                                                mode="contained"
-                                                compact
-                                                onPress={() => { setDialogVisible(med.id); setNoteText(med.notes || ''); }}
-                                            >
-                                                Confirm taking
-                                            </Button>
-                                            <Button mode="outlined" compact onPress={() => onRemindLater(med.id)}>
-                                                Remind me later
-                                            </Button>
-                                        </>
-                                    )}
-                                    {med.status === 'completed' && (
-                                        <Button mode="outlined" compact disabled>
-                                            Completed
-                                        </Button>
-                                    )}
-                                    {med.status === 'overdue' && (
-                                        <Button mode="contained" compact style={styles.overdueButton} onPress={() => onMarkProcessed(med.id)}>
-                                            Mark Processed
-                                        </Button>
-                                    )}
-                                    <IconButton
-                                        icon="information-outline"
-                                        size={20}
-                                        onPress={() => console.log('check the details')}
-                                    />
-                                </View>
-                            </Card.Content>
-                        </Card>
+                        <MedicationCard
+                            key={med.id}
+                            med={med as MedicationItem}
+                            onConfirmPress={(m) => { setDialogVisible(m.id); setNoteText(m.notes || ''); }}
+                            onRemind={onRemindLater}
+                            onMarkProcessed={onMarkProcessed}
+                        />
                     ))}
                 </View>
             </ScrollView>
@@ -438,4 +365,5 @@ const styles = StyleSheet.create({
     dialogInput: {
         marginTop: 12,
     },
-});
+});// styles.medicationCard and others below have been moved to components/MedicationCard.tsx
+    // Keeping only what's necessary for the current file
