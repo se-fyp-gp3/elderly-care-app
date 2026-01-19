@@ -50,7 +50,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="medication"
         options={{
-          title: "Medication management",
+          title: "Medication",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="pill"
@@ -84,6 +84,47 @@ export default function TabsLayout() {
               color={color}
             />
           ),
+        }}
+      />
+
+      {/* Hidden Screens */}
+      <Tabs.Screen
+        name="emergency"
+        options={{
+          href: null,
+          title: "Emergency",
+          tabBarStyle: { display: "flex" }, // Ensure tab bar is visible
+        }}
+      />
+      <Tabs.Screen
+        name="health-data"
+        options={{
+          href: null,
+          title: "Health Data",
+          tabBarStyle: { display: "flex" },
+        }}
+      />
+      <Tabs.Screen
+        name="schedule"
+        options={{
+          href: null,
+          title: "Schedule",
+          tabBarStyle: { display: "flex" },
+        }}
+      />
+      <Tabs.Screen
+        name="elderly/index"
+        options={{
+          href: null,
+          title: "Elderly List",
+        }}
+      />
+      <Tabs.Screen
+        name="elderly/[id]"
+        options={{
+          href: null,
+          title: "Elderly Detail",
+          tabBarStyle: { display: "flex" },
         }}
       />
     </Tabs>
