@@ -113,13 +113,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="elderly/index"
-        options={{
-          href: null,
-          title: "Elderly List",
-        }}
-      />
-      <Tabs.Screen
         name="elderly/[id]"
         options={{
           href: null,
