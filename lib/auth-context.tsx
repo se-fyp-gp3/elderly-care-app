@@ -1,11 +1,10 @@
-// lib/auth-context.tsx
+import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { ID, Models, OAuthProvider } from "react-native-appwrite";
-import { UserPreferences } from "../types/user.types";
+import { UserPreferences } from "../types/user";
 import { account, accountWeb } from "./appwrite";
-import { makeRedirectUri } from "expo-auth-session";
 
 export class LoginError extends Error {
   constructor(message: string) {
@@ -17,19 +16,18 @@ export class LoginError extends Error {
 type AuthContextType = {
   user: Models.User<Models.Preferences> | null;
   isLoadingUser: boolean;
-
   preferences: UserPreferences;
 
   signUp: (
     email: string,
     password: string,
-    userPreferences?: UserPreferences
+    userPreferences?: UserPreferences,
   ) => Promise<string | null>;
   signIn: (email: string, password: string) => Promise<string | null>;
   signInWithOAuth2: (provider: OAuthProvider) => Promise<string | null>;
   signOut: () => Promise<void>;
   updatePreferences: (
-    newPreferences: UserPreferences
+    newPreferences: UserPreferences,
   ) => Promise<string | null>;
   setPreference: (key: string, value: any) => Promise<string | null>;
 };
@@ -42,7 +40,7 @@ export default function AuthProvider({
   children: React.ReactNode;
 }) {
   const [user, setUser] = useState<Models.User<Models.Preferences> | null>(
-    null
+    null,
   );
   const [preferences, setPreferences] = useState<UserPreferences>({});
   const [isLoadingUser, setIsLoadingUser] = useState<boolean>(true);
@@ -64,7 +62,7 @@ export default function AuthProvider({
       if (session.prefs) {
         setPreferences(session.prefs as UserPreferences);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       setUser(null);
     } finally {
       setIsLoadingUser(false);
@@ -74,7 +72,7 @@ export default function AuthProvider({
   const signUp = async (
     email: string,
     password: string,
-    userPreferences?: UserPreferences
+    userPreferences?: UserPreferences,
   ) => {
     await account.create({
       userId: ID.unique(),
@@ -130,7 +128,7 @@ export default function AuthProvider({
       });
       session = await accountWeb.get();
     } else {
-      const deepLink = new URL(makeRedirectUri({ preferLocalhost: true }));
+      const deepLink = new URL(makeRedirectUri());
       const scheme = `${deepLink.protocol}//`;
 
       const loginUrl = await account.createOAuth2Token({
@@ -141,7 +139,7 @@ export default function AuthProvider({
 
       const result = await WebBrowser.openAuthSessionAsync(
         `${loginUrl}`,
-        scheme
+        scheme,
       );
 
       if (result.type === "success" && result.url) {
@@ -151,7 +149,7 @@ export default function AuthProvider({
 
         if (!userId || !secret) {
           throw new LoginError(
-            "OAuth2 sign-in failed: missing userId or secret"
+            "OAuth2 sign-in failed: missing userId or secret",
           );
         }
 

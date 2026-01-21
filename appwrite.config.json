@@ -1,168 +1,621 @@
 {
-    "projectId": "elderly-care-app",
-    "projectName": "elderly-care-app",
-    "settings": {
-        "services": {
-            "account": true,
-            "avatars": true,
-            "databases": true,
-            "locale": true,
-            "health": true,
-            "storage": true,
-            "teams": true,
-            "users": true,
-            "sites": true,
-            "functions": true,
-            "graphql": true,
-            "messaging": true
-        },
-        "auth": {
-            "methods": {
-                "jwt": true,
-                "phone": true,
-                "invites": true,
-                "anonymous": true,
-                "email-otp": true,
-                "magic-url": true,
-                "email-password": true
-            },
-            "security": {
-                "duration": 31536000,
-                "limit": 0,
-                "sessionsLimit": 100,
-                "passwordHistory": 0,
-                "passwordDictionary": false,
-                "personalDataCheck": false,
-                "sessionAlerts": false,
-                "mockNumbers": []
-            }
-        }
+  "projectId": "elderly-care-app",
+  "projectName": "elderly-care-app",
+  "settings": {
+    "services": {
+      "account": true,
+      "avatars": true,
+      "databases": true,
+      "locale": true,
+      "health": true,
+      "storage": true,
+      "teams": true,
+      "users": true,
+      "sites": true,
+      "functions": true,
+      "graphql": true,
+      "messaging": true
     },
-    "tablesDB": [
+    "auth": {
+      "methods": {
+        "jwt": true,
+        "phone": true,
+        "invites": true,
+        "anonymous": true,
+        "email-otp": true,
+        "magic-url": true,
+        "email-password": true
+      },
+      "security": {
+        "duration": 31536000,
+        "limit": 0,
+        "sessionsLimit": 100,
+        "passwordHistory": 0,
+        "passwordDictionary": false,
+        "personalDataCheck": false,
+        "sessionAlerts": false,
+        "mockNumbers": []
+      }
+    }
+  },
+  "tablesDB": [
+    {
+      "$id": "elderly-care-app-db",
+      "name": "elderly-care-app-db",
+      "enabled": true
+    }
+  ],
+  "tables": [
+    {
+      "$id": "elderly_t1_test",
+      "$permissions": [
+        "create(\"any\")",
+        "read(\"any\")",
+        "update(\"any\")",
+        "delete(\"any\")"
+      ],
+      "databaseId": "elderly-care-app-db",
+      "name": "elderly_t1_test",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
         {
-            "$id": "elderly-care-app-db",
-            "name": "elderly-care-app-db",
-            "enabled": true
+          "key": "name",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
         },
         {
-            "$id": "68ede3f70028f7ce4672",
-            "name": "test",
-            "enabled": true
+          "key": "phone",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "age",
+          "type": "integer",
+          "required": true,
+          "array": false,
+          "default": null,
+          "min": -9223372036854775808,
+          "max": 9223372036854775807
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 50,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "originalId",
+          "type": "integer",
+          "required": true,
+          "array": false,
+          "default": null,
+          "min": -9223372036854775808,
+          "max": 9223372036854775807
+        },
+        {
+          "key": "aaa",
+          "type": "string",
+          "required": false,
+          "array": true,
+          "size": 111,
+          "default": null,
+          "encrypt": false
         }
-    ],
-    "tables": [
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "elderly",
+      "$permissions": [
+        "create(\"users\")",
+        "read(\"users\")",
+        "update(\"users\")"
+      ],
+      "databaseId": "elderly-care-app-db",
+      "name": "Elderly",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
         {
-            "$id": "68e5eadb0011a9226f83",
-            "$permissions": [],
-            "databaseId": "elderly-care-app-db",
-            "name": "Caregiver_t1_Caregiver_Users ",
-            "enabled": true,
-            "rowSecurity": false,
-            "columns": [
-                {
-                    "key": "test",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 1,
-                    "default": null,
-                    "encrypt": false
-                }
-            ],
-            "indexes": []
+          "key": "user_id",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 20,
+          "default": null,
+          "encrypt": false
         },
         {
-            "$id": "caregiver_t2_caregiver_medications",
-            "$permissions": [],
-            "databaseId": "elderly-care-app-db",
-            "name": "Caregiver_t2_Caregiver_medications",
-            "enabled": true,
-            "rowSecurity": false,
-            "columns": [
-                {
-                    "key": "name",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 255,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "elderly",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 50,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "dosage",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 50,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "frequency",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 50,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "time",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 50,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "status",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 50,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "lastTaken",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 50,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "notes",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 50,
-                    "default": null,
-                    "encrypt": false
-                }
-            ],
-            "indexes": []
+          "key": "name",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
         },
         {
-            "$id": "68ede447002f6bd59ba2",
-            "$permissions": [],
-            "databaseId": "68ede3f70028f7ce4672",
-            "name": "test",
-            "enabled": true,
-            "rowSecurity": false,
-            "columns": [],
-            "indexes": []
+          "key": "phone",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "birth",
+          "type": "datetime",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": ""
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": "enum",
+          "elements": ["Normal", "Warning", "Danger"]
         }
-    ]
+      ],
+      "indexes": [
+        {
+          "$id": "1_7_ux_elderly__user_id",
+          "$createdAt": "2026-01-20T07:11:25.529+00:00",
+          "$updatedAt": "2026-01-20T07:11:25.591+00:00",
+          "key": "ux_elderly__user_id",
+          "type": "unique",
+          "status": "available",
+          "error": "",
+          "columns": ["user_id"],
+          "lengths": [0],
+          "orders": ["ASC"]
+        }
+      ]
+    },
+    {
+      "$id": "caregiver",
+      "$permissions": [],
+      "databaseId": "elderly-care-app-db",
+      "name": "Caregiver",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 20,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "name",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "phone",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "birth",
+          "type": "datetime",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": ""
+        }
+      ],
+      "indexes": [
+        {
+          "$id": "1_8_ux_caregiver__user_id",
+          "$createdAt": "2026-01-20T07:10:40.045+00:00",
+          "$updatedAt": "2026-01-20T07:10:40.111+00:00",
+          "key": "ux_caregiver__user_id",
+          "type": "unique",
+          "status": "available",
+          "error": "",
+          "columns": ["user_id"],
+          "lengths": [0],
+          "orders": ["ASC"]
+        }
+      ]
+    },
+    {
+      "$id": "caregiver_elderly",
+      "$permissions": [],
+      "databaseId": "elderly-care-app-db",
+      "name": "Caregiver_Elderly",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "caregiver",
+          "type": "relationship",
+          "required": false,
+          "array": false,
+          "relatedCollection": "caregiver",
+          "relationType": "oneToMany",
+          "twoWay": false,
+          "twoWayKey": "696f2b32001e6e9c0f52",
+          "onDelete": "setNull",
+          "side": "parent"
+        },
+        {
+          "key": "elderly",
+          "type": "relationship",
+          "required": false,
+          "array": false,
+          "relatedCollection": "elderly",
+          "relationType": "oneToMany",
+          "twoWay": false,
+          "twoWayKey": "696f2b69003dcda40bb9",
+          "onDelete": "setNull",
+          "side": "parent"
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "medication",
+      "$permissions": [],
+      "databaseId": "elderly-care-app-db",
+      "name": "Medication",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "name",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "unit",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "elderly_medication",
+      "$permissions": [],
+      "databaseId": "elderly-care-app-db",
+      "name": "Elderly_Medication",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "elderly",
+          "type": "relationship",
+          "required": false,
+          "array": false,
+          "relatedCollection": "elderly",
+          "relationType": "oneToMany",
+          "twoWay": false,
+          "twoWayKey": "696f2ce400358163ebaf",
+          "onDelete": "setNull",
+          "side": "parent"
+        },
+        {
+          "key": "medication",
+          "type": "relationship",
+          "required": false,
+          "array": false,
+          "relatedCollection": "medication",
+          "relationType": "oneToMany",
+          "twoWay": false,
+          "twoWayKey": "696f2d09002f43007e96",
+          "onDelete": "setNull",
+          "side": "parent"
+        },
+        {
+          "key": "dosage",
+          "type": "double",
+          "required": false,
+          "array": false,
+          "default": null,
+          "min": 0,
+          "max": 179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+        },
+        {
+          "key": "frequency",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "is_prn",
+          "type": "boolean",
+          "required": false,
+          "array": false,
+          "default": false
+        },
+        {
+          "key": "times_per_day",
+          "type": "integer",
+          "required": false,
+          "array": false,
+          "default": null,
+          "min": 0,
+          "max": 9223372036854775807
+        },
+        {
+          "key": "approx_times",
+          "type": "datetime",
+          "required": false,
+          "array": true,
+          "default": null,
+          "format": ""
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": "enum",
+          "elements": ["Pending", "Completed", "Expired"]
+        },
+        {
+          "key": "last_taken",
+          "type": "datetime",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": ""
+        },
+        {
+          "key": "notes",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "schedule",
+      "$permissions": [],
+      "databaseId": "elderly-care-app-db",
+      "name": "Schedule",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "time",
+          "type": "datetime",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": ""
+        },
+        {
+          "key": "title",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "description",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "elderly",
+          "type": "relationship",
+          "required": false,
+          "array": false,
+          "relatedCollection": "elderly",
+          "relationType": "oneToMany",
+          "twoWay": false,
+          "twoWayKey": "696f3976002f93c471e7",
+          "onDelete": "cascade",
+          "side": "parent"
+        },
+        {
+          "key": "schedule_category",
+          "type": "relationship",
+          "required": false,
+          "array": false,
+          "relatedCollection": "schedule_category",
+          "relationType": "oneToMany",
+          "twoWay": false,
+          "twoWayKey": "696f3b520012736643b1",
+          "onDelete": "setNull",
+          "side": "parent"
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": "enum",
+          "elements": ["Pending", "Completed", "Missed"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "schedule_category",
+      "$permissions": [],
+      "databaseId": "elderly-care-app-db",
+      "name": "Schedule_Category",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "name",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "color_hex",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 7,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "svg_icon",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 1073741824,
+          "default": null,
+          "encrypt": false
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "schedule_medication",
+      "$permissions": [],
+      "databaseId": "elderly-care-app-db",
+      "name": "Schedule_Medication",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "schedule",
+          "type": "relationship",
+          "required": false,
+          "array": false,
+          "relatedCollection": "schedule",
+          "relationType": "oneToMany",
+          "twoWay": false,
+          "twoWayKey": "696f3c43001efdf5d28c",
+          "onDelete": "cascade",
+          "side": "parent"
+        },
+        {
+          "key": "elderly_medication",
+          "type": "relationship",
+          "required": false,
+          "array": false,
+          "relatedCollection": "elderly_medication",
+          "relationType": "oneToMany",
+          "twoWay": false,
+          "twoWayKey": "696f3c76000704d6f0c5",
+          "onDelete": "cascade",
+          "side": "parent"
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "health_data",
+      "$permissions": [
+        "create(\"users\")",
+        "read(\"users\")",
+        "update(\"users\")"
+      ],
+      "databaseId": "elderly-care-app-db",
+      "name": "Health_Data",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "elderly",
+          "type": "relationship",
+          "required": false,
+          "array": false,
+          "relatedCollection": "elderly",
+          "relationType": "oneToMany",
+          "twoWay": false,
+          "twoWayKey": "696f4278003d8b4081ab",
+          "onDelete": "cascade",
+          "side": "parent"
+        },
+        {
+          "key": "time",
+          "type": "datetime",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": ""
+        },
+        {
+          "key": "type",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        }
+      ],
+      "indexes": []
+    }
+  ],
+  "buckets": [
+    {
+      "$id": "696f4129000d8ad7f041",
+      "$permissions": [],
+      "fileSecurity": false,
+      "name": "user_icon",
+      "enabled": true,
+      "maximumFileSize": 30000000,
+      "allowedFileExtensions": ["jpg", "png"],
+      "compression": "none",
+      "encryption": true,
+      "antivirus": true
+    }
+  ],
+  "teams": [],
+  "topics": []
 }

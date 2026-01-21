@@ -1,16 +1,16 @@
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, LoginError } from "@/lib/auth-context";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { OAuthProvider } from "react-native-appwrite";
 import { Button, Text, TextInput, useTheme } from "react-native-paper";
-import { LoginError } from "@/lib/auth-context";
+import { AppwriteException } from "appwrite";
 
 export default function AuthScreen() {
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
-  const [error, setError] = useState<string | null>("");
+  const [error, setError] = useState<string | null>(null);
 
   const theme = useTheme();
   const router = useRouter();
@@ -37,8 +37,12 @@ export default function AuthScreen() {
     } catch (error) {
       if (error instanceof LoginError) {
         setError(error.message);
+      } else if (error instanceof AppwriteException) {
+        setError(error.message);
       } else {
-        setError("An unexpected error occurred.");
+        setError(
+          "An unexpected error occurred while trying to authenticate via email and password.",
+        );
       }
     }
   };
@@ -50,8 +54,12 @@ export default function AuthScreen() {
     } catch (error) {
       if (error instanceof LoginError) {
         setError(error.message);
+      } else if (error instanceof AppwriteException) {
+        setError(error.message);
       } else {
-        setError("An unexpected error occurred.");
+        setError(
+          "An unexpected error occurred while trying to authenticate via OAuth2.",
+        );
       }
     }
   };
