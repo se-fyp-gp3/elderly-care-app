@@ -1,38 +1,39 @@
-import { useAuth, LoginError } from "@/lib/auth-context";
+import { LoginError, useAuth } from "@/lib/auth-context";
+import { AppwriteException } from "appwrite";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { OAuthProvider } from "react-native-appwrite";
-import { Button, Text, TextInput, useTheme } from "react-native-paper";
-import { AppwriteException } from "appwrite";
+import {
+    Button,
+    Snackbar,
+    Text,
+    TextInput,
+    useTheme,
+} from "react-native-paper";
 
 export default function AuthScreen() {
-  const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
   const theme = useTheme();
   const router = useRouter();
 
-  const { signIn, signUp, signInWithOAuth2 } = useAuth();
+  const { signIn, signInWithOAuth2, preferences } = useAuth();
 
-  const handleAuth = async () => {
+  const handleSignIn = async () => {
+    if (!email || !password) {
+      setError("Email and password are required.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
     try {
-      if (!email || !password) {
-        throw new LoginError("Email and password are required.");
-      }
-      setError(null);
-
-      if (isSignUp) {
-        if (password.length < 8) {
-          throw new LoginError("Password must be at least 8 characters long.");
-        }
-        await signUp(email, password);
-      } else {
-        await signIn(email, password);
-      }
-
+      await signIn(email, password);
       router.replace("/");
     } catch (error) {
       if (error instanceof LoginError) {
@@ -40,32 +41,41 @@ export default function AuthScreen() {
       } else if (error instanceof AppwriteException) {
         setError(error.message);
       } else {
-        setError(
-          "An unexpected error occurred while trying to authenticate via email and password.",
-        );
+        setError("An unexpected error occurred. Please try again.");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleOAuth2 = async (provider: OAuthProvider) => {
+  const handleOAuth2 = async () => {
+    setLoading(true);
+    setError(null);
+
     try {
-      await signInWithOAuth2(provider);
-      router.replace("/");
+      await signInWithOAuth2(OAuthProvider.Google);
+      // Check if user has role set, if not redirect to start for role selection
+      if (!preferences.role) {
+        router.replace("/start");
+      } else {
+        router.replace("/");
+      }
     } catch (error) {
       if (error instanceof LoginError) {
         setError(error.message);
       } else if (error instanceof AppwriteException) {
         setError(error.message);
       } else {
-        setError(
-          "An unexpected error occurred while trying to authenticate via OAuth2.",
-        );
+        setError("Authentication was cancelled or failed. Please try again.");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSwitchMode = () => {
-    setIsSignUp((prev) => !prev);
+  const handleGetStarted = () => {
+    router.back();
+    // router.push("/start");
   };
 
   return (
@@ -75,53 +85,92 @@ export default function AuthScreen() {
     >
       <View style={styles.content}>
         <Text style={styles.title} variant="headlineMedium">
-          {isSignUp ? "Create Account" : "Welcome Back"}
+          Welcome Back
+        </Text>
+        <Text style={styles.subtitle} variant="bodyMedium">
+          Sign in to continue
         </Text>
 
         <TextInput
           label="Email"
+          value={email}
           autoCapitalize="none"
           keyboardType="email-address"
           placeholder="user@example.com"
           mode="outlined"
           style={styles.input}
           onChangeText={setEmail}
+          disabled={loading}
         />
         <TextInput
           label="Password"
+          value={password}
           autoCapitalize="none"
           secureTextEntry
           mode="outlined"
           style={styles.input}
           onChangeText={setPassword}
+          disabled={loading}
         />
 
-        {error ? (
-          <Text style={{ color: theme.colors.error }}>{error}</Text>
-        ) : null}
-
-        <Button mode="contained" onPress={handleAuth} style={styles.button}>
-          {isSignUp ? "Sign Up" : "Sign In"}
+        <Button
+          mode="contained"
+          onPress={handleSignIn}
+          style={styles.button}
+          loading={loading}
+          disabled={loading}
+        >
+          Sign In
         </Button>
+
+        <View style={styles.divider}>
+          <View
+            style={[
+              styles.dividerLine,
+              { backgroundColor: theme.colors.outline },
+            ]}
+          />
+          <Text variant="bodySmall" style={styles.dividerText}>
+            OR
+          </Text>
+          <View
+            style={[
+              styles.dividerLine,
+              { backgroundColor: theme.colors.outline },
+            ]}
+          />
+        </View>
+
         <Button
           mode="outlined"
-          onPress={() => handleOAuth2(OAuthProvider.Google)}
+          onPress={handleOAuth2}
           style={styles.button}
           icon="google"
+          disabled={loading}
         >
-          {isSignUp ? "Sign Up" : "Sign In"}
-          {" via Google"}
+          Sign In with Google
         </Button>
+
         <Button
           mode="text"
-          onPress={handleSwitchMode}
+          onPress={handleGetStarted}
           style={styles.switchModeButton}
         >
-          {isSignUp
-            ? "Already have an account? Sign In"
-            : "Don't have an account? Sign Up"}
+          New user? Get started
         </Button>
       </View>
+
+      <Snackbar
+        visible={!!error}
+        onDismiss={() => setError(null)}
+        duration={4000}
+        action={{
+          label: "Dismiss",
+          onPress: () => setError(null),
+        }}
+      >
+        {error}
+      </Snackbar>
     </KeyboardAvoidingView>
   );
 }
@@ -132,18 +181,37 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: 24,
     justifyContent: "center",
   },
   title: {
     textAlign: "center",
-    marginBottom: 24,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  subtitle: {
+    textAlign: "center",
+    opacity: 0.7,
+    marginBottom: 32,
   },
   input: {
     marginBottom: 16,
   },
   button: {
     marginTop: 8,
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    opacity: 0.7,
   },
   switchModeButton: {
     marginTop: 16,
