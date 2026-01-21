@@ -1,5 +1,5 @@
 import ElderlyDetailView, { ElderlyDetailData } from '@/components/ElderlyDetailView';
-import { DATABASE_ID, databases, ELDERLY_COLLECTION_ID } from '@/lib/appwrite';
+import { DATABASE_ID, tablesDB, ELDERLY_TABLE_ID } from '@/lib/appwrite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -27,10 +27,10 @@ export default function ElderlyDetailPage() {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                // Cast 'databases' to avoid type mismatch between Web and Native SDKs
-                const doc = await (databases as unknown as Databases).getDocument(
+                // Cast 'tablesDB' to avoid type mismatch between Web and Native SDKs
+                const doc = await (tablesDB as unknown as Databases).getDocument(
                     DATABASE_ID,
-                    ELDERLY_COLLECTION_ID,
+                    ELDERLY_TABLE_ID,
                     docId
                 );
 
