@@ -5,7 +5,11 @@ import { Platform } from "react-native";
 import { ID, Models, OAuthProvider } from "react-native-appwrite";
 import { UserPreferences } from "../types/user";
 import { account, accountWeb } from "./appwrite";
-
+import {
+  addRoleLabel,
+  checkProfileExists,
+  hasTrialLabel,
+} from "./user";
 export class LoginError extends Error {
   constructor(message: string) {
     super(message);
@@ -17,6 +21,10 @@ type AuthContextType = {
   user: Models.User<Models.Preferences> | null;
   isLoadingUser: boolean;
   preferences: UserPreferences;
+  hasProfile: boolean | null;
+  profileLoading: boolean;
+  isTrial: boolean;
+  userLabels: string[];
 
   signUp: (
     email: string,
@@ -30,6 +38,8 @@ type AuthContextType = {
     newPreferences: UserPreferences,
   ) => Promise<string | null>;
   setPreference: (key: string, value: any) => Promise<string | null>;
+  refreshProfile: () => Promise<void>;
+  refreshLabels: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,10 +54,66 @@ export default function AuthProvider({
   );
   const [preferences, setPreferences] = useState<UserPreferences>({});
   const [isLoadingUser, setIsLoadingUser] = useState<boolean>(true);
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+  const [profileLoading, setProfileLoading] = useState<boolean>(false);
+  const [userLabels, setUserLabels] = useState<string[]>([]);
+  const [isTrial, setIsTrial] = useState<boolean>(false);
+
+  const refreshLabels = async () => {
+    if (!user) {
+      setUserLabels([]);
+      setIsTrial(false);
+      return;
+    }
+
+    try {
+      const labels = user.labels || [];
+      setUserLabels(labels);
+      setIsTrial(hasTrialLabel(labels));
+    } catch (error) {
+      console.error("Error refreshing labels:", error);
+      setUserLabels([]);
+      setIsTrial(false);
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (!user) {
+      setHasProfile(null);
+      return;
+    }
+
+    const role = preferences.role;
+    if (!role) {
+      setHasProfile(false);
+      return;
+    }
+
+    setProfileLoading(true);
+    try {
+      const exists = await checkProfileExists(user.$id, role);
+      setHasProfile(exists);
+    } catch (error) {
+      console.error("Error checking profile:", error);
+      setHasProfile(false);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   useEffect(() => {
     getUser();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      refreshLabels();
+      if (preferences.role) {
+        refreshProfile();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, preferences.role]);
 
   const getUser = async () => {
     try {
@@ -62,7 +128,7 @@ export default function AuthProvider({
       if (session.prefs) {
         setPreferences(session.prefs as UserPreferences);
       }
-    } catch (error: unknown) {
+    } catch {
       setUser(null);
     } finally {
       setIsLoadingUser(false);
@@ -74,13 +140,19 @@ export default function AuthProvider({
     password: string,
     userPreferences?: UserPreferences,
   ) => {
-    await account.create({
+    const newAccount = await account.create({
       userId: ID.unique(),
       email,
       password,
     });
+
     if (userPreferences && Object.keys(userPreferences).length > 0) {
       await account.updatePrefs(userPreferences);
+    }
+
+    // Add role label to user after signup
+    if (userPreferences?.role) {
+      await addRoleLabel(newAccount.$id, userPreferences.role);
     }
 
     await signIn(email, password);
@@ -170,6 +242,10 @@ export default function AuthProvider({
       await account.deleteSession({ sessionId: "current" });
     }
     setUser(null);
+    setHasProfile(null);
+    setPreferences({});
+    setUserLabels([]);
+    setIsTrial(false);
   };
 
   return (
@@ -178,12 +254,18 @@ export default function AuthProvider({
         user,
         isLoadingUser,
         preferences,
+        hasProfile,
+        profileLoading,
+        isTrial,
+        userLabels,
         signUp,
         signIn,
         signInWithOAuth2,
         signOut,
         updatePreferences,
         setPreference,
+        refreshProfile,
+        refreshLabels,
       }}
     >
       {children}
