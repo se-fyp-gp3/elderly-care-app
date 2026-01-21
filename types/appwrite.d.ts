@@ -32,7 +32,7 @@ export type ElderlyT1Test = Models.Row & {
 
 export type Elderly = Models.Row & {
     user_id: string;
-    name: string | null;
+    name: string;
     phone: string | null;
     birth: string | null;
     status: ElderlyStatus | null;

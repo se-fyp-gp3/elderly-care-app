@@ -1,6 +1,7 @@
 import ElderlyCard, { ElderlyItem } from "@/components/ElderlyCard"; // Import the new component
-import { DATABASE_ID, databases, ELDERLY_COLLECTION_ID, ElderlyDocument } from "@/lib/appwrite";
+import { DATABASE_ID, ELDERLY_TABLE_ID, tablesDB } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
+import { Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
@@ -21,7 +22,7 @@ import {
 } from "react-native-paper";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-interface ElderlyListItem extends ElderlyDocument {
+interface ElderlyListItem extends Elderly {
     lastCheck?: string;
     medication?: string;
     nextAppointment?: string;
@@ -38,14 +39,14 @@ export default function CaregiverDashboard() {
     const fetchElderlyData = React.useCallback(async () => {
         try {
             setError(null);
-            const response = await (databases as Databases).listDocuments(
-                DATABASE_ID,
-                ELDERLY_COLLECTION_ID,
-                [Query.limit(100), Query.orderDesc('$createdAt')]
-            );
+            const response = await tablesDB.listRows({
+                databaseId: DATABASE_ID,
+                tableId: ELDERLY_TABLE_ID,
+                queries: [Query.limit(100), Query.orderDesc('$createdAt')]
+            });
             
-            const transformedData: ElderlyListItem[] = response.documents.map((doc: any) => ({
-                ...doc,
+            const transformedData: ElderlyListItem[] = response.rows.map((row: any) => ({
+                ...row,
                 lastCheck: "Recently",
                 medication: "Pending",
                 nextAppointment: "None"
@@ -253,7 +254,7 @@ export default function CaregiverDashboard() {
                     {!loading && elderlyList.map((elderly) => (
                         <ElderlyCard
                             key={elderly.$id}
-                            elderly={elderly as ElderlyItem}
+                            elderly={elderly as ElderlyListItem}
                             onCall={handleCall}
                             onViewInfo={() => handleViewInfo(elderly.$id)}
                             onViewHealth={handleViewHealth}

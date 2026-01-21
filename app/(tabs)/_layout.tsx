@@ -36,7 +36,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="caregiver"
-        options={{ 
+        options={{
           title: "Care panel",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
@@ -52,11 +52,7 @@ export default function TabsLayout() {
         options={{
           title: "Medication",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="pill"
-              size={size}
-              color={color}
-            />
+            <MaterialCommunityIcons name="pill" size={size} color={color} />
           ),
         }}
       />
@@ -93,7 +89,6 @@ export default function TabsLayout() {
         options={{
           href: null,
           title: "Emergency",
-          tabBarStyle: { display: "flex" }, // Ensure tab bar is visible
         }}
       />
       <Tabs.Screen
@@ -101,7 +96,6 @@ export default function TabsLayout() {
         options={{
           href: null,
           title: "Health Data",
-          tabBarStyle: { display: "flex" },
         }}
       />
       <Tabs.Screen
@@ -109,14 +103,6 @@ export default function TabsLayout() {
         options={{
           href: null,
           title: "Schedule",
-          tabBarStyle: { display: "flex" },
-        }}
-      />
-      <Tabs.Screen
-        name="elderly/index"
-        options={{
-          href: null,
-          title: "Elderly List",
         }}
       />
       <Tabs.Screen
@@ -124,7 +110,6 @@ export default function TabsLayout() {
         options={{
           href: null,
           title: "Elderly Detail",
-          tabBarStyle: { display: "flex" },
         }}
       />
     </Tabs>

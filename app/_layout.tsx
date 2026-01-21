@@ -23,7 +23,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
         router.replace("/");
       }
     }
-  }, [user, segments, isLoadingUser, appReady]);
+  }, [router, user, segments, isLoadingUser, appReady]);
 
   return (
     <>
