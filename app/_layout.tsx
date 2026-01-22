@@ -28,7 +28,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     const currentRoute = segments[0];
     const authRoutes = ["start", "signup", "auth", "profile-setup"];
     const inAuthGroup = authRoutes.includes(currentRoute as string);
-    const inCaregiverTabs = currentRoute === "(tabs)";
+    const inCaregiverTabs = currentRoute === "(caregiver-tabs)";
     const inElderlyTabs = currentRoute === "(elderly-tabs)";
 
     if (isLoadingUser || profileLoading) {
@@ -60,14 +60,14 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
           if (role === "elderly") {
             router.replace("/(elderly-tabs)");
           } else {
-            router.replace("/(tabs)");
+            router.replace("/(caregiver-tabs)");
           }
         } else if (role === "elderly" && inCaregiverTabs) {
           // Elderly user trying to access caregiver tabs
           router.replace("/(elderly-tabs)");
         } else if (role === "caregiver" && inElderlyTabs) {
           // Caregiver trying to access elderly tabs
-          router.replace("/(tabs)");
+          router.replace("/(caregiver-tabs)");
         }
       }
     }
@@ -116,7 +116,7 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <RouteGuard>
               <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="(caregiver-tabs)" options={{ headerShown: false }} />
                 <Stack.Screen
                   name="(elderly-tabs)"
                   options={{ headerShown: false }}
