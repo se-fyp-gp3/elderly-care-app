@@ -5,11 +5,7 @@ import { Platform } from "react-native";
 import { ID, Models, OAuthProvider } from "react-native-appwrite";
 import { UserPreferences } from "../types/user";
 import { account, accountWeb } from "./appwrite";
-import {
-  addRoleLabel,
-  checkProfileExists,
-  hasTrialLabel,
-} from "./user";
+import { addRoleLabel, checkProfileExists, hasTrialLabel } from "./user";
 export class LoginError extends Error {
   constructor(message: string) {
     super(message);
@@ -160,45 +156,29 @@ export default function AuthProvider({
   };
 
   const signIn = async (email: string, password: string) => {
-    let session;
+    let user;
     if (Platform.OS === "web") {
       await accountWeb.createEmailPasswordSession({ email, password });
-      session = await accountWeb.get();
+      user = await accountWeb.get();
     } else {
       await account.createEmailPasswordSession({ email, password });
-      session = await account.get();
+      user = await account.get();
     }
-    setUser(session);
+    setUser(user);
 
-    if (session.prefs) {
-      setPreferences(session.prefs as UserPreferences);
+    if (user.prefs) {
+      setPreferences(user.prefs as UserPreferences);
     }
-
-    return null;
-  };
-
-  const updatePreferences = async (newPreferences: UserPreferences) => {
-    await account.updatePrefs(newPreferences);
-    const updatedUser = await account.get();
-    setUser(updatedUser);
-    setPreferences(newPreferences);
-    return null;
-  };
-
-  const setPreference = async (key: string, value: any) => {
-    const newPrefs = { ...preferences, [key]: value };
-    await account.updatePrefs(newPrefs);
-    setPreferences(newPrefs);
     return null;
   };
 
   const signInWithOAuth2 = async (provider: OAuthProvider) => {
-    let session;
+    let user;
     if (Platform.OS === "web") {
       accountWeb.createOAuth2Session({
         provider,
       });
-      session = await accountWeb.get();
+      user = await accountWeb.get();
     } else {
       const deepLink = new URL(makeRedirectUri());
       const scheme = `${deepLink.protocol}//`;
@@ -226,12 +206,16 @@ export default function AuthProvider({
         }
 
         await account.createSession({ userId, secret });
-        session = await account.get();
+        user = await account.get();
+
+        if (user.prefs) {
+          setPreferences(user.prefs as UserPreferences);
+        }
       } else {
         throw new LoginError("OAuth2 sign-in was cancelled or failed");
       }
     }
-    setUser(session);
+    setUser(user);
     return null;
   };
 
@@ -246,6 +230,21 @@ export default function AuthProvider({
     setPreferences({});
     setUserLabels([]);
     setIsTrial(false);
+  };
+
+  const updatePreferences = async (newPreferences: UserPreferences) => {
+    await account.updatePrefs({ prefs: newPreferences });
+    const updatedUser = await account.get();
+    setUser(updatedUser);
+    setPreferences(newPreferences);
+    return null;
+  };
+
+  const setPreference = async (key: string, value: any) => {
+    const newPrefs = { ...preferences, [key]: value };
+    await account.updatePrefs({ prefs: newPrefs });
+    setPreferences(newPrefs);
+    return null;
   };
 
   return (

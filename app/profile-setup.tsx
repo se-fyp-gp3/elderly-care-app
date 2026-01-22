@@ -22,7 +22,7 @@ import { DatePickerInput } from "react-native-paper-dates";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileSetupScreen() {
-  const { user, preferences, setPreference } = useAuth();
+  const { user, preferences, setPreference, refreshProfile } = useAuth();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState<Date | undefined>(undefined);
@@ -62,10 +62,10 @@ export default function ProfileSetupScreen() {
         await createElderlyProfile(profileData as Elderly);
       }
 
-      // Ensure role is set in preferences
       if (!preferences.role) {
         await setPreference("role", role);
       }
+      refreshProfile();
 
       router.replace("/");
     } catch (err: any) {
