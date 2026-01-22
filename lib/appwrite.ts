@@ -1,4 +1,4 @@
-import { Account, Client, Databases, TablesDB } from "appwrite";
+import { Account, Client, TablesDB } from "appwrite";
 import { Client as ServerClient, Users } from "node-appwrite";
 import {
   Account as AccountReactNative,
