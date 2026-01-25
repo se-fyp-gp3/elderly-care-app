@@ -1,13 +1,12 @@
 import ElderlyDetailView, {
-  ElderlyDetailData,
+    ElderlyDetailData,
 } from "@/components/ElderlyDetailView";
-import { DATABASE_ID, tablesDB, ELDERLY_TABLE_ID } from "@/lib/appwrite";
+import { DATABASE_ID, ELDERLY_TABLE_ID, tablesDB } from "@/lib/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, TouchableOpacity, View } from "react-native";
-import { Databases } from "react-native-appwrite";
 import { Text, useTheme } from "react-native-paper";
 
 export default function ElderlyDetailPage() {
@@ -29,12 +28,12 @@ export default function ElderlyDetailPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Cast 'tablesDB' to avoid type mismatch between Web and Native SDKs
-        const doc = await (tablesDB as unknown as Databases).getDocument(
-          DATABASE_ID,
-          ELDERLY_TABLE_ID,
-          docId,
-        );
+        // Fetch document using tablesDB.getRow
+        const doc = await tablesDB.getRow({
+          databaseId: DATABASE_ID,
+          tableId: ELDERLY_TABLE_ID,
+          rowId: docId,
+        });
 
         // Map Appwrite document to our component data structure
         const mappedData: ElderlyDetailData = {

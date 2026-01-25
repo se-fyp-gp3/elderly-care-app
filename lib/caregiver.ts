@@ -1,6 +1,6 @@
 import { Caregiver } from "@/types/appwrite";
-import { CAREGIVER_TABLE_ID, DATABASE_ID, tablesDB } from "./appwrite";
 import { ID, Query } from "react-native-appwrite";
+import { CAREGIVER_TABLE_ID, DATABASE_ID, tablesDB } from "./appwrite";
 
 export async function createCaregiverProfile(
   data: Caregiver,
