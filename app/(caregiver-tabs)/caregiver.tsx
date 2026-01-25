@@ -1,12 +1,12 @@
-import ElderlyCard, { ElderlyItem } from "@/components/ElderlyCard"; // Import the new component
+import ElderlyCard from "@/components/ElderlyCard"; // Import the new component
 import { DATABASE_ID, ELDERLY_TABLE_ID, tablesDB } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
-import { Elderly } from "@/types/appwrite";
+import { Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
 import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { Databases, Query } from "react-native-appwrite";
+import { Query } from "react-native-appwrite";
 import {
     Avatar,
     Button,
@@ -26,7 +26,20 @@ interface ElderlyListItem extends Elderly {
     lastCheck?: string;
     medication?: string;
     nextAppointment?: string;
+    age?: number;
 }
+
+const calculateAge = (birthDateString?: string | null): number | undefined => {
+    if (!birthDateString) return undefined;
+    const birthDate = new Date(birthDateString);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return age;
+};
 
 export default function CaregiverDashboard() {
     const { preferences } = useAuth();
@@ -47,6 +60,7 @@ export default function CaregiverDashboard() {
             
             const transformedData: ElderlyListItem[] = response.rows.map((row: any) => ({
                 ...row,
+                age: calculateAge(row.birth),
                 lastCheck: "Recently",
                 medication: "Pending",
                 nextAppointment: "None"
@@ -171,7 +185,7 @@ export default function CaregiverDashboard() {
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text variant="headlineSmall" style={styles.statNumber}>{elderlyList.filter(e => e.status === 'warning').length}</Text>
+                                <Text variant="headlineSmall" style={styles.statNumber}>{elderlyList.filter(e => e.status === ElderlyStatus.WARNING).length}</Text>
                                 <Text variant="bodyMedium">Needs Attention</Text>
                             </View>
                         </Card.Content>

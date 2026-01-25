@@ -1,18 +1,16 @@
+import { Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import { Avatar, Button, Card, Chip, Text } from "react-native-paper";
 
 // Define the interface for the elderly item
-export interface ElderlyItem {
-    $id: string; // Using $id as the ID field to match Appwrite/database structure
-    name: string;
-    age: number;
-    phone: string;
-    status: string; // 'warning' | 'normal'
+export interface ElderlyItem extends Elderly {
     lastCheck?: string;
     medication?: string;
     nextAppointment?: string;
+    // age is removed as we will calculate it from birth if needed, or define it as optional if passed
+    age?: number; 
 }
 
 interface ElderlyCardProps {
@@ -22,11 +20,26 @@ interface ElderlyCardProps {
     onViewHealth: (id: string) => void;
 }
 
+const calculateAge = (birthDateString?: string | null): number | string => {
+    if (!birthDateString) return '??';
+    const birthDate = new Date(birthDateString);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return age;
+};
+
+
 /**
  * ElderlyCard Component
  * Displays a summary card for an elderly person with quick action buttons.
  */
 export default function ElderlyCard({ elderly, onCall, onViewInfo, onViewHealth }: ElderlyCardProps) {
+    const displayAge = elderly.age ?? calculateAge(elderly.birth);
+
     return (
         <Card style={styles.elderlyCard}>
             <Card.Content>
@@ -34,25 +47,25 @@ export default function ElderlyCard({ elderly, onCall, onViewInfo, onViewHealth 
                     <View style={styles.elderlyInfo}>
                         <Avatar.Text
                             size={50}
-                            label={elderly.name.substring(0, 2)}
+                            label={elderly.name ? elderly.name.substring(0, 2) : "??"}
                             style={[
                                 styles.avatar,
-                                elderly.status === 'warning' && styles.warningAvatar
+                                elderly.status === ElderlyStatus.WARNING && styles.warningAvatar
                             ]}
                         />
                         <View style={styles.elderlyDetails}>
                             <Text variant="titleMedium">{elderly.name}</Text>
-                            <Text variant="bodyMedium">{elderly.age} years old</Text>
+                            <Text variant="bodyMedium">{displayAge} years old</Text>
                         </View>
                     </View>
                     <Chip
                         mode="outlined"
                         style={[
                             styles.statusChip,
-                            elderly.status === 'warning' && styles.warningChip
+                            elderly.status === ElderlyStatus.WARNING && styles.warningChip
                         ]}
                     >
-                        {elderly.status === 'warning' ? 'Need attention' : 'normal'}
+                        {elderly.status === ElderlyStatus.WARNING ? 'Need attention' : 'Normal'}
                     </Chip>
                 </View>
 
@@ -77,7 +90,7 @@ export default function ElderlyCard({ elderly, onCall, onViewInfo, onViewHealth 
                         compact
                         icon="phone"
                         style={styles.smallButton}
-                        onPress={() => onCall(elderly.phone)}
+                        onPress={() => onCall(elderly.phone || undefined)}
                     >
                         Call
                     </Button>

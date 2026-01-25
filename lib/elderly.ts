@@ -1,4 +1,4 @@
-import { Elderly, ElderlyStatus } from "@/types/appwrite.d";
+import { Elderly, ElderlyStatus } from "@/types/appwrite";
 import { DATABASE_ID, tablesDB, ELDERLY_TABLE_ID } from "./appwrite";
 import { ID, Query } from "react-native-appwrite";
 
