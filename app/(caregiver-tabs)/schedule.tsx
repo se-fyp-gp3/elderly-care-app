@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
 import React, { useLayoutEffect, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Avatar, Button, Chip, Divider, FAB, Surface, Text, useTheme } from 'react-native-paper';
+import { Avatar, Button, Chip, Divider, FAB, Portal, Dialog, RadioButton, Surface, Text, useTheme } from 'react-native-paper';
 
 type ScheduleEvent = {
     id: string;
@@ -29,6 +29,15 @@ export default function SchedulePage() {
     const router = useRouter();
     const navigation = useNavigation();
     const [selectedDate, setSelectedDate] = useState(new Date().getDate());
+    const [filterVisible, setFilterVisible] = useState(false);
+    const [selectedElderly, setSelectedElderly] = useState('All');
+
+    // Get unique elderly names
+    const elderlyList = ['All', ...Array.from(new Set(EVENTS.map(e => e.elderlyName).filter(n => n !== 'All')))];
+
+    const filteredEvents = selectedElderly === 'All' 
+        ? EVENTS 
+        : EVENTS.filter(item => item.elderlyName === selectedElderly);
 
     // Generate next 7 days
     const dates = Array.from({ length: 7 }, (_, i) => {
@@ -144,11 +153,47 @@ export default function SchedulePage() {
 
             <View style={styles.taskListContainer}>
                 <View style={styles.listHeader}>
-                    <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>Tasks for Today</Text>
-                    <Chip compact>6 Total</Chip>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text variant="titleMedium" style={{ fontWeight: 'bold', marginRight: 8 }}>Tasks for</Text>
+                         <Button 
+                            mode="text" 
+                            onPress={() => setFilterVisible(true)} 
+                            compact 
+                            contentStyle={{ flexDirection: 'row-reverse' }}
+                            icon="chevron-down"
+                            labelStyle={{ fontSize: 16, fontWeight: 'bold' }}
+                        >
+                            {selectedElderly === 'All' ? 'Everyone' : selectedElderly}
+                        </Button>
+                        <Portal>
+                            <Dialog visible={filterVisible} onDismiss={() => setFilterVisible(false)}>
+                                <Dialog.Title>Select Elderly</Dialog.Title>
+                                <Dialog.ScrollArea style={{ maxHeight: 300, paddingHorizontal: 0 }}>
+                                    <ScrollView contentContainerStyle={{paddingHorizontal: 0}}>
+                                        <RadioButton.Group onValueChange={value => {
+                                            setSelectedElderly(value);
+                                            setFilterVisible(false);
+                                        }} value={selectedElderly}>
+                                            {elderlyList.map((name) => (
+                                                <RadioButton.Item 
+                                                    key={name}
+                                                    label={name === 'All' ? 'Everyone' : name} 
+                                                    value={name} 
+                                                />
+                                            ))}
+                                        </RadioButton.Group>
+                                    </ScrollView>
+                                </Dialog.ScrollArea>
+                                <Dialog.Actions>
+                                    <Button onPress={() => setFilterVisible(false)}>Cancel</Button>
+                                </Dialog.Actions>
+                            </Dialog>
+                        </Portal>
+                    </View>
+                    <Chip compact>{filteredEvents.length} Total</Chip>
                 </View>
                 <FlatList
-                    data={EVENTS}
+                    data={filteredEvents}
                     keyExtractor={item => item.id}
                     renderItem={renderEvent}
                     contentContainerStyle={{ paddingBottom: 100 }}
