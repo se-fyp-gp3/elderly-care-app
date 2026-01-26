@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
 import React, { useLayoutEffect, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Avatar, Button, Chip, Divider, FAB, Portal, Dialog, RadioButton, Surface, Text, useTheme } from 'react-native-paper';
+import { Avatar, Button, Chip, Dialog, Divider, FAB, Portal, RadioButton, Surface, Text, useTheme } from 'react-native-paper';
 
 type ScheduleEvent = {
     id: string;
