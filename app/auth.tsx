@@ -35,10 +35,13 @@ export default function AuthScreen() {
     try {
       await signIn(email, password);
       router.replace("/");
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Login error:', error);
       if (error instanceof LoginError) {
         setError(error.message);
       } else if (error instanceof AppwriteException) {
+        setError(error.message);
+      } else if (error?.message) {
         setError(error.message);
       } else {
         setError("An unexpected error occurred. Please try again.");
@@ -60,10 +63,13 @@ export default function AuthScreen() {
       } else {
         router.replace("/");
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('OAuth error:', error);
       if (error instanceof LoginError) {
         setError(error.message);
       } else if (error instanceof AppwriteException) {
+        setError(error.message);
+      } else if (error?.message) {
         setError(error.message);
       } else {
         setError("Authentication was cancelled or failed. Please try again.");

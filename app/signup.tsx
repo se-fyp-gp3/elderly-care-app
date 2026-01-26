@@ -59,8 +59,9 @@ export default function SignupScreen() {
     try {
       await signUp(email, password, { role: role || "elderly" });
       router.replace("/profile-setup");
-    } catch (err) {
-      if (err instanceof AppwriteException) {
+    } catch (err: any) {
+      console.error("Signup error:", err);
+      if (err instanceof AppwriteException || (err && err.type)) {
         if (err.type === "user_already_exists") {
           setError(
             "An account with this email already exists. Please sign in instead.",
@@ -68,9 +69,11 @@ export default function SignupScreen() {
         } else if (err.type === "general_argument_invalid") {
           setError("Please enter a valid email address.");
         } else {
-          setError(err.message);
+          setError(err.message || "An unexpected error occurred.");
         }
       } else if (err instanceof LoginError) {
+        setError(err.message);
+      } else if (err?.message) {
         setError(err.message);
       } else {
         setError("An unexpected error occurred. Please try again.");
@@ -88,10 +91,13 @@ export default function SignupScreen() {
       await signInWithOAuth2(OAuthProvider.Google);
       // After OAuth, check if role is set - if not, they need to complete profile
       router.replace("/profile-setup");
-    } catch (err) {
+    } catch (err: any) {
+      console.error("OAuth error:", err);
       if (err instanceof LoginError) {
         setError(err.message);
       } else if (err instanceof AppwriteException) {
+        setError(err.message);
+      } else if (err?.message) {
         setError(err.message);
       } else {
         setError("Authentication was cancelled or failed. Please try again.");
