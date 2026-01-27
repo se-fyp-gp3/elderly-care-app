@@ -3,7 +3,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRouter } from 'expo-router';
 import React, { useLayoutEffect, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Avatar, Button, Chip, Dialog, Divider, FAB, IconButton, Modal, Portal, RadioButton, Searchbar, Surface, Text, TextInput, useTheme } from 'react-native-paper';
+import { Avatar, Button, Chip, Dialog, Divider, FAB, IconButton, Modal, Portal, Searchbar, Surface, Text, TextInput, useTheme } from 'react-native-paper';
 
 type ScheduleEvent = {
     id: string;
@@ -42,6 +42,7 @@ export default function SchedulePage() {
     // Dropdown Menus
     const [selectionMode, setSelectionMode] = useState<'form' | 'elderly' | 'type'>('form');
     const [searchQuery, setSearchQuery] = useState('');
+    const [filterSearchQuery, setFilterSearchQuery] = useState('');
 
     // Filters
     const [filterVisible, setFilterVisible] = useState(false);
@@ -242,24 +243,38 @@ export default function SchedulePage() {
                             {selectedElderly === 'All' ? 'Everyone' : selectedElderly}
                         </Button>
                         <Portal>
-                            <Dialog visible={filterVisible} onDismiss={() => setFilterVisible(false)}>
+                            <Dialog visible={filterVisible} onDismiss={() => setFilterVisible(false)} style={{ backgroundColor: theme.colors.surface }}>
                                 <Dialog.Title>Select Elderly</Dialog.Title>
-                                <Dialog.ScrollArea style={{ maxHeight: 300, paddingHorizontal: 0 }}>
-                                    <ScrollView contentContainerStyle={{paddingHorizontal: 0}}>
-                                        <RadioButton.Group onValueChange={value => {
-                                            setSelectedElderly(value);
-                                            setFilterVisible(false);
-                                        }} value={selectedElderly}>
-                                            {elderlyList.map((name) => (
-                                                <RadioButton.Item 
+                                <Dialog.Content style={{ paddingBottom: 0 }}>
+                                    <Searchbar
+                                        placeholder="Search"
+                                        onChangeText={setFilterSearchQuery}
+                                        value={filterSearchQuery}
+                                        style={{ backgroundColor: theme.colors.surfaceVariant, height: 40, marginBottom: 10 }}
+                                        inputStyle={{ minHeight: 0 }}
+                                    />
+                                    <ScrollView style={{ maxHeight: 300 }}>
+                                        {elderlyList
+                                            .filter(name => name.toLowerCase().includes(filterSearchQuery.toLowerCase()))
+                                            .map((name) => (
+                                                <TouchableOpacity
                                                     key={name}
-                                                    label={name === 'All' ? 'Everyone' : name} 
-                                                    value={name} 
-                                                />
+                                                    style={[
+                                                        styles.selectionRow,
+                                                        { backgroundColor: selectedElderly === name ? theme.colors.secondaryContainer : 'transparent' }
+                                                    ]}
+                                                    onPress={() => {
+                                                        setSelectedElderly(name);
+                                                        setFilterVisible(false);
+                                                    }}
+                                                >
+                                                    <Avatar.Icon size={40} icon="account" style={{ marginRight: 16, backgroundColor: theme.colors.secondary }} />
+                                                    <Text variant="titleMedium">{name === 'All' ? 'Everyone' : name}</Text>
+                                                    {selectedElderly === name && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
+                                                </TouchableOpacity>
                                             ))}
-                                        </RadioButton.Group>
                                     </ScrollView>
-                                </Dialog.ScrollArea>
+                                </Dialog.Content>
                                 <Dialog.Actions>
                                     <Button onPress={() => setFilterVisible(false)}>Cancel</Button>
                                 </Dialog.Actions>
