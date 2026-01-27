@@ -1,9 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
-import React, { useLayoutEffect, useState, useCallback } from 'react';
-import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View, Platform } from 'react-native';
-import { Avatar, Button, Chip, Dialog, Divider, FAB, Portal, RadioButton, Surface, Text, useTheme, TextInput, Modal } from 'react-native-paper';
-import { DatePickerModal, TimePickerModal, registerTranslation, en } from 'react-native-paper-dates';
+import React, { useCallback, useLayoutEffect, useState } from 'react';
+import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Avatar, Button, Chip, Dialog, Divider, FAB, Modal, Portal, RadioButton, Surface, Text, TextInput, useTheme } from 'react-native-paper';
+import { DatePickerModal, TimePickerModal, en, registerTranslation } from 'react-native-paper-dates';
 
 // Register translation for date picker
 registerTranslation('en', en);
