@@ -1,7 +1,8 @@
 import MedicationCard, { MedicationItem } from "@/components/MedicationCard"; // Import the new component
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import React, { useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
 import {
     Button,
     Card,
@@ -116,6 +117,15 @@ export default function MedicationManagement() {
                 if (status !== 'granted') {
                     await Notifications.requestPermissionsAsync();
                 }
+
+                if (Platform.OS === 'android') {
+                    await Notifications.setNotificationChannelAsync('default', {
+                        name: 'default',
+                        importance: Notifications.AndroidImportance.MAX,
+                        vibrationPattern: [0, 250, 250, 250],
+                        lightColor: '#FF231F7C',
+                    });
+                }
             } catch (e) {
                 console.warn('Notification permission request failed', e);
             }
@@ -166,17 +176,26 @@ export default function MedicationManagement() {
                         body,
                         data: { medId },
                     },
-                    trigger: { seconds: 10 * 60 } as any, // 10 minutes
+                    trigger: {
+                        type: 'timeInterval',
+                        seconds: 5,
+                        repeats: false,
+                    } as any,
                 });
 
                 const updated = medicationsState.map(m => m.id === medId ? { ...m, reminderId: identifier } : m);
                 setMedicationsState(updated);
                 await saveMedsToStorage(updated);
 
-                Alert.alert('Reminder set', 'You will be reminded in 10 minutes.');
-            } catch (e) {
+                Alert.alert('Reminder set', 'Testing mode: Notification will appear in 5 seconds.');
+            } catch (e: any) {
                 console.warn('Failed to schedule notification', e);
-                Alert.alert('Error', 'Unable to schedule reminder.');
+                const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+                if (isExpoGo) {
+                    Alert.alert('Not Supported', 'Notifications are not supported in Expo Go on Android (SDK 53+). Please use a Development Build.');
+                } else {
+                    Alert.alert('Error', 'Unable to schedule reminder.');
+                }
             }
         })();
     };
