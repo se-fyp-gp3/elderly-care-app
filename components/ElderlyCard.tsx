@@ -110,7 +110,7 @@ export default function ElderlyCard({ elderly, onCall, onViewInfo, onViewHealth 
                         style={styles.smallButton}
                         onPress={() => onViewHealth(elderly.$id)} // Ensure we use the correct ID field
                     >
-                        HealthData
+                        Health
                     </Button>
                 </View>
             </Card.Content>

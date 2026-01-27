@@ -388,7 +388,7 @@ export default function CaregiverDashboard() {
             <FAB
                 icon="plus"
                 style={styles.fab}
-                onPress={() => console.log('添加新记录')}
+                onPress={() => console.log('Add new elderly')}
             />
         </View>
     );

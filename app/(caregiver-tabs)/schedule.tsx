@@ -1,8 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
-import React, { useLayoutEffect, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Avatar, Button, Chip, Dialog, Divider, FAB, Portal, RadioButton, Surface, Text, useTheme } from 'react-native-paper';
+import React, { useLayoutEffect, useState, useCallback } from 'react';
+import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View, Platform } from 'react-native';
+import { Avatar, Button, Chip, Dialog, Divider, FAB, Portal, RadioButton, Surface, Text, useTheme, TextInput, Modal } from 'react-native-paper';
+import { DatePickerModal, TimePickerModal, registerTranslation, en } from 'react-native-paper-dates';
+
+// Register translation for date picker
+registerTranslation('en', en);
 
 type ScheduleEvent = {
     id: string;
@@ -28,9 +32,27 @@ export default function SchedulePage() {
     const theme = useTheme();
     const router = useRouter();
     const navigation = useNavigation();
-    const [selectedDate, setSelectedDate] = useState(new Date().getDate());
+    
+    // Date Management
+    const [referenceDate, setReferenceDate] = useState(new Date());
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [datePickerVisible, setDatePickerVisible] = useState(false);
+
+    // Filters
     const [filterVisible, setFilterVisible] = useState(false);
     const [selectedElderly, setSelectedElderly] = useState('All');
+
+    // New Task Management
+    const [newTaskVisible, setNewTaskVisible] = useState(false);
+    const [timePickerVisible, setTimePickerVisible] = useState(false);
+    const [newTask, setNewTask] = useState<Partial<ScheduleEvent>>({
+        title: '',
+        description: '',
+        time: '',
+        type: 'medication',
+        elderlyName: 'All', // Default or select first
+        status: 'pending'
+    });
 
     // Get unique elderly names
     const elderlyList = ['All', ...Array.from(new Set(EVENTS.map(e => e.elderlyName).filter(n => n !== 'All')))];
@@ -39,16 +61,31 @@ export default function SchedulePage() {
         ? EVENTS 
         : EVENTS.filter(item => item.elderlyName === selectedElderly);
 
-    // Generate next 7 days
+    // Generate next 7 days from referenceDate
     const dates = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() + i);
+        const d = new Date(referenceDate);
+        d.setDate(referenceDate.getDate() + i);
         return {
             day: d.toLocaleDateString('en-US', { weekday: 'short' }),
             date: d.getDate(),
-            fullDate: d
+            fullDate: d,
+            isToday: d.toDateString() === new Date().toDateString()
         };
     });
+
+    const onConfirmDate = useCallback((params: { date: Date | undefined }) => {
+        setDatePickerVisible(false);
+        if (params.date) {
+            setReferenceDate(params.date);
+            setSelectedDate(params.date);
+        }
+    }, []);
+
+    const onConfirmTime = useCallback(({ hours, minutes }: { hours: number; minutes: number }) => {
+        setTimePickerVisible(false);
+        const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        setNewTask(prev => ({ ...prev, time: timeString }));
+    }, []);
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -64,7 +101,7 @@ export default function SchedulePage() {
             ),
              headerRight: () => (
                 <View style={{ marginRight: 10 }}>
-                     <Chip icon="calendar-month" onPress={() => {}}>Month</Chip>
+                     <Chip icon="calendar-month" onPress={() => setDatePickerVisible(true)}>Month</Chip>
                 </View>
             )
         });
@@ -129,15 +166,15 @@ export default function SchedulePage() {
             {/* Header Date Strip */}
             <View style={[styles.calendarStrip, { backgroundColor: theme.colors.background }]}>
                 <Text variant="headlineSmall" style={{ fontWeight: 'bold', paddingHorizontal: 16, marginBottom: 16, marginTop: 10 }}>
-                    {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    {referenceDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10 }}>
                     {dates.map((d, index) => {
-                        const isSelected = d.date === selectedDate;
+                        const isSelected = d.fullDate.toDateString() === selectedDate.toDateString();
                         return (
                              <TouchableOpacity 
                                 key={index} 
-                                onPress={() => setSelectedDate(d.date)}
+                                onPress={() => setSelectedDate(d.fullDate)}
                                 style={[
                                     styles.dateBox, 
                                     { backgroundColor: isSelected ? theme.colors.primary : theme.colors.surfaceVariant }
@@ -205,9 +242,100 @@ export default function SchedulePage() {
                 icon="plus"
                 style={[styles.fab, { backgroundColor: theme.colors.primary }]}
                 color={theme.colors.onPrimary}
-                onPress={() => {}}
+                onPress={() => setNewTaskVisible(true)}
                 label="New Task"
             />
+
+            {/* Date Picker Modal */}
+            <DatePickerModal
+                locale="en"
+                mode="single"
+                visible={datePickerVisible}
+                onDismiss={() => setDatePickerVisible(false)}
+                date={referenceDate}
+                onConfirm={onConfirmDate}
+            />
+
+            {/* Time Picker Modal */}
+            <TimePickerModal
+                visible={timePickerVisible}
+                onDismiss={() => setTimePickerVisible(false)}
+                onConfirm={onConfirmTime}
+                hours={Number(newTask.time?.split(':')[0] || 12)}
+                minutes={Number(newTask.time?.split(':')[1] || 0)}
+            />
+
+            {/* New Task Modal */}
+            <Portal>
+                <Modal visible={newTaskVisible} onDismiss={() => setNewTaskVisible(false)} contentContainerStyle={[styles.modalContent, {backgroundColor: theme.colors.surface}]}>
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        <Text variant="headlineSmall" style={{marginBottom: 20, fontWeight: 'bold'}}>New Task</Text>
+                        
+                        <TextInput 
+                            mode="outlined"
+                            label="Title" 
+                            value={newTask.title} 
+                            onChangeText={t => setNewTask({...newTask, title: t})} 
+                            style={styles.input}
+                        />
+                        
+                        <TextInput 
+                            mode="outlined"
+                            label="Description" 
+                            value={newTask.description} 
+                            onChangeText={t => setNewTask({...newTask, description: t})} 
+                            style={styles.input}
+                            multiline
+                        />
+                        
+                        <TouchableOpacity onPress={() => setTimePickerVisible(true)}>
+                            <TextInput 
+                                mode="outlined"
+                                label="Time" 
+                                value={newTask.time} 
+                                editable={false} 
+                                style={styles.input}
+                                right={<TextInput.Icon icon="clock" onPress={() => setTimePickerVisible(true)} />}
+                            />
+                        </TouchableOpacity>
+
+                        <Text variant="titleMedium" style={{marginTop: 10, marginBottom: 5}}>Who is this for?</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 15}}>
+                            {elderlyList.filter(e => e!=='All').map(name => (
+                                <Chip 
+                                    key={name}
+                                    selected={newTask.elderlyName === name} 
+                                    onPress={() => setNewTask({...newTask, elderlyName: name})}
+                                    style={{marginRight: 8}}
+                                    showSelectedOverlay
+                                >
+                                    {name}
+                                </Chip>
+                            ))}
+                        </ScrollView>
+
+                        <Text variant="titleMedium" style={{marginBottom: 5}}>Type</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
+                            {['medication', 'appointment', 'meal', 'activity', 'checkup'].map(type => (
+                                <Chip 
+                                    key={type}
+                                    selected={newTask.type === type} 
+                                    onPress={() => setNewTask({...newTask, type: type as any})}
+                                    style={{marginRight: 8}}
+                                    showSelectedOverlay
+                                >
+                                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                                </Chip>
+                            ))}
+                        </ScrollView>
+
+                        <Button mode="contained" onPress={() => setNewTaskVisible(false)} style={{marginTop: 10}}>
+                            Save Task
+                        </Button>
+                    </ScrollView>
+                </Modal>
+            </Portal>
+
         </View>
     );
 }
@@ -297,5 +425,13 @@ const styles = StyleSheet.create({
         margin: 16,
         right: 0,
         bottom: 0,
+    },
+    modalContent: {
+        margin: 20,
+        padding: 20,
+        borderRadius: 10,
+    },
+    input: {
+        marginBottom: 10,
     },
 });
