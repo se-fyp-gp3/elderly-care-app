@@ -42,7 +42,8 @@
         }
       ],
       "expo-web-browser",
-      "react-native-localize"
+      "react-native-localize",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
