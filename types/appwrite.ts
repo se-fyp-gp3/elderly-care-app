@@ -56,6 +56,7 @@ export type Medication = Models.Row & {
 }
 
 export type ElderlyMedication = Models.Row & {
+    elderly_id?: string | null;
     elderly: Elderly[];
     medication: Medication[];
     dosage: number | null;
@@ -69,6 +70,7 @@ export type ElderlyMedication = Models.Row & {
 }
 
 export type Schedule = Models.Row & {
+    elderly_id?: string | null;
     time: string | null;
     title: string | null;
     description: string | null;
@@ -92,4 +94,12 @@ export type HealthData = Models.Row & {
     elderly: Elderly[];
     time: string | null;
     type: string | null;
+}
+
+export type ChatSessionRow = Models.Row & {
+    user_id: string;
+    chat_id: string;
+    title: string | null;
+    messages: string | null;
+    updated_at: string | null;
 }
