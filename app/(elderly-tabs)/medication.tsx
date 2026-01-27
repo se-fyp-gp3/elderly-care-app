@@ -1,15 +1,9 @@
-import {
-    DATABASE_ID,
-    ELDERLY_MEDICATION_TABLE_ID,
-    tablesDB,
-} from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
-import { getElderlyByUserId } from "@/lib/elderly";
+import { fetchElderlyMedicationsForUser } from "@/lib/elderly";
 import { ElderlyMedication } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { Query } from "react-native-appwrite";
 import { Button, Card, Chip, List, Text, useTheme } from "react-native-paper";
 
 export default function ElderlyMedicationScreen() {
@@ -22,16 +16,8 @@ export default function ElderlyMedicationScreen() {
     if (!user) return;
 
     try {
-      const profile = await getElderlyByUserId(user.$id);
-
-      if (profile) {
-        const response = await tablesDB.listRows({
-          databaseId: DATABASE_ID,
-          tableId: ELDERLY_MEDICATION_TABLE_ID,
-          queries: [Query.limit(50), Query.orderDesc("$createdAt")],
-        });
-        setMedications(response.rows as unknown as ElderlyMedication[]);
-      }
+      const response = await fetchElderlyMedicationsForUser(user.$id);
+      setMedications(response as ElderlyMedication[]);
     } catch (err) {
       console.error("Error fetching medications:", err);
       setMedications([]);

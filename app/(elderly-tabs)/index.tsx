@@ -1,11 +1,9 @@
-import {
-    DATABASE_ID,
-    ELDERLY_MEDICATION_TABLE_ID,
-    SCHEDULE_TABLE_ID,
-    tablesDB,
-} from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
-import { getElderlyByUserId } from "@/lib/elderly";
+import {
+  fetchElderlyMedicationsForUser,
+  fetchElderlySchedulesForUser,
+  getElderlyByUserId,
+} from "@/lib/elderly";
 import { Elderly, ElderlyMedication, Schedule } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -17,7 +15,6 @@ import {
     StyleSheet,
     View,
 } from "react-native";
-import { Query } from "react-native-appwrite";
 import {
     Avatar,
     Button,
@@ -52,12 +49,10 @@ export default function ElderlyHome() {
       if (profile) {
         // Fetch medications for this elderly
         try {
-          const medsResponse = await tablesDB.listRows({
-            databaseId: DATABASE_ID,
-            tableId: ELDERLY_MEDICATION_TABLE_ID,
-            queries: [Query.limit(10), Query.orderDesc("$createdAt")],
-          });
-          setMedications(medsResponse.rows as unknown as ElderlyMedication[]);
+          const medsResponse = await fetchElderlyMedicationsForUser(user.$id);
+          setMedications(
+            (medsResponse as ElderlyMedication[]).slice(0, 10),
+          );
         } catch {
           console.log("No medications found");
           setMedications([]);
@@ -65,12 +60,8 @@ export default function ElderlyHome() {
 
         // Fetch schedules for this elderly
         try {
-          const schedResponse = await tablesDB.listRows({
-            databaseId: DATABASE_ID,
-            tableId: SCHEDULE_TABLE_ID,
-            queries: [Query.limit(10), Query.orderDesc("$createdAt")],
-          });
-          setSchedules(schedResponse.rows as unknown as Schedule[]);
+          const schedResponse = await fetchElderlySchedulesForUser(user.$id);
+          setSchedules((schedResponse as Schedule[]).slice(0, 10));
         } catch {
           console.log("No schedules found");
           setSchedules([]);

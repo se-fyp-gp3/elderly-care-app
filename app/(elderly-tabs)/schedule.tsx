@@ -1,11 +1,9 @@
-import { DATABASE_ID, SCHEDULE_TABLE_ID, tablesDB } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
-import { getElderlyByUserId } from "@/lib/elderly";
+import { fetchElderlySchedulesForUser } from "@/lib/elderly";
 import { Schedule } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { Query } from "react-native-appwrite";
 import { Card, Chip, List, Text, useTheme } from "react-native-paper";
 
 export default function ElderlySchedule() {
@@ -18,16 +16,8 @@ export default function ElderlySchedule() {
     if (!user) return;
 
     try {
-      const profile = await getElderlyByUserId(user.$id);
-
-      if (profile) {
-        const response = await tablesDB.listRows({
-          databaseId: DATABASE_ID,
-          tableId: SCHEDULE_TABLE_ID,
-          queries: [Query.limit(50), Query.orderDesc("$createdAt")],
-        });
-        setSchedules(response.rows as unknown as Schedule[]);
-      }
+      const response = await fetchElderlySchedulesForUser(user.$id);
+      setSchedules(response as Schedule[]);
     } catch (err) {
       console.error("Error fetching schedules:", err);
       setSchedules([]);

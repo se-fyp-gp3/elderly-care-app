@@ -7,8 +7,6 @@
             "avatars": true,
             "databases": true,
             "locale": true,
-            "health": true,
-            "storage": true,
             "teams": true,
             "users": true,
             "sites": true,
@@ -41,10 +39,7 @@
     "tablesDB": [
         {
             "$id": "elderly-care-app-db",
-            "name": "elderly-care-app-db",
-            "enabled": true
-        }
-    ],
+                {
     "tables": [
         {
             "$id": "elderly",
@@ -332,6 +327,39 @@
             "rowSecurity": false,
             "columns": [
                 {
+                    "key": "elderly_id",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 20,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "elderly",
+                    "type": "relationship",
+                    "required": false,
+                    "array": false,
+                    "relatedCollection": "elderly",
+                    "relationType": "oneToMany",
+                    "twoWay": false,
+                    "twoWayKey": "696f2ce400358163ebaf",
+                    "onDelete": "setNull",
+                    "side": "parent"
+                },
+                {
+                    "key": "medication",
+                    "type": "relationship",
+                    "required": false,
+                    "array": false,
+                    "relatedCollection": "medication",
+                    "relationType": "oneToMany",
+                    "twoWay": false,
+                    "twoWayKey": "696f2d09002f43007e96",
+                    "onDelete": "setNull",
+                    "side": "parent"
+                },
+                {
                     "key": "dosage",
                     "type": "double",
                     "required": false,
@@ -377,10 +405,7 @@
                         "Completed",
                         "Expired"
                     ]
-                },
-                {
-                    "key": "last_taken",
-                    "type": "datetime",
+                    {
                     "required": false,
                     "array": false,
                     "default": null,
@@ -429,7 +454,21 @@
                     "side": "parent"
                 }
             ],
-            "indexes": []
+            "indexes": [
+                {
+                    "key": "idx_elderly_medication_elderly_id",
+                    "type": "key",
+                    "columns": [
+                        "elderly_id"
+                    ],
+                    "orders": [
+                        "ASC"
+                    ],
+                    "lengths": [
+                        0
+                    ]
+                }
+            ]
         },
         {
             "$id": "schedule",
@@ -446,6 +485,15 @@
             "enabled": true,
             "rowSecurity": false,
             "columns": [
+                {
+                    "key": "elderly_id",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 20,
+                    "default": null,
+                    "encrypt": false
+                },
                 {
                     "key": "time",
                     "type": "datetime",
@@ -525,7 +573,21 @@
                     "side": "parent"
                 }
             ],
-            "indexes": []
+            "indexes": [
+                {
+                    "key": "idx_schedule_elderly_id",
+                    "type": "key",
+                    "columns": [
+                        "elderly_id"
+                    ],
+                    "orders": [
+                        "ASC"
+                    ],
+                    "lengths": [
+                        0
+                    ]
+                }
+            ]
         },
         {
             "$id": "schedule_category",
