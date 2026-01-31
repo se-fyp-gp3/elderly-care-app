@@ -1,8 +1,13 @@
+import { DATABASE_ID, SCHEDULE_TABLE_ID, SCHEDULE_CATEGORY_TABLE_ID, tablesDB } from '@/lib/appwrite';
+import { useAuth } from '@/lib/auth-context';
+import { getCaregiverByUserId, getLinkedElderly } from '@/lib/caregiver';
+import { Elderly, Schedule, ScheduleCategory, ScheduleStatus } from '@/types/appwrite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRouter } from 'expo-router';
-import React, { useLayoutEffect, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { FlatList, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ID, Query } from 'react-native-appwrite';
 import { Avatar, Button, Chip, Dialog, Divider, FAB, IconButton, Modal, Portal, Searchbar, Surface, Text, TextInput, useTheme } from 'react-native-paper';
 
 type ScheduleEvent = {
@@ -10,25 +15,25 @@ type ScheduleEvent = {
   time: string;
   title: string;
   description: string;
-  type: 'medication' | 'appointment' | 'meal' | 'activity' | 'checkup';
-  status: 'pending' | 'completed' | 'missed';
+  type: string;
+  status: ScheduleStatus;
   elderlyName: string;
+  elderlyId: string;
+  rawDate: string;
 };
-
-// Mock Data
-const EVENTS: ScheduleEvent[] = [
-  { id: '1', time: '08:00', title: 'Morning Medication', description: 'Metformin 500mg, after meal', type: 'medication', status: 'completed', elderlyName: 'Grandpa Zhang' },
-  { id: '2', time: '09:00', title: 'Blood Pressure Check', description: 'Routine check', type: 'checkup', status: 'completed', elderlyName: 'Grandma Li' },
-  { id: '3', time: '12:00', title: 'Lunch', description: 'Low sodium diet', type: 'meal', status: 'pending', elderlyName: 'Grandpa Wang' },
-  { id: '4', time: '14:30', title: 'Doctor Appointment', description: 'Dr. Smith (Cardiology)', type: 'appointment', status: 'pending', elderlyName: 'Grandpa Zhang' },
-  { id: '5', time: '16:00', title: 'Afternoon Walk', description: 'Garden area', type: 'activity', status: 'pending', elderlyName: 'All' },
-  { id: '6', time: '20:00', title: 'Evening Medication', description: 'Amlodipine 5mg', type: 'medication', status: 'pending', elderlyName: 'Grandma Li' },
-];
 
 export default function SchedulePage() {
   const theme = useTheme();
   const router = useRouter();
   const navigation = useNavigation();
+  const { user } = useAuth();
+
+  // Data State
+  const [events, setEvents] = useState<ScheduleEvent[]>([]);
+  const [linkedElderly, setLinkedElderly] = useState<Elderly[]>([]);
+  const [categories, setCategories] = useState<ScheduleCategory[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Date Management
   const [referenceDate, setReferenceDate] = useState(new Date());
@@ -46,7 +51,7 @@ export default function SchedulePage() {
 
   // Filters
   const [filterVisible, setFilterVisible] = useState(false);
-  const [selectedElderly, setSelectedElderly] = useState('All');
+  const [selectedElderlyId, setSelectedElderlyId] = useState<string>('All'); // Store ID instead of name
 
   // New Task Management
   const [newTaskVisible, setNewTaskVisible] = useState(false);
@@ -57,25 +62,166 @@ export default function SchedulePage() {
     description: string;
     date: Date;
     time: string;
-    type: 'medication' | 'appointment' | 'meal' | 'activity' | 'checkup';
+    type: string; // Category ID or Name? Let's use Category Name for UI, ID for save
+    typeId?: string;
     elderlyName: string;
-    status: 'pending' | 'completed' | 'missed';
+    elderlyId: string;
+    status: ScheduleStatus;
   }>({
     title: '',
     description: '',
     date: new Date(),
     time: '',
-    type: 'medication',
-    elderlyName: 'All', // Default or select first
-    status: 'pending'
+    type: 'Activity',
+    elderlyName: 'All', 
+    elderlyId: '',
+    status: ScheduleStatus.PENDING
   });
 
-  // Get unique elderly names
-  const elderlyList = ['All', ...Array.from(new Set(EVENTS.map(e => e.elderlyName).filter(n => n !== 'All')))];
+  // Fetch Categories
+  const fetchCategories = useCallback(async () => {
+      try {
+          const response = await tablesDB.listRows<ScheduleCategory>({
+              databaseId: DATABASE_ID,
+              tableId: SCHEDULE_CATEGORY_TABLE_ID
+          });
+          setCategories(response.rows);
+      } catch (err) {
+          console.error("Error fetching categories", err);
+      }
+  }, []);
 
-  const filteredEvents = selectedElderly === 'All'
-    ? EVENTS
-    : EVENTS.filter(item => item.elderlyName === selectedElderly);
+  // Fetch Data
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+        // 1. Get Caregiver & Linked Elderly
+        const caregiver = await getCaregiverByUserId(user.$id);
+        if (!caregiver) {
+             setLoading(false);
+             return;
+        }
+        
+        const elderly = await getLinkedElderly(caregiver.$id);
+        setLinkedElderly(elderly);
+        
+        if (elderly.length === 0) {
+            setEvents([]);
+            setLoading(false);
+            return;
+        }
+
+        const elderlyIds = elderly.map(e => e.$id);
+
+        // 2. Fetch Schedules for selected Date
+        const startOfDay = new Date(selectedDate);
+        startOfDay.setHours(0,0,0,0);
+        const endOfDay = new Date(selectedDate);
+        endOfDay.setHours(23,59,59,999);
+
+        // Chunk queries if too many elderly? Appwrite query limit is usually high enough for IDs.
+        // Assuming not too many.
+        const response = await tablesDB.listRows<Schedule>({
+            databaseId: DATABASE_ID,
+            tableId: SCHEDULE_TABLE_ID,
+            queries: [
+                Query.greaterThanEqual('time', startOfDay.toISOString()),
+                Query.lessThanEqual('time', endOfDay.toISOString()),
+                Query.equal('elderly', elderlyIds), // Filter by ANY of these elderly
+                Query.limit(100),
+                Query.orderAsc('time')
+            ]
+        });
+
+        const fetchedEvents: ScheduleEvent[] = response.rows.map(row => {
+            // Find elderly name
+            let eName = 'Unknown';
+            let eId = '';
+            
+            // Normalize elderly relationship (can be array or single, object or ID)
+            let elderlyRef: any = null;
+            if (Array.isArray(row.elderly)) {
+                if (row.elderly.length > 0) elderlyRef = row.elderly[0];
+            } else {
+                elderlyRef = row.elderly;
+            }
+
+            if (elderlyRef) {
+                 if (typeof elderlyRef === 'object' && '$id' in elderlyRef) {
+                     // It is an expanded object from Appwrite
+                     eName = (elderlyRef as any).name || 'Unknown';
+                     eId = elderlyRef.$id;
+                 } else if (typeof elderlyRef === 'string') {
+                     // It is an ID string
+                     eId = elderlyRef;
+                     const found = elderly.find(e => e.$id === elderlyRef);
+                     if (found) eName = found.name;
+                     else {
+                         // Fallback attempt: if we are filtering by this elderly, we might know the name
+                         // But 'elderly' variable contains all linked elderly capable of being viewed
+                     }
+                 }
+            }
+
+            // Find category
+            let typeName = 'activity';
+            let catRef: any = null;
+            if (Array.isArray(row.schedule_category)) {
+                if (row.schedule_category.length > 0) catRef = row.schedule_category[0];
+            } else {
+                catRef = row.schedule_category;
+            }
+
+            if (catRef) {
+                 if (typeof catRef === 'object' && 'name' in catRef) {
+                     typeName = (catRef as any).name?.toLowerCase() || 'activity';
+                 }
+            }
+
+            return {
+                id: row.$id,
+                time: row.time ? new Date(row.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}) : '--:--',
+                title: row.title || '',
+                description: row.description || '',
+                type: typeName,
+                status: row.status || ScheduleStatus.PENDING,
+                elderlyName: eName,
+                elderlyId: eId,
+                rawDate: row.time || ''
+            };
+        });
+
+        setEvents(fetchedEvents);
+
+    } catch (err) {
+        console.error("Error fetching schedule", err);
+    } finally {
+        setLoading(false);
+        setRefreshing(false);
+    }
+  }, [user, selectedDate]);
+
+  useEffect(() => {
+      fetchCategories();
+  }, [fetchCategories]);
+
+  useEffect(() => {
+      fetchData();
+  }, [fetchData]);
+
+  const onRefresh = () => {
+      setRefreshing(true);
+      fetchData();
+  }
+
+  // Filtered view
+  const filteredEvents = selectedElderlyId === 'All'
+    ? events
+    : events.filter(item => item.elderlyId === selectedElderlyId);
+
+  // ... (Keep existing Helper Functions: dates, onConfirmDate etc)
+
 
   // Generate next 7 days from referenceDate
   const dates = Array.from({ length: 7 }, (_, i) => {
@@ -240,7 +386,7 @@ export default function SchedulePage() {
               icon="chevron-down"
               labelStyle={{ fontSize: 16, fontWeight: 'bold' }}
             >
-              {selectedElderly === 'All' ? 'Everyone' : selectedElderly}
+              {selectedElderlyId === 'All' ? 'Everyone' : (linkedElderly.find(e => e.$id === selectedElderlyId)?.name || 'Unknown')}
             </Button>
             <Portal>
               <Dialog visible={filterVisible} onDismiss={() => setFilterVisible(false)} style={{ backgroundColor: theme.colors.surface }}>
@@ -254,23 +400,37 @@ export default function SchedulePage() {
                     inputStyle={{ minHeight: 0 }}
                   />
                   <ScrollView style={{ maxHeight: 300 }}>
-                    {elderlyList
-                      .filter(name => name.toLowerCase().includes(filterSearchQuery.toLowerCase()))
-                      .map((name) => (
-                        <TouchableOpacity
-                          key={name}
+                    <TouchableOpacity
                           style={[
                             styles.selectionRow,
-                            { backgroundColor: selectedElderly === name ? theme.colors.secondaryContainer : 'transparent' }
+                            { backgroundColor: selectedElderlyId === 'All' ? theme.colors.secondaryContainer : 'transparent' }
                           ]}
                           onPress={() => {
-                            setSelectedElderly(name);
+                            setSelectedElderlyId('All');
                             setFilterVisible(false);
                           }}
                         >
-                          <Avatar.Icon size={40} icon="account" style={{ marginRight: 16, backgroundColor: theme.colors.secondary }} />
-                          <Text variant="titleMedium">{name === 'All' ? 'Everyone' : name}</Text>
-                          {selectedElderly === name && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
+                          <Avatar.Icon size={40} icon="account-group" style={{ marginRight: 16, backgroundColor: theme.colors.secondary }} />
+                          <Text variant="titleMedium">Everyone</Text>
+                          {selectedElderlyId === 'All' && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
+                    </TouchableOpacity>
+                    {linkedElderly
+                      .filter(e => e.name.toLowerCase().includes(filterSearchQuery.toLowerCase()))
+                      .map((elderly) => (
+                        <TouchableOpacity
+                          key={elderly.$id}
+                          style={[
+                            styles.selectionRow,
+                            { backgroundColor: selectedElderlyId === elderly.$id ? theme.colors.secondaryContainer : 'transparent' }
+                          ]}
+                          onPress={() => {
+                            setSelectedElderlyId(elderly.$id);
+                            setFilterVisible(false);
+                          }}
+                        >
+                          <Avatar.Text size={40} label={elderly.name.substring(0,2)} style={{ marginRight: 16, backgroundColor: theme.colors.secondary }} />
+                          <Text variant="titleMedium">{elderly.name}</Text>
+                          {selectedElderlyId === elderly.$id && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
                         </TouchableOpacity>
                       ))}
                   </ScrollView>
@@ -281,7 +441,7 @@ export default function SchedulePage() {
               </Dialog>
             </Portal>
           </View>
-          <Chip compact>{filteredEvents.length} Total</Chip>
+          <Chip compact>{filteredEvents.length} Tasks</Chip>
         </View>
         <FlatList
           data={filteredEvents}
@@ -289,6 +449,14 @@ export default function SchedulePage() {
           renderItem={renderEvent}
           contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ListEmptyComponent={
+            !loading ? (
+                <View style={{ alignItems: 'center', marginTop: 50 }}>
+                   <Text style={{ color: theme.colors.outline }}>No tasks found for this day.</Text>
+                </View>
+            ) : null
+          }
         />
       </View>
 
@@ -313,7 +481,7 @@ export default function SchedulePage() {
       {/* Native Time Picker for New Task */}
       {timePickerVisible && (
         <DateTimePicker
-          value={new Date()}
+          value={new Date()} // Ideally should use current time from newTask.time parse
           mode="time"
           display="default"
           onChange={onConfirmTime}
@@ -429,14 +597,68 @@ export default function SchedulePage() {
                 <TextInput
                   mode="outlined"
                   label="Type"
-                  value={newTask.type ? (newTask.type.charAt(0).toUpperCase() + newTask.type.slice(1)) : ''}
+                  value={newTask.type}
                   editable={false}
                   style={styles.input}
                   right={<TextInput.Icon icon="chevron-right" onPress={() => setSelectionMode('type')} />}
                 />
               </TouchableOpacity>
 
-              <Button mode="contained" onPress={() => setNewTaskVisible(false)} style={{ marginTop: 10, paddingVertical: 5 }}>
+              <Button mode="contained" onPress={async () => {
+                  if (!newTask.title || !newTask.elderlyId || !newTask.time) {
+                      // Simple alert or toast
+                      console.warn("Missing fields");
+                      return;
+                  }
+                  
+                  try {
+                      setLoading(true);
+                      // Combine date and time
+                      const combinedDate = new Date(newTask.date);
+                      const [hours, minutes] = newTask.time.split(':').map(Number);
+                      combinedDate.setHours(hours, minutes, 0, 0);
+                      
+                      const data: any = {
+                          title: newTask.title,
+                          description: newTask.description,
+                          time: combinedDate.toISOString(),
+                          elderly: newTask.elderlyId, // Pass ID string directly for relationship
+                          status: ScheduleStatus.PENDING
+                      };
+
+                      if (newTask.typeId) {
+                          data.schedule_category = newTask.typeId;
+                      }
+
+                      await tablesDB.createRow({
+                          databaseId: DATABASE_ID,
+                          tableId: SCHEDULE_TABLE_ID, 
+                          rowId: ID.unique(),
+                          data: data
+                      });
+                      
+                      setNewTaskVisible(false);
+                      // Reset form
+                      setNewTask({
+                        title: '',
+                        description: '',
+                        date: new Date(),
+                        time: '',
+                        type: 'Activity',
+                        elderlyName: 'All', 
+                        elderlyId: '',
+                        status: ScheduleStatus.PENDING
+                      });
+                      
+                      // Refresh list
+                      fetchData();
+
+                  } catch (err) {
+                      console.error("Error creating task", err);
+                  } finally {
+                      setLoading(false);
+                  }
+              }} style={{ marginTop: 10, paddingVertical: 5 }} loading={loading} disabled={loading}>
                 Save Task
               </Button>
             </ScrollView>
@@ -460,40 +682,40 @@ export default function SchedulePage() {
                   />
                 </View>
               )}
-              <ScrollView>
+              <ScrollView style={{ maxHeight: 300 }}>
                 {selectionMode === 'elderly' ? (
-                  elderlyList
-                    .filter(e => e !== 'All' && e.toLowerCase().includes(searchQuery.toLowerCase()))
-                    .map(name => (
+                  linkedElderly
+                    .filter(e => e.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map(item => (
                       <TouchableOpacity
-                        key={name}
-                        style={[styles.selectionRow, { backgroundColor: newTask.elderlyName === name ? theme.colors.secondaryContainer : 'transparent' }]}
+                        key={item.$id}
+                        style={[styles.selectionRow, { backgroundColor: newTask.elderlyId === item.$id ? theme.colors.secondaryContainer : 'transparent' }]}
                         onPress={() => {
-                          setNewTask({ ...newTask, elderlyName: name });
+                          setNewTask({ ...newTask, elderlyName: item.name, elderlyId: item.$id });
                           setSelectionMode('form');
                         }}
                       >
-                        <Avatar.Icon size={40} icon="account" style={{ marginRight: 16, backgroundColor: theme.colors.secondary }} />
-                        <Text variant="titleMedium">{name}</Text>
-                        {newTask.elderlyName === name && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
+                        <Avatar.Text size={40} label={item.name.substring(0,2)} style={{ marginRight: 16, backgroundColor: theme.colors.secondary }} />
+                        <Text variant="titleMedium">{item.name}</Text>
+                        {newTask.elderlyId === item.$id && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
                       </TouchableOpacity>
                     ))
                 ) : (
-                  ['medication', 'appointment', 'meal', 'activity', 'checkup'].map(type => (
+                  categories.map(cat => (
                     <TouchableOpacity
-                      key={type}
-                      style={[styles.selectionRow, { backgroundColor: newTask.type === type ? theme.colors.secondaryContainer : 'transparent' }]}
+                      key={cat.$id}
+                      style={[styles.selectionRow, { backgroundColor: newTask.typeId === cat.$id ? theme.colors.secondaryContainer : 'transparent' }]}
                       onPress={() => {
-                        setNewTask({ ...newTask, type: type as any });
+                        setNewTask({ ...newTask, type: cat.name || '', typeId: cat.$id });
                         setSelectionMode('form');
                       }}
                     >
-                      <Avatar.Icon size={40} icon={getTypeIcon(type)} style={{ marginRight: 16, backgroundColor: theme.colors.secondary }} />
+                      {/* TODO: Icon mapping for categories if needed */}
+                      <Avatar.Icon size={40} icon={'calendar-check'} style={{ marginRight: 16, backgroundColor: theme.colors.secondary }} />
                       <View>
-                        <Text variant="titleMedium">{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
-                        <Text variant="bodySmall" style={{ color: theme.colors.outline }}>Select to mark as {type}</Text>
+                        <Text variant="titleMedium">{cat.name}</Text>
                       </View>
-                      {newTask.type === type && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
+                      {newTask.typeId === cat.$id && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
                     </TouchableOpacity>
                   ))
                 )}

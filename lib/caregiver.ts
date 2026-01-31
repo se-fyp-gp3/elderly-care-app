@@ -1,6 +1,6 @@
-import { Caregiver } from "@/types/appwrite";
+import { Caregiver, CaregiverElderly, Elderly } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
-import { CAREGIVER_ELDERLY_TABLE_ID, CAREGIVER_TABLE_ID, DATABASE_ID, tablesDB } from "./appwrite";
+import { CAREGIVER_ELDERLY_TABLE_ID, CAREGIVER_TABLE_ID, DATABASE_ID, ELDERLY_TABLE_ID, tablesDB } from "./appwrite";
 
 export async function createCaregiverProfile(
   data: Caregiver,
@@ -50,5 +50,48 @@ export async function linkCaregiverToElderly(
       elderly: elderlyId,
     },
   });
+}
+
+export async function getLinkedElderly(caregiverId: string): Promise<Elderly[]> {
+  try {
+    const response = await tablesDB.listRows<CaregiverElderly>({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_ELDERLY_TABLE_ID,
+      queries: [
+        Query.equal("caregiver", caregiverId),
+        Query.orderDesc("$createdAt"),
+      ],
+    });
+
+    const rawItems = response.rows.flatMap((row) => row.elderly);
+    const loadedElderly: Elderly[] = [];
+    const idsToFetch: string[] = [];
+
+    for (const item of rawItems) {
+      if (typeof item === "string") {
+        idsToFetch.push(item);
+      } else if (item && typeof item === "object" && "$id" in item) {
+        loadedElderly.push(item as Elderly);
+      }
+    }
+
+    if (idsToFetch.length > 0) {
+      const uniqueIds = [...new Set(idsToFetch)];
+      const detailsResponse = await tablesDB.listRows<Elderly>({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_TABLE_ID,
+        queries: [Query.equal("$id", uniqueIds), Query.limit(100)],
+      });
+      loadedElderly.push(...detailsResponse.rows);
+    }
+
+    // Deduplicate
+    return Array.from(
+      new Map(loadedElderly.map((item) => [item.$id, item])).values(),
+    );
+  } catch (error) {
+    console.error("Error fetching linked elderly:", error);
+    return [];
+  }
 }
 
