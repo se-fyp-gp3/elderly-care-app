@@ -309,6 +309,31 @@ export default function SchedulePage() {
     }
   };
 
+  const handleMarkDone = async (taskId: string) => {
+      try {
+          await tablesDB.updateRow({
+              databaseId: DATABASE_ID,
+              tableId: SCHEDULE_TABLE_ID,
+              rowId: taskId,
+              data: {
+                  status: ScheduleStatus.COMPLETED
+              }
+          });
+          
+          // Optimistically update local state
+          setEvents(currentEvents => 
+              currentEvents.map(event => 
+                  event.id === taskId 
+                      ? { ...event, status: ScheduleStatus.COMPLETED } 
+                      : event
+              )
+          );
+      } catch (err) {
+          console.error("Error updating task status", err);
+          Alert.alert("Error", "Could not mark task as completed.");
+      }
+  };
+
   const renderEvent = ({ item }: { item: ScheduleEvent }) => (
     <View style={styles.timelineRow}>
       <View style={styles.timeColumn}>
@@ -338,7 +363,7 @@ export default function SchedulePage() {
           <Text variant="bodyMedium" numberOfLines={2} style={{ color: theme.colors.onSurfaceVariant }}>{item.description}</Text>
           {item.status === ScheduleStatus.PENDING && (
             <View style={{ alignItems: 'flex-end', marginTop: 12 }}>
-              <Button mode="contained-tonal" compact uppercase={false} onPress={() => { }}>Mark Done</Button>
+              <Button mode="contained-tonal" compact uppercase={false} onPress={() => handleMarkDone(item.id)}>Mark Done</Button>
             </View>
           )}
         </View>
