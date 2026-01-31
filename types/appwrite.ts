@@ -96,6 +96,26 @@ export type HealthData = Models.Row & {
     type: string | null;
 }
 
+export type MedicationLog = Models.Row & {
+    elderly_medication_reminder: ElderlyMedicationReminder; 
+    elderly: Elderly;
+    scheduled_at: string; // datetime
+    taken_at: string | null; // datetime
+    status: "taken" | "skipped" | "pending";
+}
+
+export type ElderlyMedicationReminder = Models.Row & {
+    elderly: Elderly;
+    elderly_medication: ElderlyMedication;
+    start_date: string;
+    duration_days: number;
+    follow_up_caregiver: string | null;
+    after_meal: boolean;
+    reminder_times: string[];
+    active: boolean;
+    is_finished: boolean;
+}
+
 export type ChatSessionRow = Models.Row & {
     user_id: string;
     chat_id: string;

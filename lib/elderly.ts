@@ -1,14 +1,23 @@
 import {
+  Caregiver,
+  CaregiverElderly,
   Elderly,
   ElderlyMedication,
+  ElderlyMedicationStatus,
   ElderlyStatus,
+  Medication,
   Schedule,
 } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
+  CAREGIVER_ELDERLY_TABLE_ID,
+  CAREGIVER_TABLE_ID,
   DATABASE_ID,
+  ELDERLY_MEDICATION_REMINDER_TABLE_ID,
   ELDERLY_MEDICATION_TABLE_ID,
   ELDERLY_TABLE_ID,
+  MEDICATION_LOGS_TABLE_ID,
+  MEDICATION_TABLE_ID,
   SCHEDULE_TABLE_ID,
   tablesDB,
 } from "./appwrite";
@@ -120,6 +129,148 @@ export async function fetchElderlyMedicationsForUser(
   }
 }
 
+export type MedicationReminderInput = {
+  name: string;
+  unit?: string | null;
+  dosage?: number | null;
+  timesPerDay: number;
+  durationDays: number;
+  followUpCaregiver?: string | null;
+  afterMeal: boolean;
+  reminderTimes: string[];
+  startDate?: string;
+  active?: boolean;
+};
+
+const buildReminderNotesFallback = (input: MedicationReminderInput) =>
+  JSON.stringify({
+    durationDays: input.durationDays,
+    followUpCaregiver: input.followUpCaregiver || null,
+    afterMeal: input.afterMeal,
+    reminderTimes: input.reminderTimes,
+    startDate: input.startDate || new Date().toISOString(),
+    active: input.active ?? true,
+  });
+
+const normalizeMedicationName = (name: string) => name.trim();
+
+async function getOrCreateMedication(
+  name: string,
+  unit?: string | null,
+): Promise<Medication> {
+  const normalizedName = normalizeMedicationName(name);
+  const response = await tablesDB.listRows<Medication>({
+    databaseId: DATABASE_ID,
+    tableId: MEDICATION_TABLE_ID,
+    queries: [Query.equal("name", normalizedName), Query.limit(1)],
+  });
+
+  if (response.total > 0) {
+    return response.rows[0] as unknown as Medication;
+  }
+
+  const document = await tablesDB.createRow<Medication>({
+    databaseId: DATABASE_ID,
+    tableId: MEDICATION_TABLE_ID,
+    rowId: ID.unique(),
+    data: {
+      name: normalizedName,
+      unit: unit?.trim() || "dose",
+    },
+  });
+
+  return document as unknown as Medication;
+}
+
+export async function createElderlyMedicationWithReminder(
+  userId: string,
+  input: MedicationReminderInput,
+): Promise<ElderlyMedication> {
+  const profile = await getElderlyByUserId(userId);
+  if (!profile?.$id) {
+    throw new Error("Elderly profile not found for user.");
+  }
+
+  const medication = await getOrCreateMedication(input.name, input.unit);
+  const approxTimes = input.reminderTimes.filter((time) => time.trim());
+  const frequency =
+    input.timesPerDay <= 1
+      ? "Daily"
+      : `${input.timesPerDay} times/day`;
+
+  const notesFallback = buildReminderNotesFallback(input);
+
+  const medicationRow = await tablesDB.createRow<ElderlyMedication>({
+    databaseId: DATABASE_ID,
+    tableId: ELDERLY_MEDICATION_TABLE_ID,
+    rowId: ID.unique(),
+    data: {
+      elderly: profile.$id as unknown as Elderly[],
+      medication: medication.$id as unknown as Medication[],
+      dosage: input.dosage ?? 1,
+      frequency,
+      is_prn: false,
+      times_per_day: input.timesPerDay,
+      approx_times: approxTimes,
+      status: ElderlyMedicationStatus.PENDING,
+      last_taken: null,
+      notes: ELDERLY_MEDICATION_REMINDER_TABLE_ID
+        ? null
+        : notesFallback,
+    },
+  });
+
+  if (ELDERLY_MEDICATION_REMINDER_TABLE_ID) {
+    try {
+      const reminder = await tablesDB.createRow({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+        rowId: ID.unique(),
+        data: {
+          elderly: profile.$id,
+          elderly_medication: medicationRow.$id,
+          start_date: input.startDate || new Date().toISOString(),
+          duration_days: input.durationDays,
+          follow_up_caregiver: input.followUpCaregiver || null,
+          after_meal: input.afterMeal,
+          reminder_times: approxTimes,
+          active: input.active ?? true,
+        },
+      });
+
+      // Auto-create Medication Logs (Pending)
+      const startDate = new Date(input.startDate || Date.now());
+      for (let i = 0; i < input.durationDays; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + i);
+        const dateStr = currentDate.toISOString().slice(0, 10); // YYYY-MM-DD
+
+        for (const time of approxTimes) {
+             const scheduledAt = `${dateStr}T${time}:00.000Z`; // Construct ISO datetime
+             
+             await tablesDB.createRow({
+                 databaseId: DATABASE_ID,
+                 tableId: MEDICATION_LOGS_TABLE_ID,
+                 rowId: ID.unique(),
+                 data: {
+                     elderly: profile.$id,
+                     elderly_medication_reminder: reminder.$id,
+                     scheduled_at: scheduledAt,
+                     status: 'pending',
+                     taken_at: null
+                 }
+             });
+        }
+      }
+
+    } catch (error) {
+      console.error("Error saving medication reminder metadata:", error);
+    }
+  }
+
+  return medicationRow as unknown as ElderlyMedication;
+}
+
 export async function fetchElderlySchedulesForUser(
   userId?: string | null,
 ): Promise<Schedule[]> {
@@ -201,4 +352,62 @@ export function buildScheduleSummary(schedules: Schedule[]): string {
   });
 
   return `Here is your schedule for today:\n${items.join("\n")}`;
+}
+
+export async function fetchCaregiversForElderly(
+  userId: string,
+): Promise<Caregiver[]> {
+  const profile = await getElderlyByUserId(userId);
+  if (!profile?.$id) return [];
+
+  try {
+    const response = await tablesDB.listRows<CaregiverElderly>({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_ELDERLY_TABLE_ID,
+      queries: [Query.equal("elderly", profile.$id)],
+    });
+
+    const caregivers: Caregiver[] = [];
+    const missingCaregiverIds = new Set<string>();
+
+    for (const row of response.rows) {
+      // Handle both single object and array cases for relationship
+      const caregiverOrArray = row.caregiver;
+      if (Array.isArray(caregiverOrArray) && caregiverOrArray.length > 0) {
+        // Expanded array
+        const c = caregiverOrArray[0];
+        if (typeof c === 'string') {
+           missingCaregiverIds.add(c);
+        } else {
+           caregivers.push(c as unknown as Caregiver);
+        }
+      } else if (caregiverOrArray && !Array.isArray(caregiverOrArray)) {
+         if (typeof caregiverOrArray === 'string') {
+             missingCaregiverIds.add(caregiverOrArray);
+         } else {
+             caregivers.push(caregiverOrArray as unknown as Caregiver);
+         }
+      }
+    }
+
+    if (missingCaregiverIds.size > 0) {
+        try {
+            const fetchedList = await tablesDB.listRows<Caregiver>({
+                databaseId: DATABASE_ID,
+                tableId: CAREGIVER_TABLE_ID,
+                queries: [
+                    Query.equal('$id', Array.from(missingCaregiverIds))
+                ]
+            });
+            caregivers.push(...(fetchedList.rows as unknown as Caregiver[]));
+        } catch (e) {
+            console.error("Failed to fetch missing caregivers", e);
+        }
+    }
+
+    return caregivers;
+  } catch (error) {
+    console.error("Error fetching caregivers for elderly:", error);
+    return [];
+  }
 }
