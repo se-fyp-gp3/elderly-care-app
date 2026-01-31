@@ -5,6 +5,8 @@ import {
   fetchElderlyMedicationsForUser,
   fetchElderlySchedulesForUser,
 } from "@/lib/elderly";
+import * as FileSystem from "expo-file-system";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -38,6 +40,11 @@ interface Message {
   imageUri?: string;
 }
 
+interface SelectedImage {
+  uri: string;
+  mimeType: string;
+}
+
 interface ChatSession {
   id: string;
   title: string;
@@ -45,12 +52,27 @@ interface ChatSession {
   updatedAt: Date;
 }
 
-interface DeepSeekResponse {
-  choices: Array<{
-    message: {
-      content: string;
+type ChatContent =
+  | string
+  | Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } }
+    >;
+
+interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: ChatContent;
+}
+
+interface OpenRouterResponse {
+  choices?: Array<{
+    message?: {
+      content?: ChatContent;
     };
   }>;
+  error?: {
+    message?: string;
+  };
 }
 
 export default function ElderlyChat() {
@@ -59,7 +81,7 @@ export default function ElderlyChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
@@ -71,8 +93,18 @@ export default function ElderlyChat() {
   const flatListRef = useRef<FlatList>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const DEEPSEEK_API_KEY = process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY?.trim();
-  const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
+  const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY?.trim();
+  const OPENROUTER_API_URL =
+    process.env.EXPO_PUBLIC_OPENROUTER_API_URL?.trim() ||
+    "https://openrouter.ai/api/v1";
+  const OPENROUTER_TEXT_MODEL =
+    process.env.EXPO_PUBLIC_OPENROUTER_MODEL?.trim() ||
+    "google/gemini-3-flash-preview";
+  const OPENROUTER_IMAGE_MODEL =
+    process.env.EXPO_PUBLIC_OPENROUTER_IMAGE_MODEL?.trim() ||
+    "google/gemini-3-pro-preview";
+  const REQUEST_TIMEOUT_MS = 90000;
+  const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
   const USE_MOCK_MODE = false;
 
   useEffect(() => {
@@ -123,8 +155,10 @@ export default function ElderlyChat() {
     return null;
   };
 
-  const buildConversationMessages = (latestUserMessage: string) => {
-    const history = messages.slice(-8).map((msg) => ({
+  const buildConversationMessages = (
+    latestUserMessage: string,
+  ): ChatMessage[] => {
+    const history: ChatMessage[] = messages.slice(-8).map((msg) => ({
       role: msg.isUser ? "user" : "assistant",
       content: msg.text,
     }));
@@ -143,7 +177,106 @@ export default function ElderlyChat() {
     ];
   };
 
-  const callDeepSeekAPI = async (userMessage: string): Promise<string> => {
+  const getImageBase64 = async (uri: string) => {
+    try {
+      let base64String = "";
+
+      if (Platform.OS === "web") {
+        const response = await fetch(uri);
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+        const blob = await response.blob();
+
+        base64String = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error("FileReader parsing failed"));
+          reader.onloadend = () => {
+            const dataUrl = reader.result as string;
+            const split = dataUrl.split(",");
+            if (split.length < 2) reject(new Error("Invalid Base64 format"));
+            resolve(split[1]);
+          };
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        base64String = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
+
+      if (!base64String || base64String.length % 4 !== 0) {
+        throw new Error("Invalid or incomplete Base64 string");
+      }
+
+      return base64String;
+    } catch (error) {
+      console.error("Failed to get Base64:", error);
+      throw error;
+    }
+  };
+
+  const compressImage = async (image: SelectedImage) => {
+    try {
+      const manipulated = await ImageManipulator.manipulateAsync(
+        image.uri,
+        [{ resize: { width: 1024 } }],
+        {
+          compress: 0.8,
+          format: ImageManipulator.SaveFormat.JPEG,
+        },
+      );
+
+      return {
+        uri: manipulated.uri,
+        mimeType: "image/jpeg",
+      } as SelectedImage;
+    } catch {
+      return image;
+    }
+  };
+
+  const prepareImageForUpload = async (image: SelectedImage) => {
+    const maxRetry = 4;
+    const qualitySteps = [0.8, 0.7, 0.6, 0.5];
+    const widthSteps = [1024, 896, 768, 640];
+
+    for (let i = 0; i < maxRetry; i += 1) {
+      try {
+        const manipulated = await ImageManipulator.manipulateAsync(
+          image.uri,
+          [{ resize: { width: widthSteps[i] } }],
+          {
+            compress: qualitySteps[i],
+            format: ImageManipulator.SaveFormat.JPEG,
+          },
+        );
+
+        const info = await FileSystem.getInfoAsync(manipulated.uri, { size: true });
+        if (!info.exists || !info.size) {
+          continue;
+        }
+
+        if (info.size <= MAX_IMAGE_BYTES) {
+          return {
+            uri: manipulated.uri,
+            mimeType: "image/jpeg",
+          } as SelectedImage;
+        }
+      } catch (error) {
+        console.warn(`Image compression attempt ${i + 1} failed`, error);
+      }
+    }
+
+    throw new Error("Image still exceeds 1.5MB after compression.");
+  };
+
+  const callOpenRouterAPI = async (
+    userMessage: string,
+    image?: SelectedImage | null,
+    allowImageFallback = true,
+  ): Promise<string> => {
+    const sleep = (ms: number) =>
+      new Promise((resolve) => setTimeout(resolve, ms));
+
     if (USE_MOCK_MODE) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -168,39 +301,156 @@ export default function ElderlyChat() {
       }
     }
 
-    if (!DEEPSEEK_API_KEY) {
-      return "I'm ready to chat freely, but the AI key isn't configured yet. Please add EXPO_PUBLIC_DEEPSEEK_API_KEY to enable full conversation.";
+    if (!OPENROUTER_API_KEY) {
+      return "I'm ready to chat freely, but the AI key isn't configured yet. Please add EXPO_PUBLIC_OPENROUTER_API_KEY to enable full conversation.";
     }
 
-    const response = await fetch(DEEPSEEK_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-      },
-      signal: abortControllerRef.current?.signal,
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: buildConversationMessages(userMessage),
-        max_tokens: 1000,
-        temperature: 0.7,
-      }),
-    });
+    const preparedImage = image ? await prepareImageForUpload(image) : null;
+    const resolvedModel = preparedImage
+      ? OPENROUTER_IMAGE_MODEL
+      : OPENROUTER_TEXT_MODEL;
+    const baseMessages = buildConversationMessages(userMessage);
+    const messagesPayload: ChatMessage[] = preparedImage
+      ? baseMessages.slice(0, -1).concat({
+          role: "user",
+          content: [
+            { type: "text", text: userMessage },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${preparedImage.mimeType};base64,${await getImageBase64(
+                  preparedImage.uri,
+                )}`,
+                detail: "high",
+              },
+            },
+          ],
+        })
+      : baseMessages;
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      if (response.status === 401) {
-        throw new Error("Authentication failed. Please check your API key.");
+    const payload = {
+      model: resolvedModel,
+      messages: messagesPayload,
+      max_tokens: 1000,
+      temperature: 0.7,
+    };
+
+    const maxAttempts = 3;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const timeoutId = setTimeout(() => {
+          abortControllerRef.current?.abort();
+        }, REQUEST_TIMEOUT_MS);
+
+        const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+            "HTTP-Referer": "https://elderly-care-app.local",
+            "X-Title": "elderly-care-app",
+            "X-OpenRouter-Enable-Multimodal": "true",
+          },
+          signal: abortControllerRef.current?.signal,
+          body: JSON.stringify(payload),
+        });
+
+        const rawText = await response.text();
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data: OpenRouterResponse = rawText
+            ? JSON.parse(rawText)
+            : {};
+          const content = data.choices?.[0]?.message?.content;
+          if (!content) {
+            throw new Error(
+              data.error?.message || "No response from OpenRouter API",
+            );
+          }
+
+          if (typeof content === "string") {
+            return content;
+          }
+
+          const textParts = content
+            .map((part) => (part.type === "text" ? part.text : ""))
+            .filter(Boolean);
+
+          if (textParts.length > 0) {
+            return textParts.join("\n");
+          }
+
+          throw new Error("No response from OpenRouter API");
+        }
+
+        const errorData: OpenRouterResponse = rawText
+          ? JSON.parse(rawText)
+          : {};
+
+        const providerMessage =
+          errorData?.error?.message ||
+          (rawText ? rawText.slice(0, 300) : "Provider returned error");
+
+        if (response.status === 401) {
+          throw new Error("Authentication failed. Please check your API key.");
+        }
+
+        if (response.status === 429) {
+          lastError = new Error(
+            providerMessage ||
+              "Rate limit reached. Please wait a moment and try again.",
+          );
+
+          if (attempt < maxAttempts) {
+            await sleep(500 * attempt * attempt);
+            continue;
+          }
+
+          throw lastError;
+        }
+
+        lastError = new Error(
+          providerMessage || `API request failed: ${response.status}`,
+        );
+        break;
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          lastError = new Error("Request timed out. Please try again.");
+          if (attempt < maxAttempts) {
+            await sleep(500 * attempt * attempt);
+            continue;
+          }
+          break;
+        }
+        lastError =
+          error instanceof Error
+            ? error
+            : new Error("Provider returned error");
+
+        if (attempt < maxAttempts) {
+          await sleep(500 * attempt * attempt);
+          continue;
+        }
+        break;
       }
-      throw new Error(`API request failed: ${response.status}`);
     }
 
-    const data: DeepSeekResponse = await response.json();
-    if (!data.choices || data.choices.length === 0) {
-      throw new Error("No response from DeepSeek API");
+    if (image && allowImageFallback) {
+      try {
+        return await callOpenRouterAPI(userMessage, null, false);
+      } catch {
+        // fall through to surface the original error
+      }
     }
 
-    return data.choices[0].message.content;
+    if (lastError) {
+      throw lastError;
+    }
+
+    throw new Error("API request failed unexpectedly.");
   };
 
   const handleImageOptions = () => {
@@ -242,11 +492,16 @@ export default function ElderlyChat() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.7,
       });
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0].uri);
+        const asset = result.assets[0];
+        const compressed = await compressImage({
+          uri: asset.uri,
+          mimeType: asset.mimeType || "image/jpeg",
+        });
+        setSelectedImage(compressed);
       }
     } catch (error) {
       console.error("Error picking image:", error);
@@ -276,11 +531,16 @@ export default function ElderlyChat() {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.7,
       });
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0].uri);
+        const asset = result.assets[0];
+        const compressed = await compressImage({
+          uri: asset.uri,
+          mimeType: asset.mimeType || "image/jpeg",
+        });
+        setSelectedImage(compressed);
       }
     } catch (error) {
       console.error("Error taking photo:", error);
@@ -323,7 +583,11 @@ export default function ElderlyChat() {
 
     const messageToEdit = messages[messageIndex];
     setInputText(messageToEdit.text);
-    setSelectedImage(messageToEdit.imageUri || null);
+    setSelectedImage(
+      messageToEdit.imageUri
+        ? { uri: messageToEdit.imageUri, mimeType: "image/jpeg" }
+        : null,
+    );
     setMessages(messages.slice(0, messageIndex));
     setPendingMessageId(null);
   };
@@ -380,7 +644,7 @@ export default function ElderlyChat() {
       text: inputText.trim() || "📷 [Image sent]",
       isUser: true,
       timestamp: new Date(),
-      imageUri: selectedImage || undefined,
+      imageUri: selectedImage?.uri,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -399,7 +663,9 @@ export default function ElderlyChat() {
         : userMessage.text;
 
       const localResponse = await tryHandleLocalDataRequest(messageForAPI);
-      const aiResponse = localResponse ?? (await callDeepSeekAPI(messageForAPI));
+      const aiResponse =
+        localResponse ??
+        (await callOpenRouterAPI(messageForAPI, selectedImage));
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -624,7 +890,7 @@ export default function ElderlyChat() {
         {selectedImage && (
           <View style={styles.imagePreviewContainer}>
             <Image
-              source={{ uri: selectedImage }}
+              source={{ uri: selectedImage.uri }}
               style={styles.imagePreview}
               resizeMode="cover"
             />
