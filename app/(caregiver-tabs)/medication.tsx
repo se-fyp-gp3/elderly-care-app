@@ -6,7 +6,7 @@ import { ElderlyMedication, ElderlyMedicationStatus, Medication } from "@/types/
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Linking, Platform, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Platform, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Query } from "react-native-appwrite";
 import {
     Button,
