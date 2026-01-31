@@ -19,8 +19,8 @@ export interface MedicationItem {
 interface MedicationCardProps {
     med: MedicationItem;
     onConfirmPress: (med: MedicationItem) => void;
-    onRemind: (id: number) => void;
-    onMarkProcessed: (id: number) => void;
+    onRemind: (id: string) => void;
+    onMarkProcessed: (id: string) => void;
 }
 
 /**
