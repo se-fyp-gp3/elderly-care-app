@@ -42,6 +42,12 @@
         }
       ],
       "expo-web-browser",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "The app needs to access your calendar to schedule medication reminders."
+        }
+      ],
       "react-native-localize",
       "@react-native-community/datetimepicker"
     ],
