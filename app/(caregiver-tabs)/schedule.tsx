@@ -622,12 +622,12 @@ export default function SchedulePage() {
                           title: newTask.title,
                           description: newTask.description,
                           time: combinedDate.toISOString(),
-                          elderly: newTask.elderlyId, // Pass ID string directly for relationship
+                          elderly: newTask.elderlyId, // Relationship expects single ID
                           status: ScheduleStatus.PENDING
                       };
 
                       if (newTask.typeId) {
-                          data.schedule_category = newTask.typeId;
+                          data.schedule_category = [newTask.typeId]; // Relationship expects array
                       }
 
                       await tablesDB.createRow({
