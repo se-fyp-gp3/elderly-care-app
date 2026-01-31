@@ -1,8 +1,8 @@
 import MedicationCard, { MedicationItem } from "@/components/MedicationCard";
-import { DATABASE_ID, ELDERLY_MEDICATION_TABLE_ID, tablesDB } from "@/lib/appwrite";
+import { DATABASE_ID, ELDERLY_MEDICATION_TABLE_ID, MEDICATION_TABLE_ID, tablesDB } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
-import { ElderlyMedication, ElderlyMedicationStatus } from "@/types/appwrite";
+import { ElderlyMedication, ElderlyMedicationStatus, Medication } from "@/types/appwrite";
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useState } from "react";
@@ -20,6 +20,21 @@ import {
     useTheme
 } from "react-native-paper";
 
+// Helper to safely extract ID from relationship (which can be string, object, array of strings, or array of objects)
+const getRelationshipId = (val: any): string | null => {
+    if (!val) return null;
+    if (Array.isArray(val)) {
+        if (val.length === 0) return null;
+        const item = val[0];
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object' && item.$id) return item.$id;
+    }
+    if (typeof val === 'string') return val;
+    if (typeof val === 'object' && val.$id) return val.$id;
+    return null;
+};
+
+// Start notification handler
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
@@ -59,9 +74,11 @@ export default function MedicationManagement() {
                 return;
             }
 
+            // Create Map for quick Elderly lookup
+            const elderlyMap = new Map(elderlyList.map(e => [e.$id, e]));
             const elderlyIds = elderlyList.map(e => e.$id);
 
-            // 2. Fetch Medication Records
+            // 2. Fetch Medication Records (Join Table)
             const response = await tablesDB.listRows<ElderlyMedication>({
                 databaseId: DATABASE_ID,
                 tableId: ELDERLY_MEDICATION_TABLE_ID,
@@ -71,24 +88,50 @@ export default function MedicationManagement() {
                 ]
             });
 
-            // 3. Transform Data
+            // 3. Fetch Linked Medication Details (if not expanded)
+            // Collect all unique medication IDs
+            const medIds = new Set<string>();
+            response.rows.forEach(row => {
+                const mId = getRelationshipId(row.medication);
+                if (mId) medIds.add(mId);
+            });
+
+            const medMap = new Map<string, Medication>();
+            if (medIds.size > 0) {
+                const medDetailsResponse = await tablesDB.listRows<Medication>({
+                    databaseId: DATABASE_ID,
+                    tableId: MEDICATION_TABLE_ID,
+                    queries: [
+                        Query.equal('$id', Array.from(medIds)),
+                        Query.limit(100)
+                    ]
+                });
+                medDetailsResponse.rows.forEach(m => medMap.set(m.$id, m));
+            }
+
+            // 4. Transform Data
             const mappedMeds: MedicationItem[] = response.rows.map(row => {
-                // Resolve Elderly Name
-                let elderlyName = "Unknown";
-                if (Array.isArray(row.elderly) && row.elderly.length > 0) {
-                    elderlyName = (row.elderly[0] as any).name || "Unknown";
-                } else if (typeof row.elderly === 'object') {
-                    elderlyName = (row.elderly as any).name || "Unknown";
-                }
-                
-                // Resolve Medication Name & Unit
-                let medName = "Unknown Drug";
-                let medUnit = "";
-                if (Array.isArray(row.medication) && row.medication.length > 0) {
-                    const m = row.medication[0] as any;
-                    medName = m.name || "Unknown";
-                    medUnit = m.unit || "";
-                }
+                // Resolve Relationships
+                const eId = getRelationshipId(row.elderly);
+                const mId = getRelationshipId(row.medication);
+
+                const elderlyObj = eId ? elderlyMap.get(eId) : null;
+                const medObj = mId ? medMap.get(mId) : null;
+
+                const elderlyName = elderlyObj ? elderlyObj.name : "Unknown";
+                const medName = medObj ? medObj.name || "Unknown Drug" : "Unknown Drug";
+                const medUnit = medObj ? medObj.unit || "" : "";
+
+                // Format Times (approx_times is ISO string array)
+                const timeString = (row.approx_times || []).map(t => {
+                   try {
+                       // Format simple HH:mm from the ISO string
+                       const d = new Date(t);
+                       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); 
+                   } catch {
+                       return '';
+                   }
+                }).filter(Boolean).join(', ');
 
                 // Status Mapping (DB is Capitalized, UI expects lowercase)
                 let status = (row.status || 'pending').toLowerCase();
@@ -100,7 +143,7 @@ export default function MedicationManagement() {
                     name: medName,
                     dosage: `${row.dosage || '?'} ${medUnit}`.trim(),
                     frequency: row.frequency || '',
-                    time: Array.isArray(row.approx_times) ? row.approx_times.join(', ') : (row.approx_times || ''),
+                    time: timeString,
                     status: status,
                     lastTaken: row.last_taken ? new Date(row.last_taken).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never',
                     notes: row.notes || ''
