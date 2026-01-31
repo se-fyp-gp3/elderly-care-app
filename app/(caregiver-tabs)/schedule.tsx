@@ -361,7 +361,7 @@ export default function SchedulePage() {
         <Divider />
         <View style={styles.eventBody}>
           <Text variant="bodyMedium" numberOfLines={2} style={{ color: theme.colors.onSurfaceVariant }}>{item.description}</Text>
-          {item.status === ScheduleStatus.PENDING && (
+          {(item.status === ScheduleStatus.PENDING || item.status === ScheduleStatus.MISSED) && (
             <View style={{ alignItems: 'flex-end', marginTop: 12 }}>
               <Button mode="contained-tonal" compact uppercase={false} onPress={() => handleMarkDone(item.id)}>Mark Done</Button>
             </View>
