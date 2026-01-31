@@ -5,7 +5,7 @@ import { Button, Card, Chip, IconButton, Text } from "react-native-paper";
 
 // Define the interface for the medication item
 export interface MedicationItem {
-    id: number;
+    id: string;
     elderly: string;
     name: string;
     dosage: string;
