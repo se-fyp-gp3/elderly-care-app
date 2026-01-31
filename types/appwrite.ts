@@ -73,7 +73,7 @@ export type Schedule = Models.Row & {
     title: string | null;
     description: string | null;
     elderly: Elderly[];
-    schedule_category: ScheduleCategory[];
+    scheduleCategory: ScheduleCategory[];
     status: ScheduleStatus | null;
 }
 

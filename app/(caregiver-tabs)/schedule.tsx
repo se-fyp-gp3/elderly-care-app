@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ID, Query } from 'react-native-appwrite';
 import { Avatar, Button, Chip, Dialog, Divider, FAB, IconButton, Modal, Portal, Searchbar, Surface, Text, TextInput, useTheme } from 'react-native-paper';
 
@@ -73,7 +73,7 @@ export default function SchedulePage() {
     date: new Date(),
     time: '',
     type: 'Activity',
-    elderlyName: 'All', 
+    elderlyName: 'Select Elderly', 
     elderlyId: '',
     status: ScheduleStatus.PENDING
   });
@@ -167,15 +167,20 @@ export default function SchedulePage() {
             // Find category
             let typeName = 'activity';
             let catRef: any = null;
-            if (Array.isArray(row.schedule_category)) {
-                if (row.schedule_category.length > 0) catRef = row.schedule_category[0];
+            if (Array.isArray(row.scheduleCategory)) {
+                if (row.scheduleCategory.length > 0) catRef = row.scheduleCategory[0];
             } else {
-                catRef = row.schedule_category;
+                catRef = row.scheduleCategory;
             }
 
             if (catRef) {
                  if (typeof catRef === 'object' && 'name' in catRef) {
                      typeName = (catRef as any).name?.toLowerCase() || 'activity';
+                 } else if (typeof catRef === 'string') {
+                     const foundCat = categories.find(c => c.$id === catRef);
+                     if (foundCat && foundCat.name) {
+                         typeName = foundCat.name.toLowerCase();
+                     }
                  }
             }
 
@@ -200,7 +205,7 @@ export default function SchedulePage() {
         setLoading(false);
         setRefreshing(false);
     }
-  }, [user, selectedDate]);
+  }, [user, selectedDate, categories]);
 
   useEffect(() => {
       fetchCategories();
@@ -606,8 +611,7 @@ export default function SchedulePage() {
 
               <Button mode="contained" onPress={async () => {
                   if (!newTask.title || !newTask.elderlyId || !newTask.time) {
-                      // Simple alert or toast
-                      console.warn("Missing fields");
+                      Alert.alert("Missing Information", "Please enter a title, select a time, and choose an elderly person.");
                       return;
                   }
                   
@@ -627,7 +631,7 @@ export default function SchedulePage() {
                       };
 
                       if (newTask.typeId) {
-                          data.schedule_category = [newTask.typeId]; // Relationship expects array
+                          data.scheduleCategory = newTask.typeId; 
                       }
 
                       await tablesDB.createRow({
