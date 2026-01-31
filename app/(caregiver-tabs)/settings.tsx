@@ -2,18 +2,18 @@ import { useAuth } from "@/lib/auth-context";
 import React, { useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
-  Banner,
-  Button,
-  Card,
-  SegmentedButtons,
-  Switch,
-  Text,
-  TextInput,
-  useTheme,
+    Banner,
+    Button,
+    Card,
+    SegmentedButtons,
+    Switch,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 export default function Settings() {
-  const { preferences, setPreference, updatePreferences, isTrial, userLabels } =
+  const { preferences, setPreference, updatePreferences, isTrial, userLabels, signOut } =
     useAuth();
   const theme = useTheme();
 
@@ -242,6 +242,16 @@ export default function Settings() {
             )}
           </Card.Content>
         </Card>
+
+        <Button
+            mode="contained"
+            buttonColor={theme.colors.error}
+            onPress={signOut}
+            style={styles.card}
+        >
+            Log Out
+        </Button>
+
       </View>
     </ScrollView>
   );

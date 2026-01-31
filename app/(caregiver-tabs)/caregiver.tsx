@@ -1,7 +1,9 @@
+import AddElderlyDialog from "@/components/AddElderlyDialog";
 import ElderlyCard from "@/components/ElderlyCard"; // Import the new component
-import { DATABASE_ID, ELDERLY_TABLE_ID, tablesDB } from "@/lib/appwrite";
+import { CAREGIVER_ELDERLY_TABLE_ID, DATABASE_ID, tablesDB } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
-import { Elderly, ElderlyStatus } from "@/types/appwrite";
+import { getCaregiverByUserId } from "@/lib/caregiver";
+import { CaregiverElderly, Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
@@ -42,7 +44,7 @@ const calculateAge = (birthDateString?: string | null): number | undefined => {
 };
 
 export default function CaregiverDashboard() {
-    const { preferences } = useAuth();
+    const { preferences, user } = useAuth();
     const theme = useTheme();
     const [refreshing, setRefreshing] = React.useState(false);
     const [elderlyList, setElderlyList] = React.useState<ElderlyListItem[]>([]);
@@ -51,14 +53,35 @@ export default function CaregiverDashboard() {
 
     const fetchElderlyData = React.useCallback(async () => {
         try {
+            if (!user) return;
             setError(null);
-            const response = await tablesDB.listRows({
+
+            const caregiver = await getCaregiverByUserId(user.$id);
+            if (!caregiver) {
+                // If checking for caregiver profile fails or doesn't exist yet, 
+                // we treat it as having no elderly
+                setElderlyList([]);
+                return;
+            }
+
+            const response = await tablesDB.listRows<CaregiverElderly>({
                 databaseId: DATABASE_ID,
-                tableId: ELDERLY_TABLE_ID,
-                queries: [Query.limit(100), Query.orderDesc('$createdAt')]
+                tableId: CAREGIVER_ELDERLY_TABLE_ID,
+                queries: [
+                    Query.equal('caregiver', caregiver.$id),
+                    Query.orderDesc('$createdAt')
+                ]
             });
             
-            const transformedData: ElderlyListItem[] = response.rows.map((row: any) => ({
+            // Extract elderly from the relationship rows.
+            // Assuming 'elderly' is expanded. If not, we would need to fetch by IDs.
+            // flatMap handles if multiple elderly are linked in one row (though usually 1-to-1 in simple links)
+            const rawElderlyList = response.rows.flatMap(row => row.elderly);
+            
+            // Deduplicate by ID just in case
+            const uniqueElderly = Array.from(new Map(rawElderlyList.map(item => [item.$id, item])).values());
+
+            const transformedData: ElderlyListItem[] = uniqueElderly.map((row: any) => ({
                 ...row,
                 age: calculateAge(row.birth),
                 lastCheck: "Recently",
@@ -75,7 +98,7 @@ export default function CaregiverDashboard() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [user]);
 
     React.useEffect(() => {
         fetchElderlyData();
@@ -118,6 +141,7 @@ export default function CaregiverDashboard() {
     const [infoVisible, setInfoVisible] = React.useState(false);
     const [selectedElderly, setSelectedElderly] = React.useState<any>(null);
     const [selectionVisible, setSelectionVisible] = React.useState(false); // New State for Health Data Selection
+    const [addElderlyVisible, setAddElderlyVisible] = React.useState(false);
 
     const handleQuickAction = (route: string) => {
         if (route === 'health-data') {
@@ -385,11 +409,20 @@ export default function CaregiverDashboard() {
                 </Dialog>
             </Portal>
 
+            <AddElderlyDialog 
+                visible={addElderlyVisible} 
+                onDismiss={() => setAddElderlyVisible(false)} 
+                onSuccess={() => {
+                   fetchElderlyData();
+                   // Maybe show a success message?
+                }} 
+            />
+
             <FAB
                 icon="plus"
                 style={styles.fab}
-                onPress={() => console.log('Add new elderly')}
-            />
+                onPress={() => setAddElderlyVisible(true)}
+             />
         </View>
     );
 }
