@@ -627,7 +627,8 @@ export default function SchedulePage() {
                           description: newTask.description,
                           time: combinedDate.toISOString(),
                           elderly: newTask.elderlyId, // Relationship expects single ID
-                          status: ScheduleStatus.PENDING
+                          status: ScheduleStatus.PENDING,
+                          type: newTask.type.toLowerCase() // Add type enum value
                       };
 
                       if (newTask.typeId) {
