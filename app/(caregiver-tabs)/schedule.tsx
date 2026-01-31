@@ -184,13 +184,29 @@ export default function SchedulePage() {
                  }
             }
 
+            // Auto-check for missed status
+            let displayStatus = row.status || ScheduleStatus.PENDING;
+            if (displayStatus === ScheduleStatus.PENDING && row.time) {
+                const taskTime = new Date(row.time);
+                if (taskTime < new Date()) {
+                    displayStatus = ScheduleStatus.MISSED;
+                    // Auto-update database in background
+                    tablesDB.updateRow({
+                        databaseId: DATABASE_ID,
+                        tableId: SCHEDULE_TABLE_ID,
+                        rowId: row.$id,
+                        data: { status: ScheduleStatus.MISSED }
+                    }).catch(console.error);
+                }
+            }
+
             return {
                 id: row.$id,
                 time: row.time ? new Date(row.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}) : '--:--',
                 title: row.title || '',
                 description: row.description || '',
                 type: typeName,
-                status: row.status || ScheduleStatus.PENDING,
+                status: displayStatus,
                 elderlyName: eName,
                 elderlyId: eId,
                 rawDate: row.time || ''
