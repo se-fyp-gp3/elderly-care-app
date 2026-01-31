@@ -1,4 +1,4 @@
-import { DATABASE_ID, SCHEDULE_TABLE_ID, SCHEDULE_CATEGORY_TABLE_ID, tablesDB } from '@/lib/appwrite';
+import { DATABASE_ID, SCHEDULE_CATEGORY_TABLE_ID, SCHEDULE_TABLE_ID, tablesDB } from '@/lib/appwrite';
 import { useAuth } from '@/lib/auth-context';
 import { getCaregiverByUserId, getLinkedElderly } from '@/lib/caregiver';
 import { Elderly, Schedule, ScheduleCategory, ScheduleStatus } from '@/types/appwrite';
@@ -288,8 +288,8 @@ export default function SchedulePage() {
   }, [navigation, router, theme]);
 
   const getStatusColor = (status: string) => {
-    if (status === 'completed') return theme.colors.primary; // '#4CAF50';
-    if (status === 'missed') return theme.colors.error;
+    if (status === ScheduleStatus.COMPLETED) return theme.colors.primary; // '#4CAF50';
+    if (status === ScheduleStatus.MISSED) return theme.colors.error;
     return theme.colors.secondary;
   };
 
@@ -308,8 +308,8 @@ export default function SchedulePage() {
     <View style={styles.timelineRow}>
       <View style={styles.timeColumn}>
         <Text style={styles.timeText}>{item.time}</Text>
-        {item.status === 'completed' && <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.primary} style={{ marginTop: 4 }} />}
-        {item.status === 'missed' && <MaterialCommunityIcons name="alert-circle" size={16} color={theme.colors.error} style={{ marginTop: 4 }} />}
+        {item.status === ScheduleStatus.COMPLETED && <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.primary} style={{ marginTop: 4 }} />}
+        {item.status === ScheduleStatus.MISSED && <MaterialCommunityIcons name="alert-circle" size={16} color={theme.colors.error} style={{ marginTop: 4 }} />}
       </View>
 
       <View style={styles.timelineLineContainer}>
@@ -331,7 +331,7 @@ export default function SchedulePage() {
         <Divider />
         <View style={styles.eventBody}>
           <Text variant="bodyMedium" numberOfLines={2} style={{ color: theme.colors.onSurfaceVariant }}>{item.description}</Text>
-          {item.status === 'pending' && (
+          {item.status === ScheduleStatus.PENDING && (
             <View style={{ alignItems: 'flex-end', marginTop: 12 }}>
               <Button mode="contained-tonal" compact uppercase={false} onPress={() => { }}>Mark Done</Button>
             </View>
@@ -701,23 +701,30 @@ export default function SchedulePage() {
                       </TouchableOpacity>
                     ))
                 ) : (
-                  categories.map(cat => (
-                    <TouchableOpacity
-                      key={cat.$id}
-                      style={[styles.selectionRow, { backgroundColor: newTask.typeId === cat.$id ? theme.colors.secondaryContainer : 'transparent' }]}
-                      onPress={() => {
-                        setNewTask({ ...newTask, type: cat.name || '', typeId: cat.$id });
-                        setSelectionMode('form');
-                      }}
-                    >
-                      {/* TODO: Icon mapping for categories if needed */}
-                      <Avatar.Icon size={40} icon={'calendar-check'} style={{ marginRight: 16, backgroundColor: theme.colors.secondary }} />
-                      <View>
-                        <Text variant="titleMedium">{cat.name}</Text>
-                      </View>
-                      {newTask.typeId === cat.$id && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
-                    </TouchableOpacity>
-                  ))
+                  categories.length > 0 ? (
+                    categories.map(cat => (
+                      <TouchableOpacity
+                        key={cat.$id}
+                        style={[styles.selectionRow, { backgroundColor: newTask.typeId === cat.$id ? theme.colors.secondaryContainer : 'transparent' }]}
+                        onPress={() => {
+                          setNewTask({ ...newTask, type: cat.name || 'Activity', typeId: cat.$id });
+                          setSelectionMode('form');
+                        }}
+                      >
+                        {/* TODO: Icon mapping for categories if needed */}
+                        <Avatar.Icon size={40} icon={'calendar-check'} style={{ marginRight: 16, backgroundColor: theme.colors.secondary }} />
+                        <View>
+                          <Text variant="titleMedium">{cat.name || 'Activity'}</Text>
+                        </View>
+                        {newTask.typeId === cat.$id && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                      <Text style={{ marginBottom: 10, color: theme.colors.secondary }}>No categories found.</Text>
+                      <Button mode="outlined" onPress={fetchCategories}>Retry Loading</Button>
+                    </View>
+                  )
                 )}
               </ScrollView>
             </View>
