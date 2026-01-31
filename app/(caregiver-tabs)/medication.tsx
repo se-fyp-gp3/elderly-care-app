@@ -3,11 +3,10 @@ import { DATABASE_ID, ELDERLY_MEDICATION_TABLE_ID, MEDICATION_TABLE_ID, tablesDB
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import { ElderlyMedication, ElderlyMedicationStatus, Medication } from "@/types/appwrite";
-import * as Calendar from 'expo-calendar';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Platform, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Linking, Platform, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Query } from "react-native-appwrite";
 import {
     Button,
@@ -38,8 +37,7 @@ const getRelationshipId = (val: any): string | null => {
 // Start notification handler
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
-        shouldShowAlert: true, // Kept for backward compatibility if needed, but priority is below
-        shouldPlaySound: true, // Changed to true to make sure it makes noise
+        shouldPlaySound: true,
         shouldSetBadge: false,
         shouldShowBanner: true,
         shouldShowList: true,
@@ -172,12 +170,6 @@ export default function MedicationManagement() {
                     await Notifications.requestPermissionsAsync();
                 }
 
-                // Request Calendar Permissions
-                const { status: calStatus } = await Calendar.requestCalendarPermissionsAsync();
-                if (calStatus === 'granted') {
-                    await Calendar.requestRemindersPermissionsAsync(); // iOS specifically
-                }
-
                 if (Platform.OS === 'android') {
                     await Notifications.setNotificationChannelAsync('default', {
                         name: 'default',
@@ -262,42 +254,7 @@ export default function MedicationManagement() {
                     trigger: { type: 'timeInterval', seconds: 5, repeats: false } as any,
                 });
 
-                // 2. Calendar Event with Alarm
-                try {
-                    const { status: calStatus } = await Calendar.requestCalendarPermissionsAsync();
-                    if (calStatus === 'granted') {
-                        const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
-                        
-                        // Find a writable calendar
-                        const defaultCalendar = Platform.OS === 'ios'
-                            ? calendars.find(c => c.source.name === 'Default')
-                            : calendars.find(c => c.accessLevel === Calendar.CalendarAccessLevel.OWNER || c.accessLevel === Calendar.CalendarAccessLevel.CONTRIBUTOR) || calendars[0];
-
-                        if (defaultCalendar) {
-                            const startsAt = new Date(Date.now() + 10 * 1000); // 10 seconds later to ensure OS has time to sync
-                            const endsAt = new Date(Date.now() + 20 * 60 * 1000); // 20 mins event
-
-                            await Calendar.createEventAsync(defaultCalendar.id, {
-                                title: title,
-                                notes: body,
-                                startDate: startsAt,
-                                endDate: endsAt,
-                                timeZone: 'Asia/Hong_Kong',
-                                location: 'Home',
-                                alarms: [{ relativeOffset: 0, method: Calendar.AlarmMethod.ALERT }],
-                            });
-                            Alert.alert('Reminder set', 'Notification and Calendar Alarm set for 10 seconds later.');
-                        } else {
-                            console.warn("No writable calendar found");
-                            Alert.alert('Reminder set', 'Notification set. (No writable calendar found for alarm)');
-                        }
-                    } else {
-                        Alert.alert('Permission required', 'Calendar permission is needed for the alarm.');
-                    }
-                } catch (calErr) {
-                    console.warn("Calendar scheduling failed", calErr);
-                    Alert.alert('Reminder set', 'Notification set. (Calendar alarm failed)');
-                }
+                Alert.alert('Reminder set', 'Notification will appear in 5 seconds.');
             } catch (e: any) {
                 console.warn('Failed to schedule notification', e);
                 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
