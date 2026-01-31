@@ -1,6 +1,6 @@
 import AddElderlyDialog from "@/components/AddElderlyDialog";
 import ElderlyCard from "@/components/ElderlyCard"; // Import the new component
-import { CAREGIVER_ELDERLY_TABLE_ID, DATABASE_ID, tablesDB } from "@/lib/appwrite";
+import { CAREGIVER_ELDERLY_TABLE_ID, DATABASE_ID, ELDERLY_TABLE_ID, tablesDB } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { CaregiverElderly, Elderly, ElderlyStatus } from "@/types/appwrite";
@@ -74,14 +74,42 @@ export default function CaregiverDashboard() {
             });
             
             // Extract elderly from the relationship rows.
-            // Assuming 'elderly' is expanded. If not, we would need to fetch by IDs.
-            // flatMap handles if multiple elderly are linked in one row (though usually 1-to-1 in simple links)
-            const rawElderlyList = response.rows.flatMap(row => row.elderly);
+            // Check if Appwrite returns objects (expanded) or IDs (strings)
+            const rawItems = response.rows.flatMap(row => row.elderly);
             
-            // Deduplicate by ID just in case
-            const uniqueElderly = Array.from(new Map(rawElderlyList.map(item => [item.$id, item])).values());
+            const loadedElderly: Elderly[] = [];
+            const idsToFetch: string[] = [];
+            
+            // Separate already loaded objects from IDs that need fetching
+            for (const item of rawItems) {
+                if (typeof item === 'string') {
+                    idsToFetch.push(item);
+                } else if (item && typeof item === 'object' && '$id' in item) {
+                    loadedElderly.push(item as Elderly);
+                }
+            }
+            
+            // If we have IDs to fetch, get their details
+            if (idsToFetch.length > 0) {
+                // Remove duplicates IDs before querying
+                const uniqueIds = [...new Set(idsToFetch)];
+                
+                // Fetch in chunks if needed, but for now single batch
+                const detailsResponse = await tablesDB.listRows<Elderly>({
+                   databaseId: DATABASE_ID,
+                   tableId: ELDERLY_TABLE_ID,
+                   queries: [
+                       Query.equal('$id', uniqueIds),
+                       Query.limit(100)
+                   ]
+                });
+                loadedElderly.push(...detailsResponse.rows);
+            }
 
-            const transformedData: ElderlyListItem[] = uniqueElderly.map((row: any) => ({
+            // Deduplicate by ID just in case (mix of expanded and fetched)
+            const uniqueElderly = Array.from(new Map(loadedElderly.map(item => [item.$id, item])).values());
+
+            const transformedData: ElderlyListItem[] = uniqueElderly.map((row) => ({
                 ...row,
                 age: calculateAge(row.birth),
                 lastCheck: "Recently",

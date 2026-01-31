@@ -46,8 +46,8 @@ export async function linkCaregiverToElderly(
     tableId: CAREGIVER_ELDERLY_TABLE_ID,
     rowId: ID.unique(),
     data: {
-      caregiver: [caregiverId],
-      elderly: [elderlyId],
+      caregiver: caregiverId,
+      elderly: elderlyId,
     },
   });
 }

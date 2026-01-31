@@ -37,3 +37,23 @@ export async function getElderlyByUserId(
     return null;
   }
 }
+
+export async function getElderlyByPhone(
+  phone: string,
+): Promise<Elderly | null> {
+  try {
+    const response = await tablesDB.listRows<Elderly>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_TABLE_ID,
+      queries: [Query.equal("phone", phone), Query.limit(1)],
+    });
+    if (response.total > 0) {
+      return response.rows[0] as unknown as Elderly;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching elderly profile by phone:", error);
+    return null;
+  }
+}
+
