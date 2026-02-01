@@ -18,34 +18,80 @@ export async function checkAndMarkSkippedMedications(
     userId: string
 ): Promise<void> {
     const now = new Date();
-    const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000); // 10 minutes ago
+    // 1 minute buffer (reduced from 10m to be more responsive)
+    const bufferTime = 1 * 60 * 1000; 
     
+    // HK Offset (UTC+8)
+    const hkOffset = 8 * 60 * 60 * 1000; 
+    const hkDate = new Date(now.getTime() + hkOffset);
+    const todayStr = hkDate.toISOString().slice(0, 10); // YYYY-MM-DD in HK
+
     // We only care about user's logs
     const profile = await getElderlyByUserId(userId);
     if (!profile?.$id) return;
     
     try {
-        const response = await tablesDB.listRows<MedicationLog>({
-            databaseId: DATABASE_ID,
-            tableId: MEDICATION_LOGS_TABLE_ID,
-            queries: [
-                Query.equal("elderly", profile.$id),
-                Query.equal("status", "pending"),
-                Query.lessThan("scheduled_at", tenMinutesAgo.toISOString()),
-                Query.limit(100) 
-            ]
-        });
+        // Fetch all active reminders
+        const reminders = await fetchActiveMedicationReminders(userId);
+        
+        // Fetch existing logs for today (based on current absolute time)
+        const todayLogs = await fetchDailyMedicationLogs(userId, now);
 
-        const updates = response.rows.map(log => 
-             tablesDB.updateRow({
-                 databaseId: DATABASE_ID,
-                 tableId: MEDICATION_LOGS_TABLE_ID,
-                 rowId: log.$id,
-                 data: {
-                     status: 'skipped'
+        const updates: Promise<any>[] = [];
+
+        for (const reminder of reminders) {
+            for (const time of reminder.reminder_times) {
+                 // Construct scheduled time treating 'time' as HK Time
+                 const [hours, minutes] = time.split(':').map(Number);
+                 
+                 // Construct a base date using the HK date string, set to 00:00 UTC
+                 const baseDate = new Date(todayStr); // e.g. 2026-02-01T00:00:00.000Z
+                 baseDate.setUTCHours(hours, minutes, 0, 0); // e.g. 2026-02-01T14:47:00.000Z
+                 
+                 // Subtract 8 hours to convert HKT to UTC
+                 const scheduledDate = new Date(baseDate.getTime() - hkOffset);
+                 const scheduledAtFull = scheduledDate.toISOString();
+
+                 // Check if it's "past due" (> 10 mins ago)
+                 const diff = now.getTime() - scheduledDate.getTime();
+                 
+                 if (diff > bufferTime) {
+                     // Find existing log
+                     // Handle relationship safely (it might be string ID or expanded object)
+                     const existingLog = todayLogs.find(l => {
+                        const logRemId = (typeof l.elderly_medication_reminder === 'string') 
+                                            ? l.elderly_medication_reminder 
+                                            : l.elderly_medication_reminder?.$id;
+                        
+                        if (logRemId !== reminder.$id) return false;
+
+                        // Robust comparison: check if time matches within 1 second
+                        // This handles potential millisecond discrepancies or string formatting issues
+                        const logTime = new Date(l.scheduled_at).getTime();
+                        const schedTime = scheduledDate.getTime();
+                        return Math.abs(logTime - schedTime) < 2000;
+                     });
+                     
+                     if (!existingLog) {
+                         // Case 1: No log exists -> Do nothing.
+                         // We rely on createElderlyMedicationWithReminder to generate all necessary logs.
+                         // If a log is missing for a past time, it means it was skipped during creation (intended).
+                         continue;
+                     } else if (existingLog.status === 'pending') {
+                         // Case 2: Log exists and is pending -> Update to MISSING
+                         console.log(`Auto-marking MISSING (update): ${existingLog.$id}`);
+                         updates.push(tablesDB.updateRow({
+                             databaseId: DATABASE_ID,
+                             tableId: MEDICATION_LOGS_TABLE_ID,
+                             rowId: existingLog.$id,
+                             data: {
+                                 status: 'missing'
+                             }
+                         }));
+                     }
                  }
-             })
-        );
+            }
+        }
         
         if (updates.length > 0) {
             await Promise.all(updates);
@@ -192,13 +238,14 @@ export async function fetchDailyMedicationLogs(
   const profile = await getElderlyByUserId(userId);
   if (!profile?.$id) return [];
 
-  // Start of day
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  
-  // End of day
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+    // Use HK day boundary to match scheduled_at generation
+    const hkOffset = 8 * 60 * 60 * 1000;
+    const hkDate = new Date(date.getTime() + hkOffset);
+    const hkDayStr = hkDate.toISOString().slice(0, 10);
+
+    const hkBase = new Date(hkDayStr); // 00:00 UTC representing HK date
+    const startOfDay = new Date(hkBase.getTime() - hkOffset); // 00:00 HK in UTC
+    const endOfDay = new Date(startOfDay.getTime() + (24 * 60 * 60 * 1000) - 1);
 
   try {
     const response = await tablesDB.listRows<MedicationLog>({
@@ -208,6 +255,7 @@ export async function fetchDailyMedicationLogs(
         Query.equal("elderly", profile.$id),
         Query.greaterThanEqual("scheduled_at", startOfDay.toISOString()),
         Query.lessThanEqual("scheduled_at", endOfDay.toISOString()),
+        Query.limit(500), // Increase limit to ensure we fetch all daily logs
       ],
     });
     return response.rows as unknown as MedicationLog[];
