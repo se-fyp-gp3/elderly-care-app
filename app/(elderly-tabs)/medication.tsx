@@ -1,3 +1,4 @@
+import { clientReactNative, DATABASE_ID, MEDICATION_LOGS_TABLE_ID } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
   createElderlyMedicationWithReminder,
@@ -10,12 +11,19 @@ import {
   fetchDailyMedicationLogs,
   logMedicationAction,
 } from "@/lib/medication_tracking";
+import {
+  cancelAllNotifications,
+  registerForPushNotificationsAsync,
+  scheduleMedicationNotification,
+  sendImmediateNotification
+} from "@/lib/notifications";
 import { Caregiver, ElderlyMedicationReminder, MedicationLog } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import {
   Alert,
   Animated,
+  AppState,
   Platform,
   RefreshControl,
   ScrollView,
@@ -61,6 +69,9 @@ export default function ElderlyMedicationScreen() {
   const [modalVisible, setModalVisible] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [caregiverMenuVisible, setCaregiverMenuVisible] = React.useState(false);
+  
+  // Track notified missing logs to avoid spam
+  const notifiedMissingLogs = React.useRef<Set<string>>(new Set());
 
   // Form State
   const [medicineName, setMedicineName] = React.useState("");
@@ -96,7 +107,96 @@ export default function ElderlyMedicationScreen() {
 
   React.useEffect(() => {
     fetchData();
+
+    // 1. AppState Listener: Refresh when app comes to foreground
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
+        fetchData();
+      }
+    });
+
+    // 2. Interval Polling: Check every 30 seconds for status updates (e.g., missed meds)
+    const intervalId = setInterval(() => {
+      fetchData();
+    }, 30000); 
+
+    // 3. Appwrite Realtime: Subscribe to medication logs changes
+    const realtimeUnsubscribe = clientReactNative.subscribe(
+      `databases.${DATABASE_ID}.collections.${MEDICATION_LOGS_TABLE_ID}.documents`,
+      (response) => {
+        if (response.events.some(e => e.includes("create") || e.includes("update"))) {
+             fetchData();
+        }
+      }
+    );
+
+    return () => {
+      subscription.remove();
+      clearInterval(intervalId);
+      realtimeUnsubscribe();
+    };
   }, [fetchData]);
+
+  // Notification Logic: Schedule reminders and alert on missing
+  React.useEffect(() => {
+    const manageNotifications = async () => {
+       const hasPerm = await registerForPushNotificationsAsync();
+       if (!hasPerm) return;
+
+       // 1. Alert for newly detected 'missing' medications
+       const missingItems = todoList.filter(i => i.status === 'missing');
+       const newMissing = missingItems.filter(i => {
+           // If we haven't notified about this specific instance/slot yet
+           // Key can be logId if exists, or schedule key
+           const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
+           return !notifiedMissingLogs.current.has(key);
+       });
+
+       if (newMissing.length > 0) {
+           // Summarize
+           const names = newMissing.map(i => i.medicationName).join(', ');
+           const body = `You have missed your scheduled medication: ${names}. Please take it as soon as possible!`;
+           await sendImmediateNotification("Missed Medication Alert", body);
+           
+           // Mark as notified
+           newMissing.forEach(i => {
+               const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
+               notifiedMissingLogs.current.add(key);
+           });
+       }
+
+       // 2. Reschedule future pending reminders
+       // We cancel everything first to ensure we sync with latest data (e.g. if time changed or taken)
+       await cancelAllNotifications();
+
+       const pendingItems = todoList.filter(i => i.status === 'pending');
+       
+       // Group by Scheduled Time string (ISO)
+       const grouped: Record<string, string[]> = {};
+       
+       pendingItems.forEach(i => {
+           if (!grouped[i.scheduledAt]) {
+               grouped[i.scheduledAt] = [];
+           }
+           grouped[i.scheduledAt].push(i.medicationName);
+       });
+
+       // Schedule for each group
+       for (const [isoDate, names] of Object.entries(grouped)) {
+           const triggerDate = new Date(isoDate);
+           if (triggerDate.getTime() > Date.now()) {
+               const medList = names.join(', ');
+               await scheduleMedicationNotification(
+                   "Medication Reminder",
+                   `It's time to take your medication: ${medList}`,
+                   triggerDate
+               );
+           }
+       }
+    };
+
+    manageNotifications();
+  }, [todoList]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -108,28 +208,60 @@ export default function ElderlyMedicationScreen() {
   const todoList = React.useMemo(() => {
     const list: TodoItem[] = [];
     const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    
+    // Calculate Today in HK
+    const hkOffset = 8 * 60 * 60 * 1000; 
+    const hkDate = new Date(now.getTime() + hkOffset);
+    const todayStr = hkDate.toISOString().slice(0, 10); // YYYY-MM-DD in HK
+
+    const toHKDateStr = (date: Date) =>
+      new Date(date.getTime() + hkOffset).toISOString().slice(0, 10);
+
+    const toHKTimeStr = (date: Date) => {
+      const hk = new Date(date.getTime() + hkOffset);
+      const hours = String(hk.getUTCHours()).padStart(2, "0");
+      const minutes = String(hk.getUTCMinutes()).padStart(2, "0");
+      return `${hours}:${minutes}`;
+    };
 
     reminders.forEach((r) => {
       // Basic check: is today within start_date + duration?
       // For simplicity, we assume active reminders are valid for today.
-      // Ideally, check date ranges properly.
       
       r.reminder_times.forEach((time) => {
-        // Construct scheduledAt for today
-        // Time is "HH:mm"
-        const scheduledAt = `${todayStr}T${time}:00.000Z`; // UTC or Local? simplified for now as string matching
-        // In real app, be careful with Timezones. Assuming stored times are effectively 'local' wall time for user preference.
+        // Construct scheduled time treating 'time' as HK Time
+        const [hours, minutes] = time.split(':').map(Number);
+            
+        // Construct a base date using the HK date string, set to 00:00 UTC
+        const baseDate = new Date(todayStr); 
+        baseDate.setUTCHours(hours, minutes, 0, 0); 
+            
+        // Subtract 8 hours to convert HKT to UTC
+        const scheduledDate = new Date(baseDate.getTime() - hkOffset);
+        const scheduledAt = scheduledDate.toISOString();
+
+        // Hide if scheduled_at is before start_date (e.g. created later in the day)
+        if (r.start_date && new Date(scheduledAt) < new Date(r.start_date)) {
+          return;
+        }
         
         // Find if logged
-        const log = todayLogs.find(
-           l => l.elderly_medication_reminder.$id === r.$id 
-           && l.scheduled_at.includes(time) // loose match on time part inside ISO string if constructed similarly
-           // Or better: construct the expected ISO string and match exactly
-        );
-        
+        const log = todayLogs.find(l => {
+          const logRemId = (typeof l.elderly_medication_reminder === 'string')
+            ? l.elderly_medication_reminder
+            : l.elderly_medication_reminder?.$id;
+
+          if (logRemId !== r.$id) return false;
+
+          const directMatch = l.scheduled_at === scheduledAt;
+          if (directMatch) return true;
+
+          const logDate = toHKDateStr(new Date(l.scheduled_at));
+          const logTime = toHKTimeStr(new Date(l.scheduled_at));
+          return logDate === todayStr && logTime === time;
+        });
+
         // Helper to get medication name safely
-        // We know r.elderly_medication.medication is an array of Medication objects after hydration
         const medications = Array.isArray(r.elderly_medication?.medication) 
             ? r.elderly_medication.medication 
             : (r.elderly_medication?.medication ? [r.elderly_medication.medication] : []);
@@ -144,7 +276,7 @@ export default function ElderlyMedicationScreen() {
         list.push({
             reminder: r,
             time,
-            scheduledAt, // This is just a key for now
+            scheduledAt,
             status: log ? (log.status as any) : "pending",
             logId: log?.$id,
             medicationName: medName,
@@ -214,6 +346,27 @@ export default function ElderlyMedicationScreen() {
             minutes,
           ).padStart(2, "0")}`;
         });
+      }
+
+      // Smart Order: Rotate schedule so the next upcoming time corresponds to the first slot
+      // using HK Time (UTC+8) to match system standards
+      const now = new Date();
+      const hkDate = new Date(now.getTime() + (8 * 60 * 60 * 1000)); 
+      const currentMinutes = hkDate.getUTCHours() * 60 + hkDate.getUTCMinutes();
+
+      let splitIndex = 0;
+      for (let i = 0; i < defaultTimes.length; i++) {
+        const [h, m] = defaultTimes[i].split(':').map(Number);
+        if ((h * 60 + m) > currentMinutes) {
+          splitIndex = i;
+          break;
+        }
+      }
+
+      if (splitIndex > 0) {
+        const upcoming = defaultTimes.slice(splitIndex);
+        const passed = defaultTimes.slice(0, splitIndex);
+        defaultTimes = [...upcoming, ...passed];
       }
 
       return defaultTimes;
@@ -358,25 +511,29 @@ export default function ElderlyMedicationScreen() {
                     </View>
                   )}
                   right={() => (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                        <Text 
                          variant="labelMedium" 
                          style={{ 
                             textTransform: 'capitalize',
                             color: item.status === 'taken' ? '#4CAF50' : 
-                                   item.status === 'skipped' ? '#FF5252' : 
+                                   item.status === 'skipped' ? '#FF5252' :
+                                   item.status === 'missing' ? '#D32F2F' :  
+                                   item.status === 'pending' ? '#FFA000' :
                                    theme.colors.onSurfaceVariant 
                          }}
                        >
                          {item.status}
                        </Text>
-                       <Button 
-                          mode={isTaken ? "outlined" : "contained"}
-                          onPress={() => handleTakeMedication(item)}
-                          compact
-                       >
-                          {isTaken ? "Taken" : "Take"}
-                       </Button>
+                        {!isTaken && (
+                         <Button 
+                           mode="contained"
+                           onPress={() => handleTakeMedication(item)}
+                           compact
+                         >
+                           Take
+                         </Button>
+                        )}
                     </View>
                   )}
                   style={[styles.listItem, isTaken && { opacity: 0.6 }]}

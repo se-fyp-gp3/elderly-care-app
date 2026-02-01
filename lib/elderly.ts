@@ -238,15 +238,37 @@ export async function createElderlyMedicationWithReminder(
         },
       });
 
-      // Auto-create Medication Logs (Pending)
-      const startDate = new Date(input.startDate || Date.now());
-      for (let i = 0; i < input.durationDays; i++) {
-        const currentDate = new Date(startDate);
-        currentDate.setDate(startDate.getDate() + i);
-        const dateStr = currentDate.toISOString().slice(0, 10); // YYYY-MM-DD
+            // Auto-create Medication Logs (Pending)
+            const hkOffset = 8 * 60 * 60 * 1000;
+            const nowMs = Date.now();
+            const startDateMs = input.startDate ? new Date(input.startDate).getTime() : nowMs;
 
-        for (const time of approxTimes) {
-             const scheduledAt = `${dateStr}T${time}:00.000Z`; // Construct ISO datetime
+            // Determine the HK date for the start date
+            const hkStartDate = new Date(startDateMs + hkOffset);
+            const startYear = hkStartDate.getUTCFullYear();
+            const startMonth = hkStartDate.getUTCMonth();
+            const startDay = hkStartDate.getUTCDate();
+
+      // Iterate per time slot to ensure full duration coverage
+      for (const time of approxTimes) {
+          const [hours, minutes] = time.split(':').map(Number);
+
+          // Calculate the first candidate time (Today's HK time converted to UTC timestamp)
+          // 1. Treats (Year-Month-Day) from HK time, and (Hours:Minutes) from slot
+          // 2. Subtract hkOffset to get the actual UTC timestamp
+          const firstCandidateHkAsUtc = Date.UTC(startYear, startMonth, startDay, hours, minutes, 0);
+          const firstCandidateInstance = firstCandidateHkAsUtc - hkOffset;
+
+          // If the calculated time for "Today" is in the past, start sequence from "Tomorrow"
+          let startDelayDays = 0;
+          if (firstCandidateInstance <= nowMs) {
+              startDelayDays = 1;
+          }
+
+          for (let d = 0; d < input.durationDays; d++) {
+             // Add days in milliseconds
+             const targetTime = firstCandidateInstance + ((startDelayDays + d) * 24 * 60 * 60 * 1000);
+             const scheduledAt = new Date(targetTime).toISOString();
              
              await tablesDB.createRow({
                  databaseId: DATABASE_ID,
@@ -260,7 +282,7 @@ export async function createElderlyMedicationWithReminder(
                      taken_at: null
                  }
              });
-        }
+          }
       }
 
     } catch (error) {
