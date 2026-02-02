@@ -1,9 +1,19 @@
-import { DATABASE_ID, SCHEDULE_CATEGORY_TABLE_ID, SCHEDULE_TABLE_ID, tablesDB } from '@/lib/appwrite';
+import {
+  DATABASE_ID,
+  ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+  ELDERLY_MEDICATION_TABLE_ID,
+  MEDICATION_LOGS_TABLE_ID,
+  MEDICATION_TABLE_ID,
+  SCHEDULE_CATEGORY_TABLE_ID,
+  SCHEDULE_TABLE_ID,
+  tablesDB
+} from '@/lib/appwrite';
 import { useAuth } from '@/lib/auth-context';
 import { getCaregiverByUserId, getLinkedElderly } from '@/lib/caregiver';
-import { Elderly, Schedule, ScheduleCategory, ScheduleStatus } from '@/types/appwrite';
+import { Elderly, ElderlyMedication, Medication, Schedule, ScheduleCategory, ScheduleStatus } from '@/types/appwrite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Notifications from 'expo-notifications';
 import { useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, FlatList, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -20,6 +30,20 @@ type ScheduleEvent = {
   elderlyName: string;
   elderlyId: string;
   rawDate: string;
+  medicationData?: {
+    realId: string;
+    logId?: string;
+    reminderId?: string;
+    name: string;
+    time: string;
+  };
+};
+
+const getRelationshipId = (val: any) => {
+  if (!val) return null;
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object' && val.$id) return val.$id;
+  return null;
 };
 
 export default function SchedulePage() {
@@ -113,65 +137,199 @@ export default function SchedulePage() {
         }
 
         const elderlyIds = elderly.map(e => e.$id);
+        const elderlyMap = new Map(elderly.map(e => [e.$id, e.name]));
 
-        // 2. Fetch Schedules for selected Date
         const startOfDay = new Date(selectedDate);
         startOfDay.setHours(0,0,0,0);
         const endOfDay = new Date(selectedDate);
         endOfDay.setHours(23,59,59,999);
 
-        // Chunk queries if too many elderly? Appwrite query limit is usually high enough for IDs.
-        // Assuming not too many.
-        const response = await tablesDB.listRows<Schedule>({
+        // --- FETCH 1: GENERIC SCHEDULES ---
+        const schedulePromise = tablesDB.listRows<Schedule>({
             databaseId: DATABASE_ID,
             tableId: SCHEDULE_TABLE_ID,
             queries: [
                 Query.greaterThanEqual('time', startOfDay.toISOString()),
                 Query.lessThanEqual('time', endOfDay.toISOString()),
-                Query.equal('elderly', elderlyIds), // Filter by ANY of these elderly
+                Query.equal('elderly', elderlyIds),
                 Query.limit(100),
                 Query.orderAsc('time')
             ]
         });
 
-        const fetchedEvents: ScheduleEvent[] = response.rows.map(row => {
-            // Find elderly name
+        // --- FETCH 2: MEDICATIONS ---
+        const medicationPromise = (async () => {
+             const emResponse = await tablesDB.listRows<ElderlyMedication>({
+                databaseId: DATABASE_ID,
+                tableId: ELDERLY_MEDICATION_TABLE_ID,
+                queries: [
+                    Query.equal('elderly', elderlyIds),
+                    Query.limit(100)
+                ]
+            });
+
+            const remindersResponse = await tablesDB.listRows<any>({
+                databaseId: DATABASE_ID,
+                tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+                queries: [ Query.equal('elderly', elderlyIds), Query.limit(100) ]
+            });
+            const emToReminderMap = new Map<string, string>();
+             remindersResponse.rows.forEach(rem => {
+                const emId = getRelationshipId(rem.elderly_medication);
+                if (emId) emToReminderMap.set(emId, rem.$id);
+            });
+
+            const medIds = new Set<string>();
+            emResponse.rows.forEach(row => {
+                const mId = getRelationshipId(row.medication);
+                if (mId) medIds.add(mId);
+            });
+            const medMap = new Map<string, Medication>();
+            if (medIds.size > 0) {
+                 const medRes = await tablesDB.listRows<Medication>({
+                    databaseId: DATABASE_ID,
+                    tableId: MEDICATION_TABLE_ID,
+                    queries: [ Query.equal('$id', Array.from(medIds)) ]
+                });
+                medRes.rows.forEach(m => medMap.set(m.$id, m));
+            }
+
+             const logStart = new Date(startOfDay);
+             logStart.setDate(logStart.getDate() - 1);
+             const logEnd = new Date(endOfDay);
+             logEnd.setDate(logEnd.getDate() + 1);
+             
+             const logsResponse = await tablesDB.listRows<any>({
+                databaseId: DATABASE_ID,
+                tableId: MEDICATION_LOGS_TABLE_ID,
+                queries: [
+                    Query.equal('elderly', elderlyIds),
+                    Query.greaterThanEqual('scheduled_at', logStart.toISOString()),
+                    Query.lessThanEqual('scheduled_at', logEnd.toISOString()),
+                    Query.limit(100)
+                ]
+            });
+
+            const medEvents: ScheduleEvent[] = [];
+            
+            emResponse.rows.forEach(em => {
+                 const eId = getRelationshipId(em.elderly);
+                 if (!eId) return;
+                 const elderlyName = elderlyMap.get(eId) || 'Unknown';
+                 
+                 const mId = getRelationshipId(em.medication);
+                 const medInfo = mId ? medMap.get(mId) : null;
+                 const medName = medInfo?.name || 'Unknown Drug';
+                 const dosage = `${em.dosage || ''} ${medInfo?.unit || ''}`;
+                 
+                 const times = em.approx_times || [];
+                 const reminderId = emToReminderMap.get(em.$id);
+
+                 let potentialLogs = [];
+                 if (reminderId) {
+                      potentialLogs = logsResponse.rows.filter(l => getRelationshipId(l.elderly_medication_reminder) === reminderId);
+                 }
+
+                  times.forEach((tStr, index) => {
+                      const slotDate = new Date(selectedDate);
+                      if (tStr.includes('T')) {
+                          const d = new Date(tStr);
+                          slotDate.setHours(d.getHours(), d.getMinutes(), 0, 0);
+                      } else if (tStr.includes(':')) {
+                          const parts = tStr.split(':');
+                          slotDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+                      }
+                      
+                      let status = ScheduleStatus.PENDING;
+                      let logId = undefined;
+                      let bestLog: any = null;
+                      let maxScore = -1;
+                      
+                      potentialLogs.forEach(log => {
+                           const logDate = new Date(log.scheduled_at);
+                           let score = 0;
+                           
+                           // 0. Strict Time Distance Check (Stop Day-Jumping)
+                           const diffHours = Math.abs(logDate.getTime() - slotDate.getTime()) / 36e5;
+                           if (diffHours >= 13) return; // REJECT if shift is > 13h (prevents matching adjacent days)
+
+                           // 1. Minute check
+                           if (Math.abs(logDate.getMinutes() - slotDate.getMinutes()) < 5) score += 20;
+                           else return;
+
+                           // 2. Hour check
+                           const logH = logDate.getHours();
+                           const logUTC = logDate.getUTCHours();
+                           const slotH = slotDate.getHours();
+                           
+                           if (logH === slotH) score += 50;
+                           else if (logUTC === slotH) score += 40; // UTC shift matched
+                           else return;
+                           
+                           // 3. Proximity Bonus
+                           if (diffHours < 4) score += 30; // Close match
+                           else score += 10; // Shift match
+
+                           if (score > maxScore) {
+                               maxScore = score;
+                               bestLog = log;
+                           }
+                      });
+                      
+                      if (bestLog && maxScore >= 40) {
+                           logId = bestLog.$id;
+                           if (bestLog.status === 'taken') {
+                               status = ScheduleStatus.COMPLETED;
+                           }
+                      }
+                      
+                      if (status === ScheduleStatus.PENDING && new Date() > slotDate) {
+                           status = ScheduleStatus.MISSED;
+                      }
+
+                      medEvents.push({
+                          id: `${em.$id}_${index}`,
+                          time: slotDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}),
+                          title: medName,
+                          description: dosage,
+                          type: 'medication',
+                          status: status,
+                          elderlyName: elderlyName,
+                          elderlyId: eId,
+                          rawDate: slotDate.toISOString(),
+                          medicationData: {
+                              realId: em.$id,
+                              logId: logId,
+                              reminderId: reminderId,
+                              name: medName,
+                              time: tStr
+                          }
+                      });
+                  });
+            });
+            return medEvents;
+        })();
+
+        const [scheduleRes, medEvents] = await Promise.all([schedulePromise, medicationPromise]);
+
+        const scheduleEvents: ScheduleEvent[] = scheduleRes.rows.map(row => {
             let eName = 'Unknown';
             let eId = '';
-            
-            // Normalize elderly relationship (can be array or single, object or ID)
-            let elderlyRef: any = null;
-            if (Array.isArray(row.elderly)) {
-                if (row.elderly.length > 0) elderlyRef = row.elderly[0];
-            } else {
-                elderlyRef = row.elderly;
-            }
+            let elderlyRef: any = Array.isArray(row.elderly) ? (row.elderly.length > 0 ? row.elderly[0] : null) : row.elderly;
 
             if (elderlyRef) {
                  if (typeof elderlyRef === 'object' && '$id' in elderlyRef) {
-                     // It is an expanded object from Appwrite
                      eName = (elderlyRef as any).name || 'Unknown';
                      eId = elderlyRef.$id;
                  } else if (typeof elderlyRef === 'string') {
-                     // It is an ID string
                      eId = elderlyRef;
                      const found = elderly.find(e => e.$id === elderlyRef);
                      if (found) eName = found.name;
-                     else {
-                         // Fallback attempt: if we are filtering by this elderly, we might know the name
-                         // But 'elderly' variable contains all linked elderly capable of being viewed
-                     }
                  }
             }
 
-            // Find category
             let typeName = 'activity';
-            let catRef: any = null;
-            if (Array.isArray(row.scheduleCategory)) {
-                if (row.scheduleCategory.length > 0) catRef = row.scheduleCategory[0];
-            } else {
-                catRef = row.scheduleCategory;
-            }
+            let catRef: any = Array.isArray(row.scheduleCategory) ? (row.scheduleCategory.length > 0 ? row.scheduleCategory[0] : null) : row.scheduleCategory;
 
             if (catRef) {
                  if (typeof catRef === 'object' && 'name' in catRef) {
@@ -184,13 +342,11 @@ export default function SchedulePage() {
                  }
             }
 
-            // Auto-check for missed status
             let displayStatus = row.status || ScheduleStatus.PENDING;
             if (displayStatus === ScheduleStatus.PENDING && row.time) {
                 const taskTime = new Date(row.time);
                 if (taskTime < new Date()) {
                     displayStatus = ScheduleStatus.MISSED;
-                    // Auto-update database in background
                     tablesDB.updateRow({
                         databaseId: DATABASE_ID,
                         tableId: SCHEDULE_TABLE_ID,
@@ -213,7 +369,8 @@ export default function SchedulePage() {
             };
         });
 
-        setEvents(fetchedEvents);
+        const allEvents = [...scheduleEvents, ...medEvents].sort((a,b) => a.rawDate.localeCompare(b.rawDate));
+        setEvents(allEvents);
 
     } catch (err) {
         console.error("Error fetching schedule", err);
@@ -350,12 +507,120 @@ export default function SchedulePage() {
       }
   };
 
+  const handleTakeMedication = async (event: ScheduleEvent) => {
+      if (!event.medicationData) return;
+      const { realId, logId, reminderId, time } = event.medicationData;
+      
+      try {
+          let activeLogId = logId;
+          const now = new Date();
+
+          if (reminderId) {
+             if (logId) {
+                 // Update existing
+                 await tablesDB.updateRow({
+                     databaseId: DATABASE_ID,
+                     tableId: MEDICATION_LOGS_TABLE_ID,
+                     rowId: logId,
+                     data: { status: 'taken', taken_at: now.toISOString() }
+                 });
+             } else {
+                 // Create new
+                 const parts = time.includes(':') ? time.split(':') : ['00','00'];
+                 const scheduledDate = new Date(selectedDate);
+                 scheduledDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+
+                const newLog = await tablesDB.createRow({
+                    databaseId: DATABASE_ID,
+                    tableId: MEDICATION_LOGS_TABLE_ID,
+                    rowId: ID.unique(),
+                    data: {
+                        status: 'taken',
+                        taken_at: now.toISOString(),
+                        scheduled_at: scheduledDate.toISOString(),
+                        elderly: event.elderlyId,
+                        elderly_medication_reminder: reminderId
+                    }
+                });
+                activeLogId = newLog.$id;
+             }
+          }
+
+          // Update Prescription last_taken (optional, but good for sync)
+          await tablesDB.updateRow({
+               databaseId: DATABASE_ID,
+               tableId: ELDERLY_MEDICATION_TABLE_ID,
+               rowId: realId,
+               data: { last_taken: now.toISOString() }
+          });
+
+          setEvents(prev => prev.map(e => {
+              if (e.id === event.id) {
+                  return {
+                      ...e,
+                      status: ScheduleStatus.COMPLETED,
+                      medicationData: { ...e.medicationData!, logId: activeLogId }
+                  };
+              }
+              return e;
+          }));
+
+      } catch (err) {
+          console.error("Failed to take med", err);
+          Alert.alert("Error", "Failed to update medication status.");
+      }
+  };
+
+  const handleUndoMedication = async (event: ScheduleEvent) => {
+      if (!event.medicationData?.logId) return;
+      
+      try {
+          await tablesDB.updateRow({
+              databaseId: DATABASE_ID,
+              tableId: MEDICATION_LOGS_TABLE_ID,
+              rowId: event.medicationData.logId,
+              data: { status: 'pending', taken_at: null }
+          });
+          
+          setEvents(prev => prev.map(e => {
+               if (e.id === event.id) {
+                   return { ...e, status: ScheduleStatus.PENDING }; // Keep logId!
+               }
+               return e;
+          }));
+      } catch (err) {
+          Alert.alert("Error", "Failed to undo.");
+      }
+  };
+
+  const handleRemindMedication = async (event: ScheduleEvent) => {
+      try {
+          const { status } = await Notifications.getPermissionsAsync();
+          if (status !== 'granted') {
+               Alert.alert('Permission required', 'Please enable notifications.');
+               return;
+          }
+          await Notifications.scheduleNotificationAsync({
+              content: { 
+                  title: 'Medication Reminder', 
+                  body: `Time to take ${event.title} (${event.elderlyName})`,
+                  data: { eventId: event.id }
+              },
+              trigger: { type: 'timeInterval', seconds: 5, repeats: false } as any,
+          });
+          Alert.alert('Reminder set', 'Notification in 5 seconds.');
+      } catch (e) {
+          console.warn(e);
+          Alert.alert("Error", "Could not schedule reminder.");
+      }
+  };
+
   const renderEvent = ({ item }: { item: ScheduleEvent }) => (
     <View style={styles.timelineRow}>
       <View style={styles.timeColumn}>
         <Text style={styles.timeText}>{item.time}</Text>
-        {item.status === ScheduleStatus.COMPLETED && <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.primary} style={{ marginTop: 4 }} />}
-        {item.status === ScheduleStatus.MISSED && <MaterialCommunityIcons name="alert-circle" size={16} color={theme.colors.error} style={{ marginTop: 4 }} />}
+        {(item.status === ScheduleStatus.COMPLETED || item.status === 'completed' as any) && <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.primary} style={{ marginTop: 4 }} />}
+        {(item.status === ScheduleStatus.MISSED || item.status === 'missed' as any) && <MaterialCommunityIcons name="alert-circle" size={16} color={theme.colors.error} style={{ marginTop: 4 }} />}
       </View>
 
       <View style={styles.timelineLineContainer}>
@@ -377,10 +642,24 @@ export default function SchedulePage() {
         <Divider />
         <View style={styles.eventBody}>
           <Text variant="bodyMedium" numberOfLines={2} style={{ color: theme.colors.onSurfaceVariant }}>{item.description}</Text>
-          {(item.status === ScheduleStatus.PENDING || item.status === ScheduleStatus.MISSED) && (
-            <View style={{ alignItems: 'flex-end', marginTop: 12 }}>
-              <Button mode="contained-tonal" compact uppercase={false} onPress={() => handleMarkDone(item.id)}>Mark Done</Button>
-            </View>
+          
+          {item.type === 'medication' ? (
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12, alignItems: 'center' }}>
+                  {(item.status === ScheduleStatus.PENDING || item.status === ScheduleStatus.MISSED) ? (
+                      <>
+                          <IconButton icon="bell-outline" size={20} onPress={() => handleRemindMedication(item)} />
+                          <Button mode="contained" compact onPress={() => handleTakeMedication(item)}>Take</Button>
+                      </>
+                  ) : (
+                      <Button icon="undo" compact mode="text" onPress={() => handleUndoMedication(item)}>Undo</Button>
+                  )}
+              </View>
+          ) : (
+              (item.status === ScheduleStatus.PENDING || item.status === ScheduleStatus.MISSED) && (
+                <View style={{ alignItems: 'flex-end', marginTop: 12 }}>
+                  <Button mode="contained-tonal" compact uppercase={false} onPress={() => handleMarkDone(item.id)}>Mark Done</Button>
+                </View>
+              )
           )}
         </View>
       </Surface>
