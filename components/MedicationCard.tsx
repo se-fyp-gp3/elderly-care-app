@@ -14,6 +14,10 @@ export interface MedicationItem {
     status: string; // 'pending' | 'completed' | 'overdue'
     lastTaken: string;
     notes?: string;
+    isPrescriptionId?: boolean;
+    realId?: string;
+    reminderId?: string;
+    logId?: string;
 }
 
 interface MedicationCardProps {

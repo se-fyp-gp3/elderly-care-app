@@ -1,6 +1,7 @@
 import MedicationCard, { MedicationItem } from "@/components/MedicationCard";
 import {
     DATABASE_ID,
+    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
     ELDERLY_MEDICATION_TABLE_ID,
     MEDICATION_LOGS_TABLE_ID,
     MEDICATION_TABLE_ID,
@@ -10,18 +11,21 @@ import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import { Elderly, ElderlyMedication, Medication } from "@/types/appwrite";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import React, { useCallback, useEffect, useState } from "react";
-import { Alert, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import { Query } from "react-native-appwrite";
+import React, { useCallback, useEffect, useState, useRef } from "react";
+import { Alert, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View, AppState, AppStateStatus } from "react-native";
+import { ID, Query } from "react-native-appwrite";
 import {
     Avatar,
     Button,
     Card,
     Dialog,
     Divider,
+    IconButton,
     Portal,
     Searchbar,
+    Snackbar,
     Text,
     useTheme
 } from "react-native-paper";
@@ -73,6 +77,33 @@ export default function MedicationManagement() {
     const [selectedElderlyId, setSelectedElderlyId] = useState<string>('All');
     const [statusFilterVisible, setStatusFilterVisible] = useState(false);
     const [filterSearchQuery, setFilterSearchQuery] = useState('');
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+    const [undoVisible, setUndoVisible] = useState(false);
+    const [lastAction, setLastAction] = useState<string | null>(null);
+
+    // AppState handling for auto-refresh
+    const appState = useRef(AppState.currentState);
+
+    const toggleGroup = (groupId: string) => {
+        setCollapsedGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(groupId)) {
+                next.delete(groupId);
+            } else {
+                next.add(groupId);
+            }
+            return next;
+        });
+    };
+
+    useEffect(() => {
+        (async () => {
+            const { status } = await Notifications.getPermissionsAsync();
+            if (status !== 'granted') {
+                await Notifications.requestPermissionsAsync();
+            }
+        })();
+    }, []);
 
     const fetchData = useCallback(async () => {
         if (!user) return;
@@ -105,6 +136,22 @@ export default function MedicationManagement() {
                     Query.equal('elderly', elderlyIds),
                     Query.limit(100)
                 ]
+            });
+            
+            // 2a. Fetch Reminders (to link logs)
+            const remindersResponse = await tablesDB.listRows<any>({
+                databaseId: DATABASE_ID,
+                tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+                queries: [
+                    Query.equal('elderly', elderlyIds),
+                    Query.limit(100)
+                ]
+            });
+            // Map ElderlyMedication ID -> Reminder ID (assuming one reminder per medication for simplicity)
+            const emToReminderMap = new Map<string, string>();
+            remindersResponse.rows.forEach(rem => {
+                const emId = getRelationshipId(rem.elderly_medication);
+                if (emId) emToReminderMap.set(emId, rem.$id);
             });
 
             // 3. Fetch Medication Details
@@ -168,6 +215,8 @@ export default function MedicationManagement() {
                     // Let's rely on approx_times to generate "Planned Slots"
                     
                     const times = em.approx_times || [];
+                    const reminderId = emToReminderMap.get(em.$id);
+
                     if (times.length === 0) {
                          // No specific times, maybe 'PRN' or just show one generic pending item
                          dailyMeds.push({
@@ -180,75 +229,87 @@ export default function MedicationManagement() {
                             time: 'Anytime',
                             status: 'pending',
                             lastTaken: em.last_taken ? new Date(em.last_taken).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never',
-                            notes: em.notes || ''
+                            notes: em.notes || '',
+                            reminderId: reminderId
                          });
                     } else {
                         times.forEach((tStr, index) => {
-                            let scheduledTime;
-                            try {
-                                scheduledTime = new Date(tStr);
-                            } catch {
-                                return;
+                            let todayScheduledTime = new Date();
+                            // Parse 'tStr' which can be ISO string or HH:MM
+                            if (tStr.includes('T')) {
+                                const d = new Date(tStr);
+                                todayScheduledTime.setHours(d.getHours(), d.getMinutes(), 0, 0);
+                            } else if (tStr.includes(':')) {
+                                const parts = tStr.split(':');
+                                todayScheduledTime.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
                             }
                             
                             // Normalize scheduledTime to Today for display/comparison
-                            const displayTime = scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-                            
-                            // Try start find if there is a log that matches this time approximately?
-                            // Or just find ANY log for this ElderlyMedication that is "taken" today?
-                            // Current Log structure has `elderly_medication_reminder` which points to `elderly_medication`.
-                            // So we can find logs related to `em.$id`.
-                            
-                            // Filter logs for this ElderlyMedication
-                            // Complexity: We need to know which reminder ID corresponds to this EM.
-                            // But we fetched Logs. Logs have `elderly_medication_reminder` (ID).
-                            // We didn't fetch all reminders.
-                            // Simplified Check: Check if there's any log for this elderly at roughly this time?
-                            // Better: Check if any log is linked to a reminder that is linked to this EM.
-                            // This requires fetching reminders. Or, assuming we can just display Prescriptions "as is" and if we find a log, we mark complete.
-                            
-                            // Let's implement a simple "Plan View"
-                            // Use the time from approx_times.
-                            // Status: Check Global Logs for this elderly, try to match by time? unreliable.
-                            
-                            // Advanced: Use 'reminders' query if needed. 
-                            // FALLBACK: Use Prescription status/last_taken if Log logic is too complex without reminder fetching.
-                            // BUT user has logs.
-                            
-                            // Let's try to match Log by Time + Medication Name (if possible)? No med name in log.
-                            // Let's assume for now: Show Prescription Items. Status comes from Prescription 'last_taken' check against Today?
-                            // em.last_taken is datetime.
+                            const displayTime = todayScheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
                             
                             let status = 'pending';
-                            const lastTakenDate = em.last_taken ? new Date(em.last_taken) : null;
-                            const isTakenToday = lastTakenDate && 
-                                lastTakenDate.getDate() === new Date().getDate() &&
-                                lastTakenDate.getMonth() === new Date().getMonth() &&
-                                lastTakenDate.getFullYear() === new Date().getFullYear();
+                            let logTaken = null;
+                            let currentLogId = undefined;
 
-                            // If frequencies > 1, single last_taken isn't enough.
-                            // But usually last_taken updates on every take.
-                            // If taken today, and we are iterating times... difficult to map 1-to-1 without Logs.
+                            // NEW LOGIC: Check matches in MedicationLogs
+                            if (reminderId) {
+                                // Find any log that matches this reminder ID
+                                // AND matches the scheduled time slot (approx)
+                                
+                                const targetTimeHour = todayScheduledTime.getHours();
+                                const targetTimeMin = todayScheduledTime.getMinutes();
+                                
+                                const matchingLog = logsResponse.rows.find(l => {
+                                    const lRemId = getRelationshipId(l.elderly_medication_reminder);
+                                    if (lRemId !== reminderId) return false;
+                                    
+                                    // Check time match
+                                    const logScheduled = new Date(l.scheduled_at);
+                                    // Handle Timezone or just check hours?
+                                    // Appwrite stores UTC. new Date() parses to local.
+                                    // Assuming safe comparison:
+                                    return logScheduled.getHours() === targetTimeHour && Math.abs(logScheduled.getMinutes() - targetTimeMin) < 5;
+                                });
+                                
+                                if (matchingLog && matchingLog.status === 'taken') {
+                                    status = 'completed';
+                                    logTaken = matchingLog.taken_at;
+                                    currentLogId = matchingLog.$id;
+                                }
+                            } else {
+                                // Fallback for old data without reminders
+                                const lastTakenDate = em.last_taken ? new Date(em.last_taken) : null;
+                                const isTakenToday = lastTakenDate && 
+                                    lastTakenDate.getDate() === new Date().getDate() &&
+                                    lastTakenDate.getMonth() === new Date().getMonth() &&
+                                    lastTakenDate.getFullYear() === new Date().getFullYear();
+                                
+                                if (isTakenToday && times.length === 1) status = 'completed';
+                            }
                             
-                            // Let's look at logsResponse. 
-                            // We can guess: if we find *any* log for this medication today that is 'taken', mark one as taken?
-                            // Limitation: Without full join, we can't perfectly map Log -> Time Slot.
-                            
-                            // Compromise: Show "Plan" as generated from Prescriptions.
-                            // Status: 'pending' (default)
-                            // If user logs it, we create a Log AND update Prescription last_taken.
-                            
+                            // Check for OVERDUE
+                            // If still pending, and time has passed by e.g. 1 minute?
+                            if (status === 'pending') {
+                                const now = new Date();
+                                if (now > todayScheduledTime) {
+                                    status = 'missed';
+                                }
+                            }
+
                             dailyMeds.push({
                                 id: `${em.$id}_${index}`, // Composite ID for list key
                                 realId: em.$id, // Actual ID for actions
+                                isPrescriptionId: true,
                                 elderly: elderly.name,
                                 name: medName,
                                 dosage: dosage,
                                 frequency: em.frequency || '',
                                 time: displayTime,
-                                status: (isTakenToday && times.length === 1) ? 'completed' : 'pending', // Rough heuristic
-                                lastTaken: em.last_taken ? new Date(em.last_taken).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never',
-                                notes: em.notes || ''
+                                status: status,
+                                lastTaken: logTaken ? new Date(logTaken).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : (em.last_taken ? new Date(em.last_taken).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'),
+                                notes: em.notes || '',
+                                reminderId: reminderId,
+                                logId: currentLogId
                             });
                         });
                     }
@@ -275,7 +336,22 @@ export default function MedicationManagement() {
 
     useEffect(() => {
         fetchData();
-        // Permission check...
+        
+        // Add AppState listener to refresh data when app returns to foreground
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            if (
+                appState.current.match(/inactive|background/) &&
+                nextAppState === 'active'
+            ) {
+                console.log('App returned to foreground, refreshing data...');
+                fetchData();
+            }
+            appState.current = nextAppState;
+        });
+
+        return () => {
+            subscription.remove();
+        };
     }, [fetchData]);
 
     const onRefresh = useCallback(() => {
@@ -308,7 +384,7 @@ export default function MedicationManagement() {
     const totalCount = allMeds.length;
     const pendingCount = allMeds.filter(m => m.status === 'pending').length;
     const completedCount = allMeds.filter(m => m.status === 'completed' || m.status === 'taken').length;
-    const overdueCount = allMeds.filter(m => m.status === 'overdue' || m.status === 'missing').length;
+    const missedCount = allMeds.filter(m => m.status === 'missed' || m.status === 'overdue').length;
 
     const onConfirmTaking = async (medItem: MedicationItem) => {
         // If it's a generated item (from prescription), we might need to CREATE a log
@@ -326,20 +402,78 @@ export default function MedicationManagement() {
         
         try {
             if (item.isPrescriptionId) {
-                // It's a prescription item, so we CREATE a log
-                // rowId: unique()
-                // data: { elderly, elderly_medication_reminder?? We don't have reminder ID easily here without fetching it. }
-                // Fallback: Just update local state to green or use old logic: Update ElderlyMedication.last_taken
-                
+                // Find group for elderlyId
+                const group = elderlyGroups.find(g => g.medications.some(m => m.id === medItem.id));
+                const elderlyId = group?.elderlyId;
+
+                // 1. Create Log Entry If Reminder Exists
+                let activeLogId = item.logId; // Use existing IF we have it
+
+                if (item.reminderId && elderlyId) {
+                    const now = new Date();
+                    
+                    if (item.logId) {
+                        // UPDATE existing log (e.g. from Undo which set it to pending)
+                        await tablesDB.updateRow({
+                            databaseId: DATABASE_ID,
+                            tableId: MEDICATION_LOGS_TABLE_ID,
+                            rowId: item.logId,
+                            data: {
+                                status: 'taken',
+                                taken_at: now.toISOString(),
+                            }
+                        });
+                    } else {
+                        // Create NEW log
+                        // Calculate Scheduled Time
+                        const scheduledDate = new Date();
+                        
+                        if (item.time !== 'Anytime') {
+                            const [hours, minutes] = item.time.split(':');
+                            scheduledDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                        }
+                        
+                        const newLog = await tablesDB.createRow({
+                            databaseId: DATABASE_ID,
+                            tableId: MEDICATION_LOGS_TABLE_ID,
+                            rowId: ID.unique(),
+                            data: {
+                                status: 'taken',
+                                taken_at: now.toISOString(),
+                                scheduled_at: scheduledDate.toISOString(),
+                                elderly: elderlyId,
+                                elderly_medication_reminder: item.reminderId
+                            }
+                        });
+                        activeLogId = newLog.$id; // Capture the NEW ID
+                    }
+                }
+
+                 // 2. Update Prescription Last Taken
                  await tablesDB.updateRow({
                     databaseId: DATABASE_ID,
                     tableId: ELDERLY_MEDICATION_TABLE_ID,
                     rowId: item.realId,
                     data: {
                         last_taken: new Date().toISOString(),
-                        // status: 'Completed' // Don't change status of Regimen
                     }
                 });
+                
+                // Update local state with the LOG ID
+                setElderlyGroups(prev => prev.map(group => ({
+                    ...group,
+                    medications: group.medications.map(m => {
+                        if (m.id === medItem.id) {
+                            return { 
+                                ...m, 
+                                status: 'completed', 
+                                lastTaken: new Date().toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                                logId: activeLogId // SAVE it so Undo can find it!
+                            };
+                        }
+                        return m;
+                    })
+                })));
             } else {
                 // It's an existing Log
                 await tablesDB.updateRow({
@@ -351,21 +485,21 @@ export default function MedicationManagement() {
                         taken_at: new Date().toISOString(),
                     }
                 });
+                
+                setElderlyGroups(prev => prev.map(group => ({
+                    ...group,
+                    medications: group.medications.map(m => {
+                        if (m.id === medItem.id) {
+                            return { 
+                                ...m, 
+                                status: 'completed', 
+                                lastTaken: new Date().toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            };
+                        }
+                        return m;
+                    })
+                })));
             }
-
-            setElderlyGroups(prev => prev.map(group => ({
-                ...group,
-                medications: group.medications.map(m => {
-                    if (m.id === medItem.id) {
-                        return { 
-                            ...m, 
-                            status: 'completed', 
-                            lastTaken: new Date().toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                        };
-                    }
-                    return m;
-                })
-            })));
             
             setDialogVisible(null);
             setNoteText('');
@@ -375,9 +509,75 @@ export default function MedicationManagement() {
         }
     };
 
+    const onUndoTaking = async (medItem: MedicationItem) => {
+         if (!medItem.logId) {
+             Alert.alert('Cannot Undo', 'History record not found.');
+             return;
+         }
+
+         try {
+             await tablesDB.updateRow({
+                 databaseId: DATABASE_ID,
+                 tableId: MEDICATION_LOGS_TABLE_ID,
+                 rowId: medItem.logId,
+                 data: {
+                     status: 'pending',
+                     taken_at: null
+                 }
+             });
+
+             setElderlyGroups(prev => prev.map(group => ({
+                ...group,
+                medications: group.medications.map(m => {
+                    if (m.id === medItem.id) {
+                         // Revert status
+                         return { 
+                             ...m, 
+                             status: 'pending',
+                             lastTaken: 'Never', // Or keep previous if known? Hard without history.
+                             // logId: undefined // KEEP the logId so we can re-update it if user clicks Take again!
+                         };
+                    }
+                    return m;
+                })
+             })));
+
+         } catch (err) {
+             Alert.alert('Error', 'Failed to undo.');
+         }
+    };
+
     const onRemindLater = (medId: string) => {
-        // ... same notification logic ...
-        // Need to find med from groups
+        (async () => {
+            try {
+                // 1. Notification
+                const { status } = await Notifications.getPermissionsAsync();
+                if (status !== 'granted') {
+                    Alert.alert('Permission required', 'Please enable notifications to receive reminders.');
+                    return;
+                }
+
+                // Find the medication in our nested structure
+                const med = allMeds.find(m => m.id === medId);
+                const title = 'Medication reminder';
+                const body = med ? `Please check medication for ${med.elderly}: ${med.name}` : 'Please check medication';
+
+                await Notifications.scheduleNotificationAsync({
+                    content: { title, body, data: { medId } },
+                    trigger: { type: 'timeInterval', seconds: 5, repeats: false } as any,
+                });
+
+                Alert.alert('Reminder set', 'Notification will appear in 5 seconds.');
+            } catch (e: any) {
+                console.warn('Failed to schedule notification', e);
+                const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+                if (isExpoGo) {
+                    Alert.alert('Not Supported', 'Notifications are not supported in Expo Go on Android (SDK 53+). Please use a Development Build.');
+                } else {
+                    Alert.alert('Error', 'Unable to schedule reminder.');
+                }
+            }
+        })();
     };
 
     const onMarkProcessed = async (medId: string) => {
@@ -436,7 +636,7 @@ export default function MedicationManagement() {
                                     <Text variant="bodyMedium">Done</Text>
                                 </View>
                                 <View style={styles.stat}>
-                                    <Text variant="headlineSmall" style={[styles.statNumber, styles.overdue]}>{overdueCount}</Text>
+                                    <Text variant="headlineSmall" style={[styles.statNumber, styles.overdue]}>{missedCount}</Text>
                                     <Text variant="bodyMedium">Missed</Text>
                                 </View>
                             </View>
@@ -485,21 +685,115 @@ export default function MedicationManagement() {
                                         </Text>
                                     </View>
                                     <Text variant="titleMedium" style={styles.groupTitle}>{group.elderlyName}</Text>
+                                    <IconButton 
+                                        icon={collapsedGroups.has(group.elderlyId) ? "chevron-down" : "chevron-up"}
+                                        onPress={() => toggleGroup(group.elderlyId)}
+                                        style={{ marginLeft: 'auto', margin: 0 }}
+                                        size={24}
+                                    />
                                 </View>
                                 <Divider style={{ marginBottom: 12 }} />
                                 
-                                {group.medications.length === 0 ? (
-                                    <Text style={{ color: theme.colors.outline, fontStyle: 'italic', marginBottom: 10 }}>No medications scheduled.</Text>
-                                ) : (
-                                    group.medications.map(med => (
-                                        <MedicationCard
-                                            key={med.id}
-                                            med={med}
-                                            onConfirmPress={() => { setDialogVisible(med); setNoteText(med.notes || ''); }}
-                                            onRemind={() => onRemindLater(med.id)}
-                                            onMarkProcessed={() => onMarkProcessed(med.id)}
-                                        />
-                                    ))
+                                {!collapsedGroups.has(group.elderlyId) && (
+                                    group.medications.length === 0 ? (
+                                        <Text style={{ color: theme.colors.outline, fontStyle: 'italic', marginBottom: 10 }}>No medications scheduled.</Text>
+                                    ) : (
+                                        Object.values(
+                                            group.medications.reduce((acc, med) => {
+                                                const key = med.realId || med.id;
+                                                if (!acc[key]) acc[key] = { common: med, slots: [] };
+                                                acc[key].slots.push(med);
+                                                return acc;
+                                            }, {} as Record<string, { common: MedicationItem, slots: MedicationItem[] }>)
+                                        ).map((groupItem) => (
+                                            <Card key={groupItem.common.realId || groupItem.common.id} style={{ marginBottom: 16, backgroundColor: theme.colors.elevation.level1 }}>
+                                                <Card.Title
+                                                    title={groupItem.common.name}
+                                                    titleStyle={{ fontWeight: 'bold' }}
+                                                    subtitle={`${groupItem.common.dosage} • ${groupItem.common.frequency}`}
+                                                    left={(props) => <Avatar.Icon {...props} icon="pill" size={40} style={{ backgroundColor: theme.colors.primaryContainer }} color={theme.colors.onPrimaryContainer} />}
+                                                />
+                                                <Card.Content>
+                                                    {groupItem.slots.sort((a, b) => a.time.localeCompare(b.time)).map((slot, index) => (
+                                                        <View key={slot.id} style={{
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            paddingVertical: 12,
+                                                            borderTopWidth: index > 0 ? 1 : 0,
+                                                            borderTopColor: theme.colors.surfaceVariant
+                                                        }}>
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                                                <MaterialCommunityIcons 
+                                                                    name="clock-time-four-outline" 
+                                                                    size={20} 
+                                                                    color={theme.colors.onSurfaceVariant} 
+                                                                    style={{ marginRight: 8 }} 
+                                                                />
+                                                                <Text variant="bodyLarge" style={{ fontWeight: '500', marginRight: 12, width: 60 }}>{slot.time}</Text>
+                                                                
+                                                                <View style={{ 
+                                                                    backgroundColor: slot.status === 'completed' ? theme.colors.primaryContainer : 
+                                                                                    slot.status === 'missed' ? theme.colors.errorContainer : theme.colors.surfaceVariant,
+                                                                    paddingHorizontal: 8,
+                                                                    paddingVertical: 2,
+                                                                    borderRadius: 4
+                                                                }}>
+                                                                    <Text style={{ 
+                                                                        color: slot.status === 'completed' ? theme.colors.onPrimaryContainer : 
+                                                                               slot.status === 'missed' ? theme.colors.onErrorContainer : theme.colors.onSurfaceVariant,
+                                                                        fontSize: 12,
+                                                                        fontWeight: 'bold'
+                                                                    }}>
+                                                                        {slot.status === 'completed' ? 'Taken' : (slot.status === 'pending' ? 'Pending' : slot.status.charAt(0).toUpperCase() + slot.status.slice(1))}
+                                                                    </Text>
+                                                                </View>
+                                                            </View>
+
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                                {(slot.status === 'pending' || slot.status === 'missed') ? (
+                                                                    <>
+                                                                        <IconButton
+                                                                            icon="bell-outline"
+                                                                            size={20}
+                                                                            onPress={() => onRemindLater(slot.id)}
+                                                                            style={{ margin: 0 }}
+                                                                        />
+                                                                        <Button
+                                                                            mode="contained"
+                                                                            compact
+                                                                            onPress={() => { setDialogVisible(slot); setNoteText(slot.notes || ''); }}
+                                                                            style={{ marginLeft: 4 }}
+                                                                        >
+                                                                            Take
+                                                                        </Button>
+                                                                    </>
+                                                                ) : (
+                                                                    slot.status === 'completed' && (
+                                                                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                                           <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
+                                                                           <Text variant="bodySmall" style={{ color: theme.colors.outline, marginRight: 8 }}>
+                                                                               {slot.lastTaken && slot.lastTaken.includes(' ') ? slot.lastTaken.split(' ')[1] : slot.lastTaken}
+                                                                           </Text>
+                                                                           <Button 
+                                                                                icon="undo" 
+                                                                                compact 
+                                                                                mode="text" 
+                                                                                onPress={() => onUndoTaking(slot)}
+                                                                                labelStyle={{ fontSize: 12 }}
+                                                                            >
+                                                                                Undo
+                                                                           </Button>
+                                                                       </View>
+                                                                    )
+                                                                )}
+                                                            </View>
+                                                        </View>
+                                                    ))}
+                                                </Card.Content>
+                                            </Card>
+                                        ))
+                                    )
                                 )}
                             </View>
                         ))
