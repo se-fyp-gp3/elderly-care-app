@@ -368,6 +368,7 @@ export default function MedicationManagement() {
                                 time: slot.displayTime,
                                 status: status,
                                 lastTaken: logTaken ? new Date(logTaken).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : (em.last_taken ? new Date(em.last_taken).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'),
+                                takenAtIso: logTaken || em.last_taken || undefined,
                                 notes: em.notes || '',
                                 reminderId: reminderId,
                                 logId: currentLogId
@@ -961,7 +962,10 @@ export default function MedicationManagement() {
                                                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                                            <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
                                                                            <Text variant="bodySmall" style={{ color: theme.colors.outline, marginRight: 8 }}>
-                                                                               {slot.lastTaken && slot.lastTaken.includes(' ') ? slot.lastTaken.split(' ')[1] : slot.lastTaken}
+                                                                               {slot.takenAtIso 
+                                                                                   ? new Date(slot.takenAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                                                                                   : slot.lastTaken
+                                                                               }
                                                                            </Text>
                                                                            <Button 
                                                                                 icon="undo" 

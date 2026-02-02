@@ -283,9 +283,6 @@ export default function CaregiverDashboard() {
                         <Text variant="titleLarge" style={styles.sectionTitle}>
                             Responsible elderly
                         </Text>
-                        <Button mode="text" compact>
-                            View All
-                        </Button>
                     </View>
 
                     {loading && (
