@@ -112,6 +112,13 @@ export default function TabsLayout() {
           title: "Elderly Detail",
         }}
       />
+      <Tabs.Screen
+        name="medication_old"
+        options={{
+          href: null,
+          title: "medication_old",
+        }}
+      />
     </Tabs>
   );
 }

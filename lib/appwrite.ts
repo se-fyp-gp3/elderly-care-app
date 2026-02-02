@@ -47,6 +47,8 @@ export const SCHEDULE_CATEGORY_TABLE_ID =
   process.env.EXPO_PUBLIC_SCHEDULE_CATEGORY_TABLE_ID!;
 export const SCHEDULE_MEDICATION_TABLE_ID =
   process.env.EXPO_PUBLIC_SCHEDULE_MEDICATION_TABLE_ID!;
+export const ELDERLY_MEDICATION_REMINDER_TABLE_ID = "elderly_medication_reminder"; 
+export const MEDICATION_LOGS_TABLE_ID = "medication_logs";
 
 export interface RealtimeResponse {
   events: string[];
