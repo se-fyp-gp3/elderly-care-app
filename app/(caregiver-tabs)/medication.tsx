@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import { Elderly, ElderlyMedication, Medication } from "@/types/appwrite";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect } from 'expo-router';
@@ -21,6 +22,7 @@ import {
     Avatar,
     Button,
     Card,
+    Chip,
     Dialog,
     Divider,
     FAB,
@@ -28,6 +30,8 @@ import {
     Portal,
     Searchbar,
     Text,
+    TextInput,
+    Menu,
     useTheme
 } from "react-native-paper";
 
@@ -81,6 +85,22 @@ export default function MedicationManagement() {
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
     const [undoVisible, setUndoVisible] = useState(false);
     const [lastAction, setLastAction] = useState<string | null>(null);
+
+    // Add Medication State
+    const [addMedVisible, setAddMedVisible] = useState(false);
+    const [medSelectionMode, setMedSelectionMode] = useState<'form' | 'elderly' | 'frequency'>('form');
+    const [medFormSearchQuery, setMedFormSearchQuery] = useState('');
+    const [newMedData, setNewMedData] = useState({
+        elderlyId: '',
+        elderlyName: '', // Added for display
+        name: '',
+        unit: 'mg',
+        dosage: '1',
+        frequency: 'Daily',
+        times: [new Date()]
+    });
+    const [showTimePicker, setShowTimePicker] = useState(false);
+    const [editingTimeIndex, setEditingTimeIndex] = useState<number | null>(null);
 
     // AppState handling for auto-refresh
     const appState = useRef(AppState.currentState);
@@ -401,6 +421,87 @@ export default function MedicationManagement() {
         setRefreshing(true);
         fetchData();
     }, [fetchData]);
+
+    const handleAddMedication = async () => {
+        if (!newMedData.elderlyId || !newMedData.name) {
+            Alert.alert("Error", "Please fill in Elderly and Medication Name.");
+            return;
+        }
+
+        try {
+            setLoading(true);
+            
+            // 1. Get or Create Medication
+            let medId = '';
+            const medRes = await tablesDB.listRows<Medication>({
+                databaseId: DATABASE_ID,
+                tableId: MEDICATION_TABLE_ID,
+                queries: [Query.equal('name', newMedData.name)]
+            });
+
+            if (medRes.total > 0) {
+                medId = medRes.rows[0].$id;
+            } else {
+                const newMed = await tablesDB.createRow({
+                    databaseId: DATABASE_ID,
+                    tableId: MEDICATION_TABLE_ID,
+                    rowId: ID.unique(),
+                    data: {
+                        name: newMedData.name,
+                        unit: newMedData.unit
+                    }
+                });
+                medId = newMed.$id;
+            }
+
+            // 2. Create ElderlyMedication (The Plan)
+            const approxTimes = newMedData.times.map(t => 
+                t.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})
+            );
+            
+            const emRow = await tablesDB.createRow({
+                databaseId: DATABASE_ID,
+                tableId: ELDERLY_MEDICATION_TABLE_ID,
+                rowId: ID.unique(),
+                data: {
+                    elderly: newMedData.elderlyId,
+                    medication: medId,
+                    dosage: parseFloat(newMedData.dosage) || 1,
+                    frequency: newMedData.frequency,
+                    is_prn: false,
+                    approx_times: approxTimes,
+                    status: 'Pending',
+                    notes: ''
+                }
+            });
+
+            // 3. Create Reminder
+            await tablesDB.createRow({
+                databaseId: DATABASE_ID,
+                tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+                rowId: ID.unique(),
+                data: {
+                    elderly: newMedData.elderlyId,
+                    elderly_medication: emRow.$id,
+                    start_date: new Date().toISOString(),
+                    duration_days: 365,
+                    active: true,
+                    reminder_times: approxTimes,
+                    is_finished: false
+                }
+            });
+
+            Alert.alert("Success", "Medication added successfully.");
+            setAddMedVisible(false);
+            fetchData();
+
+        } catch (err) {
+            console.error(err);
+            Alert.alert("Error", "Failed to add medication.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Flatten for stats
     const allMeds = elderlyGroups.flatMap(g => g.medications);
@@ -915,12 +1016,173 @@ export default function MedicationManagement() {
                         <Button onPress={() => { if (dialogVisible) onConfirmTaking(dialogVisible); }}>Confirm</Button>
                     </Dialog.Actions>
                 </Dialog>
+
+                <Dialog visible={addMedVisible} onDismiss={() => { setAddMedVisible(false); setMedSelectionMode('form'); }} style={{ maxHeight: '80%' }}>
+                    {medSelectionMode === 'form' ? (
+                    <>
+                    <Dialog.Title>Add New Medication</Dialog.Title>
+                    <Dialog.ScrollArea>
+                    <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
+                        <TouchableOpacity onPress={() => setMedSelectionMode('elderly')}>
+                            <TextInput
+                                label="Select Elderly"
+                                value={newMedData.elderlyName || (linkedElderly.find(e => e.$id === newMedData.elderlyId)?.name || '')}
+                                editable={false}
+                                right={<TextInput.Icon icon="chevron-right" onPress={() => setMedSelectionMode('elderly')} />}
+                                mode="outlined"
+                                style={{ marginBottom: 10 }}
+                            />
+                        </TouchableOpacity>
+
+                        <TextInput
+                            label="Medication Name"
+                            value={newMedData.name}
+                            onChangeText={val => setNewMedData(prev => ({ ...prev, name: val }))}
+                            style={{ marginBottom: 10 }}
+                            mode="outlined"
+                        />
+                         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+                            <TextInput
+                                label="Dosage"
+                                value={newMedData.dosage}
+                                keyboardType="numeric"
+                                onChangeText={val => setNewMedData(prev => ({ ...prev, dosage: val }))}
+                                style={{ flex: 1 }}
+                                mode="outlined"
+                            />
+                             <TextInput
+                                label="Unit"
+                                value={newMedData.unit}
+                                onChangeText={val => setNewMedData(prev => ({ ...prev, unit: val }))}
+                                style={{ flex: 1 }}
+                                mode="outlined"
+                            />
+                        </View>
+
+                        <TouchableOpacity onPress={() => setMedSelectionMode('frequency')}>
+                            <TextInput
+                                label="Frequency"
+                                value={newMedData.frequency}
+                                editable={false}
+                                right={<TextInput.Icon icon="chevron-right" onPress={() => setMedSelectionMode('frequency')} />}
+                                mode="outlined"
+                                style={{ marginBottom: 10 }}
+                            />
+                        </TouchableOpacity>
+
+                        <Text style={{marginBottom: 5}}>Reminder Times:</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                            {newMedData.times.map((t, idx) => (
+                                <Chip 
+                                    key={idx} 
+                                    icon="clock" 
+                                    onClose={() => setNewMedData(prev => ({ ...prev, times: prev.times.filter((_, i) => i !== idx) }))}
+                                    onPress={() => { setEditingTimeIndex(idx); setShowTimePicker(true); }}
+                                >
+                                    {t.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </Chip>
+                            ))}
+                            <Chip icon="plus" onPress={() => { setEditingTimeIndex(-1); setShowTimePicker(true); }}>Add Time</Chip>
+                        </View>
+
+                    </ScrollView>
+                    </Dialog.ScrollArea>
+                    <Dialog.Actions>
+                        <Button onPress={() => setAddMedVisible(false)}>Cancel</Button>
+                        <Button onPress={handleAddMedication}>Save</Button>
+                    </Dialog.Actions>
+                    </>
+                    ) : (
+                    <>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10 }}>
+                        <IconButton icon="arrow-left" onPress={() => setMedSelectionMode('form')} />
+                        <Text variant="titleLarge" style={{ fontWeight: 'bold' }}>
+                            {medSelectionMode === 'elderly' ? 'Select Elderly' : 'Select Frequency'}
+                        </Text>
+                    </View>
+                    <Divider />
+                    {medSelectionMode === 'elderly' && (
+                        <View style={{ padding: 10 }}>
+                        <Searchbar
+                            placeholder="Search"
+                            onChangeText={setMedFormSearchQuery}
+                            value={medFormSearchQuery}
+                            style={{ backgroundColor: theme.colors.surfaceVariant, height: 40 }}
+                            inputStyle={{ minHeight: 0 }}
+                        />
+                        </View>
+                    )}
+                    <Dialog.ScrollArea>
+                        <ScrollView style={{ maxHeight: 300 }}>
+                            {medSelectionMode === 'elderly' ? (
+                                linkedElderly
+                                    .filter(e => e.name.toLowerCase().includes(medFormSearchQuery.toLowerCase()))
+                                    .map(item => (
+                                        <TouchableOpacity
+                                            key={item.$id}
+                                            style={[styles.selectionRow, { backgroundColor: newMedData.elderlyId === item.$id ? theme.colors.secondaryContainer : 'transparent' }]}
+                                            onPress={() => {
+                                                setNewMedData(prev => ({ ...prev, elderlyId: item.$id, elderlyName: item.name }));
+                                                setMedSelectionMode('form');
+                                            }}
+                                        >
+                                            <Avatar.Text size={40} label={item.name.substring(0, 2)} style={{ marginRight: 16, backgroundColor: theme.colors.secondary }} />
+                                            <Text variant="titleMedium">{item.name}</Text>
+                                            {newMedData.elderlyId === item.$id && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
+                                        </TouchableOpacity>
+                                    ))
+                            ) : (
+                                ['Daily', 'Twice a day', '3 times/day', 'Weekly'].map(f => (
+                                    <TouchableOpacity
+                                        key={f}
+                                        style={[styles.selectionRow, { backgroundColor: newMedData.frequency === f ? theme.colors.secondaryContainer : 'transparent' }]}
+                                        onPress={() => {
+                                            setNewMedData(prev => ({ ...prev, frequency: f }));
+                                            setMedSelectionMode('form');
+                                        }}
+                                    >
+                                        <Text variant="titleMedium">{f}</Text>
+                                        {newMedData.frequency === f && <MaterialCommunityIcons name="check" size={24} color={theme.colors.onSecondaryContainer} style={{ marginLeft: 'auto' }} />}
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </ScrollView>
+                    </Dialog.ScrollArea>
+                    <Dialog.Actions>
+                        <Button onPress={() => setMedSelectionMode('form')}>Back</Button>
+                    </Dialog.Actions>
+                    </>
+                    )}
+                </Dialog>
             </Portal>
+
+            {showTimePicker && (
+                <DateTimePicker
+                    value={editingTimeIndex !== null && editingTimeIndex >= 0 ? newMedData.times[editingTimeIndex] : new Date()}
+                    mode="time"
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                        setShowTimePicker(false);
+                        if (selectedDate) {
+                            if (editingTimeIndex === -1) {
+                                // Add new
+                                setNewMedData(prev => ({ ...prev, times: [...prev.times, selectedDate] }));
+                            } else if (editingTimeIndex !== null) {
+                                // Update existing
+                                const newTimes = [...newMedData.times];
+                                newTimes[editingTimeIndex] = selectedDate;
+                                setNewMedData(prev => ({ ...prev, times: newTimes }));
+                            }
+                        }
+                        setEditingTimeIndex(null);
+                    }}
+                />
+            )}
 
             <FAB
                 icon="plus"
                 style={styles.fab}
-                onPress={() => Alert.alert("Guide", "To add medication, please go to the 'Schedule' tab or use the Web Portal.")}
+                onPress={() => setAddMedVisible(true)}
             />
         </View>
     );
