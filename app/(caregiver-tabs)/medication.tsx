@@ -13,6 +13,7 @@ import { Elderly, ElderlyMedication, Medication } from "@/types/appwrite";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Notifications from 'expo-notifications';
+import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AppState, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ID, Query } from "react-native-appwrite";
@@ -371,9 +372,13 @@ export default function MedicationManagement() {
         }
     }, [user]);
 
+    useFocusEffect(
+        useCallback(() => {
+            fetchData();
+        }, [fetchData])
+    );
+
     useEffect(() => {
-        fetchData();
-        
         // Add AppState listener to refresh data when app returns to foreground
         const subscription = AppState.addEventListener('change', nextAppState => {
             if (
