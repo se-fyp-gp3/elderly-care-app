@@ -164,7 +164,7 @@ export default function MedicationManagement() {
                 tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
                 queries: [
                     Query.equal('elderly', elderlyIds),
-                    Query.limit(100)
+                    Query.limit(1000) // Increased limit to ensure we catch all reminders
                 ]
             });
             // Map ElderlyMedication ID -> Reminder ID (assuming one reminder per medication for simplicity)
@@ -337,7 +337,9 @@ export default function MedicationManagement() {
                                     logTaken = bestLog.taken_at;
                                 }
                             } 
-                            // Fallback for old data without reminders (same as before)
+                            // Fallback removed to ensure strict consistency with Database Logs.
+                            // Previously, this relied on 'last_taken' which caused UI to show 'Taken' even if Log creation failed.
+                            /* 
                             else if (!reminderId && em.last_taken) {
                                 const lastTakenDate = new Date(em.last_taken);
                                 const isTakenToday = lastTakenDate.getDate() === new Date().getDate() &&
@@ -345,6 +347,7 @@ export default function MedicationManagement() {
                                     lastTakenDate.getFullYear() === new Date().getFullYear();
                                 if (isTakenToday && times.length === 1) status = 'completed';
                             }
+                            */
 
                             // Check for OVERDUE
                             if (status === 'pending') {
@@ -486,7 +489,8 @@ export default function MedicationManagement() {
                     duration_days: 365,
                     active: true,
                     reminder_times: approxTimes,
-                    is_finished: false
+                    is_finished: false,
+                    after_meal: false // Default to false
                 }
             });
 
@@ -551,8 +555,53 @@ export default function MedicationManagement() {
 
                 // 1. Create Log Entry If Reminder Exists
                 let activeLogId = item.logId; // Use existing IF we have it
+                let activeReminderId = item.reminderId;
 
-                if (item.reminderId && elderlyId) {
+                // Auto-Recover: If link is missing, try to heal it
+                if (!activeReminderId && elderlyId && item.isPrescriptionId) {
+                     try {
+                         const recoveryRows = await tablesDB.listRows<any>({
+                             databaseId: DATABASE_ID,
+                             tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+                             queries: [ Query.equal('elderly_medication', item.realId) ]
+                         });
+
+                         if (recoveryRows.rows.length > 0) {
+                             activeReminderId = recoveryRows.rows[0].$id;
+                         } else {
+                             // Must fetch the original medication plan
+                             const planRows = await tablesDB.listRows<any>({
+                                 databaseId: DATABASE_ID,
+                                 tableId: ELDERLY_MEDICATION_TABLE_ID,
+                                 queries: [ Query.equal('$id', item.realId) ]
+                             });
+                             
+                             if (planRows.rows.length > 0) {
+                                 const plan = planRows.rows[0];
+                                 const newRem = await tablesDB.createRow({
+                                     databaseId: DATABASE_ID,
+                                     tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+                                     rowId: ID.unique(),
+                                     data: {
+                                         elderly: elderlyId,
+                                         elderly_medication: item.realId,
+                                         start_date: new Date().toISOString(),
+                                         duration_days: 365,
+                                         active: true,
+                                         reminder_times: plan.approx_times || [],
+                                         is_finished: false,
+                                         after_meal: false
+                                     }
+                                 });
+                                 activeReminderId = newRem.$id;
+                             }
+                         }
+                     } catch (recErr) {
+                         console.warn("Auto-recovery failed", recErr);
+                     }
+                }
+
+                if (activeReminderId && elderlyId) {
                     const now = new Date();
                     
                     if (item.logId) {
@@ -585,11 +634,14 @@ export default function MedicationManagement() {
                                 taken_at: now.toISOString(),
                                 scheduled_at: scheduledDate.toISOString(),
                                 elderly: elderlyId,
-                                elderly_medication_reminder: item.reminderId
+                                elderly_medication_reminder: activeReminderId
                             }
                         });
                         activeLogId = newLog.$id; // Capture the NEW ID
                     }
+                } else if (item.isPrescriptionId && !activeReminderId) {
+                    Alert.alert("Configuration Error", "Record is missing a linked reminder and auto-repair failed.");
+                    return; // Stop here to prevent fake completion
                 }
 
                  // 2. Update Prescription Last Taken
@@ -835,13 +887,13 @@ export default function MedicationManagement() {
                                     ) : (
                                         Object.values(
                                             group.medications.reduce((acc, med) => {
-                                                const key = med.realId || med.id;
+                                                const key = `${med.name}_${med.dosage}`;
                                                 if (!acc[key]) acc[key] = { common: med, slots: [] };
                                                 acc[key].slots.push(med);
                                                 return acc;
                                             }, {} as Record<string, { common: MedicationItem, slots: MedicationItem[] }>)
                                         ).map((groupItem) => (
-                                            <Card key={groupItem.common.realId || groupItem.common.id} style={{ marginBottom: 16, backgroundColor: theme.colors.elevation.level1 }}>
+                                            <Card key={`${groupItem.common.name}_${groupItem.common.dosage}`} style={{ marginBottom: 16, backgroundColor: theme.colors.elevation.level1 }}>
                                                 <Card.Title
                                                     title={groupItem.common.name}
                                                     titleStyle={{ fontWeight: 'bold' }}
