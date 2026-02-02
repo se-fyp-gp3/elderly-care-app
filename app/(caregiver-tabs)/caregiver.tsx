@@ -13,8 +13,6 @@ import {
     Avatar,
     Button,
     Card,
-    Chip,
-    DataTable,
     Dialog,
     FAB,
     List,
