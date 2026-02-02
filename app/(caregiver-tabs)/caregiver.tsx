@@ -328,50 +328,7 @@ export default function CaregiverDashboard() {
                     ))}
                 </View>
 
-                <View style={styles.section}>
-                    <Text variant="titleLarge" style={styles.sectionTitle}>Today's Reminder</Text>
-                    <Card>
-                        <Card.Content>
-                            <DataTable>
-                                <DataTable.Header>
-                                    <DataTable.Title>Time</DataTable.Title>
-                                    <DataTable.Title>Old Man</DataTable.Title>
-                                    <DataTable.Title>Items</DataTable.Title>
-                                    <DataTable.Title numeric>Status</DataTable.Title>
-                                </DataTable.Header>
 
-                                <DataTable.Row>
-                                    <DataTable.Cell>09:00</DataTable.Cell>
-                                    <DataTable.Cell>Grandpa Zhang</DataTable.Cell>
-                                    <DataTable.Cell>Measure Blood Pressure</DataTable.Cell>
-                                    <DataTable.Cell numeric>
-                                        <Chip mode="outlined" compact>Completed</Chip>
-                                    </DataTable.Cell>
-                                </DataTable.Row>
-
-                                <DataTable.Row>
-                                    <DataTable.Cell>2:30 PM</DataTable.Cell>
-                                    <DataTable.Cell>Grandma Li</DataTable.Cell>
-                                    <DataTable.Cell>Doctor's Follow-up</DataTable.Cell>
-                                    <DataTable.Cell numeric>
-                                        <Chip mode="flat" compact textStyle={{ color: 'white' }} style={{ backgroundColor: '#2196F3' }}>
-                                            To be continued
-                                        </Chip>
-                                    </DataTable.Cell>
-                                </DataTable.Row>
-
-                                <DataTable.Row>
-                                    <DataTable.Cell>8:00 PM</DataTable.Cell>
-                                    <DataTable.Cell>Grandpa Wang</DataTable.Cell>
-                                    <DataTable.Cell>Evening Medication</DataTable.Cell>
-                                    <DataTable.Cell numeric>
-                                        <Chip mode="outlined" compact>Pending</Chip>
-                                    </DataTable.Cell>
-                                </DataTable.Row>
-                            </DataTable>
-                        </Card.Content>
-                    </Card>
-                </View>
             </ScrollView>
 
             <Portal>

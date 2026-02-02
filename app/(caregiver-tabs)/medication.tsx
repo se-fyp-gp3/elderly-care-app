@@ -652,15 +652,7 @@ export default function MedicationManagement() {
     return (
         <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-                <View style={styles.header}>
-                    <Searchbar
-                        placeholder="Search for medicines or elderly..."
-                        onChangeText={setSearchQuery}
-                        value={searchQuery}
-                        style={styles.searchbar}
-                    />
-                </View>
-
+                
                 <View style={styles.section}>
                     <Card>
                         <Card.Content>
