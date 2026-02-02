@@ -1018,7 +1018,7 @@ export default function MedicationManagement() {
 
                 <Dialog visible={addMedVisible} onDismiss={() => { setAddMedVisible(false); setMedSelectionMode('form'); }} style={{ maxHeight: '80%' }}>
                     {medSelectionMode === 'form' ? (
-                    <>
+                    <View>
                     <Dialog.Title>Add New Medication</Dialog.Title>
                     <Dialog.ScrollArea>
                     <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
@@ -1090,9 +1090,9 @@ export default function MedicationManagement() {
                         <Button onPress={() => setAddMedVisible(false)}>Cancel</Button>
                         <Button onPress={handleAddMedication}>Save</Button>
                     </Dialog.Actions>
-                    </>
+                    </View>
                     ) : (
-                    <>
+                    <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10 }}>
                         <IconButton icon="arrow-left" onPress={() => setMedSelectionMode('form')} />
                         <Text variant="titleLarge" style={{ fontWeight: 'bold' }}>
@@ -1150,7 +1150,7 @@ export default function MedicationManagement() {
                     <Dialog.Actions>
                         <Button onPress={() => setMedSelectionMode('form')}>Back</Button>
                     </Dialog.Actions>
-                    </>
+                    </View>
                     )}
                 </Dialog>
             </Portal>
