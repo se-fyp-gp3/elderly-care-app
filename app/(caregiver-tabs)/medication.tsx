@@ -269,7 +269,7 @@ export default function MedicationManagement() {
                             let currentLogId = undefined;
 
                             // Find best matching log that hasn't been used
-                            let bestLog = null;
+                            let bestLog: any = null;
                             let maxScore = -1;
 
                             potentialLogs.forEach(log => {
