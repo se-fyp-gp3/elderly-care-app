@@ -1,5 +1,10 @@
+export enum Role {
+  Elderly = 'elderly',
+  Caregiver = 'caregiver',
+}
+
 export type UserPreferences = {
-  role?: 'elderly' | 'caregiver';
+  role?: Role;
   fontSize?: 'small' | 'medium' | 'large';
   voiceTone?: 'gentle' | 'friendly' | 'professional';
   notifications?: boolean;

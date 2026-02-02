@@ -6,16 +6,17 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { OAuthProvider } from "react-native-appwrite";
 import {
-    Button,
-    Chip,
-    Snackbar,
-    Text,
-    TextInput,
-    useTheme,
+  Button,
+  Chip,
+  Snackbar,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
+import { Role } from "@/types/user";
 
 export default function SignupScreen() {
-  const { role } = useLocalSearchParams<{ role: "elderly" | "caregiver" }>();
+  const { role } = useLocalSearchParams<{ role: Role }>();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -25,13 +26,14 @@ export default function SignupScreen() {
 
   const theme = useTheme();
   const router = useRouter();
-  const { signUp, signInWithOAuth2 } = useAuth();
+  const { user, signUp, signInWithOAuth2 } = useAuth();
 
   const validateForm = (): string | null => {
     if (!email.trim()) {
       return "Email is required";
     }
-    if (!email.includes("@")) {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
       return "Please enter a valid email address";
     }
     if (!password) {
@@ -57,7 +59,8 @@ export default function SignupScreen() {
     setError(null);
 
     try {
-      await signUp(email, password, { role: role || "elderly" });
+      await signUp(email, password, role);
+      if (!user) return;
       router.replace("/profile-setup");
     } catch (err) {
       if (err instanceof AppwriteException) {
@@ -80,13 +83,13 @@ export default function SignupScreen() {
     }
   };
 
-  const handleOAuth = async () => {
+  const handleOAuth = async (provider: OAuthProvider) => {
     setLoading(true);
     setError(null);
 
     try {
-      await signInWithOAuth2(OAuthProvider.Google);
-      // After OAuth, check if role is set - if not, they need to complete profile
+      await signInWithOAuth2(provider, role);
+      if (!user) return;
       router.replace("/profile-setup");
     } catch (err) {
       if (err instanceof LoginError) {
@@ -209,7 +212,7 @@ export default function SignupScreen() {
 
         <Button
           mode="outlined"
-          onPress={handleOAuth}
+          onPress={() => handleOAuth(OAuthProvider.Google)}
           style={styles.button}
           icon="google"
           disabled={loading}
