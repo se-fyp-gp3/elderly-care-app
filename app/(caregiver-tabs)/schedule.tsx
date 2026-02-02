@@ -588,6 +588,8 @@ export default function SchedulePage() {
                }
                return e;
           }));
+
+          await fetchData();
       } catch (err) {
           Alert.alert("Error", "Failed to undo.");
       }

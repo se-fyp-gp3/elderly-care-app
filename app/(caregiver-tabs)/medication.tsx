@@ -737,6 +737,7 @@ export default function MedicationManagement() {
                 })
              })));
 
+             await fetchData();
          } catch (err) {
              Alert.alert('Error', 'Failed to undo.');
          }
