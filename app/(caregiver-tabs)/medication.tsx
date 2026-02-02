@@ -173,10 +173,13 @@ export default function MedicationManagement() {
                 medResponse.rows.forEach(m => medMap.set(m.$id, m));
             }
 
-            // 4. Fetch Today's Logs (to check status)
+            // 4. Fetch Logs (Expanded range to catch timezone shifts)
             const startOfDay = new Date();
+            startOfDay.setDate(startOfDay.getDate() - 1); // Looking back 24h
             startOfDay.setHours(0, 0, 0, 0);
+            
             const endOfDay = new Date();
+            endOfDay.setDate(endOfDay.getDate() + 1); // Looking forward 24h
             endOfDay.setHours(23, 59, 59, 999);
 
             const logsResponse = await tablesDB.listRows<any>({
@@ -232,9 +235,15 @@ export default function MedicationManagement() {
                             reminderId: reminderId
                          });
                     } else {
-                        times.forEach((tStr, index) => {
+                        // Prepare logs for matching
+                        let potentialLogs: any[] = [];
+                        if (reminderId) {
+                             potentialLogs = logsResponse.rows.filter(l => getRelationshipId(l.elderly_medication_reminder) === reminderId);
+                        }
+
+                        // Create slots
+                        const slots = times.map((tStr, index) => {
                             let todayScheduledTime = new Date();
-                            // Parse 'tStr' which can be ISO string or HH:MM
                             if (tStr.includes('T')) {
                                 const d = new Date(tStr);
                                 todayScheduledTime.setHours(d.getHours(), d.getMinutes(), 0, 0);
@@ -242,68 +251,97 @@ export default function MedicationManagement() {
                                 const parts = tStr.split(':');
                                 todayScheduledTime.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
                             }
-                            
-                            // Normalize scheduledTime to Today for display/comparison
-                            const displayTime = todayScheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-                            
+                            return { 
+                                timeObj: todayScheduledTime, 
+                                tStr, 
+                                index,
+                                displayTime: todayScheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+                            };
+                        });
+
+                        // Match Logs to Slots using "Closest Time" strategy
+                        // Using a set to track used log IDs to prevent double assignment
+                        const usedLogIds = new Set<string>();
+
+                        slots.forEach(slot => {
                             let status = 'pending';
                             let logTaken = null;
                             let currentLogId = undefined;
 
-                            // NEW LOGIC: Check matches in MedicationLogs
-                            if (reminderId) {
-                                // Find any log that matches this reminder ID
-                                // AND matches the scheduled time slot (approx)
+                            // Find best matching log that hasn't been used
+                            let bestLog = null;
+                            let maxScore = -1;
+
+                            potentialLogs.forEach(log => {
+                                if (usedLogIds.has(log.$id)) return;
                                 
-                                const targetTimeHour = todayScheduledTime.getHours();
-                                const targetTimeMin = todayScheduledTime.getMinutes();
+                                const logDate = new Date(log.scheduled_at);
+                                let score = 0;
+
+                                // 1. Check Minute Match (Robust +/- 5 mins)
+                                const logMin = logDate.getMinutes();
+                                const slotMin = slot.timeObj.getMinutes();
+                                if (Math.abs(logMin - slotMin) < 5) score += 20;
+                                else return; // Must match minutes roughly
+
+                                // 2. Check Hour Match
+                                const logHourLocal = logDate.getHours();
+                                const logHourUTC = logDate.getUTCHours();
+                                const slotHour = slot.timeObj.getHours();
+
+                                if (logHourLocal === slotHour) score += 50; // Perfect local time match
+                                else if (logHourUTC === slotHour) score += 40; // UTC shift match (common bug)
+                                else return; // Must match hour in some way
                                 
-                                const matchingLog = logsResponse.rows.find(l => {
-                                    const lRemId = getRelationshipId(l.elderly_medication_reminder);
-                                    if (lRemId !== reminderId) return false;
-                                    
-                                    // Check time match
-                                    const logScheduled = new Date(l.scheduled_at);
-                                    // Handle Timezone or just check hours?
-                                    // Appwrite stores UTC. new Date() parses to local.
-                                    // Assuming safe comparison:
-                                    return logScheduled.getHours() === targetTimeHour && Math.abs(logScheduled.getMinutes() - targetTimeMin) < 5;
-                                });
+                                // 3. Day Proximity (Penalize wrong day)
+                                const timeDiff = Math.abs(logDate.getTime() - slot.timeObj.getTime());
+                                const hoursDiff = timeDiff / (1000 * 60 * 60);
                                 
-                                if (matchingLog && matchingLog.status === 'taken') {
-                                    status = 'completed';
-                                    logTaken = matchingLog.taken_at;
-                                    currentLogId = matchingLog.$id;
+                                if (hoursDiff < 4) score += 30; // Very close (Same day intended)
+                                else if (hoursDiff < 26) score += 10; // Within a day shift
+
+                                if (score > maxScore) {
+                                    maxScore = score;
+                                    bestLog = log;
                                 }
-                            } else {
-                                // Fallback for old data without reminders
-                                const lastTakenDate = em.last_taken ? new Date(em.last_taken) : null;
-                                const isTakenToday = lastTakenDate && 
-                                    lastTakenDate.getDate() === new Date().getDate() &&
+                            });
+
+                            // Threshold score > 30 implies at least Hour+Min match
+                            if (bestLog && maxScore >= 40) {
+                                currentLogId = bestLog.$id;
+                                usedLogIds.add(bestLog.$id);
+                                
+                                if (bestLog.status === 'taken') {
+                                    status = 'completed';
+                                    logTaken = bestLog.taken_at;
+                                }
+                            } 
+                            // Fallback for old data without reminders (same as before)
+                            else if (!reminderId && em.last_taken) {
+                                const lastTakenDate = new Date(em.last_taken);
+                                const isTakenToday = lastTakenDate.getDate() === new Date().getDate() &&
                                     lastTakenDate.getMonth() === new Date().getMonth() &&
                                     lastTakenDate.getFullYear() === new Date().getFullYear();
-                                
                                 if (isTakenToday && times.length === 1) status = 'completed';
                             }
-                            
+
                             // Check for OVERDUE
-                            // If still pending, and time has passed by e.g. 1 minute?
                             if (status === 'pending') {
                                 const now = new Date();
-                                if (now > todayScheduledTime) {
+                                if (now > slot.timeObj) {
                                     status = 'missed';
                                 }
                             }
 
                             dailyMeds.push({
-                                id: `${em.$id}_${index}`, // Composite ID for list key
-                                realId: em.$id, // Actual ID for actions
+                                id: `${em.$id}_${slot.index}`,
+                                realId: em.$id,
                                 isPrescriptionId: true,
                                 elderly: elderly.name,
                                 name: medName,
                                 dosage: dosage,
                                 frequency: em.frequency || '',
-                                time: displayTime,
+                                time: slot.displayTime,
                                 status: status,
                                 lastTaken: logTaken ? new Date(logTaken).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : (em.last_taken ? new Date(em.last_taken).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'),
                                 notes: em.notes || '',
