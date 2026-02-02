@@ -23,6 +23,7 @@ import {
     Card,
     Dialog,
     Divider,
+    FAB,
     IconButton,
     Portal,
     Searchbar,
@@ -915,6 +916,12 @@ export default function MedicationManagement() {
                     </Dialog.Actions>
                 </Dialog>
             </Portal>
+
+            <FAB
+                icon="plus"
+                style={styles.fab}
+                onPress={() => Alert.alert("Guide", "To add medication, please go to the 'Schedule' tab or use the Web Portal.")}
+            />
         </View>
     );
 }
@@ -987,5 +994,11 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 8,
         borderRadius: 8,
+    },
+    fab: {
+        position: 'absolute',
+        margin: 16,
+        right: 0,
+        bottom: 0,
     },
 });
