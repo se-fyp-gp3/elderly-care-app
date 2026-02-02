@@ -1,4 +1,4 @@
-import MedicationCard, { MedicationItem } from "@/components/MedicationCard";
+import { MedicationItem } from "@/components/MedicationCard";
 import {
     DATABASE_ID,
     ELDERLY_MEDICATION_REMINDER_TABLE_ID,
@@ -13,8 +13,8 @@ import { Elderly, ElderlyMedication, Medication } from "@/types/appwrite";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import React, { useCallback, useEffect, useState, useRef } from "react";
-import { Alert, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View, AppState, AppStateStatus } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, AppState, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ID, Query } from "react-native-appwrite";
 import {
     Avatar,
@@ -25,7 +25,6 @@ import {
     IconButton,
     Portal,
     Searchbar,
-    Snackbar,
     Text,
     useTheme
 } from "react-native-paper";
