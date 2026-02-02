@@ -1,15 +1,23 @@
+import { useAuth } from "@/lib/auth-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Button, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Role } from "@/types/user";
 
 export default function StartScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { user, signOut, setPreference } = useAuth();
 
-  const handleRoleSelect = (role: "elderly" | "caregiver") => {
-    router.push(`/signup?role=${role}`);
+  const handleRoleSelect = (role: Role) => {
+    if (!user) {
+      router.push(`/signup?role=${role}`);
+    } else {
+      setPreference("role", role);
+      router.push("/profile-setup");
+    }
   };
 
   const handleSignIn = () => {
@@ -34,7 +42,7 @@ export default function StartScreen() {
               styles.roleCard,
               { backgroundColor: "#2196F3", opacity: pressed ? 0.8 : 1 },
             ]}
-            onPress={() => handleRoleSelect("elderly")}
+            onPress={() => handleRoleSelect(Role.Elderly)}
           >
             <MaterialCommunityIcons name="human-cane" size={64} color="white" />
             <Text variant="headlineSmall" style={styles.roleTitle}>
@@ -50,7 +58,7 @@ export default function StartScreen() {
               styles.roleCard,
               { backgroundColor: "#4CAF50", opacity: pressed ? 0.8 : 1 },
             ]}
-            onPress={() => handleRoleSelect("caregiver")}
+            onPress={() => handleRoleSelect(Role.Caregiver)}
           >
             <MaterialCommunityIcons name="hand-heart" size={64} color="white" />
             <Text variant="headlineSmall" style={styles.roleTitle}>
@@ -62,13 +70,31 @@ export default function StartScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.footer}>
-          <Text variant="bodyMedium" style={styles.footerText}>
-            Already have an account?
-          </Text>
-          <Button mode="text" onPress={handleSignIn}>
-            Sign In
-          </Button>
+        <View style={[styles.footer, user && styles.footerLoggedIn]}>
+          {user ? (
+            <>
+              <Text variant="bodyMedium" style={styles.footerText}>
+                Logged in as {user.email}
+              </Text>
+              <View style={styles.signOutRow}>
+                <Text variant="bodyMedium" style={styles.footerText}>
+                  Not you?
+                </Text>
+                <Button mode="text" onPress={signOut}>
+                  Sign Out
+                </Button>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text variant="bodyMedium" style={styles.footerText}>
+                Already have an account?
+              </Text>
+              <Button mode="text" onPress={handleSignIn}>
+                Sign In
+              </Button>
+            </>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -122,8 +148,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 48,
+    flexWrap: "wrap",
+  },
+  footerLoggedIn: {
+    flexDirection: "column",
+    alignItems: "center",
+    width: "100%",
   },
   footerText: {
     opacity: 0.7,
+    textAlign: "center",
+  },
+  signOutRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
   },
 });

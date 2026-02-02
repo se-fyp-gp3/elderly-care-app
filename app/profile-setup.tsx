@@ -20,6 +20,7 @@ import {
 } from "react-native-paper";
 import { DatePickerInput } from "react-native-paper-dates";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Role } from "@/types/user";
 
 export default function ProfileSetupScreen() {
   const { user, preferences, setPreference, refreshProfile } = useAuth();
@@ -32,7 +33,7 @@ export default function ProfileSetupScreen() {
   const theme = useTheme();
   const router = useRouter();
 
-  const role = preferences.role || "elderly";
+  const role: Role = preferences.role || Role.Elderly;
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -56,9 +57,9 @@ export default function ProfileSetupScreen() {
         birth: birthDate ? birthDate.toISOString().split("T")[0] : null,
       };
 
-      if (role === "caregiver") {
+      if (role === Role.Caregiver) {
         await createCaregiverProfile(profileData as Caregiver);
-      } else {
+      } else if (role === Role.Elderly) {
         await createElderlyProfile(profileData as Elderly);
       }
 
@@ -74,6 +75,12 @@ export default function ProfileSetupScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSwitchRole = async () => {
+    const newRole = role === Role.Elderly ? Role.Caregiver : Role.Elderly;
+    await setPreference("role", newRole);
+    router.replace("/start");
   };
 
   return (
@@ -152,6 +159,15 @@ export default function ProfileSetupScreen() {
             disabled={loading || !name.trim()}
           >
             Complete Setup
+          </Button>
+
+          <Button
+            mode="text"
+            onPress={handleSwitchRole}
+            style={styles.submitButton}
+            disabled={loading}
+          >
+            Switch Role to {role === Role.Elderly ? "Caregiver" : "Elderly"}
           </Button>
         </ScrollView>
       </KeyboardAvoidingView>
