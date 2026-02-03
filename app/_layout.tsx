@@ -55,7 +55,10 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
         }
       } else if (hasProfile === true) {
         if (inAuthGroup || (!inCaregiverTabs && !inElderlyTabs)) {
-          router.replace(tabs[role]);
+          const targetTab = role && tabs[role as keyof typeof tabs];
+          if (targetTab) {
+            router.replace(targetTab);
+          }
         }
       }
     }
