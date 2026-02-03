@@ -59,8 +59,8 @@ export default function SignupScreen() {
     setError(null);
 
     try {
-      await signUp(email, password, role);
-      if (!user) return;
+      const newUser = await signUp(email, password, role);
+      if (!newUser) return;
       router.replace("/profile-setup");
     } catch (err: any) {
       console.error("Signup error:", err);
