@@ -42,13 +42,13 @@ export default function ElderlyEmergency() {
   const handleEmergencyCall = () => {
     Alert.alert(
       "Emergency Call",
-      "Are you sure you want to call emergency services (999)?",
+      "Are you sure you want to call emergency services (91361140)?",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Call 999",
+          text: "Call 91361140",
           style: "destructive",
-          onPress: () => Linking.openURL("tel:999"),
+          onPress: () => Linking.openURL("tel:91361140"),
         },
       ],
     );
