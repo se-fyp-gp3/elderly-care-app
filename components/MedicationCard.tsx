@@ -13,6 +13,7 @@ export interface MedicationItem {
     time: string;
     status: string; // 'pending' | 'completed' | 'overdue'
     lastTaken: string;
+    takenAtIso?: string;
     notes?: string;
     isPrescriptionId?: boolean;
     realId?: string;
