@@ -51,7 +51,7 @@ type TodoItem = {
   reminder: ElderlyMedicationReminder;
   time: string; // HH:mm
   scheduledAt: string; // ISO String
-  status: "pending" | "taken" | "skipped";
+  status: "pending" | "taken" | "missing";
   logId?: string;
   medicationName: string;
   dosage: string;
@@ -135,73 +135,6 @@ export default function ElderlyMedicationScreen() {
       clearInterval(intervalId);
       realtimeUnsubscribe();
     };
-  }, [fetchData]);
-
-  // Notification Logic: Schedule reminders and alert on missing
-  React.useEffect(() => {
-    const manageNotifications = async () => {
-       const hasPerm = await registerForPushNotificationsAsync();
-       if (!hasPerm) return;
-
-       // 1. Alert for newly detected 'missing' medications
-       const missingItems = todoList.filter(i => i.status === 'missing');
-       const newMissing = missingItems.filter(i => {
-           // If we haven't notified about this specific instance/slot yet
-           // Key can be logId if exists, or schedule key
-           const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
-           return !notifiedMissingLogs.current.has(key);
-       });
-
-       if (newMissing.length > 0) {
-           // Summarize
-           const names = newMissing.map(i => i.medicationName).join(', ');
-           const body = `You have missed your scheduled medication: ${names}. Please take it as soon as possible!`;
-           await sendImmediateNotification("Missed Medication Alert", body);
-           
-           // Mark as notified
-           newMissing.forEach(i => {
-               const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
-               notifiedMissingLogs.current.add(key);
-           });
-       }
-
-       // 2. Reschedule future pending reminders
-       // We cancel everything first to ensure we sync with latest data (e.g. if time changed or taken)
-       await cancelAllNotifications();
-
-       const pendingItems = todoList.filter(i => i.status === 'pending');
-       
-       // Group by Scheduled Time string (ISO)
-       const grouped: Record<string, string[]> = {};
-       
-       pendingItems.forEach(i => {
-           if (!grouped[i.scheduledAt]) {
-               grouped[i.scheduledAt] = [];
-           }
-           grouped[i.scheduledAt].push(i.medicationName);
-       });
-
-       // Schedule for each group
-       for (const [isoDate, names] of Object.entries(grouped)) {
-           const triggerDate = new Date(isoDate);
-           if (triggerDate.getTime() > Date.now()) {
-               const medList = names.join(', ');
-               await scheduleMedicationNotification(
-                   "Medication Reminder",
-                   `It's time to take your medication: ${medList}`,
-                   triggerDate
-               );
-           }
-       }
-    };
-
-    manageNotifications();
-  }, [todoList]);
-
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
   }, [fetchData]);
 
   // Compute "To Take Today" list
@@ -288,6 +221,75 @@ export default function ElderlyMedicationScreen() {
     // Sort by time
     return list.sort((a, b) => a.time.localeCompare(b.time));
   }, [reminders, todayLogs]);
+
+  // Notification Logic: Schedule reminders and alert on missing
+  React.useEffect(() => {
+    const manageNotifications = async () => {
+       const hasPerm = await registerForPushNotificationsAsync();
+       if (!hasPerm) return;
+
+       // 1. Alert for newly detected 'missing' medications
+       const missingItems = todoList.filter(i => i.status === 'missing');
+       const newMissing = missingItems.filter(i => {
+           // If we haven't notified about this specific instance/slot yet
+           // Key can be logId if exists, or schedule key
+           const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
+           return !notifiedMissingLogs.current.has(key);
+       });
+
+       if (newMissing.length > 0) {
+           // Summarize
+           const names = newMissing.map(i => i.medicationName).join(', ');
+           const body = `You have missed your scheduled medication: ${names}. Please take it as soon as possible!`;
+           await sendImmediateNotification("Missed Medication Alert", body);
+           
+           // Mark as notified
+           newMissing.forEach(i => {
+               const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
+               notifiedMissingLogs.current.add(key);
+           });
+       }
+
+       // 2. Reschedule future pending reminders
+       // We cancel everything first to ensure we sync with latest data (e.g. if time changed or taken)
+       await cancelAllNotifications();
+
+       const pendingItems = todoList.filter(i => i.status === 'pending');
+       
+       // Group by Scheduled Time string (ISO)
+       const grouped: Record<string, string[]> = {};
+       
+       pendingItems.forEach(i => {
+           if (!grouped[i.scheduledAt]) {
+               grouped[i.scheduledAt] = [];
+           }
+           grouped[i.scheduledAt].push(i.medicationName);
+       });
+
+       // Schedule for each group
+       for (const [isoDate, names] of Object.entries(grouped)) {
+           const triggerDate = new Date(isoDate);
+           if (triggerDate.getTime() > Date.now()) {
+               const medList = names.join(', ');
+               await scheduleMedicationNotification(
+                   "Medication Reminder",
+                   `It's time to take your medication: ${medList}`,
+                   triggerDate
+               );
+           }
+       }
+    };
+
+    manageNotifications();
+  }, [todoList]);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  }, [fetchData]);
+
+
 
   const handleTakeMedication = async (item: TodoItem) => {
       // Toggle logic: if taken -> pending. if pending/skipped -> taken.
@@ -517,7 +519,6 @@ export default function ElderlyMedicationScreen() {
                          style={{ 
                             textTransform: 'capitalize',
                             color: item.status === 'taken' ? '#4CAF50' : 
-                                   item.status === 'skipped' ? '#FF5252' :
                                    item.status === 'missing' ? '#D32F2F' :  
                                    item.status === 'pending' ? '#FFA000' :
                                    theme.colors.onSurfaceVariant 

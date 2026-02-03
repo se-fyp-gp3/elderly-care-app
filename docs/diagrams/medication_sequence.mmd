@@ -1,0 +1,41 @@
+sequenceDiagram
+    autonumber
+    actor Elder as Elderly User
+    participant UI as Medication Screen
+    participant Lib as lib/medication_tracking
+    participant DB as Appwrite DB
+    participant Notif as Notifications (Expo)
+
+    Elder->>UI: Tap (+) Add Medication
+    UI->>Elder: Show Form (Name, Dosage, Time)
+    Elder->>UI: Fill details and "Save"
+    
+    UI->>Lib: createElderlyMedicationWithReminder(data)
+    
+    rect rgb(240, 248, 255)
+        Note right of Lib: Transaction-like operation
+        Lib->>DB: createRow(ElderlyMedication)
+        DB-->>Lib: Medication ID
+        
+        Lib->>DB: createRow(ElderlyMedicationReminder)
+        DB-->>Lib: Reminder ID
+    end
+    
+    Lib-->>UI: Success
+    
+    UI->>Notif: scheduleMedicationNotification(title, time)
+    Notif->>Notif: Validates permission
+    Notif->>Notif: Schedule local notification
+    
+    UI->>Elder: Show Success Message
+    UI->>UI: Refresh List
+    
+    opt Daily Check Logic (On Screen Load)
+        UI->>Lib: checkAndMarkSkippedMedications(userId)
+        Lib->>DB: Fetch Active Reminders
+        Lib->>DB: Fetch Today's Logs
+        Lib->>Lib: Compare Time vs Now (Buffer 1min)
+        alt Found Missed Meds
+            Lib->>DB: updateRow(Log, status='missing')
+        end
+    end

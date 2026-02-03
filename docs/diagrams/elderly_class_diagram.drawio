@@ -1,0 +1,53 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Elderly Class Diagram" id="elderly-class-diagram">
+    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Class: Elderly -->
+        <mxCell id="class_elderly" value="Elderly|user_id: string&lt;br&gt;name: string&lt;br&gt;phone: string&lt;br&gt;birth: Date&lt;br&gt;status: ElderlyStatus|+ getProfile()&lt;br&gt;+ updateStatus()" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="80" width="160" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Class: ElderlyMedication -->
+        <mxCell id="class_medication" value="ElderlyMedication|elderly_id: string&lt;br&gt;name: string&lt;br&gt;dosage: string&lt;br&gt;frequency: string&lt;br&gt;status: Status|+ markAsTaken()&lt;br&gt;+ getReminders()" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;" vertex="1" parent="1">
+          <mxGeometry x="320" y="80" width="180" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Class: MedicationLog -->
+        <mxCell id="class_med_log" value="MedicationLog|log_id: string&lt;br&gt;taken_at: DateTime&lt;br&gt;status: string|+ createLog()" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;" vertex="1" parent="1">
+          <mxGeometry x="320" y="280" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Class: Schedule -->
+        <mxCell id="class_schedule" value="Schedule|title: string&lt;br&gt;time: DateTime&lt;br&gt;description: string|+ fetchUpcoming()" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="280" width="160" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Relationships -->
+        <!-- Elderly 1--* Medication -->
+        <mxCell id="rel1" style="endArrow=diamondThin;endFill=0;endSize=24;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="class_elderly" target="class_medication">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="240" y="140" as="sourcePoint" />
+            <mxPoint x="320" y="140" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lbl1" value="1..*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="rel1">
+          <mxGeometry x="0.2" y="1" relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Medication 1--* Log -->
+        <mxCell id="rel2" style="endArrow=diamondThin;endFill=1;endSize=24;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="class_medication" target="class_med_log">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- Elderly 1--* Schedule -->
+        <mxCell id="rel3" style="endArrow=diamondThin;endFill=0;endSize=24;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="class_elderly" target="class_schedule">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

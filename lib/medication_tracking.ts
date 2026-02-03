@@ -356,3 +356,95 @@ export async function deactivateMedicationReminder(
         throw error;
     }
 }
+
+export async function getFormattedTodayMedicationSummary(userId: string): Promise<string> {
+    const now = new Date();
+    const hkOffset = 8 * 60 * 60 * 1000;
+    const hkDate = new Date(now.getTime() + hkOffset);
+    const todayStr = hkDate.toISOString().slice(0, 10);
+
+    const [reminders, todayLogs] = await Promise.all([
+        fetchActiveMedicationReminders(userId),
+        fetchDailyMedicationLogs(userId, now),
+    ]);
+
+    const todoList: {
+        time: string;
+        medicationName: string;
+        dosage: string;
+        status: string;
+    }[] = [];
+
+    const toHKDateStr = (date: Date) =>
+        new Date(date.getTime() + hkOffset).toISOString().slice(0, 10);
+  
+    const toHKTimeStr = (date: Date) => {
+        const hk = new Date(date.getTime() + hkOffset);
+        const hours = String(hk.getUTCHours()).padStart(2, "0");
+        const minutes = String(hk.getUTCMinutes()).padStart(2, "0");
+        return `${hours}:${minutes}`;
+    };
+
+    reminders.forEach((r) => {
+        r.reminder_times.forEach((time) => {
+            const [hours, minutes] = time.split(':').map(Number);
+            const baseDate = new Date(todayStr); 
+            baseDate.setUTCHours(hours, minutes, 0, 0); 
+            const scheduledDate = new Date(baseDate.getTime() - hkOffset);
+            const scheduledAt = scheduledDate.toISOString();
+
+            if (r.start_date && new Date(scheduledAt) < new Date(r.start_date)) {
+                return;
+            }
+
+            const log = todayLogs.find(l => {
+                const logRemId = (typeof l.elderly_medication_reminder === 'string')
+                  ? l.elderly_medication_reminder
+                  : l.elderly_medication_reminder?.$id;
+      
+                if (logRemId !== r.$id) return false;
+      
+                const directMatch = l.scheduled_at === scheduledAt;
+                if (directMatch) return true;
+      
+                const logDate = toHKDateStr(new Date(l.scheduled_at));
+                const logTime = toHKTimeStr(new Date(l.scheduled_at));
+                return logDate === todayStr && logTime === time;
+            });
+
+            const medications = Array.isArray(r.elderly_medication?.medication) 
+                ? r.elderly_medication.medication 
+                : (r.elderly_medication?.medication ? [r.elderly_medication.medication] : []);
+            
+            // @ts-ignore
+            const medName = medications[0]?.name || "Medication";
+            // @ts-ignore
+            const medUnit = medications[0]?.unit || 'dose';
+            // @ts-ignore
+            const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+
+            todoList.push({
+                time,
+                medicationName: medName,
+                dosage: medDosage,
+                status: log ? (log.status as string) : "pending",
+            });
+        });
+    });
+
+    todoList.sort((a, b) => a.time.localeCompare(b.time));
+
+    if (todoList.length === 0) {
+        return "You have no medications scheduled for today.";
+    }
+
+    const items = todoList.map(item => {
+        const time = item.time;
+        const name = item.medicationName;
+        const dosage = item.dosage;
+        const status = item.status === 'taken' ? '✅ Taken' : (item.status === 'missing' ? '❌ Missed' : '⏳ Pending');
+        return `• ${time} - ${name} (${dosage}) : ${status}`;
+    });
+
+    return `Here is your medication schedule for today:\n${items.join("\n")}`;
+}

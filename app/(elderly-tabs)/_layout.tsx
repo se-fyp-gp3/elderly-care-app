@@ -59,10 +59,10 @@ export default function ElderlyTabsLayout() {
       <Tabs.Screen
         name="emergency"
         options={{
-          title: "Emergency",
+          title: "Community",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
-              name="phone-alert"
+              name="account-group"
               size={size}
               color={color}
             />
@@ -70,12 +70,12 @@ export default function ElderlyTabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="more"
+        name="settings"
         options={{
-          title: "More",
+          title: "Settings",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
-              name="dots-horizontal-circle-outline"
+              name="cog"
               size={size}
               color={color}
             />
@@ -96,13 +96,6 @@ export default function ElderlyTabsLayout() {
         options={{
           href: null,
           title: "Schedule",
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          href: null,
-          title: "Settings",
         }}
       />
     </Tabs>

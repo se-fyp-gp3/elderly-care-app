@@ -1,31 +1,53 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-  fetchElderlyMedicationsForUser,
   fetchElderlySchedulesForUser,
   getElderlyByUserId,
 } from "@/lib/elderly";
-import { Elderly, ElderlyMedication, Schedule } from "@/types/appwrite";
+import {
+  checkAndMarkSkippedMedications,
+  fetchActiveMedicationReminders,
+  fetchDailyMedicationLogs,
+  logMedicationAction,
+} from "@/lib/medication_tracking";
+import {
+  Elderly,
+  ElderlyMedicationReminder,
+  MedicationLog,
+  Schedule
+} from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { openURL } from "expo-linking";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-    Linking,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    View,
+  Alert,
+  AppState,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
 import {
-    Avatar,
-    Button,
-    Card,
-    Chip,
-    List,
-    Text,
-    useTheme,
+  Avatar,
+  Button,
+  Card,
+  Chip,
+  List,
+  Text,
+  useTheme,
 } from "react-native-paper";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+
+type TodoItem = {
+  reminder: ElderlyMedicationReminder;
+  time: string; // HH:mm
+  scheduledAt: string; // ISO String
+  status: "pending" | "taken" | "missing";
+  logId?: string;
+  medicationName: string;
+  dosage: string;
+};
 
 export default function ElderlyHome() {
   const { user } = useAuth();
@@ -35,27 +57,32 @@ export default function ElderlyHome() {
   const [elderlyProfile, setElderlyProfile] = React.useState<Elderly | null>(
     null,
   );
-  const [medications, setMedications] = React.useState<ElderlyMedication[]>([]);
+  const [reminders, setReminders] = React.useState<ElderlyMedicationReminder[]>([]);
+  const [todayLogs, setTodayLogs] = React.useState<MedicationLog[]>([]);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
 
   const fetchElderlyData = React.useCallback(async () => {
     if (!user) return;
 
     try {
+      // Check for skipped status first
+      await checkAndMarkSkippedMedications(user.$id);
+
       // Get elderly profile
       const profile = await getElderlyByUserId(user.$id);
       setElderlyProfile(profile);
 
       if (profile) {
-        // Fetch medications for this elderly
+        // Fetch reminders and logs for "To Take Today"
         try {
-          const medsResponse = await fetchElderlyMedicationsForUser(user.$id);
-          setMedications(
-            (medsResponse as ElderlyMedication[]).slice(0, 10),
-          );
-        } catch {
-          console.log("No medications found");
-          setMedications([]);
+          const [remindersData, logsData] = await Promise.all([
+            fetchActiveMedicationReminders(user.$id),
+            fetchDailyMedicationLogs(user.$id, new Date()),
+          ]);
+          setReminders(remindersData);
+          setTodayLogs(logsData);
+        } catch (err) {
+          console.error("Error fetching medication reminders/logs:", err);
         }
 
         // Fetch schedules for this elderly
@@ -74,7 +101,115 @@ export default function ElderlyHome() {
 
   React.useEffect(() => {
     fetchElderlyData();
+
+    // Refresh when app comes to foreground
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
+        fetchElderlyData();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [fetchElderlyData]);
+
+  // Compute "To Take Today" list
+  const todoList = React.useMemo(() => {
+    const list: TodoItem[] = [];
+    const now = new Date();
+    
+    // Calculate Today in HK
+    const hkOffset = 8 * 60 * 60 * 1000; 
+    const hkDate = new Date(now.getTime() + hkOffset);
+    const todayStr = hkDate.toISOString().slice(0, 10); // YYYY-MM-DD in HK
+
+    const toHKDateStr = (date: Date) =>
+      new Date(date.getTime() + hkOffset).toISOString().slice(0, 10);
+
+    const toHKTimeStr = (date: Date) => {
+      const hk = new Date(date.getTime() + hkOffset);
+      const hours = String(hk.getUTCHours()).padStart(2, "0");
+      const minutes = String(hk.getUTCMinutes()).padStart(2, "0");
+      return `${hours}:${minutes}`;
+    };
+
+    reminders.forEach((r) => {
+      r.reminder_times.forEach((time) => {
+        // Construct scheduled time treating 'time' as HK Time
+        const [hours, minutes] = time.split(':').map(Number);
+            
+        // Construct a base date using the HK date string, set to 00:00 UTC
+        const baseDate = new Date(todayStr); 
+        baseDate.setUTCHours(hours, minutes, 0, 0); 
+            
+        // Subtract 8 hours to convert HKT to UTC
+        const scheduledDate = new Date(baseDate.getTime() - hkOffset);
+        const scheduledAt = scheduledDate.toISOString();
+
+        // Hide if scheduled_at is before start_date
+        if (r.start_date && new Date(scheduledAt) < new Date(r.start_date)) {
+          return;
+        }
+        
+        // Find if logged
+        const log = todayLogs.find(l => {
+          const logRemId = (typeof l.elderly_medication_reminder === 'string')
+            ? l.elderly_medication_reminder
+            : l.elderly_medication_reminder?.$id;
+
+          if (logRemId !== r.$id) return false;
+
+          const directMatch = l.scheduled_at === scheduledAt;
+          if (directMatch) return true;
+
+          const logDate = toHKDateStr(new Date(l.scheduled_at));
+          const logTime = toHKTimeStr(new Date(l.scheduled_at));
+          return logDate === todayStr && logTime === time;
+        });
+
+        // Helper to get medication name safely
+        const medications = Array.isArray(r.elderly_medication?.medication) 
+            ? r.elderly_medication.medication 
+            : (r.elderly_medication?.medication ? [r.elderly_medication.medication] : []);
+            
+        // @ts-ignore
+        const medName = medications[0]?.name || "Medication";
+        // @ts-ignore
+        const medUnit = medications[0]?.unit || 'dose';
+        // @ts-ignore
+        const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+
+        list.push({
+            reminder: r,
+            time,
+            scheduledAt,
+            status: log ? (log.status as any) : "pending",
+            logId: log?.$id,
+            medicationName: medName,
+            dosage: medDosage
+        });
+      });
+    });
+
+    // Sort by time
+    return list.sort((a, b) => a.time.localeCompare(b.time));
+  }, [reminders, todayLogs]);
+
+  const handleTakeMedication = async (item: TodoItem) => {
+      try {
+          const newStatus = item.status === 'taken' ? 'pending' : 'taken';
+          await logMedicationAction(
+              user!.$id,
+              item.reminder.$id,
+              item.scheduledAt, 
+              newStatus
+          );
+          await fetchElderlyData();
+      } catch (error) {
+          Alert.alert("Error", "Failed to update status");
+      }
+  };
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -84,16 +219,16 @@ export default function ElderlyHome() {
 
   const quickActions = [
     {
+      icon: "robot" as IconName,
+      label: "Chat with AI",
+      color: "#673AB7",
+      route: "chat",
+    },
+    {
       icon: "pill" as IconName,
       label: "My Medications",
       color: "#4CAF50",
       route: "medication",
-    },
-    {
-      icon: "heart-pulse" as IconName,
-      label: "My Health",
-      color: "#F44336",
-      route: "health-data",
     },
     {
       icon: "calendar-clock" as IconName,
@@ -102,15 +237,15 @@ export default function ElderlyHome() {
       route: "schedule",
     },
     {
-      icon: "phone-alert" as IconName,
-      label: "Emergency",
+      icon: "account-group" as IconName,
+      label: "Community",
       color: "#FF9800",
-      route: "emergency",
+      route: "chat",
     },
   ];
 
   const handleEmergencyCall = () => {
-    Linking.openURL("tel:999");
+    openURL("tel:999");
   };
 
   return (
@@ -201,32 +336,45 @@ export default function ElderlyHome() {
       <Card
         style={[styles.listCard, { backgroundColor: theme.colors.surface }]}
       >
-        {medications.length > 0 ? (
-          medications.slice(0, 3).map((med, index) => (
-            <List.Item
-              key={index}
-              title={med.medication?.[0]?.name || "Medication"}
-              description={`${med.dosage || 1} ${med.medication?.[0]?.unit || "dose"} - ${med.frequency || "Daily"}`}
-              left={(props) => (
-                <List.Icon {...props} icon="pill" color="#4CAF50" />
-              )}
-              right={() => (
-                <Chip
-                  compact
-                  style={{
-                    backgroundColor:
-                      med.status === "Completed" ? "#4CAF5020" : "#FF980020",
-                  }}
-                >
-                  {med.status || "Pending"}
-                </Chip>
-              )}
-            />
-          ))
+        {todoList.length > 0 ? (
+          todoList.slice(0, 3).map((item, index) => {
+             const isTaken = item.status === 'taken';
+             return (
+                <List.Item
+                  key={`${item.reminder.$id}-${item.time}-${index}`}
+                  title={`${item.medicationName} (${item.dosage})`}
+                  description={`Time: ${item.time}`}
+                  left={(props) => (
+                    <View style={styles.iconContainer}>
+                      <MaterialCommunityIcons
+                        name={isTaken ? "check-circle" : "clock-outline"}
+                        size={28}
+                        color={isTaken ? "#4CAF50" : theme.colors.primary}
+                      />
+                    </View>
+                  )}
+                  right={() => (
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {!isTaken && (
+                         <Button 
+                             mode="contained"
+                             compact
+                             onPress={() => handleTakeMedication(item)}
+                             style={{ marginLeft: 8 }}
+                         >
+                            Take
+                         </Button>
+                        )}
+                      </View>
+                  )}
+                  style={[styles.listItem, isTaken && { opacity: 0.6 }]}
+                />
+             );
+          })
         ) : (
           <List.Item
             title="No medications scheduled"
-            description="Your medication list is empty"
+            description="You are all set for today!"
             left={(props) => <List.Icon {...props} icon="pill-off" />}
           />
         )}
@@ -235,7 +383,7 @@ export default function ElderlyHome() {
           onPress={() => router.push("/medication" as never)}
           style={styles.viewAllButton}
         >
-          View All Medications
+          View Full Schedule
         </Button>
       </Card>
 
@@ -288,9 +436,9 @@ export default function ElderlyHome() {
         </Button>
       </Card>
 
-      {/* Health Status */}
+      {/* Steps Today */}
       <Text variant="titleMedium" style={styles.sectionTitle}>
-        Health Overview
+        Steps Today
       </Text>
       <Card
         style={[styles.healthCard, { backgroundColor: theme.colors.surface }]}
@@ -299,40 +447,16 @@ export default function ElderlyHome() {
         <Card.Content style={styles.healthContent}>
           <View style={styles.healthItem}>
             <MaterialCommunityIcons
-              name="heart-pulse"
+              name="shoe-print"
               size={32}
-              color="#F44336"
+              color="#4CAF50"
             />
-            <Text variant="labelMedium">Heart Rate</Text>
+            <Text variant="labelMedium">Steps</Text>
             <Text
               variant="bodySmall"
               style={{ color: theme.colors.onSurfaceVariant }}
             >
-              -- bpm
-            </Text>
-          </View>
-          <View style={styles.healthItem}>
-            <MaterialCommunityIcons
-              name="thermometer"
-              size={32}
-              color="#FF9800"
-            />
-            <Text variant="labelMedium">Temperature</Text>
-            <Text
-              variant="bodySmall"
-              style={{ color: theme.colors.onSurfaceVariant }}
-            >
-              -- °C
-            </Text>
-          </View>
-          <View style={styles.healthItem}>
-            <MaterialCommunityIcons name="water" size={32} color="#2196F3" />
-            <Text variant="labelMedium">Blood Pressure</Text>
-            <Text
-              variant="bodySmall"
-              style={{ color: theme.colors.onSurfaceVariant }}
-            >
-              --/-- mmHg
+              1,234 steps
             </Text>
           </View>
         </Card.Content>
@@ -405,6 +529,14 @@ const styles = StyleSheet.create({
   },
   viewAllButton: {
     marginTop: 4,
+  },
+  listItem: {
+    paddingVertical: 8,
+  },
+  iconContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    width: 40,
   },
   healthCard: {
     marginBottom: 16,
