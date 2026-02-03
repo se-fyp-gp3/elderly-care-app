@@ -5,7 +5,7 @@ import { Platform } from "react-native";
 import { ID, Models, OAuthProvider } from "react-native-appwrite";
 import { UserPreferences } from "../types/user";
 import { account, accountWeb } from "./appwrite";
-import { addRoleLabel, checkProfileExists, hasTrialLabel } from "./user";
+import { checkProfileExists, hasTrialLabel } from "./user";
 export class LoginError extends Error {
   constructor(message: string) {
     super(message);
@@ -15,20 +15,22 @@ export class LoginError extends Error {
 
 type AuthContextType = {
   user: Models.User<Models.Preferences> | null;
-  isLoadingUser: boolean;
+  isLoading: boolean;
   preferences: UserPreferences;
   hasProfile: boolean | null;
-  profileLoading: boolean;
   isTrial: boolean;
   userLabels: string[];
 
   signUp: (
     email: string,
     password: string,
-    userPreferences?: UserPreferences,
+    role: "elderly" | "caregiver",
   ) => Promise<string | null>;
   signIn: (email: string, password: string) => Promise<string | null>;
-  signInWithOAuth2: (provider: OAuthProvider) => Promise<string | null>;
+  signInWithOAuth2: (
+    provider: OAuthProvider,
+    role?: "elderly" | "caregiver",
+  ) => Promise<string | null>;
   signOut: () => Promise<void>;
   updatePreferences: (
     newPreferences: UserPreferences,
@@ -49,9 +51,8 @@ export default function AuthProvider({
     null,
   );
   const [preferences, setPreferences] = useState<UserPreferences>({});
-  const [isLoadingUser, setIsLoadingUser] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
-  const [profileLoading, setProfileLoading] = useState<boolean>(false);
   const [userLabels, setUserLabels] = useState<string[]>([]);
   const [isTrial, setIsTrial] = useState<boolean>(false);
 
@@ -85,7 +86,7 @@ export default function AuthProvider({
       return;
     }
 
-    setProfileLoading(true);
+    setIsLoading(true);
     try {
       const exists = await checkProfileExists(user.$id, role);
       setHasProfile(exists);
@@ -93,7 +94,7 @@ export default function AuthProvider({
       console.error("Error checking profile:", error);
       setHasProfile(false);
     } finally {
-      setProfileLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -127,30 +128,21 @@ export default function AuthProvider({
     } catch {
       setUser(null);
     } finally {
-      setIsLoadingUser(false);
+      setIsLoading(false);
     }
   };
 
   const signUp = async (
     email: string,
     password: string,
-    userPreferences?: UserPreferences,
+    role: "elderly" | "caregiver",
   ) => {
-    const newAccount = await account.create({
+    await account.create({
       userId: ID.unique(),
       email,
       password,
     });
-
-    if (userPreferences && Object.keys(userPreferences).length > 0) {
-      await account.updatePrefs(userPreferences);
-    }
-
-    // Add role label to user after signup
-    if (userPreferences?.role) {
-      await addRoleLabel(newAccount.$id, userPreferences.role);
-    }
-
+    setPreference("role", role);
     await signIn(email, password);
     return null;
   };
@@ -172,7 +164,10 @@ export default function AuthProvider({
     return null;
   };
 
-  const signInWithOAuth2 = async (provider: OAuthProvider) => {
+  const signInWithOAuth2 = async (
+    provider: OAuthProvider,
+    role?: "elderly" | "caregiver",
+  ) => {
     let user;
     if (Platform.OS === "web") {
       accountWeb.createOAuth2Session({
@@ -208,9 +203,10 @@ export default function AuthProvider({
         await account.createSession({ userId, secret });
         user = await account.get();
 
-        if (user.prefs) {
-          setPreferences(user.prefs as UserPreferences);
+        if (role && !user.prefs.role) {
+          setPreference("role", role);
         }
+        setPreferences(user.prefs as UserPreferences);
       } else {
         throw new LoginError("OAuth2 sign-in was cancelled or failed");
       }
@@ -230,20 +226,29 @@ export default function AuthProvider({
     setPreferences({});
     setUserLabels([]);
     setIsTrial(false);
+    setIsLoading(false);
   };
 
   const updatePreferences = async (newPreferences: UserPreferences) => {
-    await account.updatePrefs({ prefs: newPreferences });
-    const updatedUser = await account.get();
-    setUser(updatedUser);
-    setPreferences(newPreferences);
+    try {
+      await account.updatePrefs({ prefs: newPreferences });
+      const updatedUser = await account.get();
+      setUser(updatedUser);
+      setPreferences(newPreferences);
+    } catch (error) {
+      console.error("Error updating preferences:", error);
+    }
     return null;
   };
 
   const setPreference = async (key: string, value: any) => {
     const newPrefs = { ...preferences, [key]: value };
-    await account.updatePrefs({ prefs: newPrefs });
-    setPreferences(newPrefs);
+    try {
+      await account.updatePrefs({ prefs: newPrefs });
+      setPreferences(newPrefs);
+    } catch (error) {
+      console.error("Error updating preference:", error);
+    }
     return null;
   };
 
@@ -251,10 +256,9 @@ export default function AuthProvider({
     <AuthContext.Provider
       value={{
         user,
-        isLoadingUser,
+        isLoading,
         preferences,
         hasProfile,
-        profileLoading,
         isTrial,
         userLabels,
         signUp,

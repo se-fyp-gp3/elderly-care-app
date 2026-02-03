@@ -12,13 +12,17 @@ registerTranslation("en", enGB);
 
 const SKIP_SPLASH = true;
 
+const tabs: Record<string, "/(elderly-tabs)" | "/(caregiver-tabs)"> = {
+  elderly: "/(elderly-tabs)",
+  caregiver: "/(caregiver-tabs)",
+};
+
 function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const {
     user,
-    isLoadingUser,
+    isLoading,
     hasProfile,
-    profileLoading,
     preferences: { role },
   } = useAuth();
   const segments = useSegments();
@@ -31,11 +35,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     const inCaregiverTabs = currentRoute === "(caregiver-tabs)";
     const inElderlyTabs = currentRoute === "(elderly-tabs)";
 
-    if (isLoadingUser || profileLoading) {
-      return;
-    }
-
-    if (!appReady) {
+    if (isLoading || !appReady) {
       return;
     }
 
@@ -45,45 +45,27 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
       }
     } else {
       const hasRole = !!role;
-
       if (!hasRole) {
-        if (currentRoute !== "start" && currentRoute !== "signup") {
-          router.replace("/start");
+        if (currentRoute !== "start" && currentRoute !== "profile-setup") {
+          router.replace("/profile-setup");
         }
       } else if (hasProfile === false) {
         if (currentRoute !== "profile-setup") {
           router.replace("/profile-setup");
         }
       } else if (hasProfile === true) {
-        if (inAuthGroup) {
-          // Redirect to appropriate tab group based on role
-          if (role === "elderly") {
-            router.replace("/(elderly-tabs)");
-          } else {
-            router.replace("/(caregiver-tabs)");
+        if (inAuthGroup || (!inCaregiverTabs && !inElderlyTabs)) {
+          const targetTab = role && tabs[role as keyof typeof tabs];
+          if (targetTab) {
+            router.replace(targetTab);
           }
-        } else if (role === "elderly" && inCaregiverTabs) {
-          // Elderly user trying to access caregiver tabs
-          router.replace("/(elderly-tabs)");
-        } else if (role === "caregiver" && inElderlyTabs) {
-          // Caregiver trying to access elderly tabs
-          router.replace("/(caregiver-tabs)");
         }
       }
     }
-  }, [
-    router,
-    user,
-    segments,
-    isLoadingUser,
-    appReady,
-    hasProfile,
-    profileLoading,
-    role,
-  ]);
+  }, [router, user, segments, isLoading, appReady, hasProfile, role]);
 
   // Show loading spinner while checking auth and profile state
-  if (isLoadingUser || (user && profileLoading)) {
+  if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
@@ -116,7 +98,10 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <RouteGuard>
               <Stack>
-                <Stack.Screen name="(caregiver-tabs)" options={{ headerShown: false }} />
+                <Stack.Screen
+                  name="(caregiver-tabs)"
+                  options={{ headerShown: false }}
+                />
                 <Stack.Screen
                   name="(elderly-tabs)"
                   options={{ headerShown: false }}

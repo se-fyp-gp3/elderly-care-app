@@ -1,6 +1,7 @@
 import { users } from "./appwrite";
 import { getElderlyByUserId } from "./elderly";
 import { getCaregiverByUserId } from "./caregiver";
+import { UserPreferences } from "@/types/user";
 
 export async function checkProfileExists(
   userId: string,
@@ -41,3 +42,17 @@ export async function addRoleLabel(
   }
 }
 
+export async function removeRoleLabel(
+  userId: string,
+  role: "elderly" | "caregiver",
+): Promise<void> {
+  try {
+    const user = await users.get<UserPreferences>({ userId });
+    const currentLabels = user.labels || [];
+    const updatedLabels = currentLabels.filter((label) => label !== role);
+    await users.updateLabels({ userId: userId, labels: updatedLabels });
+  } catch (error) {
+    console.error("Error removing role label:", error);
+    throw error;
+  }
+}
