@@ -1,0 +1,98 @@
+stateDiagram-v2
+    direction LR
+
+    %% ============================================================
+    %% 1. User Authentication & Session State (UC-01, UC-02)
+    %% ============================================================
+    state "User Session Lifecycle" as AuthState {
+        [*] --> Unauthenticated
+        
+        Unauthenticated --> LoginView : Launch App
+        Unauthenticated --> RegisterView : Select "Sign Up"
+
+        state LoginView {
+            [*] --> EnteringCredentials
+            EnteringCredentials --> Validating : Submit
+            Validating --> Error : Invalid Creds
+            Error --> EnteringCredentials : Retry
+        }
+
+        state RegisterView {
+            [*] --> IdentitySelection
+            IdentitySelection --> InputDetails : Elderly/Caregiver Selected
+            InputDetails --> CreatingAccount : Submit
+            CreatingAccount --> ProfileSetup : Account Created
+            ProfileSetup --> SavingProfile : Save Details
+        }
+
+        Validating --> Authenticated : Success
+        SavingProfile --> Authenticated : Success
+
+        state Authenticated {
+            [*] --> Routing
+            Routing --> ElderlyDashboard : Role = Elderly
+            Routing --> CaregiverDashboard : Role = Caregiver
+        }
+
+        Authenticated --> Unauthenticated : Log Out
+    }
+
+    %% ============================================================
+    %% 2. Chat Interaction State (UC-06)
+    %% ============================================================
+    state "Chat Interaction" as ChatState {
+        [*] --> Idle
+
+        Idle --> Sending : User sends message
+        
+        state Sending {
+            [*] --> Uploading
+            Uploading --> ServerReceived
+        }
+
+        Sending --> AIProcessing : Success
+        
+        state AIProcessing {
+            [*] --> AnalyzingContext
+            AnalyzingContext --> GeneratingResponse
+        }
+
+        AIProcessing --> StreamingResponse : AI Ready
+        
+        state StreamingResponse {
+            [*] --> ReceivingChunks
+            ReceivingChunks --> Finalizing
+        }
+
+        StreamingResponse --> Idle : Complete
+        StreamingResponse --> Error : Connection Lost
+        Sending --> Error : Network Fail
+        
+        Error --> Idle : Retry/Dismiss
+    }
+
+    %% ============================================================
+    %% 3. Emergency Trigger State (UC-05)
+    %% ============================================================
+    state "Emergency Flow" as EmergencyState {
+        [*] --> NormalState
+
+        NormalState --> ConfirmationDialog : Tap SOS Button
+        
+        state ConfirmationDialog {
+            [*] --> WaitingForInput
+            WaitingForInput --> Cancelled : Tap "Cancel"
+            WaitingForInput --> Confirmed : Tap "Call 999"
+            WaitingForInput --> Confirmed : Timeout (if auto-trigger)
+        }
+
+        ConfirmationDialog --> NormalState : Cancelled
+        Confirmed --> LaunchingDialer
+
+        state LaunchingDialer {
+            [*] --> InvokingNativeOS
+            InvokingNativeOS --> CallActive : User presses call in OS
+        }
+
+        CallActive --> NormalState : End Call
+    }

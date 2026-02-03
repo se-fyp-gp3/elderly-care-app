@@ -2,10 +2,10 @@ import { useAuth } from "@/lib/auth-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Card, List, Switch, Text, useTheme } from "react-native-paper";
+import { Button, Card, List, Switch, Text, useTheme } from "react-native-paper";
 
 export default function ElderlySettings() {
-  const { preferences, updatePreferences } = useAuth();
+  const { preferences, updatePreferences, signOut } = useAuth();
   const theme = useTheme();
   const [notifications, setNotifications] = React.useState(
     preferences.notifications ?? true,
@@ -163,6 +163,34 @@ export default function ElderlySettings() {
         </Card.Content>
       </Card>
 
+      {/* Settings Options */}
+      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <List.Item
+          title="About App"
+          description="Version 1.0.0"
+          left={() => (
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons
+                name="information"
+                size={24}
+                color={theme.colors.primary}
+              />
+            </View>
+          )}
+        />
+      </Card>
+
+      <Button
+        mode="contained"
+        onPress={signOut}
+        style={styles.logoutButton}
+        contentStyle={styles.logoutButtonContent}
+        icon="logout"
+        buttonColor={theme.colors.error}
+      >
+        Sign Out
+      </Button>
+
       <View style={styles.bottomSpacer} />
     </ScrollView>
   );
@@ -204,6 +232,13 @@ const styles = StyleSheet.create({
   infoHeader: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  logoutButton: {
+    marginTop: 24,
+    borderRadius: 12,
+  },
+  logoutButtonContent: {
+    height: 48,
   },
   bottomSpacer: {
     height: 32,

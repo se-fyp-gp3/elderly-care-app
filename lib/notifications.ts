@@ -4,6 +4,8 @@ import { Platform } from 'react-native';
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -47,10 +49,11 @@ export async function scheduleMedicationNotification(
       body,
       sound: true,
       data: { type: 'medication_reminder' },
-    },
+    }  ,
     trigger: {
+      type: 'date',
       date: triggerDate,
-    },
+    } as any,
   });
 }
 

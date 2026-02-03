@@ -1,10 +1,9 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-  buildMedicationSummary,
   buildScheduleSummary,
-  fetchElderlyMedicationsForUser,
   fetchElderlySchedulesForUser,
 } from "@/lib/elderly";
+import { getFormattedTodayMedicationSummary } from "@/lib/medication_tracking";
 import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
@@ -139,8 +138,8 @@ export default function ElderlyChat() {
       lower.includes("medication") ||
       lower.includes("pill")
     ) {
-      const meds = await fetchElderlyMedicationsForUser(user?.$id);
-      return buildMedicationSummary(meds);
+      if (!user?.$id) return "I can't access your medication data right now.";
+      return await getFormattedTodayMedicationSummary(user.$id);
     }
 
     if (
