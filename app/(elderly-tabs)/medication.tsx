@@ -19,6 +19,9 @@ import {
 } from "@/lib/notifications";
 import { Caregiver, ElderlyMedicationReminder, MedicationLog } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system";
+import * as ImageManipulator from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
 import React from "react";
 import {
   Alert,
@@ -47,6 +50,14 @@ import {
   useTheme
 } from "react-native-paper";
 
+// --- AI / Scan Configuration ---
+const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY?.trim();
+const OPENROUTER_API_URL = process.env.EXPO_PUBLIC_OPENROUTER_API_URL?.trim() || "https://openrouter.ai/api/v1";
+const OPENROUTER_IMAGE_MODEL = process.env.EXPO_PUBLIC_OPENROUTER_IMAGE_MODEL?.trim() || "google/gemini-2.0-flash-exp:free";
+
+// Maximum image size for upload (1.5MB to be safe)
+const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
+
 type TodoItem = {
   reminder: ElderlyMedicationReminder;
   time: string; // HH:mm
@@ -70,6 +81,9 @@ export default function ElderlyMedicationScreen() {
   const [saving, setSaving] = React.useState(false);
   const [caregiverMenuVisible, setCaregiverMenuVisible] = React.useState(false);
   
+  // --- AI Scan State ---
+  const [isScanning, setIsScanning] = React.useState(false);
+
   // Track notified missing logs to avoid spam
   const notifiedMissingLogs = React.useRef<Set<string>>(new Set());
 
@@ -279,9 +293,138 @@ export default function ElderlyMedicationScreen() {
            }
        }
     };
-
+    
     manageNotifications();
   }, [todoList]);
+
+  // --- AI Image Processing ---
+  const getImageBase64 = async (uri: string) => {
+    try {
+      if (Platform.OS === 'web') {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        return await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64data = reader.result as string;
+            resolve(base64data.split(',')[1]);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+      return await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+    } catch (e) {
+      console.error("Base64 error:", e);
+      throw e;
+    }
+  };
+
+  const prepareImageForUpload = async (uri: string) => {
+    try {
+      const manipulated = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 1024 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      return manipulated.uri;
+    } catch (error) {
+       console.warn("Image prep failed, using original", error);
+       return uri;
+    }
+  };
+
+  const analyzeMedicationImage = async (uri: string) => {
+    if (!OPENROUTER_API_KEY) {
+      Alert.alert("Configuration Error", "API Key missing.");
+      return null;
+    }
+
+    try {
+      const processedUri = await prepareImageForUpload(uri);
+      const base64 = await getImageBase64(processedUri);
+
+      const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          "HTTP-Referer": "https://elderly-care-app.local",
+          "X-Title": "elderly-care-app",
+        },
+        body: JSON.stringify({
+          model: OPENROUTER_IMAGE_MODEL,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Analyze this image of a medication package or pill. Extract: name, dosage (e.g. '500 mg'), unit (e.g. 'tablet'), timesPerDay (number, default 1), durationDays (number, default 7). Return ONLY a JSON object. No markdown." },
+                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` } }
+              ]
+            }
+          ]
+        })
+      });
+      
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) throw new Error("No content from AI");
+
+      const jsonString = content.replace(/```json/g, "").replace(/```/g, "").trim();
+      return JSON.parse(jsonString);
+
+    } catch (error) {
+      console.error("AI Analysis failed:", error);
+      Alert.alert("Error", "Failed to analyze image.");
+      return null;
+    }
+  };
+
+  const handleScanMedication = async () => {
+    try {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert("Permission needed", "Camera permission is required.");
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.7,
+        });
+
+        if (!result.canceled && result.assets[0]) {
+            setIsScanning(true);
+            const data = await analyzeMedicationImage(result.assets[0].uri);
+            setIsScanning(false);
+
+            if (data) {
+                if (data.name) setMedicineName(data.name);
+                if (data.unit) setUnit(data.unit);
+                if (data.dosage) setDosage(String(data.dosage));
+                
+                const tpd = Number(data.timesPerDay) || 1;
+                setTimesPerDay(tpd);
+                
+                // Set default times based on timesPerDay
+                let newTimes = ["08:00"];
+                if (tpd === 2) newTimes = ["08:00", "20:00"];
+                else if (tpd === 3) newTimes = ["08:00", "13:00", "20:00"];
+                else if (tpd === 4) newTimes = ["08:00", "12:00", "16:00", "20:00"];
+                
+                setReminderTimes(newTimes);
+                
+                if (data.durationDays) setDurationDays(Number(data.durationDays));
+                
+                Alert.alert("Success", "Medication details scanned!");
+            }
+        }
+    } catch (error) {
+        setIsScanning(false);
+        Alert.alert("Error", "Scan failed.");
+    }
+  };
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -672,6 +815,18 @@ export default function ElderlyMedicationScreen() {
             <Text variant="titleLarge" style={styles.modalTitle}>
               Add Medication
             </Text>
+
+            <Button 
+              mode="contained-tonal" 
+              icon="camera" 
+              onPress={handleScanMedication} 
+              loading={isScanning}
+              disabled={isScanning}
+              style={{ marginBottom: 20 }}
+            >
+              Scan Medication
+            </Button>
+            { isScanning && <Text style={{textAlign: 'center', marginBottom: 16}}>Analyzing image...</Text> }
 
             <TextInput
               label="Medicine Name *"
