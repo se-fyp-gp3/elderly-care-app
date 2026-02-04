@@ -1,50 +1,45 @@
-import type { ChatSessionRow } from "@/types/appwrite";
+import type { ChatSession } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import { CHAT_SESSION_TABLE_ID, DATABASE_ID, tablesDB } from "./appwrite";
 
 export interface ChatSessionInput {
   userId: string;
-  chatId: string;
   title: string;
   messages: string;
-  updatedAt: string;
 }
 
 export async function createChatSession(
   input: ChatSessionInput,
-): Promise<ChatSessionRow> {
-  const row = await tablesDB.createRow<ChatSessionRow>({
+): Promise<ChatSession> {
+  const row = await tablesDB.createRow<ChatSession>({
     databaseId: DATABASE_ID,
     tableId: CHAT_SESSION_TABLE_ID,
     rowId: ID.unique(),
     data: {
       user_id: input.userId,
-      chat_id: input.chatId,
       title: input.title,
       messages: input.messages,
-      updated_at: input.updatedAt,
     },
   });
 
-  return row as unknown as ChatSessionRow;
+  return row as unknown as ChatSession;
 }
 
 export async function updateChatSession(
   rowId: string,
-  input: Pick<ChatSessionInput, "title" | "messages" | "updatedAt">,
-): Promise<ChatSessionRow> {
-  const row = await tablesDB.updateRow<ChatSessionRow>({
+  input: Pick<ChatSessionInput, "title" | "messages">,
+): Promise<ChatSession> {
+  const row = await tablesDB.updateRow<ChatSession>({
     databaseId: DATABASE_ID,
     tableId: CHAT_SESSION_TABLE_ID,
     rowId,
     data: {
       title: input.title,
       messages: input.messages,
-      updated_at: input.updatedAt,
     },
   });
 
-  return row as unknown as ChatSessionRow;
+  return row as unknown as ChatSession;
 }
 
 export async function deleteChatSession(rowId: string): Promise<void> {
@@ -57,8 +52,8 @@ export async function deleteChatSession(rowId: string): Promise<void> {
 
 export async function listChatSessionsForUser(
   userId: string,
-): Promise<ChatSessionRow[]> {
-  const response = await tablesDB.listRows<ChatSessionRow>({
+): Promise<ChatSession[]> {
+  const response = await tablesDB.listRows<ChatSession>({
     databaseId: DATABASE_ID,
     tableId: CHAT_SESSION_TABLE_ID,
     queries: [
@@ -68,7 +63,7 @@ export async function listChatSessionsForUser(
     ],
   });
 
-  return response.rows as unknown as ChatSessionRow[];
+  return response.rows as unknown as ChatSession[];
 }
 
 export async function deleteChatsOlderThan(
@@ -78,7 +73,7 @@ export async function deleteChatsOlderThan(
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
 
-  const response = await tablesDB.listRows<ChatSessionRow>({
+  const response = await tablesDB.listRows<ChatSession>({
     databaseId: DATABASE_ID,
     tableId: CHAT_SESSION_TABLE_ID,
     queries: [

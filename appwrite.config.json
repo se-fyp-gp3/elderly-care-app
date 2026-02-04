@@ -7,6 +7,8 @@
             "avatars": true,
             "databases": true,
             "locale": true,
+            "health": true,
+            "storage": true,
             "teams": true,
             "users": true,
             "sites": true,
@@ -39,7 +41,10 @@
     "tablesDB": [
         {
             "$id": "elderly-care-app-db",
-                {
+            "name": "elderly-care-app-db",
+            "enabled": true
+        }
+    ],
     "tables": [
         {
             "$id": "elderly",
@@ -236,24 +241,24 @@
                     "type": "relationship",
                     "required": false,
                     "array": false,
-                    "relatedCollection": "caregiver",
                     "relationType": "manyToOne",
                     "twoWay": false,
                     "twoWayKey": "697857ca0021022a75e4",
                     "onDelete": "cascade",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "caregiver"
                 },
                 {
                     "key": "elderly",
                     "type": "relationship",
                     "required": false,
                     "array": false,
-                    "relatedCollection": "elderly",
                     "relationType": "manyToOne",
                     "twoWay": false,
                     "twoWayKey": "697859db00222cbd447a",
                     "onDelete": "cascade",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "elderly"
                 }
             ],
             "indexes": [
@@ -327,39 +332,6 @@
             "rowSecurity": false,
             "columns": [
                 {
-                    "key": "elderly_id",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 20,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "elderly",
-                    "type": "relationship",
-                    "required": false,
-                    "array": false,
-                    "relatedCollection": "elderly",
-                    "relationType": "oneToMany",
-                    "twoWay": false,
-                    "twoWayKey": "696f2ce400358163ebaf",
-                    "onDelete": "setNull",
-                    "side": "parent"
-                },
-                {
-                    "key": "medication",
-                    "type": "relationship",
-                    "required": false,
-                    "array": false,
-                    "relatedCollection": "medication",
-                    "relationType": "oneToMany",
-                    "twoWay": false,
-                    "twoWayKey": "696f2d09002f43007e96",
-                    "onDelete": "setNull",
-                    "side": "parent"
-                },
-                {
                     "key": "dosage",
                     "type": "double",
                     "required": false,
@@ -405,7 +377,10 @@
                         "Completed",
                         "Expired"
                     ]
-                    {
+                },
+                {
+                    "key": "last_taken",
+                    "type": "datetime",
                     "required": false,
                     "array": false,
                     "default": null,
@@ -434,41 +409,27 @@
                     "type": "relationship",
                     "required": false,
                     "array": false,
-                    "relatedCollection": "elderly",
                     "relationType": "manyToOne",
                     "twoWay": false,
                     "twoWayKey": "697dc5330027cc089eb7",
                     "onDelete": "setNull",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "elderly"
                 },
                 {
                     "key": "medication",
                     "type": "relationship",
                     "required": false,
                     "array": false,
-                    "relatedCollection": "medication",
                     "relationType": "manyToOne",
                     "twoWay": false,
                     "twoWayKey": "697dc58b00218b7f59a4",
                     "onDelete": "setNull",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "medication"
                 }
             ],
-            "indexes": [
-                {
-                    "key": "idx_elderly_medication_elderly_id",
-                    "type": "key",
-                    "columns": [
-                        "elderly_id"
-                    ],
-                    "orders": [
-                        "ASC"
-                    ],
-                    "lengths": [
-                        0
-                    ]
-                }
-            ]
+            "indexes": []
         },
         {
             "$id": "schedule",
@@ -485,15 +446,6 @@
             "enabled": true,
             "rowSecurity": false,
             "columns": [
-                {
-                    "key": "elderly_id",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 20,
-                    "default": null,
-                    "encrypt": false
-                },
                 {
                     "key": "time",
                     "type": "datetime",
@@ -553,41 +505,27 @@
                     "type": "relationship",
                     "required": false,
                     "array": false,
-                    "relatedCollection": "elderly",
                     "relationType": "manyToOne",
                     "twoWay": false,
                     "twoWayKey": "6978566a002838eef365",
                     "onDelete": "cascade",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "elderly"
                 },
                 {
                     "key": "scheduleCategory",
                     "type": "relationship",
                     "required": false,
                     "array": false,
-                    "relatedCollection": "schedule_category",
                     "relationType": "manyToOne",
                     "twoWay": false,
                     "twoWayKey": "697dc070003497402616",
                     "onDelete": "setNull",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "schedule_category"
                 }
             ],
-            "indexes": [
-                {
-                    "key": "idx_schedule_elderly_id",
-                    "type": "key",
-                    "columns": [
-                        "elderly_id"
-                    ],
-                    "orders": [
-                        "ASC"
-                    ],
-                    "lengths": [
-                        0
-                    ]
-                }
-            ]
+            "indexes": []
         },
         {
             "$id": "schedule_category",
@@ -648,24 +586,24 @@
                     "type": "relationship",
                     "required": false,
                     "array": false,
-                    "relatedCollection": "schedule",
                     "relationType": "manyToOne",
                     "twoWay": false,
                     "twoWayKey": "697dd33100050f7ab4dc",
                     "onDelete": "cascade",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "schedule"
                 },
                 {
                     "key": "elderlyMedication",
                     "type": "relationship",
                     "required": false,
                     "array": false,
-                    "relatedCollection": "elderly_medication",
                     "relationType": "manyToOne",
                     "twoWay": false,
                     "twoWayKey": "697dd349002834561b55",
                     "onDelete": "cascade",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "elderly_medication"
                 },
                 {
                     "key": "status",
@@ -700,12 +638,12 @@
                     "type": "relationship",
                     "required": false,
                     "array": false,
-                    "relatedCollection": "elderly",
                     "relationType": "oneToMany",
                     "twoWay": false,
                     "twoWayKey": "696f4278003d8b4081ab",
                     "onDelete": "cascade",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "elderly"
                 },
                 {
                     "key": "time",
@@ -818,7 +756,8 @@
                     "twoWay": false,
                     "twoWayKey": "elderly_medication_reminder",
                     "onDelete": "cascade",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "elderly"
                 },
                 {
                     "key": "elderly_medication",
@@ -829,7 +768,8 @@
                     "twoWay": false,
                     "twoWayKey": "elderly_medication_reminder",
                     "onDelete": "cascade",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "elderly_medication"
                 },
                 {
                     "key": "active",
@@ -903,7 +843,8 @@
                     "twoWay": false,
                     "twoWayKey": "medication_logs",
                     "onDelete": "cascade",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "elderly_medication_reminder"
                 },
                 {
                     "key": "elderly",
@@ -914,7 +855,46 @@
                     "twoWay": false,
                     "twoWayKey": "medication_logs",
                     "onDelete": "cascade",
-                    "side": "parent"
+                    "side": "parent",
+                    "relatedCollection": "elderly"
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "chat_session",
+            "$permissions": [],
+            "databaseId": "elderly-care-app-db",
+            "name": "Chat_Session",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [
+                {
+                    "key": "user_id",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 20,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "title",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "message",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 1073741824,
+                    "default": null,
+                    "encrypt": false
                 }
             ],
             "indexes": []

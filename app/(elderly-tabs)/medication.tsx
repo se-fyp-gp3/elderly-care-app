@@ -17,7 +17,7 @@ import {
   scheduleMedicationNotification,
   sendImmediateNotification
 } from "@/lib/notifications";
-import { Caregiver, ElderlyMedicationReminder, MedicationLog } from "@/types/appwrite";
+import { Caregiver, ElderlyMedicationReminder, MedicationLogs } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -74,7 +74,7 @@ export default function ElderlyMedicationScreen() {
   const [refreshing, setRefreshing] = React.useState(false);
   
   const [reminders, setReminders] = React.useState<ElderlyMedicationReminder[]>([]);
-  const [todayLogs, setTodayLogs] = React.useState<MedicationLog[]>([]);
+  const [todayLogs, setTodayLogs] = React.useState<MedicationLogs[]>([]);
   
   const [caregivers, setCaregivers] = React.useState<Caregiver[]>([]);
   const [modalVisible, setModalVisible] = React.useState(false);

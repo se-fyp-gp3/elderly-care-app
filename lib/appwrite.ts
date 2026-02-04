@@ -1,8 +1,8 @@
 import { Account, Client, TablesDB } from "appwrite";
 import { Client as ServerClient, Users } from "node-appwrite";
 import {
-    Account as AccountReactNative,
-    Client as ClientReactNative,
+  Account as AccountReactNative,
+  Client as ClientReactNative,
 } from "react-native-appwrite";
 
 const APPWRITE_ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!;
@@ -43,17 +43,16 @@ export const HEALTH_DATA_TABLE_ID =
   process.env.EXPO_PUBLIC_HEALTH_DATA_TABLE_ID!;
 export const MEDICATION_TABLE_ID = process.env.EXPO_PUBLIC_MEDICATION_TABLE_ID!;
 export const ELDERLY_MEDICATION_REMINDER_TABLE_ID =
-  process.env.EXPO_PUBLIC_ELDERLY_MEDICATION_REMINDER_TABLE_ID;
+  process.env.EXPO_PUBLIC_ELDERLY_MEDICATION_REMINDER_TABLE_ID!;
 export const SCHEDULE_TABLE_ID = process.env.EXPO_PUBLIC_SCHEDULE_TABLE_ID!;
 export const SCHEDULE_CATEGORY_TABLE_ID =
   process.env.EXPO_PUBLIC_SCHEDULE_CATEGORY_TABLE_ID!;
 export const SCHEDULE_MEDICATION_TABLE_ID =
   process.env.EXPO_PUBLIC_SCHEDULE_MEDICATION_TABLE_ID!;
-export const MEDICATION_LOGS_TABLE_ID = "medication_logs";
+export const MEDICATION_LOGS_TABLE_ID =
+  process.env.EXPO_PUBLIC_MEDICATION_LOGS_TABLE_ID!;
 export const CHAT_SESSION_TABLE_ID =
   process.env.EXPO_PUBLIC_CHAT_SESSION_TABLE_ID!;
-export const ELDERLY_MEDICATION_REMINDER_TABLE_ID = "elderly_medication_reminder";
-export const MEDICATION_LOGS_TABLE_ID = "medication_logs";
 
 export interface RealtimeResponse {
   events: string[];

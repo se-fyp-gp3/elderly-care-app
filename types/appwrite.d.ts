@@ -21,13 +21,18 @@ export enum ScheduleStatus {
     MISSED = "Missed"
 }
 
-export type ElderlyT1Test = Models.Row & {
-    name: string;
-    phone: string | null;
-    age: number;
-    status: string | null;
-    originalId: number;
-    aaa: string[] | null;
+export enum ScheduleType {
+    MEDICATION = "medication",
+    APPOINTMENT = "appointment",
+    MEAL = "meal",
+    ACTIVITY = "activity",
+    CHECKUP = "checkup"
+}
+
+export enum ScheduleMedicationStatus {
+    MISSED = "Missed",
+    PENDING = "Pending",
+    COMPLETED = "Completed"
 }
 
 export type Elderly = Models.Row & {
@@ -36,6 +41,9 @@ export type Elderly = Models.Row & {
     phone: string | null;
     birth: string | null;
     status: ElderlyStatus | null;
+    gender: string | null;
+    blood_type: string | null;
+    emergency_contact: string | null;
 }
 
 export type Caregiver = Models.Row & {
@@ -46,8 +54,8 @@ export type Caregiver = Models.Row & {
 }
 
 export type CaregiverElderly = Models.Row & {
-    caregiver: Caregiver[];
-    elderly: Elderly[];
+    caregiver: Caregiver;
+    elderly: Elderly;
 }
 
 export type Medication = Models.Row & {
@@ -56,27 +64,26 @@ export type Medication = Models.Row & {
 }
 
 export type ElderlyMedication = Models.Row & {
-    elderly_id?: string | null;
-    elderly: Elderly[];
-    medication: Medication[];
     dosage: number | null;
     frequency: string | null;
     is_prn: boolean;
     times_per_day: number | null;
-    approx_times: string[] | null;
     status: ElderlyMedicationStatus | null;
     last_taken: string | null;
     notes: string | null;
+    approx_times: string[] | null;
+    elderly: Elderly;
+    medication: Medication;
 }
 
 export type Schedule = Models.Row & {
-    elderly_id?: string | null;
     time: string | null;
     title: string | null;
     description: string | null;
-    elderly: Elderly[];
-    scheduleCategory: ScheduleCategory[];
     status: ScheduleStatus | null;
+    type: ScheduleType | null;
+    elderly: Elderly;
+    scheduleCategory: ScheduleCategory;
 }
 
 export type ScheduleCategory = Models.Row & {
@@ -86,40 +93,43 @@ export type ScheduleCategory = Models.Row & {
 }
 
 export type ScheduleMedication = Models.Row & {
-    schedule: Schedule[];
-    elderly_medication: ElderlyMedication[];
+    schedule: Schedule;
+    elderlyMedication: ElderlyMedication;
+    status: ScheduleMedicationStatus | null;
 }
 
 export type HealthData = Models.Row & {
     elderly: Elderly[];
     time: string | null;
     type: string | null;
-}
-
-export type MedicationLog = Models.Row & {
-    elderly_medication_reminder: ElderlyMedicationReminder; 
-    elderly: Elderly;
-    scheduled_at: string; // datetime
-    taken_at: string | null; // datetime
-    status: "taken" | "skipped" | "pending";
+    data: string | null;
+    value: string | null;
+    unit: string | null;
 }
 
 export type ElderlyMedicationReminder = Models.Row & {
-    elderly: Elderly;
-    elderly_medication: ElderlyMedication;
     start_date: string;
     duration_days: number;
     follow_up_caregiver: string | null;
     after_meal: boolean;
     reminder_times: string[];
+    elderly: Elderly;
+    elderly_medication: ElderlyMedication;
     active: boolean;
     is_finished: boolean;
+    end_date: string | null;
 }
 
-export type ChatSessionRow = Models.Row & {
+export type MedicationLogs = Models.Row & {
+    scheduled_at: string;
+    taken_at: string | null;
+    status: string;
+    elderly_medication_reminder: ElderlyMedicationReminder;
+    elderly: Elderly;
+}
+
+export type ChatSession = Models.Row & {
     user_id: string;
-    chat_id: string;
-    title: string | null;
-    messages: string | null;
-    updated_at: string | null;
+    title: string;
+    messages: string;
 }

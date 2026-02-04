@@ -12,7 +12,7 @@ import {
 import {
   Elderly,
   ElderlyMedicationReminder,
-  MedicationLog,
+  MedicationLogs,
   Schedule
 } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -58,7 +58,7 @@ export default function ElderlyHome() {
     null,
   );
   const [reminders, setReminders] = React.useState<ElderlyMedicationReminder[]>([]);
-  const [todayLogs, setTodayLogs] = React.useState<MedicationLog[]>([]);
+  const [todayLogs, setTodayLogs] = React.useState<MedicationLogs[]>([]);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
 
   const fetchElderlyData = React.useCallback(async () => {
