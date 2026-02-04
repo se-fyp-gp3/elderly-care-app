@@ -1,6 +1,6 @@
 // components/ChatBox.tsx
-import * as ImagePicker from 'expo-image-picker';
-import React, { useEffect, useRef, useState } from 'react';
+import * as ImagePicker from "expo-image-picker";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -11,7 +11,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 import {
   ActivityIndicator,
   Avatar,
@@ -20,7 +20,7 @@ import {
   Text,
   TextInput,
   useTheme,
-} from 'react-native-paper';
+} from "react-native-paper";
 
 interface Message {
   id: string;
@@ -40,19 +40,19 @@ interface DeepSeekResponse {
 
 export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const theme = useTheme();
 
   const DEEPSEEK_API_KEY = process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY?.trim();
-  const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
+  const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
   const USE_MOCK_MODE = true;
 
   useEffect(() => {
     const welcomeMessage: Message = {
-      id: '1',
+      id: "1",
       text: "Hello! I'm your AI Care Assistant. 👋\n\nI'm here to help you with health information, medication reminders, and general wellness advice. How can I assist you today?",
       isUser: false,
       timestamp: new Date(),
@@ -60,10 +60,14 @@ export default function ChatBox() {
     setMessages([welcomeMessage]);
 
     (async () => {
-      if (Platform.OS !== 'web') {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission needed', 'We need camera roll permissions to upload photos.');
+      if (Platform.OS !== "web") {
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Permission needed",
+            "We need camera roll permissions to upload photos.",
+          );
         }
       }
     })();
@@ -75,13 +79,19 @@ export default function ChatBox() {
 
       const lowerMessage = userMessage.toLowerCase();
 
-      if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
+      if (lowerMessage.includes("hello") || lowerMessage.includes("hi")) {
         return "Hello! I'm your AI Care Assistant. I'm here to help you with health-related questions, medication reminders, and wellness advice. What would you like to know?";
-      } else if (lowerMessage.includes('medication') || lowerMessage.includes('medicine')) {
-        return 'I can help you with medication information! For personalized medication advice, please consult with your healthcare provider. Would you like me to help you set up medication reminders?';
-      } else if (lowerMessage.includes('health') || lowerMessage.includes('symptom')) {
+      } else if (
+        lowerMessage.includes("medication") ||
+        lowerMessage.includes("medicine")
+      ) {
+        return "I can help you with medication information! For personalized medication advice, please consult with your healthcare provider. Would you like me to help you set up medication reminders?";
+      } else if (
+        lowerMessage.includes("health") ||
+        lowerMessage.includes("symptom")
+      ) {
         return "I'm here to provide general health information. However, for any serious health concerns or symptoms, please consult with a healthcare professional immediately. How can I assist you today?";
-      } else if (lowerMessage.includes('emergency')) {
+      } else if (lowerMessage.includes("emergency")) {
         return "⚠️ For medical emergencies, please call emergency services immediately (911 or your local emergency number). I'm an AI assistant and cannot provide emergency medical care.";
       } else {
         return `I understand you're asking about "${userMessage}". As your AI Care Assistant, I'm here to help with health information, medication tracking, and wellness support. Could you provide more details about what you'd like to know?`;
@@ -89,25 +99,25 @@ export default function ChatBox() {
     }
 
     if (!DEEPSEEK_API_KEY) {
-      throw new Error('DeepSeek API key not configured.');
+      throw new Error("DeepSeek API key not configured.");
     }
 
     const response = await fetch(DEEPSEEK_API_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: "deepseek-chat",
         messages: [
           {
-            role: 'system',
+            role: "system",
             content:
-              'You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.',
+              "You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.",
           },
           {
-            role: 'user',
+            role: "user",
             content: userMessage,
           },
         ],
@@ -119,22 +129,24 @@ export default function ChatBox() {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       if (response.status === 401) {
-        throw new Error('Authentication failed. Please check your API key.');
+        throw new Error("Authentication failed. Please check your API key.");
       }
       throw new Error(`API request failed: ${response.status}`);
     }
 
     const data: DeepSeekResponse = await response.json();
     if (!data.choices || data.choices.length === 0) {
-      throw new Error('No response from DeepSeek API');
+      throw new Error("No response from DeepSeek API");
     }
 
     return data.choices[0].message.content;
   };
 
   const handleImageOptions = () => {
-    if (Platform.OS === 'web') {
-      const choice = window.confirm('Click OK to take a photo, or Cancel to choose from gallery');
+    if (Platform.OS === "web") {
+      const choice = window.confirm(
+        "Click OK to take a photo, or Cancel to choose from gallery",
+      );
       if (choice) {
         takePhoto();
       } else {
@@ -142,23 +154,23 @@ export default function ChatBox() {
       }
     } else {
       Alert.alert(
-        'Add Photo',
-        'Choose an option',
+        "Add Photo",
+        "Choose an option",
         [
           {
-            text: 'Take Photo',
+            text: "Take Photo",
             onPress: () => takePhoto(),
           },
           {
-            text: 'Choose from Gallery',
+            text: "Choose from Gallery",
             onPress: () => pickImage(),
           },
           {
-            text: 'Cancel',
-            style: 'cancel',
+            text: "Cancel",
+            style: "cancel",
           },
         ],
-        { cancelable: true }
+        { cancelable: true },
       );
     }
   };
@@ -176,11 +188,11 @@ export default function ChatBox() {
         setSelectedImage(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error picking image:', error);
-      if (Platform.OS === 'web') {
-        alert('Failed to pick image. Please try again.');
+      console.error("Error picking image:", error);
+      if (Platform.OS === "web") {
+        alert("Failed to pick image. Please try again.");
       } else {
-        Alert.alert('Error', 'Failed to pick image. Please try again.');
+        Alert.alert("Error", "Failed to pick image. Please try again.");
       }
     }
   };
@@ -189,11 +201,14 @@ export default function ChatBox() {
     try {
       // Request camera permissions
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        if (Platform.OS === 'web') {
-          alert('Camera permission is required to take photos.');
+      if (status !== "granted") {
+        if (Platform.OS === "web") {
+          alert("Camera permission is required to take photos.");
         } else {
-          Alert.alert('Permission needed', 'Camera permission is required to take photos.');
+          Alert.alert(
+            "Permission needed",
+            "Camera permission is required to take photos.",
+          );
         }
         return;
       }
@@ -208,11 +223,11 @@ export default function ChatBox() {
         setSelectedImage(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error taking photo:', error);
-      if (Platform.OS === 'web') {
-        alert('Failed to take photo. Please try again.');
+      console.error("Error taking photo:", error);
+      if (Platform.OS === "web") {
+        alert("Failed to take photo. Please try again.");
       } else {
-        Alert.alert('Error', 'Failed to take photo. Please try again.');
+        Alert.alert("Error", "Failed to take photo. Please try again.");
       }
     }
   };
@@ -226,14 +241,14 @@ export default function ChatBox() {
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText.trim() || '📷 [Image sent]',
+      text: inputText.trim() || "📷 [Image sent]",
       isUser: true,
       timestamp: new Date(),
       imageUri: selectedImage || undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInputText('');
+    setInputText("");
     setSelectedImage(null);
     setIsLoading(true);
 
@@ -256,11 +271,11 @@ export default function ChatBox() {
 
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
-      console.error('Error calling DeepSeek API:', error);
+      console.error("Error calling DeepSeek API:", error);
 
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        text: `Sorry, I encountered an error: ${error instanceof Error ? error.message : "Unknown error"}`,
         isUser: false,
         timestamp: new Date(),
       };
@@ -281,7 +296,7 @@ export default function ChatBox() {
       {!item.isUser && (
         <Avatar.Icon size={36} icon="robot" style={styles.avatarAI} />
       )}
-      
+
       <View style={styles.messageBubbleContainer}>
         <Card
           style={[
@@ -293,10 +308,10 @@ export default function ChatBox() {
             {item.imageUri && (
               <TouchableOpacity
                 onPress={() => {
-                  if (Platform.OS === 'web') {
-                    window.open(item.imageUri, '_blank');
+                  if (Platform.OS === "web") {
+                    window.open(item.imageUri, "_blank");
                   } else {
-                    Alert.alert('Image', 'Image preview');
+                    Alert.alert("Image", "Image preview");
                   }
                 }}
               >
@@ -310,7 +325,7 @@ export default function ChatBox() {
             <Text
               style={[
                 styles.messageText,
-                { color: item.isUser ? '#FFFFFF' : '#000000' },
+                { color: item.isUser ? "#FFFFFF" : "#000000" },
               ]}
             >
               {item.text}
@@ -320,14 +335,14 @@ export default function ChatBox() {
                 styles.timestamp,
                 {
                   color: item.isUser
-                    ? 'rgba(255,255,255,0.8)'
-                    : 'rgba(0,0,0,0.5)',
+                    ? "rgba(255,255,255,0.8)"
+                    : "rgba(0,0,0,0.5)",
                 },
               ]}
             >
               {item.timestamp.toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
+                hour: "2-digit",
+                minute: "2-digit",
               })}
             </Text>
           </Card.Content>
@@ -335,11 +350,7 @@ export default function ChatBox() {
       </View>
 
       {item.isUser && (
-        <Avatar.Icon
-          size={36}
-          icon="account"
-          style={styles.avatarUser}
-        />
+        <Avatar.Icon size={36} icon="account" style={styles.avatarUser} />
       )}
     </View>
   );
@@ -347,8 +358,10 @@ export default function ChatBox() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : Platform.OS === 'android' ? 98 : 0}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={
+        Platform.OS === "ios" ? 90 : Platform.OS === "android" ? 98 : 0
+      }
     >
       <View style={styles.chatContainer}>
         <FlatList
@@ -358,7 +371,9 @@ export default function ChatBox() {
           renderItem={renderMessage}
           style={styles.messagesList}
           contentContainerStyle={styles.messagesListContent}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() =>
+            flatListRef.current?.scrollToEnd({ animated: true })
+          }
           onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
         />
 
@@ -441,50 +456,50 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   messageRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 12,
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
     paddingHorizontal: 4,
   },
   userMessageRow: {
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   aiMessageRow: {
-    justifyContent: 'flex-start',
+    justifyContent: "flex-start",
   },
   avatarAI: {
     marginRight: 8,
-    backgroundColor: '#E3F2FD',
+    backgroundColor: "#E3F2FD",
   },
   avatarUser: {
     marginLeft: 8,
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
   },
   messageBubbleContainer: {
-    maxWidth: '75%',
+    maxWidth: "75%",
     flexShrink: 1,
   },
   messageCard: {
     borderRadius: 16,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
   userMessage: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     borderBottomRightRadius: 4,
   },
   aiMessage: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     borderBottomLeftRadius: 4,
   },
   messageContent: {
     padding: 8,
   },
   messageImage: {
-    width: '100%',
+    width: "100%",
     height: 200,
     borderRadius: 8,
     marginBottom: 8,
@@ -496,12 +511,12 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: 11,
     marginTop: 4,
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
   },
   loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
@@ -512,10 +527,10 @@ const styles = StyleSheet.create({
   inputContainer: {
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: "#E0E0E0",
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: -2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -525,9 +540,9 @@ const styles = StyleSheet.create({
       },
     }),
   },
-   inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
     minHeight: 56,
   },
   photoButton: {
@@ -538,7 +553,7 @@ const styles = StyleSheet.create({
   // ... keep imagePreviewContainer, imagePreview, removeImageButton unchanged
   textInput: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     maxHeight: 120,
     minHeight: 56,
   },
@@ -547,11 +562,11 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   imagePreviewContainer: {
-    position: 'relative',
+    position: "relative",
     marginBottom: 8,
     borderRadius: 8,
-    overflow: 'hidden',
-    alignSelf: 'flex-start',
+    overflow: "hidden",
+    alignSelf: "flex-start",
   },
   imagePreview: {
     width: 100,
@@ -559,10 +574,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   removeImageButton: {
-    position: 'absolute',
+    position: "absolute",
     top: -8,
     right: -8,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: "rgba(0,0,0,0.6)",
     margin: 0,
   },
 });

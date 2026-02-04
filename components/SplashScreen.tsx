@@ -1,28 +1,30 @@
 // components/SplashScreen.tsx
-import { useAssets } from 'expo-asset';
-import { Image } from 'expo-image';
-import React, { useEffect } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import { useAssets } from "expo-asset";
+import { Image } from "expo-image";
+import React, { useEffect } from "react";
+import { Dimensions, StyleSheet, View } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 import Animated, {
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
-    withDelay,
-    withSequence,
-    withTiming,
-} from 'react-native-reanimated';
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
 
 interface SplashScreenProps {
   onAnimationComplete: () => void;
 }
 
-export default function SplashScreen({ onAnimationComplete }: SplashScreenProps) {
+export default function SplashScreen({
+  onAnimationComplete,
+}: SplashScreenProps) {
   const theme = useTheme();
-  const [assets] = useAssets([require('@/assets/images/logo.png')]);
-  
+  const [assets] = useAssets([require("@/assets/images/logo.png")]);
+
   // 动画值
   const logoScale = useSharedValue(0);
   const logoPosition = useSharedValue(0);
@@ -54,10 +56,10 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
   useEffect(() => {
     // 启动动画序列
     logoOpacity.value = withTiming(1, { duration: 500 });
-    
+
     logoScale.value = withSequence(
       withTiming(1.2, { duration: 600 }),
-      withTiming(1, { duration: 400 })
+      withTiming(1, { duration: 400 }),
     );
 
     // logo 移动到顶部
@@ -67,13 +69,17 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
         if (finished) {
           // logo 移动完成后，开始内容动画
           contentOpacity.value = withTiming(1, { duration: 500 });
-          contentTranslateY.value = withTiming(0, { duration: 600 }, (contentFinished) => {
-            if (contentFinished) {
-              runOnJS(triggerAnimationComplete)();
-            }
-          });
+          contentTranslateY.value = withTiming(
+            0,
+            { duration: 600 },
+            (contentFinished) => {
+              if (contentFinished) {
+                runOnJS(triggerAnimationComplete)();
+              }
+            },
+          );
         }
-      })
+      }),
     );
   }, []);
 
@@ -93,7 +99,10 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
               👵
             </Text>
           )}
-          <Text style={[styles.logoText, styles.logoTitle]} variant="headlineMedium">
+          <Text
+            style={[styles.logoText, styles.logoTitle]}
+            variant="headlineMedium"
+          >
             Elderly Care
           </Text>
         </View>
@@ -115,43 +124,43 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   logoImage: {
     width: 120,
     height: 120,
   },
   logoContainer: {
-    position: 'absolute',
-    alignItems: 'center',
+    position: "absolute",
+    alignItems: "center",
   },
   logo: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   logoText: {
-    color: 'white',
-    textAlign: 'center',
+    color: "white",
+    textAlign: "center",
   },
   logoTitle: {
     marginTop: 8,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   content: {
-    position: 'absolute',
+    position: "absolute",
     bottom: height * 0.2,
-    alignItems: 'center',
-    width: '100%',
+    alignItems: "center",
+    width: "100%",
     paddingHorizontal: 32,
   },
   welcomeText: {
-    color: 'white',
-    textAlign: 'center',
+    color: "white",
+    textAlign: "center",
     marginBottom: 8,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   subtitle: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
+    color: "rgba(255, 255, 255, 0.8)",
+    textAlign: "center",
   },
 });

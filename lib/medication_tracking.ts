@@ -1,104 +1,107 @@
 import {
-    ElderlyMedicationReminder,
-    Medication,
-    MedicationLogs,
+  ElderlyMedicationReminder,
+  Medication,
+  MedicationLogs,
 } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
-    DATABASE_ID,
-    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-    ELDERLY_MEDICATION_TABLE_ID,
-    MEDICATION_LOGS_TABLE_ID,
-    MEDICATION_TABLE_ID,
-    tablesDB,
+  DATABASE_ID,
+  ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+  ELDERLY_MEDICATION_TABLE_ID,
+  MEDICATION_LOGS_TABLE_ID,
+  MEDICATION_TABLE_ID,
+  tablesDB,
 } from "./appwrite";
 import { getElderlyByUserId } from "./elderly";
 
 export async function checkAndMarkSkippedMedications(
-    userId: string
+  userId: string,
 ): Promise<void> {
-    const now = new Date();
-    // 1 minute buffer (reduced from 10m to be more responsive)
-    const bufferTime = 1 * 60 * 1000; 
-    
-    // HK Offset (UTC+8)
-    const hkOffset = 8 * 60 * 60 * 1000; 
-    const hkDate = new Date(now.getTime() + hkOffset);
-    const todayStr = hkDate.toISOString().slice(0, 10); // YYYY-MM-DD in HK
+  const now = new Date();
+  // 1 minute buffer (reduced from 10m to be more responsive)
+  const bufferTime = 1 * 60 * 1000;
 
-    // We only care about user's logs
-    const profile = await getElderlyByUserId(userId);
-    if (!profile?.$id) return;
-    
-    try {
-        // Fetch all active reminders
-        const reminders = await fetchActiveMedicationReminders(userId);
-        
-        // Fetch existing logs for today (based on current absolute time)
-        const todayLogs = await fetchDailyMedicationLogs(userId, now);
+  // HK Offset (UTC+8)
+  const hkOffset = 8 * 60 * 60 * 1000;
+  const hkDate = new Date(now.getTime() + hkOffset);
+  const todayStr = hkDate.toISOString().slice(0, 10); // YYYY-MM-DD in HK
 
-        const updates: Promise<any>[] = [];
+  // We only care about user's logs
+  const profile = await getElderlyByUserId(userId);
+  if (!profile?.$id) return;
 
-        for (const reminder of reminders) {
-            for (const time of reminder.reminder_times) {
-                 // Construct scheduled time treating 'time' as HK Time
-                 const [hours, minutes] = time.split(':').map(Number);
-                 
-                 // Construct a base date using the HK date string, set to 00:00 UTC
-                 const baseDate = new Date(todayStr); // e.g. 2026-02-01T00:00:00.000Z
-                 baseDate.setUTCHours(hours, minutes, 0, 0); // e.g. 2026-02-01T14:47:00.000Z
-                 
-                 // Subtract 8 hours to convert HKT to UTC
-                 const scheduledDate = new Date(baseDate.getTime() - hkOffset);
-                 const scheduledAtFull = scheduledDate.toISOString();
+  try {
+    // Fetch all active reminders
+    const reminders = await fetchActiveMedicationReminders(userId);
 
-                 // Check if it's "past due" (> 10 mins ago)
-                 const diff = now.getTime() - scheduledDate.getTime();
-                 
-                 if (diff > bufferTime) {
-                     // Find existing log
-                     // Handle relationship safely (it might be string ID or expanded object)
-                     const existingLog = todayLogs.find(l => {
-                        const logRemId = (typeof l.elderly_medication_reminder === 'string') 
-                                            ? l.elderly_medication_reminder 
-                                            : l.elderly_medication_reminder?.$id;
-                        
-                        if (logRemId !== reminder.$id) return false;
+    // Fetch existing logs for today (based on current absolute time)
+    const todayLogs = await fetchDailyMedicationLogs(userId, now);
 
-                        // Robust comparison: check if time matches within 1 second
-                        // This handles potential millisecond discrepancies or string formatting issues
-                        const logTime = new Date(l.scheduled_at).getTime();
-                        const schedTime = scheduledDate.getTime();
-                        return Math.abs(logTime - schedTime) < 2000;
-                     });
-                     
-                     if (!existingLog) {
-                         // Case 1: No log exists -> Do nothing.
-                         // We rely on createElderlyMedicationWithReminder to generate all necessary logs.
-                         // If a log is missing for a past time, it means it was skipped during creation (intended).
-                         continue;
-                     } else if (existingLog.status === 'pending') {
-                         // Case 2: Log exists and is pending -> Update to MISSING
-                         console.log(`Auto-marking MISSING (update): ${existingLog.$id}`);
-                         updates.push(tablesDB.updateRow({
-                             databaseId: DATABASE_ID,
-                             tableId: MEDICATION_LOGS_TABLE_ID,
-                             rowId: existingLog.$id,
-                             data: {
-                                 status: 'missing'
-                             }
-                         }));
-                     }
-                 }
-            }
+    const updates: Promise<any>[] = [];
+
+    for (const reminder of reminders) {
+      for (const time of reminder.reminder_times) {
+        // Construct scheduled time treating 'time' as HK Time
+        const [hours, minutes] = time.split(":").map(Number);
+
+        // Construct a base date using the HK date string, set to 00:00 UTC
+        const baseDate = new Date(todayStr); // e.g. 2026-02-01T00:00:00.000Z
+        baseDate.setUTCHours(hours, minutes, 0, 0); // e.g. 2026-02-01T14:47:00.000Z
+
+        // Subtract 8 hours to convert HKT to UTC
+        const scheduledDate = new Date(baseDate.getTime() - hkOffset);
+        const scheduledAtFull = scheduledDate.toISOString();
+
+        // Check if it's "past due" (> 10 mins ago)
+        const diff = now.getTime() - scheduledDate.getTime();
+
+        if (diff > bufferTime) {
+          // Find existing log
+          // Handle relationship safely (it might be string ID or expanded object)
+          const existingLog = todayLogs.find((l) => {
+            const logRemId =
+              typeof l.elderly_medication_reminder === "string"
+                ? l.elderly_medication_reminder
+                : l.elderly_medication_reminder?.$id;
+
+            if (logRemId !== reminder.$id) return false;
+
+            // Robust comparison: check if time matches within 1 second
+            // This handles potential millisecond discrepancies or string formatting issues
+            const logTime = new Date(l.scheduled_at).getTime();
+            const schedTime = scheduledDate.getTime();
+            return Math.abs(logTime - schedTime) < 2000;
+          });
+
+          if (!existingLog) {
+            // Case 1: No log exists -> Do nothing.
+            // We rely on createElderlyMedicationWithReminder to generate all necessary logs.
+            // If a log is missing for a past time, it means it was skipped during creation (intended).
+            continue;
+          } else if (existingLog.status === "pending") {
+            // Case 2: Log exists and is pending -> Update to MISSING
+            console.log(`Auto-marking MISSING (update): ${existingLog.$id}`);
+            updates.push(
+              tablesDB.updateRow({
+                databaseId: DATABASE_ID,
+                tableId: MEDICATION_LOGS_TABLE_ID,
+                rowId: existingLog.$id,
+                data: {
+                  status: "missing",
+                },
+              }),
+            );
+          }
         }
-        
-        if (updates.length > 0) {
-            await Promise.all(updates);
-        }
-    } catch (e) {
-        console.error("Error marking skipped medications:", e);
+      }
     }
+
+    if (updates.length > 0) {
+      await Promise.all(updates);
+    }
+  } catch (e) {
+    console.error("Error marking skipped medications:", e);
+  }
 }
 
 export async function fetchActiveMedicationReminders(
@@ -125,103 +128,107 @@ export async function fetchActiveMedicationReminders(
 
     // Hydrate Level 2 Relationship: ElderlyMedication -> Medication
     // Appwrite usually returns Depth=1, so elderly_medication might be expanded or not.
-    
+
     // Phase 1: Ensure ElderlyMedication is hydrated
     const elderlyMedicationIds = new Set<string>();
     const pendingRowsIndices: number[] = [];
 
     rows.forEach((row, index) => {
-        if (typeof row.elderly_medication === 'string') {
-            elderlyMedicationIds.add(row.elderly_medication);
-            pendingRowsIndices.push(index);
-        }
-        // If it's already an object, we proceed to Phase 2 directly
+      if (typeof row.elderly_medication === "string") {
+        elderlyMedicationIds.add(row.elderly_medication);
+        pendingRowsIndices.push(index);
+      }
+      // If it's already an object, we proceed to Phase 2 directly
     });
 
     if (elderlyMedicationIds.size > 0) {
-        try {
-             // We can't use ELDERLY_MEDICATION_TABLE_ID directly if it's strictly typed or check limits
-             // But let's assume we can fetch.
-            const emResponse = await tablesDB.listRows<any>({ // Use any or ElderlyMedication type
-                databaseId: DATABASE_ID,
-                tableId: ELDERLY_MEDICATION_TABLE_ID,
-                queries: [
-                    Query.equal('$id', Array.from(elderlyMedicationIds))
-                ]
-            });
-            const emMap = new Map(emResponse.rows.map((r: any) => [r.$id, r]));
-            
-            rows.forEach(row => {
-                if (typeof row.elderly_medication === 'string') {
-                    if (emMap.has(row.elderly_medication)) {
-                        // @ts-ignore
-                        row.elderly_medication = emMap.get(row.elderly_medication);
-                    }
-                }
-            });
-        } catch (e) {
-            console.error("Failed to hydrate elderly_medication", e);
-        }
+      try {
+        // We can't use ELDERLY_MEDICATION_TABLE_ID directly if it's strictly typed or check limits
+        // But let's assume we can fetch.
+        const emResponse = await tablesDB.listRows<any>({
+          // Use any or ElderlyMedication type
+          databaseId: DATABASE_ID,
+          tableId: ELDERLY_MEDICATION_TABLE_ID,
+          queries: [Query.equal("$id", Array.from(elderlyMedicationIds))],
+        });
+        const emMap = new Map(emResponse.rows.map((r: any) => [r.$id, r]));
+
+        rows.forEach((row) => {
+          if (typeof row.elderly_medication === "string") {
+            if (emMap.has(row.elderly_medication)) {
+              // @ts-ignore
+              row.elderly_medication = emMap.get(row.elderly_medication);
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Failed to hydrate elderly_medication", e);
+      }
     }
 
     // Phase 2: Hydrate Medication inside ElderlyMedication
     const medicationIds = new Set<string>();
-    rows.forEach(row => {
-        // Now row.elderly_medication should be an object if available
-        if (row.elderly_medication && typeof row.elderly_medication !== 'string') {
-             const meds = row.elderly_medication.medication;
-             if (Array.isArray(meds)) {
-                 meds.forEach((m: any) => {
-                     if (typeof m === 'string') medicationIds.add(m);
-                 });
-             } else if (typeof meds === 'string') {
-                 medicationIds.add(meds);
-             }
+    rows.forEach((row) => {
+      // Now row.elderly_medication should be an object if available
+      if (
+        row.elderly_medication &&
+        typeof row.elderly_medication !== "string"
+      ) {
+        const meds = row.elderly_medication.medication;
+        if (Array.isArray(meds)) {
+          meds.forEach((m: any) => {
+            if (typeof m === "string") medicationIds.add(m);
+          });
+        } else if (typeof meds === "string") {
+          medicationIds.add(meds);
         }
+      }
     });
 
     if (medicationIds.size > 0) {
-        const fetchedMedications: Record<string, Medication> = {};
-        const ids = Array.from(medicationIds);
-        
-        // Fetch medications
-        try {
-            const medResponse = await tablesDB.listRows<Medication>({
-                databaseId: DATABASE_ID,
-                tableId: MEDICATION_TABLE_ID,
-                queries: [
-                    Query.equal('$id', ids)
-                ]
-            });
-            medResponse.rows.forEach((m: any) => {
-                fetchedMedications[m.$id] = m;
-            });
+      const fetchedMedications: Record<string, Medication> = {};
+      const ids = Array.from(medicationIds);
 
-            // Attach back
-            rows.forEach(row => {
-                if (row.elderly_medication && typeof row.elderly_medication !== 'string') {
-                    const meds = row.elderly_medication.medication;
-                    if (Array.isArray(meds)) {
-                        const hydratedMeds: Medication[] = [];
-                        meds.forEach((m: any) => {
-                            if (typeof m === 'string') {
-                                if (fetchedMedications[m]) hydratedMeds.push(fetchedMedications[m]);
-                            } else {
-                                hydratedMeds.push(m);
-                            }
-                        });
-                        // row.elderly_medication.medication = hydratedMeds;
-                    } else if (typeof meds === 'string') {
-                         if (fetchedMedications[meds]) {
-                             // @ts-ignore
-                             row.elderly_medication.medication = [fetchedMedications[meds]]; // Convert to array for consistency with types
-                         }
-                    }
+      // Fetch medications
+      try {
+        const medResponse = await tablesDB.listRows<Medication>({
+          databaseId: DATABASE_ID,
+          tableId: MEDICATION_TABLE_ID,
+          queries: [Query.equal("$id", ids)],
+        });
+        medResponse.rows.forEach((m: any) => {
+          fetchedMedications[m.$id] = m;
+        });
+
+        // Attach back
+        rows.forEach((row) => {
+          if (
+            row.elderly_medication &&
+            typeof row.elderly_medication !== "string"
+          ) {
+            const meds = row.elderly_medication.medication;
+            if (Array.isArray(meds)) {
+              const hydratedMeds: Medication[] = [];
+              meds.forEach((m: any) => {
+                if (typeof m === "string") {
+                  if (fetchedMedications[m])
+                    hydratedMeds.push(fetchedMedications[m]);
+                } else {
+                  hydratedMeds.push(m);
                 }
-            });
-        } catch (e) {
-             console.error("Failed to hydrate medications", e);
-        }
+              });
+              // row.elderly_medication.medication = hydratedMeds;
+            } else if (typeof meds === "string") {
+              if (fetchedMedications[meds]) {
+                // @ts-ignore
+                row.elderly_medication.medication = [fetchedMedications[meds]]; // Convert to array for consistency with types
+              }
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Failed to hydrate medications", e);
+      }
     }
 
     return rows;
@@ -238,14 +245,14 @@ export async function fetchDailyMedicationLogs(
   const profile = await getElderlyByUserId(userId);
   if (!profile?.$id) return [];
 
-    // Use HK day boundary to match scheduled_at generation
-    const hkOffset = 8 * 60 * 60 * 1000;
-    const hkDate = new Date(date.getTime() + hkOffset);
-    const hkDayStr = hkDate.toISOString().slice(0, 10);
+  // Use HK day boundary to match scheduled_at generation
+  const hkOffset = 8 * 60 * 60 * 1000;
+  const hkDate = new Date(date.getTime() + hkOffset);
+  const hkDayStr = hkDate.toISOString().slice(0, 10);
 
-    const hkBase = new Date(hkDayStr); // 00:00 UTC representing HK date
-    const startOfDay = new Date(hkBase.getTime() - hkOffset); // 00:00 HK in UTC
-    const endOfDay = new Date(startOfDay.getTime() + (24 * 60 * 60 * 1000) - 1);
+  const hkBase = new Date(hkDayStr); // 00:00 UTC representing HK date
+  const startOfDay = new Date(hkBase.getTime() - hkOffset); // 00:00 HK in UTC
+  const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
 
   try {
     const response = await tablesDB.listRows<MedicationLogs>({
@@ -271,180 +278,189 @@ export async function logMedicationAction(
   scheduledAt: string,
   status: "taken" | "skipped" | "pending",
 ): Promise<void> {
-    const profile = await getElderlyByUserId(userId);
-    if (!profile?.$id) throw new Error("Elderly profile not found");
+  const profile = await getElderlyByUserId(userId);
+  if (!profile?.$id) throw new Error("Elderly profile not found");
 
-    // Check if log already exists
-    const logs = await tablesDB.listRows<MedicationLogs>({
-        databaseId: DATABASE_ID,
-        tableId: MEDICATION_LOGS_TABLE_ID,
-        queries: [
-            Query.equal("elderly_medication_reminder", reminderId),
-            Query.equal("scheduled_at", scheduledAt),
-            Query.limit(1)
-        ]
+  // Check if log already exists
+  const logs = await tablesDB.listRows<MedicationLogs>({
+    databaseId: DATABASE_ID,
+    tableId: MEDICATION_LOGS_TABLE_ID,
+    queries: [
+      Query.equal("elderly_medication_reminder", reminderId),
+      Query.equal("scheduled_at", scheduledAt),
+      Query.limit(1),
+    ],
+  });
+
+  if (logs.total > 0) {
+    // Update existing log
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: MEDICATION_LOGS_TABLE_ID,
+      rowId: logs.rows[0].$id,
+      data: {
+        status,
+        taken_at: status === "taken" ? new Date().toISOString() : null,
+      },
     });
-
-    if (logs.total > 0) {
-        // Update existing log
-        await tablesDB.updateRow({
-            databaseId: DATABASE_ID,
-            tableId: MEDICATION_LOGS_TABLE_ID,
-            rowId: logs.rows[0].$id,
-            data: {
-                status,
-                taken_at: status === 'taken' ? new Date().toISOString() : null
-            }
-        });
-    } else {
-        // Create new log
-        await tablesDB.createRow({
-            databaseId: DATABASE_ID,
-            tableId: MEDICATION_LOGS_TABLE_ID,
-            rowId: ID.unique(),
-            data: {
-                elderly: profile.$id,
-                elderly_medication_reminder: reminderId,
-                scheduled_at: scheduledAt,
-                taken_at: status === 'taken' ? new Date().toISOString() : null,
-                status
-            }
-        });
-    }
+  } else {
+    // Create new log
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: MEDICATION_LOGS_TABLE_ID,
+      rowId: ID.unique(),
+      data: {
+        elderly: profile.$id,
+        elderly_medication_reminder: reminderId,
+        scheduled_at: scheduledAt,
+        taken_at: status === "taken" ? new Date().toISOString() : null,
+        status,
+      },
+    });
+  }
 }
 
 export async function deactivateMedicationReminder(
   userId: string,
-  reminderId: string
+  reminderId: string,
 ): Promise<void> {
-    if (!ELDERLY_MEDICATION_REMINDER_TABLE_ID) return;
+  if (!ELDERLY_MEDICATION_REMINDER_TABLE_ID) return;
 
-    try {
-        // 1. Deactivate Reminder
-        await tablesDB.updateRow({
-            databaseId: DATABASE_ID,
-            tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-            rowId: reminderId,
-            data: {
-                active: false
-            }
-        });
+  try {
+    // 1. Deactivate Reminder
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+      rowId: reminderId,
+      data: {
+        active: false,
+      },
+    });
 
-        // 2. Hide/Update future or pending Logs
-        const logs = await tablesDB.listRows<MedicationLogs>({
-            databaseId: DATABASE_ID,
-            tableId: MEDICATION_LOGS_TABLE_ID,
-            queries: [
-                Query.equal("elderly_medication_reminder", reminderId),
-                Query.equal("status", "pending")
-            ]
-        });
+    // 2. Hide/Update future or pending Logs
+    const logs = await tablesDB.listRows<MedicationLogs>({
+      databaseId: DATABASE_ID,
+      tableId: MEDICATION_LOGS_TABLE_ID,
+      queries: [
+        Query.equal("elderly_medication_reminder", reminderId),
+        Query.equal("status", "pending"),
+      ],
+    });
 
-        for (const log of logs.rows) {
-             await tablesDB.updateRow({
-                 databaseId: DATABASE_ID,
-                 tableId: MEDICATION_LOGS_TABLE_ID,
-                 rowId: log.$id,
-                 data: {
-                     status: "skipped"
-                 }
-             });
-        }
-
-    } catch (error) {
-        console.error("Error deactivating medication reminder:", error);
-        throw error;
+    for (const log of logs.rows) {
+      await tablesDB.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: MEDICATION_LOGS_TABLE_ID,
+        rowId: log.$id,
+        data: {
+          status: "skipped",
+        },
+      });
     }
+  } catch (error) {
+    console.error("Error deactivating medication reminder:", error);
+    throw error;
+  }
 }
 
-export async function getFormattedTodayMedicationSummary(userId: string): Promise<string> {
-    const now = new Date();
-    const hkOffset = 8 * 60 * 60 * 1000;
-    const hkDate = new Date(now.getTime() + hkOffset);
-    const todayStr = hkDate.toISOString().slice(0, 10);
+export async function getFormattedTodayMedicationSummary(
+  userId: string,
+): Promise<string> {
+  const now = new Date();
+  const hkOffset = 8 * 60 * 60 * 1000;
+  const hkDate = new Date(now.getTime() + hkOffset);
+  const todayStr = hkDate.toISOString().slice(0, 10);
 
-    const [reminders, todayLogs] = await Promise.all([
-        fetchActiveMedicationReminders(userId),
-        fetchDailyMedicationLogs(userId, now),
-    ]);
+  const [reminders, todayLogs] = await Promise.all([
+    fetchActiveMedicationReminders(userId),
+    fetchDailyMedicationLogs(userId, now),
+  ]);
 
-    const todoList: {
-        time: string;
-        medicationName: string;
-        dosage: string;
-        status: string;
-    }[] = [];
+  const todoList: {
+    time: string;
+    medicationName: string;
+    dosage: string;
+    status: string;
+  }[] = [];
 
-    const toHKDateStr = (date: Date) =>
-        new Date(date.getTime() + hkOffset).toISOString().slice(0, 10);
-  
-    const toHKTimeStr = (date: Date) => {
-        const hk = new Date(date.getTime() + hkOffset);
-        const hours = String(hk.getUTCHours()).padStart(2, "0");
-        const minutes = String(hk.getUTCMinutes()).padStart(2, "0");
-        return `${hours}:${minutes}`;
-    };
+  const toHKDateStr = (date: Date) =>
+    new Date(date.getTime() + hkOffset).toISOString().slice(0, 10);
 
-    reminders.forEach((r) => {
-        r.reminder_times.forEach((time) => {
-            const [hours, minutes] = time.split(':').map(Number);
-            const baseDate = new Date(todayStr); 
-            baseDate.setUTCHours(hours, minutes, 0, 0); 
-            const scheduledDate = new Date(baseDate.getTime() - hkOffset);
-            const scheduledAt = scheduledDate.toISOString();
+  const toHKTimeStr = (date: Date) => {
+    const hk = new Date(date.getTime() + hkOffset);
+    const hours = String(hk.getUTCHours()).padStart(2, "0");
+    const minutes = String(hk.getUTCMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
 
-            if (r.start_date && new Date(scheduledAt) < new Date(r.start_date)) {
-                return;
-            }
+  reminders.forEach((r) => {
+    r.reminder_times.forEach((time) => {
+      const [hours, minutes] = time.split(":").map(Number);
+      const baseDate = new Date(todayStr);
+      baseDate.setUTCHours(hours, minutes, 0, 0);
+      const scheduledDate = new Date(baseDate.getTime() - hkOffset);
+      const scheduledAt = scheduledDate.toISOString();
 
-            const log = todayLogs.find(l => {
-                const logRemId = (typeof l.elderly_medication_reminder === 'string')
-                  ? l.elderly_medication_reminder
-                  : l.elderly_medication_reminder?.$id;
-      
-                if (logRemId !== r.$id) return false;
-      
-                const directMatch = l.scheduled_at === scheduledAt;
-                if (directMatch) return true;
-      
-                const logDate = toHKDateStr(new Date(l.scheduled_at));
-                const logTime = toHKTimeStr(new Date(l.scheduled_at));
-                return logDate === todayStr && logTime === time;
-            });
+      if (r.start_date && new Date(scheduledAt) < new Date(r.start_date)) {
+        return;
+      }
 
-            const medications = Array.isArray(r.elderly_medication?.medication) 
-                ? r.elderly_medication.medication 
-                : (r.elderly_medication?.medication ? [r.elderly_medication.medication] : []);
-            
-            // @ts-ignore
-            const medName = medications[0]?.name || "Medication";
-            // @ts-ignore
-            const medUnit = medications[0]?.unit || 'dose';
-            // @ts-ignore
-            const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+      const log = todayLogs.find((l) => {
+        const logRemId =
+          typeof l.elderly_medication_reminder === "string"
+            ? l.elderly_medication_reminder
+            : l.elderly_medication_reminder?.$id;
 
-            todoList.push({
-                time,
-                medicationName: medName,
-                dosage: medDosage,
-                status: log ? (log.status as string) : "pending",
-            });
-        });
+        if (logRemId !== r.$id) return false;
+
+        const directMatch = l.scheduled_at === scheduledAt;
+        if (directMatch) return true;
+
+        const logDate = toHKDateStr(new Date(l.scheduled_at));
+        const logTime = toHKTimeStr(new Date(l.scheduled_at));
+        return logDate === todayStr && logTime === time;
+      });
+
+      const medications = Array.isArray(r.elderly_medication?.medication)
+        ? r.elderly_medication.medication
+        : r.elderly_medication?.medication
+          ? [r.elderly_medication.medication]
+          : [];
+
+      // @ts-ignore
+      const medName = medications[0]?.name || "Medication";
+      // @ts-ignore
+      const medUnit = medications[0]?.unit || "dose";
+      // @ts-ignore
+      const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+
+      todoList.push({
+        time,
+        medicationName: medName,
+        dosage: medDosage,
+        status: log ? (log.status as string) : "pending",
+      });
     });
+  });
 
-    todoList.sort((a, b) => a.time.localeCompare(b.time));
+  todoList.sort((a, b) => a.time.localeCompare(b.time));
 
-    if (todoList.length === 0) {
-        return "You have no medications scheduled for today.";
-    }
+  if (todoList.length === 0) {
+    return "You have no medications scheduled for today.";
+  }
 
-    const items = todoList.map(item => {
-        const time = item.time;
-        const name = item.medicationName;
-        const dosage = item.dosage;
-        const status = item.status === 'taken' ? '✅ Taken' : (item.status === 'missing' ? '❌ Missed' : '⏳ Pending');
-        return `• ${time} - ${name} (${dosage}) : ${status}`;
-    });
+  const items = todoList.map((item) => {
+    const time = item.time;
+    const name = item.medicationName;
+    const dosage = item.dosage;
+    const status =
+      item.status === "taken"
+        ? "✅ Taken"
+        : item.status === "missing"
+          ? "❌ Missed"
+          : "⏳ Pending";
+    return `• ${time} - ${name} (${dosage}) : ${status}`;
+  });
 
-    return `Here is your medication schedule for today:\n${items.join("\n")}`;
+  return `Here is your medication schedule for today:\n${items.join("\n")}`;
 }

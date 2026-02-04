@@ -55,7 +55,10 @@ type ChatContent =
   | string
   | Array<
       | { type: "text"; text: string }
-      | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } }
+      | {
+          type: "image_url";
+          image_url: { url: string; detail?: "low" | "high" | "auto" };
+        }
     >;
 
 interface ChatMessage {
@@ -80,14 +83,14 @@ export default function ElderlyChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
+  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(
+    null,
+  );
   const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [isSuggestionsExpanded, setIsSuggestionsExpanded] = useState(false);
-  const [currentChatId, setCurrentChatId] = useState(
-    `chat-${Date.now()}`,
-  );
+  const [currentChatId, setCurrentChatId] = useState(`chat-${Date.now()}`);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -249,7 +252,9 @@ export default function ElderlyChat() {
           },
         );
 
-        const info = await FileSystem.getInfoAsync(manipulated.uri, { size: true });
+        const info = await FileSystem.getInfoAsync(manipulated.uri, {
+          size: true,
+        });
         if (!info.exists || !info.size) {
           continue;
         }
@@ -360,9 +365,7 @@ export default function ElderlyChat() {
         clearTimeout(timeoutId);
 
         if (response.ok) {
-          const data: OpenRouterResponse = rawText
-            ? JSON.parse(rawText)
-            : {};
+          const data: OpenRouterResponse = rawText ? JSON.parse(rawText) : {};
           const content = data.choices?.[0]?.message?.content;
           if (!content) {
             throw new Error(
@@ -425,9 +428,7 @@ export default function ElderlyChat() {
           break;
         }
         lastError =
-          error instanceof Error
-            ? error
-            : new Error("Provider returned error");
+          error instanceof Error ? error : new Error("Provider returned error");
 
         if (attempt < maxAttempts) {
           await sleep(500 * attempt * attempt);
@@ -825,9 +826,7 @@ export default function ElderlyChat() {
           onContentSizeChange={() =>
             flatListRef.current?.scrollToEnd({ animated: true })
           }
-          onLayout={() =>
-            flatListRef.current?.scrollToEnd({ animated: false })
-          }
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
         />
 
         {isLoading && (
@@ -856,7 +855,12 @@ export default function ElderlyChat() {
             onPress={() => setIsSuggestionsExpanded((prev) => !prev)}
             accessibilityRole="button"
           >
-            <Text style={[styles.suggestionsToggle, { color: theme.colors.primary }]}>
+            <Text
+              style={[
+                styles.suggestionsToggle,
+                { color: theme.colors.primary },
+              ]}
+            >
               {isSuggestionsExpanded ? "Show less" : "Show more"}
             </Text>
           </TouchableOpacity>
@@ -884,7 +888,10 @@ export default function ElderlyChat() {
       </View>
 
       <View
-        style={[styles.inputContainer, { backgroundColor: theme.colors.surface }]}
+        style={[
+          styles.inputContainer,
+          { backgroundColor: theme.colors.surface },
+        ]}
       >
         {selectedImage && (
           <View style={styles.imagePreviewContainer}>

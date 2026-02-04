@@ -1,6 +1,12 @@
 import { Caregiver, CaregiverElderly, Elderly } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
-import { CAREGIVER_ELDERLY_TABLE_ID, CAREGIVER_TABLE_ID, DATABASE_ID, ELDERLY_TABLE_ID, tablesDB } from "./appwrite";
+import {
+  CAREGIVER_ELDERLY_TABLE_ID,
+  CAREGIVER_TABLE_ID,
+  DATABASE_ID,
+  ELDERLY_TABLE_ID,
+  tablesDB,
+} from "./appwrite";
 
 export async function createCaregiverProfile(
   data: Caregiver,
@@ -52,7 +58,9 @@ export async function linkCaregiverToElderly(
   });
 }
 
-export async function getLinkedElderly(caregiverId: string): Promise<Elderly[]> {
+export async function getLinkedElderly(
+  caregiverId: string,
+): Promise<Elderly[]> {
   try {
     const response = await tablesDB.listRows<CaregiverElderly>({
       databaseId: DATABASE_ID,
@@ -94,4 +102,3 @@ export async function getLinkedElderly(caregiverId: string): Promise<Elderly[]> 
     return [];
   }
 }
-

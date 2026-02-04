@@ -13,7 +13,7 @@ import {
   Elderly,
   ElderlyMedicationReminder,
   MedicationLogs,
-  Schedule
+  Schedule,
 } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { openURL } from "expo-linking";
@@ -57,7 +57,9 @@ export default function ElderlyHome() {
   const [elderlyProfile, setElderlyProfile] = React.useState<Elderly | null>(
     null,
   );
-  const [reminders, setReminders] = React.useState<ElderlyMedicationReminder[]>([]);
+  const [reminders, setReminders] = React.useState<ElderlyMedicationReminder[]>(
+    [],
+  );
   const [todayLogs, setTodayLogs] = React.useState<MedicationLogs[]>([]);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
 
@@ -118,9 +120,9 @@ export default function ElderlyHome() {
   const todoList = React.useMemo(() => {
     const list: TodoItem[] = [];
     const now = new Date();
-    
+
     // Calculate Today in HK
-    const hkOffset = 8 * 60 * 60 * 1000; 
+    const hkOffset = 8 * 60 * 60 * 1000;
     const hkDate = new Date(now.getTime() + hkOffset);
     const todayStr = hkDate.toISOString().slice(0, 10); // YYYY-MM-DD in HK
 
@@ -137,12 +139,12 @@ export default function ElderlyHome() {
     reminders.forEach((r) => {
       r.reminder_times.forEach((time) => {
         // Construct scheduled time treating 'time' as HK Time
-        const [hours, minutes] = time.split(':').map(Number);
-            
+        const [hours, minutes] = time.split(":").map(Number);
+
         // Construct a base date using the HK date string, set to 00:00 UTC
-        const baseDate = new Date(todayStr); 
-        baseDate.setUTCHours(hours, minutes, 0, 0); 
-            
+        const baseDate = new Date(todayStr);
+        baseDate.setUTCHours(hours, minutes, 0, 0);
+
         // Subtract 8 hours to convert HKT to UTC
         const scheduledDate = new Date(baseDate.getTime() - hkOffset);
         const scheduledAt = scheduledDate.toISOString();
@@ -151,12 +153,13 @@ export default function ElderlyHome() {
         if (r.start_date && new Date(scheduledAt) < new Date(r.start_date)) {
           return;
         }
-        
+
         // Find if logged
-        const log = todayLogs.find(l => {
-          const logRemId = (typeof l.elderly_medication_reminder === 'string')
-            ? l.elderly_medication_reminder
-            : l.elderly_medication_reminder?.$id;
+        const log = todayLogs.find((l) => {
+          const logRemId =
+            typeof l.elderly_medication_reminder === "string"
+              ? l.elderly_medication_reminder
+              : l.elderly_medication_reminder?.$id;
 
           if (logRemId !== r.$id) return false;
 
@@ -169,25 +172,27 @@ export default function ElderlyHome() {
         });
 
         // Helper to get medication name safely
-        const medications = Array.isArray(r.elderly_medication?.medication) 
-            ? r.elderly_medication.medication 
-            : (r.elderly_medication?.medication ? [r.elderly_medication.medication] : []);
-            
+        const medications = Array.isArray(r.elderly_medication?.medication)
+          ? r.elderly_medication.medication
+          : r.elderly_medication?.medication
+            ? [r.elderly_medication.medication]
+            : [];
+
         // @ts-ignore
         const medName = medications[0]?.name || "Medication";
         // @ts-ignore
-        const medUnit = medications[0]?.unit || 'dose';
+        const medUnit = medications[0]?.unit || "dose";
         // @ts-ignore
         const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
 
         list.push({
-            reminder: r,
-            time,
-            scheduledAt,
-            status: log ? (log.status as any) : "pending",
-            logId: log?.$id,
-            medicationName: medName,
-            dosage: medDosage
+          reminder: r,
+          time,
+          scheduledAt,
+          status: log ? (log.status as any) : "pending",
+          logId: log?.$id,
+          medicationName: medName,
+          dosage: medDosage,
         });
       });
     });
@@ -197,18 +202,18 @@ export default function ElderlyHome() {
   }, [reminders, todayLogs]);
 
   const handleTakeMedication = async (item: TodoItem) => {
-      try {
-          const newStatus = item.status === 'taken' ? 'pending' : 'taken';
-          await logMedicationAction(
-              user!.$id,
-              item.reminder.$id,
-              item.scheduledAt, 
-              newStatus
-          );
-          await fetchElderlyData();
-      } catch (error) {
-          Alert.alert("Error", "Failed to update status");
-      }
+    try {
+      const newStatus = item.status === "taken" ? "pending" : "taken";
+      await logMedicationAction(
+        user!.$id,
+        item.reminder.$id,
+        item.scheduledAt,
+        newStatus,
+      );
+      await fetchElderlyData();
+    } catch (error) {
+      Alert.alert("Error", "Failed to update status");
+    }
   };
 
   const onRefresh = React.useCallback(async () => {
@@ -338,38 +343,38 @@ export default function ElderlyHome() {
       >
         {todoList.length > 0 ? (
           todoList.slice(0, 3).map((item, index) => {
-             const isTaken = item.status === 'taken';
-             return (
-                <List.Item
-                  key={`${item.reminder.$id}-${item.time}-${index}`}
-                  title={`${item.medicationName} (${item.dosage})`}
-                  description={`Time: ${item.time}`}
-                  left={(props) => (
-                    <View style={styles.iconContainer}>
-                      <MaterialCommunityIcons
-                        name={isTaken ? "check-circle" : "clock-outline"}
-                        size={28}
-                        color={isTaken ? "#4CAF50" : theme.colors.primary}
-                      />
-                    </View>
-                  )}
-                  right={() => (
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {!isTaken && (
-                         <Button 
-                             mode="contained"
-                             compact
-                             onPress={() => handleTakeMedication(item)}
-                             style={{ marginLeft: 8 }}
-                         >
-                            Take
-                         </Button>
-                        )}
-                      </View>
-                  )}
-                  style={[styles.listItem, isTaken && { opacity: 0.6 }]}
-                />
-             );
+            const isTaken = item.status === "taken";
+            return (
+              <List.Item
+                key={`${item.reminder.$id}-${item.time}-${index}`}
+                title={`${item.medicationName} (${item.dosage})`}
+                description={`Time: ${item.time}`}
+                left={(props) => (
+                  <View style={styles.iconContainer}>
+                    <MaterialCommunityIcons
+                      name={isTaken ? "check-circle" : "clock-outline"}
+                      size={28}
+                      color={isTaken ? "#4CAF50" : theme.colors.primary}
+                    />
+                  </View>
+                )}
+                right={() => (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    {!isTaken && (
+                      <Button
+                        mode="contained"
+                        compact
+                        onPress={() => handleTakeMedication(item)}
+                        style={{ marginLeft: 8 }}
+                      >
+                        Take
+                      </Button>
+                    )}
+                  </View>
+                )}
+                style={[styles.listItem, isTaken && { opacity: 0.6 }]}
+              />
+            );
           })
         ) : (
           <List.Item
