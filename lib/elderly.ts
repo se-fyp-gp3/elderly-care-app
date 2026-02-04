@@ -22,9 +22,7 @@ import {
   tablesDB,
 } from "./appwrite";
 
-export async function createElderlyProfile(
-  data: Elderly,
-): Promise<Elderly> {
+export async function createElderlyProfile(data: Elderly): Promise<Elderly> {
   const document = await tablesDB.createRow<Elderly>({
     databaseId: DATABASE_ID,
     tableId: ELDERLY_TABLE_ID,
@@ -35,6 +33,9 @@ export async function createElderlyProfile(
       phone: data.phone,
       birth: data.birth,
       status: ElderlyStatus.NORMAL,
+      gender: data.gender ?? null,
+      blood_type: data.blood_type ?? null,
+      emergency_contact: data.emergency_contact ?? null,
     },
   });
   return document as unknown as Elderly;
@@ -194,9 +195,7 @@ export async function createElderlyMedicationWithReminder(
   const medication = await getOrCreateMedication(input.name, input.unit);
   const approxTimes = input.reminderTimes.filter((time) => time.trim());
   const frequency =
-    input.timesPerDay <= 1
-      ? "Daily"
-      : `${input.timesPerDay} times/day`;
+    input.timesPerDay <= 1 ? "Daily" : `${input.timesPerDay} times/day`;
 
   const notesFallback = buildReminderNotesFallback(input);
 
@@ -205,8 +204,8 @@ export async function createElderlyMedicationWithReminder(
     tableId: ELDERLY_MEDICATION_TABLE_ID,
     rowId: ID.unique(),
     data: {
-      elderly: profile.$id as unknown as Elderly[],
-      medication: medication.$id as unknown as Medication[],
+      elderly: profile.$id as unknown as Elderly,
+      medication: medication.$id as unknown as Medication,
       dosage: input.dosage ?? 1,
       frequency,
       is_prn: false,
@@ -214,9 +213,7 @@ export async function createElderlyMedicationWithReminder(
       approx_times: approxTimes,
       status: ElderlyMedicationStatus.PENDING,
       last_taken: null,
-      notes: ELDERLY_MEDICATION_REMINDER_TABLE_ID
-        ? null
-        : notesFallback,
+      notes: ELDERLY_MEDICATION_REMINDER_TABLE_ID ? null : notesFallback,
     },
   });
 
@@ -238,53 +235,62 @@ export async function createElderlyMedicationWithReminder(
         },
       });
 
-            // Auto-create Medication Logs (Pending)
-            const hkOffset = 8 * 60 * 60 * 1000;
-            const nowMs = Date.now();
-            const startDateMs = input.startDate ? new Date(input.startDate).getTime() : nowMs;
+      // Auto-create Medication Logs (Pending)
+      const hkOffset = 8 * 60 * 60 * 1000;
+      const nowMs = Date.now();
+      const startDateMs = input.startDate
+        ? new Date(input.startDate).getTime()
+        : nowMs;
 
-            // Determine the HK date for the start date
-            const hkStartDate = new Date(startDateMs + hkOffset);
-            const startYear = hkStartDate.getUTCFullYear();
-            const startMonth = hkStartDate.getUTCMonth();
-            const startDay = hkStartDate.getUTCDate();
+      // Determine the HK date for the start date
+      const hkStartDate = new Date(startDateMs + hkOffset);
+      const startYear = hkStartDate.getUTCFullYear();
+      const startMonth = hkStartDate.getUTCMonth();
+      const startDay = hkStartDate.getUTCDate();
 
       // Iterate per time slot to ensure full duration coverage
       for (const time of approxTimes) {
-          const [hours, minutes] = time.split(':').map(Number);
+        const [hours, minutes] = time.split(":").map(Number);
 
-          // Calculate the first candidate time (Today's HK time converted to UTC timestamp)
-          // 1. Treats (Year-Month-Day) from HK time, and (Hours:Minutes) from slot
-          // 2. Subtract hkOffset to get the actual UTC timestamp
-          const firstCandidateHkAsUtc = Date.UTC(startYear, startMonth, startDay, hours, minutes, 0);
-          const firstCandidateInstance = firstCandidateHkAsUtc - hkOffset;
+        // Calculate the first candidate time (Today's HK time converted to UTC timestamp)
+        // 1. Treats (Year-Month-Day) from HK time, and (Hours:Minutes) from slot
+        // 2. Subtract hkOffset to get the actual UTC timestamp
+        const firstCandidateHkAsUtc = Date.UTC(
+          startYear,
+          startMonth,
+          startDay,
+          hours,
+          minutes,
+          0,
+        );
+        const firstCandidateInstance = firstCandidateHkAsUtc - hkOffset;
 
-          // If the calculated time for "Today" is in the past, start sequence from "Tomorrow"
-          let startDelayDays = 0;
-          if (firstCandidateInstance <= nowMs) {
-              startDelayDays = 1;
-          }
+        // If the calculated time for "Today" is in the past, start sequence from "Tomorrow"
+        let startDelayDays = 0;
+        if (firstCandidateInstance <= nowMs) {
+          startDelayDays = 1;
+        }
 
-          for (let d = 0; d < input.durationDays; d++) {
-             // Add days in milliseconds
-             const targetTime = firstCandidateInstance + ((startDelayDays + d) * 24 * 60 * 60 * 1000);
-             const scheduledAt = new Date(targetTime).toISOString();
-             
-             await tablesDB.createRow({
-                 databaseId: DATABASE_ID,
-                 tableId: MEDICATION_LOGS_TABLE_ID,
-                 rowId: ID.unique(),
-                 data: {
-                     elderly: profile.$id,
-                     elderly_medication_reminder: reminder.$id,
-                     scheduled_at: scheduledAt,
-                     status: 'pending',
-                     taken_at: null
-                 }
-             });
-          }
+        for (let d = 0; d < input.durationDays; d++) {
+          // Add days in milliseconds
+          const targetTime =
+            firstCandidateInstance + (startDelayDays + d) * 24 * 60 * 60 * 1000;
+          const scheduledAt = new Date(targetTime).toISOString();
+
+          await tablesDB.createRow({
+            databaseId: DATABASE_ID,
+            tableId: MEDICATION_LOGS_TABLE_ID,
+            rowId: ID.unique(),
+            data: {
+              elderly: profile.$id,
+              elderly_medication_reminder: reminder.$id,
+              scheduled_at: scheduledAt,
+              status: "pending",
+              taken_at: null,
+            },
+          });
+        }
       }
-
     } catch (error) {
       console.error("Error saving medication reminder metadata:", error);
     }
@@ -342,9 +348,9 @@ export function buildMedicationSummary(
   }
 
   const items = pending.slice(0, 5).map((med) => {
-    const name = med.medication?.[0]?.name || "Medication";
+    const name = med.medication?.name || "Medication";
     const dosage = med.dosage ? `${med.dosage}` : "1";
-    const unit = med.medication?.[0]?.unit || "dose";
+    const unit = med.medication?.unit || "dose";
     const time = med.approx_times?.[0] ? ` at ${med.approx_times[0]}` : "";
     return `• ${name} — ${dosage} ${unit}${time}`;
   });
@@ -398,33 +404,31 @@ export async function fetchCaregiversForElderly(
       if (Array.isArray(caregiverOrArray) && caregiverOrArray.length > 0) {
         // Expanded array
         const c = caregiverOrArray[0];
-        if (typeof c === 'string') {
-           missingCaregiverIds.add(c);
+        if (typeof c === "string") {
+          missingCaregiverIds.add(c);
         } else {
-           caregivers.push(c as unknown as Caregiver);
+          caregivers.push(c as unknown as Caregiver);
         }
       } else if (caregiverOrArray && !Array.isArray(caregiverOrArray)) {
-         if (typeof caregiverOrArray === 'string') {
-             missingCaregiverIds.add(caregiverOrArray);
-         } else {
-             caregivers.push(caregiverOrArray as unknown as Caregiver);
-         }
+        if (typeof caregiverOrArray === "string") {
+          missingCaregiverIds.add(caregiverOrArray);
+        } else {
+          caregivers.push(caregiverOrArray as unknown as Caregiver);
+        }
       }
     }
 
     if (missingCaregiverIds.size > 0) {
-        try {
-            const fetchedList = await tablesDB.listRows<Caregiver>({
-                databaseId: DATABASE_ID,
-                tableId: CAREGIVER_TABLE_ID,
-                queries: [
-                    Query.equal('$id', Array.from(missingCaregiverIds))
-                ]
-            });
-            caregivers.push(...(fetchedList.rows as unknown as Caregiver[]));
-        } catch (e) {
-            console.error("Failed to fetch missing caregivers", e);
-        }
+      try {
+        const fetchedList = await tablesDB.listRows<Caregiver>({
+          databaseId: DATABASE_ID,
+          tableId: CAREGIVER_TABLE_ID,
+          queries: [Query.equal("$id", Array.from(missingCaregiverIds))],
+        });
+        caregivers.push(...(fetchedList.rows as unknown as Caregiver[]));
+      } catch (e) {
+        console.error("Failed to fetch missing caregivers", e);
+      }
     }
 
     return caregivers;

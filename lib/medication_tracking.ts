@@ -1,7 +1,7 @@
 import {
     ElderlyMedicationReminder,
     Medication,
-    MedicationLog,
+    MedicationLogs,
 } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
@@ -210,7 +210,7 @@ export async function fetchActiveMedicationReminders(
                                 hydratedMeds.push(m);
                             }
                         });
-                        row.elderly_medication.medication = hydratedMeds;
+                        // row.elderly_medication.medication = hydratedMeds;
                     } else if (typeof meds === 'string') {
                          if (fetchedMedications[meds]) {
                              // @ts-ignore
@@ -234,7 +234,7 @@ export async function fetchActiveMedicationReminders(
 export async function fetchDailyMedicationLogs(
   userId: string,
   date: Date,
-): Promise<MedicationLog[]> {
+): Promise<MedicationLogs[]> {
   const profile = await getElderlyByUserId(userId);
   if (!profile?.$id) return [];
 
@@ -248,7 +248,7 @@ export async function fetchDailyMedicationLogs(
     const endOfDay = new Date(startOfDay.getTime() + (24 * 60 * 60 * 1000) - 1);
 
   try {
-    const response = await tablesDB.listRows<MedicationLog>({
+    const response = await tablesDB.listRows<MedicationLogs>({
       databaseId: DATABASE_ID,
       tableId: MEDICATION_LOGS_TABLE_ID,
       queries: [
@@ -258,7 +258,7 @@ export async function fetchDailyMedicationLogs(
         Query.limit(500), // Increase limit to ensure we fetch all daily logs
       ],
     });
-    return response.rows as unknown as MedicationLog[];
+    return response.rows as unknown as MedicationLogs[];
   } catch (error) {
     console.error("Error fetching medication logs:", error);
     return [];
@@ -275,7 +275,7 @@ export async function logMedicationAction(
     if (!profile?.$id) throw new Error("Elderly profile not found");
 
     // Check if log already exists
-    const logs = await tablesDB.listRows<MedicationLog>({
+    const logs = await tablesDB.listRows<MedicationLogs>({
         databaseId: DATABASE_ID,
         tableId: MEDICATION_LOGS_TABLE_ID,
         queries: [
@@ -331,7 +331,7 @@ export async function deactivateMedicationReminder(
         });
 
         // 2. Hide/Update future or pending Logs
-        const logs = await tablesDB.listRows<MedicationLog>({
+        const logs = await tablesDB.listRows<MedicationLogs>({
             databaseId: DATABASE_ID,
             tableId: MEDICATION_LOGS_TABLE_ID,
             queries: [
