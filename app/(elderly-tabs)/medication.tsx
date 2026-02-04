@@ -1,4 +1,8 @@
-import { clientReactNative, DATABASE_ID, MEDICATION_LOGS_TABLE_ID } from "@/lib/appwrite";
+import {
+  clientReactNative,
+  DATABASE_ID,
+  MEDICATION_LOGS_TABLE_ID,
+} from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
   createElderlyMedicationWithReminder,
@@ -15,9 +19,13 @@ import {
   cancelAllNotifications,
   registerForPushNotificationsAsync,
   scheduleMedicationNotification,
-  sendImmediateNotification
+  sendImmediateNotification,
 } from "@/lib/notifications";
-import { Caregiver, ElderlyMedicationReminder, MedicationLogs } from "@/types/appwrite";
+import {
+  Caregiver,
+  ElderlyMedicationReminder,
+  MedicationLogs,
+} from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -34,7 +42,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Swipeable from 'react-native-gesture-handler/Swipeable';
+import Swipeable from "react-native-gesture-handler/Swipeable";
 import {
   Button,
   Card,
@@ -47,13 +55,17 @@ import {
   Switch,
   Text,
   TextInput,
-  useTheme
+  useTheme,
 } from "react-native-paper";
 
 // --- AI / Scan Configuration ---
 const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY?.trim();
-const OPENROUTER_API_URL = process.env.EXPO_PUBLIC_OPENROUTER_API_URL?.trim() || "https://openrouter.ai/api/v1";
-const OPENROUTER_IMAGE_MODEL = process.env.EXPO_PUBLIC_OPENROUTER_IMAGE_MODEL?.trim() || "google/gemini-2.0-flash-exp:free";
+const OPENROUTER_API_URL =
+  process.env.EXPO_PUBLIC_OPENROUTER_API_URL?.trim() ||
+  "https://openrouter.ai/api/v1";
+const OPENROUTER_IMAGE_MODEL =
+  process.env.EXPO_PUBLIC_OPENROUTER_IMAGE_MODEL?.trim() ||
+  "google/gemini-2.0-flash-exp:free";
 
 // Maximum image size for upload (1.5MB to be safe)
 const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
@@ -72,15 +84,17 @@ export default function ElderlyMedicationScreen() {
   const { user } = useAuth();
   const theme = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
-  
-  const [reminders, setReminders] = React.useState<ElderlyMedicationReminder[]>([]);
+
+  const [reminders, setReminders] = React.useState<ElderlyMedicationReminder[]>(
+    [],
+  );
   const [todayLogs, setTodayLogs] = React.useState<MedicationLogs[]>([]);
-  
+
   const [caregivers, setCaregivers] = React.useState<Caregiver[]>([]);
   const [modalVisible, setModalVisible] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [caregiverMenuVisible, setCaregiverMenuVisible] = React.useState(false);
-  
+
   // --- AI Scan State ---
   const [isScanning, setIsScanning] = React.useState(false);
 
@@ -95,22 +109,20 @@ export default function ElderlyMedicationScreen() {
   const [durationDays, setDurationDays] = React.useState(7);
   const [followUpCaregiver, setFollowUpCaregiver] = React.useState("");
   const [afterMeal, setAfterMeal] = React.useState(false);
-  const [reminderTimes, setReminderTimes] = React.useState<string[]>([
-    "08:00",
-  ]);
+  const [reminderTimes, setReminderTimes] = React.useState<string[]>(["08:00"]);
 
   const fetchData = React.useCallback(async () => {
     if (!user) return;
 
     try {
       if (user) await checkAndMarkSkippedMedications(user.$id); // Check for skipped status first
-      
+
       const [remindersData, logsData, caregiversData] = await Promise.all([
         fetchActiveMedicationReminders(user.$id),
         fetchDailyMedicationLogs(user.$id, new Date()),
-        fetchCaregiversForElderly(user.$id)
+        fetchCaregiversForElderly(user.$id),
       ]);
-      
+
       setReminders(remindersData);
       setTodayLogs(logsData);
       setCaregivers(caregiversData);
@@ -132,16 +144,20 @@ export default function ElderlyMedicationScreen() {
     // 2. Interval Polling: Check every 30 seconds for status updates (e.g., missed meds)
     const intervalId = setInterval(() => {
       fetchData();
-    }, 30000); 
+    }, 30000);
 
     // 3. Appwrite Realtime: Subscribe to medication logs changes
     const realtimeUnsubscribe = clientReactNative.subscribe(
       `databases.${DATABASE_ID}.collections.${MEDICATION_LOGS_TABLE_ID}.documents`,
       (response) => {
-        if (response.events.some(e => e.includes("create") || e.includes("update"))) {
-             fetchData();
+        if (
+          response.events.some(
+            (e) => e.includes("create") || e.includes("update"),
+          )
+        ) {
+          fetchData();
         }
-      }
+      },
     );
 
     return () => {
@@ -155,9 +171,9 @@ export default function ElderlyMedicationScreen() {
   const todoList = React.useMemo(() => {
     const list: TodoItem[] = [];
     const now = new Date();
-    
+
     // Calculate Today in HK
-    const hkOffset = 8 * 60 * 60 * 1000; 
+    const hkOffset = 8 * 60 * 60 * 1000;
     const hkDate = new Date(now.getTime() + hkOffset);
     const todayStr = hkDate.toISOString().slice(0, 10); // YYYY-MM-DD in HK
 
@@ -174,15 +190,15 @@ export default function ElderlyMedicationScreen() {
     reminders.forEach((r) => {
       // Basic check: is today within start_date + duration?
       // For simplicity, we assume active reminders are valid for today.
-      
+
       r.reminder_times.forEach((time) => {
         // Construct scheduled time treating 'time' as HK Time
-        const [hours, minutes] = time.split(':').map(Number);
-            
+        const [hours, minutes] = time.split(":").map(Number);
+
         // Construct a base date using the HK date string, set to 00:00 UTC
-        const baseDate = new Date(todayStr); 
-        baseDate.setUTCHours(hours, minutes, 0, 0); 
-            
+        const baseDate = new Date(todayStr);
+        baseDate.setUTCHours(hours, minutes, 0, 0);
+
         // Subtract 8 hours to convert HKT to UTC
         const scheduledDate = new Date(baseDate.getTime() - hkOffset);
         const scheduledAt = scheduledDate.toISOString();
@@ -191,12 +207,13 @@ export default function ElderlyMedicationScreen() {
         if (r.start_date && new Date(scheduledAt) < new Date(r.start_date)) {
           return;
         }
-        
+
         // Find if logged
-        const log = todayLogs.find(l => {
-          const logRemId = (typeof l.elderly_medication_reminder === 'string')
-            ? l.elderly_medication_reminder
-            : l.elderly_medication_reminder?.$id;
+        const log = todayLogs.find((l) => {
+          const logRemId =
+            typeof l.elderly_medication_reminder === "string"
+              ? l.elderly_medication_reminder
+              : l.elderly_medication_reminder?.$id;
 
           if (logRemId !== r.$id) return false;
 
@@ -209,25 +226,27 @@ export default function ElderlyMedicationScreen() {
         });
 
         // Helper to get medication name safely
-        const medications = Array.isArray(r.elderly_medication?.medication) 
-            ? r.elderly_medication.medication 
-            : (r.elderly_medication?.medication ? [r.elderly_medication.medication] : []);
-            
+        const medications = Array.isArray(r.elderly_medication?.medication)
+          ? r.elderly_medication.medication
+          : r.elderly_medication?.medication
+            ? [r.elderly_medication.medication]
+            : [];
+
         // @ts-ignore
         const medName = medications[0]?.name || "Medication";
         // @ts-ignore
-        const medUnit = medications[0]?.unit || 'dose';
+        const medUnit = medications[0]?.unit || "dose";
         // @ts-ignore
         const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
 
         list.push({
-            reminder: r,
-            time,
-            scheduledAt,
-            status: log ? (log.status as any) : "pending",
-            logId: log?.$id,
-            medicationName: medName,
-            dosage: medDosage
+          reminder: r,
+          time,
+          scheduledAt,
+          status: log ? (log.status as any) : "pending",
+          logId: log?.$id,
+          medicationName: medName,
+          dosage: medDosage,
         });
       });
     });
@@ -239,81 +258,83 @@ export default function ElderlyMedicationScreen() {
   // Notification Logic: Schedule reminders and alert on missing
   React.useEffect(() => {
     const manageNotifications = async () => {
-       const hasPerm = await registerForPushNotificationsAsync();
-       if (!hasPerm) return;
+      const hasPerm = await registerForPushNotificationsAsync();
+      if (!hasPerm) return;
 
-       // 1. Alert for newly detected 'missing' medications
-       const missingItems = todoList.filter(i => i.status === 'missing');
-       const newMissing = missingItems.filter(i => {
-           // If we haven't notified about this specific instance/slot yet
-           // Key can be logId if exists, or schedule key
-           const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
-           return !notifiedMissingLogs.current.has(key);
-       });
+      // 1. Alert for newly detected 'missing' medications
+      const missingItems = todoList.filter((i) => i.status === "missing");
+      const newMissing = missingItems.filter((i) => {
+        // If we haven't notified about this specific instance/slot yet
+        // Key can be logId if exists, or schedule key
+        const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
+        return !notifiedMissingLogs.current.has(key);
+      });
 
-       if (newMissing.length > 0) {
-           // Summarize
-           const names = newMissing.map(i => i.medicationName).join(', ');
-           const body = `You have missed your scheduled medication: ${names}. Please take it as soon as possible!`;
-           await sendImmediateNotification("Missed Medication Alert", body);
-           
-           // Mark as notified
-           newMissing.forEach(i => {
-               const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
-               notifiedMissingLogs.current.add(key);
-           });
-       }
+      if (newMissing.length > 0) {
+        // Summarize
+        const names = newMissing.map((i) => i.medicationName).join(", ");
+        const body = `You have missed your scheduled medication: ${names}. Please take it as soon as possible!`;
+        await sendImmediateNotification("Missed Medication Alert", body);
 
-       // 2. Reschedule future pending reminders
-       // We cancel everything first to ensure we sync with latest data (e.g. if time changed or taken)
-       await cancelAllNotifications();
+        // Mark as notified
+        newMissing.forEach((i) => {
+          const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
+          notifiedMissingLogs.current.add(key);
+        });
+      }
 
-       const pendingItems = todoList.filter(i => i.status === 'pending');
-       
-       // Group by Scheduled Time string (ISO)
-       const grouped: Record<string, string[]> = {};
-       
-       pendingItems.forEach(i => {
-           if (!grouped[i.scheduledAt]) {
-               grouped[i.scheduledAt] = [];
-           }
-           grouped[i.scheduledAt].push(i.medicationName);
-       });
+      // 2. Reschedule future pending reminders
+      // We cancel everything first to ensure we sync with latest data (e.g. if time changed or taken)
+      await cancelAllNotifications();
 
-       // Schedule for each group
-       for (const [isoDate, names] of Object.entries(grouped)) {
-           const triggerDate = new Date(isoDate);
-           if (triggerDate.getTime() > Date.now()) {
-               const medList = names.join(', ');
-               await scheduleMedicationNotification(
-                   "Medication Reminder",
-                   `It's time to take your medication: ${medList}`,
-                   triggerDate
-               );
-           }
-       }
+      const pendingItems = todoList.filter((i) => i.status === "pending");
+
+      // Group by Scheduled Time string (ISO)
+      const grouped: Record<string, string[]> = {};
+
+      pendingItems.forEach((i) => {
+        if (!grouped[i.scheduledAt]) {
+          grouped[i.scheduledAt] = [];
+        }
+        grouped[i.scheduledAt].push(i.medicationName);
+      });
+
+      // Schedule for each group
+      for (const [isoDate, names] of Object.entries(grouped)) {
+        const triggerDate = new Date(isoDate);
+        if (triggerDate.getTime() > Date.now()) {
+          const medList = names.join(", ");
+          await scheduleMedicationNotification(
+            "Medication Reminder",
+            `It's time to take your medication: ${medList}`,
+            triggerDate,
+          );
+        }
+      }
     };
-    
+
     manageNotifications();
   }, [todoList]);
 
   // --- AI Image Processing ---
   const getImageBase64 = async (uri: string) => {
     try {
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         const response = await fetch(uri);
         const blob = await response.blob();
         return await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onloadend = () => {
             const base64data = reader.result as string;
-            resolve(base64data.split(',')[1]);
+            resolve(base64data.split(",")[1]);
           };
           reader.onerror = reject;
           reader.readAsDataURL(blob);
         });
       }
-      return await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      return await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
     } catch (e) {
       console.error("Base64 error:", e);
       throw e;
@@ -325,12 +346,12 @@ export default function ElderlyMedicationScreen() {
       const manipulated = await ImageManipulator.manipulateAsync(
         uri,
         [{ resize: { width: 1024 } }],
-        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
       );
       return manipulated.uri;
     } catch (error) {
-       console.warn("Image prep failed, using original", error);
-       return uri;
+      console.warn("Image prep failed, using original", error);
+      return uri;
     }
   };
 
@@ -358,21 +379,29 @@ export default function ElderlyMedicationScreen() {
             {
               role: "user",
               content: [
-                { type: "text", text: "Analyze this image of a medication package or pill. Extract: name, dosage (e.g. '500 mg'), unit (e.g. 'tablet'), timesPerDay (number, default 1), durationDays (number, default 7). Return ONLY a JSON object. No markdown." },
-                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` } }
-              ]
-            }
-          ]
-        })
+                {
+                  type: "text",
+                  text: "Analyze this image of a medication package or pill. Extract: name, dosage (e.g. '500 mg'), unit (e.g. 'tablet'), timesPerDay (number, default 1), durationDays (number, default 7). Return ONLY a JSON object. No markdown.",
+                },
+                {
+                  type: "image_url",
+                  image_url: { url: `data:image/jpeg;base64,${base64}` },
+                },
+              ],
+            },
+          ],
+        }),
       });
-      
+
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content;
       if (!content) throw new Error("No content from AI");
 
-      const jsonString = content.replace(/```json/g, "").replace(/```/g, "").trim();
+      const jsonString = content
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
       return JSON.parse(jsonString);
-
     } catch (error) {
       console.error("AI Analysis failed:", error);
       Alert.alert("Error", "Failed to analyze image.");
@@ -382,47 +411,47 @@ export default function ElderlyMedicationScreen() {
 
   const handleScanMedication = async () => {
     try {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert("Permission needed", "Camera permission is required.");
-            return;
-        }
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission needed", "Camera permission is required.");
+        return;
+      }
 
-        const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.7,
-        });
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.7,
+      });
 
-        if (!result.canceled && result.assets[0]) {
-            setIsScanning(true);
-            const data = await analyzeMedicationImage(result.assets[0].uri);
-            setIsScanning(false);
-
-            if (data) {
-                if (data.name) setMedicineName(data.name);
-                if (data.unit) setUnit(data.unit);
-                if (data.dosage) setDosage(String(data.dosage));
-                
-                const tpd = Number(data.timesPerDay) || 1;
-                setTimesPerDay(tpd);
-                
-                // Set default times based on timesPerDay
-                let newTimes = ["08:00"];
-                if (tpd === 2) newTimes = ["08:00", "20:00"];
-                else if (tpd === 3) newTimes = ["08:00", "13:00", "20:00"];
-                else if (tpd === 4) newTimes = ["08:00", "12:00", "16:00", "20:00"];
-                
-                setReminderTimes(newTimes);
-                
-                if (data.durationDays) setDurationDays(Number(data.durationDays));
-                
-                Alert.alert("Success", "Medication details scanned!");
-            }
-        }
-    } catch (error) {
+      if (!result.canceled && result.assets[0]) {
+        setIsScanning(true);
+        const data = await analyzeMedicationImage(result.assets[0].uri);
         setIsScanning(false);
-        Alert.alert("Error", "Scan failed.");
+
+        if (data) {
+          if (data.name) setMedicineName(data.name);
+          if (data.unit) setUnit(data.unit);
+          if (data.dosage) setDosage(String(data.dosage));
+
+          const tpd = Number(data.timesPerDay) || 1;
+          setTimesPerDay(tpd);
+
+          // Set default times based on timesPerDay
+          let newTimes = ["08:00"];
+          if (tpd === 2) newTimes = ["08:00", "20:00"];
+          else if (tpd === 3) newTimes = ["08:00", "13:00", "20:00"];
+          else if (tpd === 4) newTimes = ["08:00", "12:00", "16:00", "20:00"];
+
+          setReminderTimes(newTimes);
+
+          if (data.durationDays) setDurationDays(Number(data.durationDays));
+
+          Alert.alert("Success", "Medication details scanned!");
+        }
+      }
+    } catch (error) {
+      setIsScanning(false);
+      Alert.alert("Error", "Scan failed.");
     }
   };
 
@@ -432,23 +461,21 @@ export default function ElderlyMedicationScreen() {
     setRefreshing(false);
   }, [fetchData]);
 
-
-
   const handleTakeMedication = async (item: TodoItem) => {
-      // Toggle logic: if taken -> pending. if pending/skipped -> taken.
-      try {
-          const newStatus = item.status === 'taken' ? 'pending' : 'taken';
-          
-          await logMedicationAction(
-              user!.$id,
-              item.reminder.$id,
-              item.scheduledAt, 
-              newStatus
-          );
-          await fetchData();
-      } catch (error) {
-          Alert.alert("Error", "Failed to update status");
-      }
+    // Toggle logic: if taken -> pending. if pending/skipped -> taken.
+    try {
+      const newStatus = item.status === "taken" ? "pending" : "taken";
+
+      await logMedicationAction(
+        user!.$id,
+        item.reminder.$id,
+        item.scheduledAt,
+        newStatus,
+      );
+      await fetchData();
+    } catch (error) {
+      Alert.alert("Error", "Failed to update status");
+    }
   };
 
   const showMessage = React.useCallback((title: string, message: string) => {
@@ -496,13 +523,13 @@ export default function ElderlyMedicationScreen() {
       // Smart Order: Rotate schedule so the next upcoming time corresponds to the first slot
       // using HK Time (UTC+8) to match system standards
       const now = new Date();
-      const hkDate = new Date(now.getTime() + (8 * 60 * 60 * 1000)); 
+      const hkDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
       const currentMinutes = hkDate.getUTCHours() * 60 + hkDate.getUTCMinutes();
 
       let splitIndex = 0;
       for (let i = 0; i < defaultTimes.length; i++) {
-        const [h, m] = defaultTimes[i].split(':').map(Number);
-        if ((h * 60 + m) > currentMinutes) {
+        const [h, m] = defaultTimes[i].split(":").map(Number);
+        if (h * 60 + m > currentMinutes) {
           splitIndex = i;
           break;
         }
@@ -526,9 +553,12 @@ export default function ElderlyMedicationScreen() {
     setTimesPerDay(1);
     setDurationDays(7);
     // Show all caregivers
-    const allCaregivers = caregivers.map(c => c.name).filter(Boolean).join(", ");
+    const allCaregivers = caregivers
+      .map((c) => c.name)
+      .filter(Boolean)
+      .join(", ");
     setFollowUpCaregiver(allCaregivers);
-    
+
     setAfterMeal(false);
     setReminderTimes(generateSmartReminderTimes(1, false));
   }, [caregivers, generateSmartReminderTimes]);
@@ -632,16 +662,15 @@ export default function ElderlyMedicationScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-
-      {/* NEW: To Take Today (Ci hecklist view) */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>
-        To Take Today
-      </Text>
-      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-        {todoList.length > 0 ? (
-          todoList.map((item, index) => {
-             const isTaken = item.status === 'taken';
-             return (
+        {/* NEW: To Take Today (Ci hecklist view) */}
+        <Text variant="titleMedium" style={styles.sectionTitle}>
+          To Take Today
+        </Text>
+        <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          {todoList.length > 0 ? (
+            todoList.map((item, index) => {
+              const isTaken = item.status === "taken";
+              return (
                 <List.Item
                   key={`${item.reminder.$id}-${item.time}-${index}`}
                   title={`${item.medicationName} (${item.dosage})`}
@@ -656,141 +685,174 @@ export default function ElderlyMedicationScreen() {
                     </View>
                   )}
                   right={() => (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                       <Text 
-                         variant="labelMedium" 
-                         style={{ 
-                            textTransform: 'capitalize',
-                            color: item.status === 'taken' ? '#4CAF50' : 
-                                   item.status === 'missing' ? '#D32F2F' :  
-                                   item.status === 'pending' ? '#FFA000' :
-                                   theme.colors.onSurfaceVariant 
-                         }}
-                       >
-                         {item.status}
-                       </Text>
-                        {!isTaken && (
-                         <Button 
-                           mode="contained"
-                           onPress={() => handleTakeMedication(item)}
-                           compact
-                         >
-                           Take
-                         </Button>
-                        )}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <Text
+                        variant="labelMedium"
+                        style={{
+                          textTransform: "capitalize",
+                          color:
+                            item.status === "taken"
+                              ? "#4CAF50"
+                              : item.status === "missing"
+                                ? "#D32F2F"
+                                : item.status === "pending"
+                                  ? "#FFA000"
+                                  : theme.colors.onSurfaceVariant,
+                        }}
+                      >
+                        {item.status}
+                      </Text>
+                      {!isTaken && (
+                        <Button
+                          mode="contained"
+                          onPress={() => handleTakeMedication(item)}
+                          compact
+                        >
+                          Take
+                        </Button>
+                      )}
                     </View>
                   )}
                   style={[styles.listItem, isTaken && { opacity: 0.6 }]}
                 />
-             );
-          })
-        ) : (
-          <View style={styles.emptyState}>
-             <Text>No medications scheduled for today.</Text>
-          </View>
-        )}
-      </Card>
+              );
+            })
+          ) : (
+            <View style={styles.emptyState}>
+              <Text>No medications scheduled for today.</Text>
+            </View>
+          )}
+        </Card>
 
-      {/* OLD: My Medications List (Overview) */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>
-        Active Prescriptions
-      </Text>
-      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-        {reminders.length > 0 ? (
-          reminders.map((r, index) => {
-             // @ts-ignore
-             const meds = Array.isArray(r.elderly_medication?.medication) ? r.elderly_medication.medication : [];
-             // @ts-ignore
-             const name = meds[0]?.name || "Medication";
+        {/* OLD: My Medications List (Overview) */}
+        <Text variant="titleMedium" style={styles.sectionTitle}>
+          Active Prescriptions
+        </Text>
+        <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          {reminders.length > 0 ? (
+            reminders.map((r, index) => {
+              // @ts-ignore
+              const meds = Array.isArray(r.elderly_medication?.medication)
+                ? r.elderly_medication.medication
+                : [];
+              // @ts-ignore
+              const name = meds[0]?.name || "Medication";
 
-             const handleDelete = () => {
+              const handleDelete = () => {
                 Alert.alert(
-                    "Remove Prescription",
-                    "Are you sure you want to remove this prescription? It will be hidden from your active list and pending schedules.",
-                    [
-                        { text: "Cancel", style: "cancel" },
-                        { 
-                            text: "Remove", 
-                            style: "destructive",
-                            onPress: async () => {
-                                try {
-                                    // Optimistic
-                                    setReminders(prev => prev.filter(item => item.$id !== r.$id));
-                                    await deactivateMedicationReminder(user!.$id, r.$id);
-                                    await fetchData(); 
-                                } catch (e) {
-                                    console.error(e);
-                                    Alert.alert("Error", "Could not remove prescription.");
-                                    await fetchData();
-                                }
-                            }
+                  "Remove Prescription",
+                  "Are you sure you want to remove this prescription? It will be hidden from your active list and pending schedules.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Remove",
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          // Optimistic
+                          setReminders((prev) =>
+                            prev.filter((item) => item.$id !== r.$id),
+                          );
+                          await deactivateMedicationReminder(user!.$id, r.$id);
+                          await fetchData();
+                        } catch (e) {
+                          console.error(e);
+                          Alert.alert(
+                            "Error",
+                            "Could not remove prescription.",
+                          );
+                          await fetchData();
                         }
-                    ]
+                      },
+                    },
+                  ],
                 );
-             };
-             
-             const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+              };
+
+              const renderRightActions = (
+                progress: Animated.AnimatedInterpolation<number>,
+                dragX: Animated.AnimatedInterpolation<number>,
+              ) => {
                 const scale = dragX.interpolate({
                   inputRange: [-80, 0],
                   outputRange: [1, 0],
-                  extrapolate: 'clamp',
+                  extrapolate: "clamp",
                 });
                 return (
-                  <TouchableOpacity onPress={handleDelete} style={styles.swipedRow}>
-                    <Animated.View style={[styles.deleteButton, { transform: [{ scale }] }]}>
-                      <MaterialCommunityIcons name="trash-can-outline" size={24} color="white" />
+                  <TouchableOpacity
+                    onPress={handleDelete}
+                    style={styles.swipedRow}
+                  >
+                    <Animated.View
+                      style={[styles.deleteButton, { transform: [{ scale }] }]}
+                    >
+                      <MaterialCommunityIcons
+                        name="trash-can-outline"
+                        size={24}
+                        color="white"
+                      />
                     </Animated.View>
                   </TouchableOpacity>
                 );
-             };
-             
-             return (
+              };
+
+              return (
                 <Swipeable key={r.$id} renderRightActions={renderRightActions}>
-                    <List.Item
-                      title={name}
-                      description={`${r.reminder_times.length} times daily (${r.reminder_times.join(', ')})`}
-                      left={(props) => <List.Icon {...props} icon="pill" />}
-                    />
+                  <List.Item
+                    title={name}
+                    description={`${r.reminder_times.length} times daily (${r.reminder_times.join(", ")})`}
+                    left={(props) => <List.Icon {...props} icon="pill" />}
+                  />
                 </Swipeable>
-             );
-          })
-        ) : (
-          <View style={styles.emptyState}>
-            <Text>No active prescriptions.</Text>
-          </View>
-        )}
-      </Card>
-      
-      {/* Notes */}
-      <Card
-        style={[
-          styles.notesCard,
-          { backgroundColor: theme.colors.primaryContainer },
-        ]}
-      >
-        <Card.Content>
-          <View style={styles.notesHeader}>
-            <MaterialCommunityIcons
-              name="information"
-              size={24}
-              color={theme.colors.primary}
-            />
+              );
+            })
+          ) : (
+            <View style={styles.emptyState}>
+              <Text>No active prescriptions.</Text>
+            </View>
+          )}
+        </Card>
+
+        {/* Notes */}
+        <Card
+          style={[
+            styles.notesCard,
+            { backgroundColor: theme.colors.primaryContainer },
+          ]}
+        >
+          <Card.Content>
+            <View style={styles.notesHeader}>
+              <MaterialCommunityIcons
+                name="information"
+                size={24}
+                color={theme.colors.primary}
+              />
+              <Text
+                variant="titleSmall"
+                style={{
+                  marginLeft: 8,
+                  color: theme.colors.onPrimaryContainer,
+                }}
+              >
+                Reminder
+              </Text>
+            </View>
             <Text
-              variant="titleSmall"
-              style={{ marginLeft: 8, color: theme.colors.onPrimaryContainer }}
+              variant="bodyMedium"
+              style={{ color: theme.colors.onPrimaryContainer, marginTop: 8 }}
             >
-              Reminder
+              Take your medications with water. If you miss a dose, take it as
+              soon as you remember unless it&apos;s almost time for the next
+              dose.
             </Text>
-          </View>
-          <Text
-            variant="bodyMedium"
-            style={{ color: theme.colors.onPrimaryContainer, marginTop: 8 }}
-          >
-            Take your medications with water. If you miss a dose, take it as
-            soon as you remember unless it&apos;s almost time for the next dose.
-          </Text>
-        </Card.Content>
-      </Card>
+          </Card.Content>
+        </Card>
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -816,17 +878,21 @@ export default function ElderlyMedicationScreen() {
               Add Medication
             </Text>
 
-            <Button 
-              mode="contained-tonal" 
-              icon="camera" 
-              onPress={handleScanMedication} 
+            <Button
+              mode="contained-tonal"
+              icon="camera"
+              onPress={handleScanMedication}
               loading={isScanning}
               disabled={isScanning}
               style={{ marginBottom: 20 }}
             >
               Scan Medication
             </Button>
-            { isScanning && <Text style={{textAlign: 'center', marginBottom: 16}}>Analyzing image...</Text> }
+            {isScanning && (
+              <Text style={{ textAlign: "center", marginBottom: 16 }}>
+                Analyzing image...
+              </Text>
+            )}
 
             <TextInput
               label="Medicine Name *"
@@ -885,9 +951,7 @@ export default function ElderlyMedicationScreen() {
               <IconButton
                 icon="minus"
                 size={24}
-                onPress={() =>
-                  setDurationDays(Math.max(1, durationDays - 1))
-                }
+                onPress={() => setDurationDays(Math.max(1, durationDays - 1))}
               />
               <Text variant="headlineSmall" style={styles.counterText}>
                 {durationDays}
@@ -926,7 +990,9 @@ export default function ElderlyMedicationScreen() {
                   <input
                     type="time"
                     value={timeSlot}
-                    onChange={(event) => handleTimeChange(index, event.target.value)}
+                    onChange={(event) =>
+                      handleTimeChange(index, event.target.value)
+                    }
                     style={{
                       padding: 8,
                       fontSize: 16,
@@ -1087,12 +1153,12 @@ const styles = StyleSheet.create({
   },
   swipedRow: {
     width: 80,
-    backgroundColor: '#dd2c00',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#dd2c00",
+    alignItems: "center",
+    justifyContent: "center",
   },
   deleteButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

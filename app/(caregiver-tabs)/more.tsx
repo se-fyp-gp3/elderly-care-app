@@ -8,7 +8,9 @@ export default function More() {
   const theme = useTheme();
 
   return (
-    <View style={[styles.container, {backgroundColor: theme.colors.background}]}>
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <View style={styles.header}>
         <Text variant="headlineSmall" style={styles.title}>
           More

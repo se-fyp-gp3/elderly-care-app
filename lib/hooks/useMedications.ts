@@ -2,9 +2,9 @@ import { ElderlyMedication, ElderlyMedicationStatus } from "@/types/appwrite";
 import { useCallback, useEffect, useState } from "react";
 import { Query } from "react-native-appwrite";
 import {
-    DATABASE_ID,
-    ELDERLY_MEDICATION_TABLE_ID,
-    tablesDB,
+  DATABASE_ID,
+  ELDERLY_MEDICATION_TABLE_ID,
+  tablesDB,
 } from "../appwrite";
 import { useAuth } from "../auth-context";
 import { getElderlyByUserId } from "../elderly";

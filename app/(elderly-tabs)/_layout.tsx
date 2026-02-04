@@ -74,11 +74,7 @@ export default function ElderlyTabsLayout() {
         options={{
           title: "Settings",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="cog"
-              size={size}
-              color={color}
-            />
+            <MaterialCommunityIcons name="cog" size={size} color={color} />
           ),
         }}
       />

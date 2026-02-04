@@ -5,11 +5,11 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { OAuthProvider } from "react-native-appwrite";
 import {
-    Button,
-    Snackbar,
-    Text,
-    TextInput,
-    useTheme,
+  Button,
+  Snackbar,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 export default function AuthScreen() {
@@ -36,7 +36,7 @@ export default function AuthScreen() {
       await signIn(email, password);
       router.replace("/");
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       if (error instanceof LoginError) {
         setError(error.message);
       } else if (error instanceof AppwriteException) {
@@ -64,7 +64,7 @@ export default function AuthScreen() {
         router.replace("/");
       }
     } catch (error: any) {
-      console.error('OAuth error:', error);
+      console.error("OAuth error:", error);
       if (error instanceof LoginError) {
         setError(error.message);
       } else if (error instanceof AppwriteException) {
