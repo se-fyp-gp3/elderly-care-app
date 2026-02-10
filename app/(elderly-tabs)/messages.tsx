@@ -1,8 +1,8 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-  Contact,
-  formatRelativeTime,
-  getContactsForElderly,
+    Contact,
+    formatRelativeTime,
+    getContactsForElderly,
 } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
@@ -11,22 +11,22 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  FlatList,
-  Linking,
-  Alert,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Linking,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Badge,
-  Divider,
-  Searchbar,
-  Text,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Badge,
+    Divider,
+    Searchbar,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 export default function ElderlyMessages() {
