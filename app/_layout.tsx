@@ -113,6 +113,10 @@ export default function RootLayout() {
                   name="profile-setup"
                   options={{ headerShown: false }}
                 />
+                <Stack.Screen
+                  name="conversation"
+                  options={{ headerShown: false }}
+                />
               </Stack>
             </RouteGuard>
           </SafeAreaProvider>
