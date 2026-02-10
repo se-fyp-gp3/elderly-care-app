@@ -1,10 +1,10 @@
 import { DirectMessage } from "@/types/messaging";
 import { ID, Query } from "react-native-appwrite";
 import {
-  client,
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
-  tablesDB,
+    client,
+    DATABASE_ID,
+    DIRECT_MESSAGES_TABLE_ID,
+    tablesDB,
 } from "./appwrite";
 
 /**
