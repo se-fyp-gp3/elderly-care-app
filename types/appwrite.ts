@@ -105,6 +105,9 @@ export type HealthData = Models.Row & {
   data: string | null;
   value: string | null;
   unit: string | null;
+  numeric_value: number | null;
+  second_value: number | null;
+  note: string | null;
 };
 
 export type ElderlyMedicationReminder = Models.Row & {

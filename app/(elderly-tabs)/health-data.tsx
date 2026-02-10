@@ -1,11 +1,13 @@
-import { DATABASE_ID, HEALTH_DATA_TABLE_ID, tablesDB } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getElderlyByUserId } from "@/lib/elderly";
+import {
+  fetchHealthDataForElderly,
+  getLatestMetrics,
+} from "@/lib/health-data";
 import { HealthData } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { Query } from "react-native-appwrite";
 import { Card, Text, useTheme } from "react-native-paper";
 
 export default function ElderlyHealthData() {
@@ -13,6 +15,12 @@ export default function ElderlyHealthData() {
   const theme = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
   const [healthData, setHealthData] = React.useState<HealthData[]>([]);
+  const [latestMetrics, setLatestMetrics] = React.useState<
+    Record<string, HealthData>
+  >({});
+  const [elderlyProfileId, setElderlyProfileId] = React.useState<
+    string | null
+  >(null);
 
   const fetchHealthData = React.useCallback(async () => {
     if (!user) return;
@@ -21,12 +29,13 @@ export default function ElderlyHealthData() {
       const profile = await getElderlyByUserId(user.$id);
 
       if (profile) {
-        const response = await tablesDB.listRows({
-          databaseId: DATABASE_ID,
-          tableId: HEALTH_DATA_TABLE_ID,
-          queries: [Query.limit(50), Query.orderDesc("$createdAt")],
-        });
-        setHealthData(response.rows as unknown as HealthData[]);
+        setElderlyProfileId(profile.$id);
+        const [records, metrics] = await Promise.all([
+          fetchHealthDataForElderly(profile.$id, 50),
+          getLatestMetrics(profile.$id),
+        ]);
+        setHealthData(records);
+        setLatestMetrics(metrics);
       }
     } catch (err) {
       console.error("Error fetching health data:", err);
@@ -46,31 +55,41 @@ export default function ElderlyHealthData() {
 
   const healthMetrics = [
     {
+      icon: "water",
+      label: "Blood Pressure",
+      value: latestMetrics["Blood Pressure"]?.value || "--/-- mmHg",
+      color: "#2196F3",
+    },
+    {
       icon: "heart-pulse",
       label: "Heart Rate",
-      value: "-- bpm",
+      value: latestMetrics["Heart Rate"]?.value || "-- bpm",
       color: "#F44336",
     },
     {
       icon: "thermometer",
       label: "Temperature",
-      value: "-- °C",
+      value: latestMetrics["Temperature"]?.value || "-- °C",
       color: "#FF9800",
-    },
-    {
-      icon: "water",
-      label: "Blood Pressure",
-      value: "--/-- mmHg",
-      color: "#2196F3",
     },
     {
       icon: "scale-bathroom",
       label: "Weight",
-      value: "-- kg",
+      value: latestMetrics["Weight"]?.value || "-- kg",
       color: "#4CAF50",
     },
-    { icon: "walk", label: "Steps Today", value: "-- steps", color: "#9C27B0" },
-    { icon: "sleep", label: "Sleep", value: "-- hrs", color: "#3F51B5" },
+    {
+      icon: "water-outline",
+      label: "Blood Sugar",
+      value: latestMetrics["Blood Sugar"]?.value || "-- mg/dL",
+      color: "#9C27B0",
+    },
+    {
+      icon: "lungs",
+      label: "Oxygen Saturation",
+      value: latestMetrics["Oxygen Saturation"]?.value || "-- %",
+      color: "#00BCD4",
+    },
   ];
 
   return (
@@ -142,16 +161,26 @@ export default function ElderlyHealthData() {
       >
         {healthData.length > 0 ? (
           healthData.slice(0, 5).map((record, index) => (
-            <View key={index} style={styles.recordItem}>
-              <View>
+            <View key={record.$id || index} style={styles.recordItem}>
+              <View style={{ flex: 1 }}>
                 <Text variant="bodyLarge">
                   {record.type || "Health Record"}
+                </Text>
+                <Text variant="bodyMedium" style={{ fontWeight: "600" }}>
+                  {record.value || "—"}
                 </Text>
                 <Text
                   variant="bodySmall"
                   style={{ color: theme.colors.onSurfaceVariant }}
                 >
-                  {record.time || "No date"}
+                  {record.time
+                    ? new Date(record.time).toLocaleString([], {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "No date"}
                 </Text>
               </View>
               <MaterialCommunityIcons

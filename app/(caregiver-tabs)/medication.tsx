@@ -1363,7 +1363,7 @@ export default function MedicationManagement() {
         >
           <Dialog.Title>Filter Status</Dialog.Title>
           <Dialog.Content>
-            {["all", "pending", "completed"].map((status) => (
+            {["all", "pending", "completed", "missed"].map((status) => (
               <TouchableOpacity
                 key={status}
                 style={[
@@ -1386,7 +1386,9 @@ export default function MedicationManagement() {
                       ? "filter-variant"
                       : status === "pending"
                         ? "clock-outline"
-                        : "check-circle-outline"
+                        : status === "completed"
+                          ? "check-circle-outline"
+                          : "alert-circle-outline"
                   }
                   size={24}
                   color={theme.colors.onSurface}
