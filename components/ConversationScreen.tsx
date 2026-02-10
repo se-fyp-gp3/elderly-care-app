@@ -1,28 +1,28 @@
-import { DirectMessage } from "@/types/messaging";
 import {
-  buildConversationId,
-  fetchConversationMessages,
-  markConversationAsRead,
-  sendDirectMessage,
-  subscribeToConversation,
+    buildConversationId,
+    fetchConversationMessages,
+    markConversationAsRead,
+    sendDirectMessage,
+    subscribeToConversation,
 } from "@/lib/messaging";
+import { DirectMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  View,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  IconButton,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    IconButton,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 interface ConversationScreenProps {
