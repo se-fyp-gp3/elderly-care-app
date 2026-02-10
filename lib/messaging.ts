@@ -1,14 +1,11 @@
 import { DirectMessage } from "@/types/messaging";
 import { ID, Query } from "react-native-appwrite";
-import { client, DATABASE_ID, tablesDB } from "./appwrite";
-
-/**
- * Collection ID for direct messages.
- * Must match env var EXPO_PUBLIC_DIRECT_MESSAGES_TABLE_ID
- * or be created manually in Appwrite console.
- */
-export const DIRECT_MESSAGES_TABLE_ID =
-  process.env.EXPO_PUBLIC_DIRECT_MESSAGES_TABLE_ID || "direct_messages";
+import {
+  client,
+  DATABASE_ID,
+  DIRECT_MESSAGES_TABLE_ID,
+  tablesDB,
+} from "./appwrite";
 
 /**
  * Build a deterministic conversation ID from two profile IDs.
