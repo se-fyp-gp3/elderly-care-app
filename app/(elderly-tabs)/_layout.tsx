@@ -48,6 +48,19 @@ export default function ElderlyTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="messages"
+        options={{
+          title: "Messages",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="chat"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="medication"
         options={{
           title: "Medication",
@@ -80,6 +93,13 @@ export default function ElderlyTabsLayout() {
       />
 
       {/* Hidden Screens */}
+      <Tabs.Screen
+        name="conversation"
+        options={{
+          href: null,
+          title: "Chat",
+        }}
+      />
       <Tabs.Screen
         name="health-data"
         options={{
