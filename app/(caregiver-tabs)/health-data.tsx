@@ -807,12 +807,12 @@ const styles = StyleSheet.create({
   // Timeline Styles
   timelineItem: { flexDirection: "row", marginBottom: 0 },
   timelineLeft: {
-    width: 60,
+    width: 70,
     alignItems: "flex-end",
     paddingRight: 10,
     paddingTop: 14,
   },
-  timeText: { fontWeight: "bold", fontSize: 13 },
+  timeText: { fontWeight: "bold", fontSize: 11 },
   dateText: { fontSize: 10, color: "#888" },
   timelineCenter: { width: 20, alignItems: "center" },
   timelineLine: { width: 2, flex: 1, backgroundColor: "#E0E0E0" },

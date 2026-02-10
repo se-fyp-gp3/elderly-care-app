@@ -8,6 +8,11 @@ import {
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
+import {
+  computeElderlyStatus,
+  ElderlyStatusInfo,
+  formatLastCheck,
+} from "@/lib/elderly-status";
 import { CaregiverElderly, Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -39,6 +44,7 @@ interface ElderlyListItem extends Elderly {
   medication?: string;
   nextAppointment?: string;
   age?: number;
+  statusInfo?: ElderlyStatusInfo;
 }
 
 const calculateAge = (birthDateString?: string | null): number | undefined => {
@@ -118,13 +124,35 @@ export default function CaregiverDashboard() {
         new Map(loadedElderly.map((item) => [item.$id, item])).values(),
       );
 
-      const transformedData: ElderlyListItem[] = uniqueElderly.map((row) => ({
+      // First set basic data immediately so UI is not empty
+      const basicData: ElderlyListItem[] = uniqueElderly.map((row) => ({
         ...row,
         age: calculateAge(row.birth),
-        lastCheck: "Recently",
-        medication: "Pending",
-        nextAppointment: "None",
+        lastCheck: "Loading...",
+        medication: "Loading...",
+        nextAppointment: "Loading...",
       }));
+      setElderlyList(basicData);
+
+      // Then compute real status for each elderly in background
+      const statusResults = await Promise.all(
+        uniqueElderly.map((row) => computeElderlyStatus(row.$id)),
+      );
+
+      const transformedData: ElderlyListItem[] = uniqueElderly.map(
+        (row, i) => {
+          const info = statusResults[i];
+          return {
+            ...row,
+            age: calculateAge(row.birth),
+            status: info.status,
+            lastCheck: formatLastCheck(info.lastCheckTime),
+            medication: info.medicationSummary,
+            nextAppointment: info.nextAppointment || "None",
+            statusInfo: info,
+          };
+        },
+      );
 
       setElderlyList(transformedData);
     } catch (err: any) {
