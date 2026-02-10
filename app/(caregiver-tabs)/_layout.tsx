@@ -35,6 +35,19 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="messages"
+        options={{
+          title: "Messages",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="chat"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="caregiver"
         options={{
           title: "Care panel",
@@ -69,9 +82,20 @@ export default function TabsLayout() {
           ),
         }}
       />
+      
+
+      {/* Hidden Screens */}
+      <Tabs.Screen
+        name="conversation"
+        options={{
+          href: null,
+          title: "Chat",
+        }}
+      />
       <Tabs.Screen
         name="more"
         options={{
+          href: null,
           title: "More",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
@@ -82,8 +106,6 @@ export default function TabsLayout() {
           ),
         }}
       />
-
-      {/* Hidden Screens */}
       <Tabs.Screen
         name="emergency"
         options={{
