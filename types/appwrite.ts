@@ -100,6 +100,7 @@ export type ScheduleMedication = Models.Row & {
 
 export type HealthData = Models.Row & {
   elderly: Elderly[];
+  elderly_id: string | null;
   time: string | null;
   type: string | null;
   data: string | null;

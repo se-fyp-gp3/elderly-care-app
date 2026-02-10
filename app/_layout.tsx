@@ -99,6 +99,10 @@ export default function RootLayout() {
             <RouteGuard>
               <Stack>
                 <Stack.Screen
+                  name="index"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
                   name="(caregiver-tabs)"
                   options={{ headerShown: false }}
                 />
