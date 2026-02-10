@@ -1,40 +1,40 @@
 import {
-  createHealthRecord,
-  fetchHealthDataForElderly,
-  getLatestMetrics,
+    createHealthRecord,
+    fetchHealthDataForElderly,
+    getLatestMetrics,
 } from "@/lib/health-data";
 import { HealthData } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useState,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useState,
 } from "react";
 import {
-  Alert,
-  Dimensions,
-  FlatList,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    Dimensions,
+    FlatList,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import {
-  Button,
-  Card,
-  Chip,
-  Dialog,
-  IconButton,
-  Portal,
-  Surface,
-  Text,
-  TextInput,
-  useTheme,
+    Button,
+    Card,
+    Chip,
+    Dialog,
+    IconButton,
+    Portal,
+    Surface,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 export default function HealthDataPage() {

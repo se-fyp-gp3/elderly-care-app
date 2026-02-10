@@ -1,8 +1,8 @@
 import { useAuth } from "@/lib/auth-context";
 import { getElderlyByUserId } from "@/lib/elderly";
 import {
-  fetchHealthDataForElderly,
-  getLatestMetrics,
+    fetchHealthDataForElderly,
+    getLatestMetrics,
 } from "@/lib/health-data";
 import { HealthData } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
