@@ -53,6 +53,8 @@ export const MEDICATION_LOGS_TABLE_ID =
   process.env.EXPO_PUBLIC_MEDICATION_LOGS_TABLE_ID!;
 export const CHAT_SESSION_TABLE_ID =
   process.env.EXPO_PUBLIC_CHAT_SESSION_TABLE_ID!;
+export const DIRECT_MESSAGES_TABLE_ID =
+  process.env.EXPO_PUBLIC_DIRECT_MESSAGES_TABLE_ID!;
 
 export interface RealtimeResponse {
   events: string[];
