@@ -1,41 +1,73 @@
+import {
+  createHealthRecord,
+  fetchHealthDataForElderly,
+  getLatestMetrics,
+} from "@/lib/health-data";
+import { HealthData } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import React, { useLayoutEffect, useMemo } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
+  Alert,
   Dimensions,
   FlatList,
+  RefreshControl,
   ScrollView,
-  Share,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import {
+  Button,
   Card,
   Chip,
+  Dialog,
   IconButton,
+  Portal,
   Surface,
   Text,
   TextInput,
   useTheme,
 } from "react-native-paper";
 
-type HealthRecord = {
-  id: string;
-  time: string;
-  type: string;
-  value: string;
-  numericValue?: number; // Helper for charts
-  secondValue?: number; // Helper for BP (diastolic)
-  note?: string;
-};
-
 export default function HealthDataPage() {
-  const { elderlyId, elderlyName } = useLocalSearchParams();
+  const { elderlyId, elderlyName } = useLocalSearchParams<{
+    elderlyId: string;
+    elderlyName: string;
+  }>();
   const theme = useTheme();
   const router = useRouter();
   const navigation = useNavigation();
+
+  const [records, setRecords] = useState<HealthData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filterRange, setFilterRange] = useState<"24h" | "7d" | "30d" | "all">(
+    "all",
+  );
+  const [searchType, setSearchType] = useState("");
+  const [latestMetrics, setLatestMetrics] = useState<
+    Record<string, HealthData>
+  >({});
+
+  // Add Record Dialog
+  const [addDialogVisible, setAddDialogVisible] = useState(false);
+  const [newRecord, setNewRecord] = useState({
+    type: "Blood Pressure",
+    value: "",
+    numericValue: "",
+    secondValue: "",
+    unit: "mmHg",
+    note: "",
+  });
+  const [saving, setSaving] = useState(false);
 
   // Header Customization
   useLayoutEffect(() => {
@@ -55,60 +87,45 @@ export default function HealthDataPage() {
         </TouchableOpacity>
       ),
       headerRight: () => (
-        <IconButton icon="share-variant" onPress={handleExport} />
+        <IconButton
+          icon="plus-circle"
+          size={28}
+          onPress={() => setAddDialogVisible(true)}
+        />
       ),
     });
   }, [navigation, router, theme]);
 
-  const [records, setRecords] = React.useState<HealthRecord[]>([
-    {
-      id: "1",
-      time: "2025-11-11 09:00",
-      type: "Blood Pressure",
-      value: "120/78 mmHg",
-      numericValue: 120,
-      secondValue: 78,
-    },
-    {
-      id: "2",
-      time: "2025-11-11 12:00",
-      type: "Heart Rate",
-      value: "72 bpm",
-      numericValue: 72,
-    },
-    {
-      id: "3",
-      time: "2025-11-10 20:00",
-      type: "Medication",
-      value: "Evening med taken",
-    },
-    {
-      id: "4",
-      time: "2025-11-10 08:30",
-      type: "Blood Pressure",
-      value: "118/75 mmHg",
-      numericValue: 118,
-      secondValue: 75,
-    },
-    {
-      id: "5",
-      time: "2025-11-09 09:15",
-      type: "Blood Pressure",
-      value: "122/80 mmHg",
-      numericValue: 122,
-      secondValue: 80,
-    },
-  ]);
+  // ── Fetch data from Appwrite ──────────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    if (!elderlyId) return;
+    try {
+      const [allRecords, metrics] = await Promise.all([
+        fetchHealthDataForElderly(elderlyId, 100),
+        getLatestMetrics(elderlyId),
+      ]);
+      setRecords(allRecords);
+      setLatestMetrics(metrics);
+    } catch (error) {
+      console.error("Error fetching health data:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [elderlyId]);
 
-  const [filterRange, setFilterRange] = React.useState<
-    "24h" | "7d" | "30d" | "all"
-  >("all");
-  const [searchType, setSearchType] = React.useState("");
-  const [newNote, setNewNote] = React.useState("");
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const now = React.useMemo(() => new Date("2025-11-11T13:00:00"), []); // Mock 'now' for consistent demo
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchData();
+  }, [fetchData]);
 
-  const filteredRecords = React.useMemo(() => {
+  // ── Filter records ────────────────────────────────────────────────────
+  const filteredRecords = useMemo(() => {
+    const now = new Date();
     const cutoff = (() => {
       if (filterRange === "24h")
         return new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -119,41 +136,42 @@ export default function HealthDataPage() {
       return new Date(0);
     })();
 
-    return records
-      .filter((r) => {
-        const t = new Date(r.time);
-        if (isNaN(t.getTime())) return true; // keep if cannot parse
-        if (t < cutoff) return false;
-        if (
-          searchType &&
-          !r.type.toLowerCase().includes(searchType.toLowerCase())
-        )
-          return false;
-        return true;
-      })
-      .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-  }, [records, filterRange, searchType, now]);
+    return records.filter((r) => {
+      const t = r.time ? new Date(r.time) : null;
+      if (t && t < cutoff) return false;
+      if (searchType && r.type?.toLowerCase() !== searchType.toLowerCase())
+        return false;
+      return true;
+    });
+  }, [records, filterRange, searchType]);
 
-  // Prepare Chart Data (Blood Pressure focus)
+  // ── Chart Data (Blood Pressure) ───────────────────────────────────────
   const chartData = useMemo(() => {
     const bpRecords = records
-      .filter((r) => r.type === "Blood Pressure" && r.numericValue)
-      .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
-      .slice(-6); // Last 6 records
+      .filter((r) => r.type === "Blood Pressure" && r.numeric_value)
+      .sort(
+        (a, b) =>
+          new Date(a.time || 0).getTime() - new Date(b.time || 0).getTime(),
+      )
+      .slice(-6);
 
-    if (bpRecords.length === 0) return null;
+    if (bpRecords.length < 2) return null;
 
     return {
-      labels: bpRecords.map((r) => r.time.split(" ")[1]), // Just time
+      labels: bpRecords.map((r) => {
+        if (!r.time) return "";
+        const d = new Date(r.time);
+        return `${d.getMonth() + 1}/${d.getDate()}`;
+      }),
       datasets: [
         {
-          data: bpRecords.map((r) => r.numericValue || 0),
-          color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`, // Blue for Systolic
+          data: bpRecords.map((r) => r.numeric_value || 0),
+          color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`,
           strokeWidth: 2,
         },
         {
-          data: bpRecords.map((r) => r.secondValue || 0),
-          color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`, // Green for Diastolic
+          data: bpRecords.map((r) => r.second_value || 0),
+          color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
           strokeWidth: 2,
         },
       ],
@@ -161,51 +179,81 @@ export default function HealthDataPage() {
     };
   }, [records]);
 
-  const handleAddNote = () => {
-    if (!newNote.trim()) return;
-    const rec: HealthRecord = {
-      id: Date.now().toString(),
-      time: new Date().toISOString().slice(0, 16).replace("T", " "),
-      type: "Note",
-      value: newNote.trim(),
-    };
-    setRecords((prev) => [rec, ...prev]);
-    setNewNote("");
-  };
-
-  const handleExport = async () => {
+  // ── Add record handler ────────────────────────────────────────────────
+  const handleAddRecord = async () => {
+    if (!elderlyId || !newRecord.value.trim()) {
+      Alert.alert("Error", "Please fill in the value.");
+      return;
+    }
+    setSaving(true);
     try {
-      await Share.share({
-        message: JSON.stringify({ elderlyId, records }, null, 2),
+      await createHealthRecord({
+        elderlyId,
+        type: newRecord.type,
+        value: newRecord.value.trim(),
+        unit: newRecord.unit || undefined,
+        numericValue: newRecord.numericValue
+          ? parseFloat(newRecord.numericValue)
+          : undefined,
+        secondValue: newRecord.secondValue
+          ? parseFloat(newRecord.secondValue)
+          : undefined,
+        note: newRecord.note.trim() || undefined,
       });
-    } catch (e) {
-      console.warn("Export failed", e);
+      setAddDialogVisible(false);
+      setNewRecord({
+        type: "Blood Pressure",
+        value: "",
+        numericValue: "",
+        secondValue: "",
+        unit: "mmHg",
+        note: "",
+      });
+      fetchData(); // Refresh list
+    } catch (error) {
+      console.error("Error adding health record:", error);
+      Alert.alert("Error", "Failed to add record.");
+    } finally {
+      setSaving(false);
     }
   };
 
+  // ── Helpers ───────────────────────────────────────────────────────────
   const getTypeColor = (type: string) => {
     switch ((type || "").toLowerCase()) {
       case "blood pressure":
-        return "#2196F3"; // Blue
+        return "#2196F3";
       case "heart rate":
-        return "#F44336"; // Red
-      case "medication":
-        return "#4CAF50"; // Green
+        return "#F44336";
+      case "temperature":
+        return "#FF9800";
+      case "weight":
+        return "#4CAF50";
+      case "blood sugar":
+        return "#9C27B0";
+      case "oxygen saturation":
+        return "#00BCD4";
       case "note":
-        return "#FF9800"; // Orange
+        return "#607D8B";
       default:
-        return "#607D8B"; // Grey
+        return "#607D8B";
     }
   };
 
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = (type: string): string => {
     switch ((type || "").toLowerCase()) {
       case "blood pressure":
         return "heart-pulse";
       case "heart rate":
         return "heart-flash";
-      case "medication":
-        return "pill";
+      case "temperature":
+        return "thermometer";
+      case "weight":
+        return "scale-bathroom";
+      case "blood sugar":
+        return "water";
+      case "oxygen saturation":
+        return "lungs";
       case "note":
         return "note-text-outline";
       default:
@@ -213,7 +261,45 @@ export default function HealthDataPage() {
     }
   };
 
-  // Render Components
+  const formatTime = (timeStr: string | null) => {
+    if (!timeStr) return { time: "--:--", date: "" };
+    const d = new Date(timeStr);
+    return {
+      time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      date: d.toLocaleDateString([], { month: "short", day: "numeric" }),
+    };
+  };
+
+  // Record type options for the add dialog
+  const recordTypes = [
+    { label: "Blood Pressure", unit: "mmHg", hasSecond: true },
+    { label: "Heart Rate", unit: "bpm", hasSecond: false },
+    { label: "Temperature", unit: "°C", hasSecond: false },
+    { label: "Weight", unit: "kg", hasSecond: false },
+    { label: "Blood Sugar", unit: "mg/dL", hasSecond: false },
+    { label: "Oxygen Saturation", unit: "%", hasSecond: false },
+  ];
+
+  const selectedTypeConfig = recordTypes.find(
+    (t) => t.label === newRecord.type,
+  );
+
+  // Update display value when numeric values change
+  const updateDisplayValue = (
+    type: string,
+    primary: string,
+    secondary: string,
+  ) => {
+    const config = recordTypes.find((t) => t.label === type);
+    if (config?.hasSecond && primary && secondary) {
+      return `${primary}/${secondary} ${config.unit}`;
+    } else if (primary) {
+      return `${primary} ${config?.unit || ""}`;
+    }
+    return "";
+  };
+
+  // ── Render Components ─────────────────────────────────────────────────
   const renderSummaryCard = (
     title: string,
     value: string,
@@ -225,7 +311,7 @@ export default function HealthDataPage() {
       <View style={[styles.statIconBadge, { backgroundColor: color + "20" }]}>
         <MaterialCommunityIcons name={icon as any} size={24} color={color} />
       </View>
-      <View>
+      <View style={{ flex: 1 }}>
         <Text variant="labelMedium" style={{ color: theme.colors.secondary }}>
           {title}
         </Text>
@@ -234,7 +320,7 @@ export default function HealthDataPage() {
         </Text>
         <Text
           variant="bodySmall"
-          style={{ color: theme.colors.onSurfaceDisabled }}
+          style={{ color: theme.colors.onSurfaceVariant }}
         >
           {sub}
         </Text>
@@ -242,52 +328,106 @@ export default function HealthDataPage() {
     </Surface>
   );
 
-  const renderRecordItem = ({ item }: { item: HealthRecord }) => (
-    <View style={styles.timelineItem}>
-      <View style={styles.timelineLeft}>
-        <Text style={styles.timeText}>{item.time.split(" ")[1]}</Text>
-        <Text style={styles.dateText}>{item.time.split(" ")[0]}</Text>
-      </View>
-      <View style={styles.timelineCenter}>
-        <View style={styles.timelineLine} />
-        <View
-          style={[
-            styles.timelineDot,
-            { backgroundColor: getTypeColor(item.type) },
-          ]}
-        />
-      </View>
-      <Surface style={styles.recordCard} elevation={0}>
-        <View
-          style={[
-            styles.recordHeader,
-            { borderLeftColor: getTypeColor(item.type), borderLeftWidth: 4 },
-          ]}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.recordType}>{item.type}</Text>
-            <Text style={styles.recordValue}>{item.value}</Text>
-          </View>
-          <MaterialCommunityIcons
-            name={getTypeIcon(item.type) as any}
-            size={20}
-            color={getTypeColor(item.type)}
-            style={{ opacity: 0.5 }}
+  // Timeline record item
+  const renderRecordItem = ({ item }: { item: HealthData }) => {
+    const { time, date } = formatTime(item.time);
+    return (
+      <View style={styles.timelineItem}>
+        <View style={styles.timelineLeft}>
+          <Text style={styles.timeText}>{time}</Text>
+          <Text style={styles.dateText}>{date}</Text>
+        </View>
+        <View style={styles.timelineCenter}>
+          <View style={styles.timelineLine} />
+          <View
+            style={[
+              styles.timelineDot,
+              { backgroundColor: getTypeColor(item.type || "") },
+            ]}
           />
         </View>
-      </Surface>
-    </View>
-  );
+        <Surface
+          style={[styles.recordCard, { backgroundColor: theme.colors.surface }]}
+          elevation={0}
+        >
+          <View
+            style={[
+              styles.recordHeader,
+              {
+                borderLeftColor: getTypeColor(item.type || ""),
+                borderLeftWidth: 4,
+              },
+            ]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[
+                  styles.recordType,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
+                {item.type || "Health Record"}
+              </Text>
+              <Text
+                style={[
+                  styles.recordValue,
+                  { color: theme.colors.onSurface },
+                ]}
+              >
+                {item.value || "—"}
+              </Text>
+              {item.note ? (
+                <Text
+                  style={[
+                    styles.recordNote,
+                    { color: theme.colors.onSurfaceVariant },
+                  ]}
+                >
+                  {item.note}
+                </Text>
+              ) : null}
+            </View>
+            <MaterialCommunityIcons
+              name={getTypeIcon(item.type || "") as any}
+              size={20}
+              color={getTypeColor(item.type || "")}
+              style={{ opacity: 0.5 }}
+            />
+          </View>
+        </Surface>
+      </View>
+    );
+  };
 
-  const latestBP =
-    records.find((r) => r.type === "Blood Pressure")?.value || "—";
-  const latestHR = records.find((r) => r.type === "Heart Rate")?.value || "—";
+  // Get latest values for summary cards
+  const latestBP = latestMetrics["Blood Pressure"]?.value || "—";
+  const latestHR = latestMetrics["Heart Rate"]?.value || "—";
+  const latestTemp = latestMetrics["Temperature"]?.value || "—";
+  const latestWeight = latestMetrics["Weight"]?.value || "—";
+
+  const bpSub = latestMetrics["Blood Pressure"]?.time
+    ? formatTime(latestMetrics["Blood Pressure"].time).date
+    : "No data";
+  const hrSub = latestMetrics["Heart Rate"]?.time
+    ? formatTime(latestMetrics["Heart Rate"].time).date
+    : "No data";
+  const tempSub = latestMetrics["Temperature"]?.time
+    ? formatTime(latestMetrics["Temperature"].time).date
+    : "No data";
+  const weightSub = latestMetrics["Weight"]?.time
+    ? formatTime(latestMetrics["Weight"].time).date
+    : "No data";
 
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 80 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Header Title Area */}
         <View style={styles.pageHeader}>
           <Text variant="headlineMedium" style={{ fontWeight: "bold" }}>
@@ -310,25 +450,8 @@ export default function HealthDataPage() {
               <Text variant="titleMedium">
                 {decodeURIComponent(elderlyName as string)}
               </Text>
-              {elderlyId && (
-                <Text
-                  variant="bodySmall"
-                  style={{ marginLeft: 8, color: theme.colors.outline }}
-                >
-                  #{elderlyId}
-                </Text>
-              )}
             </View>
-          ) : (
-            elderlyId && (
-              <Chip
-                icon="account"
-                style={{ alignSelf: "flex-start", marginTop: 4 }}
-              >
-                ID: {elderlyId}
-              </Chip>
-            )
-          )}
+          ) : null}
         </View>
 
         {/* Summary Statistics */}
@@ -336,16 +459,32 @@ export default function HealthDataPage() {
           {renderSummaryCard(
             "Blood Pressure",
             latestBP,
-            "Latest",
+            bpSub,
             "heart-pulse",
             "#2196F3",
           )}
           {renderSummaryCard(
             "Heart Rate",
             latestHR,
-            "Latest",
+            hrSub,
             "heart-flash",
             "#F44336",
+          )}
+        </View>
+        <View style={styles.statsRow}>
+          {renderSummaryCard(
+            "Temperature",
+            latestTemp,
+            tempSub,
+            "thermometer",
+            "#FF9800",
+          )}
+          {renderSummaryCard(
+            "Weight",
+            latestWeight,
+            weightSub,
+            "scale-bathroom",
+            "#4CAF50",
           )}
         </View>
 
@@ -361,7 +500,7 @@ export default function HealthDataPage() {
             <Card.Content style={{ alignItems: "center" }}>
               <LineChart
                 data={chartData}
-                width={Dimensions.get("window").width - 64} // from react-native
+                width={Dimensions.get("window").width - 64}
                 height={220}
                 yAxisLabel=""
                 yAxisSuffix=""
@@ -382,18 +521,53 @@ export default function HealthDataPage() {
           </Card>
         )}
 
-        {/* Filters */}
+        {/* Type Filters */}
         <View style={styles.filterSection}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 16 }}
           >
-            {["all", "24h", "7d", "30d"].map((range) => (
+            <Chip
+              selected={searchType === ""}
+              onPress={() => setSearchType("")}
+              style={styles.filterChip}
+              showSelectedOverlay
+            >
+              All
+            </Chip>
+            {[
+              "Blood Pressure",
+              "Heart Rate",
+              "Temperature",
+              "Weight",
+              "Blood Sugar",
+            ].map((t) => (
+              <Chip
+                key={t}
+                selected={searchType === t}
+                onPress={() => setSearchType(searchType === t ? "" : t)}
+                style={styles.filterChip}
+                showSelectedOverlay
+              >
+                {t}
+              </Chip>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Time Range Filters */}
+        <View style={styles.filterSection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16 }}
+          >
+            {(["all", "24h", "7d", "30d"] as const).map((range) => (
               <Chip
                 key={range}
                 selected={filterRange === range}
-                onPress={() => setFilterRange(range as any)}
+                onPress={() => setFilterRange(range)}
                 style={styles.filterChip}
                 showSelectedOverlay
               >
@@ -405,42 +579,190 @@ export default function HealthDataPage() {
 
         {/* Records List */}
         <View style={styles.listSection}>
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            Activity Log
-          </Text>
-          <FlatList
-            data={filteredRecords}
-            renderItem={renderRecordItem}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false} // Let parent ScrollView handle scrolling
-          />
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Activity Log ({filteredRecords.length})
+            </Text>
+          </View>
+          {loading ? (
+            <View style={styles.emptyState}>
+              <Text variant="bodyLarge">Loading...</Text>
+            </View>
+          ) : filteredRecords.length === 0 ? (
+            <Surface
+              style={[
+                styles.emptyCard,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              elevation={1}
+            >
+              <MaterialCommunityIcons
+                name="chart-line"
+                size={48}
+                color={theme.colors.onSurfaceVariant}
+              />
+              <Text variant="bodyLarge" style={{ marginTop: 12 }}>
+                No health records yet
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                  marginTop: 4,
+                }}
+              >
+                Tap + to add a health record
+              </Text>
+            </Surface>
+          ) : (
+            <FlatList
+              data={filteredRecords}
+              renderItem={renderRecordItem}
+              keyExtractor={(item) => item.$id}
+              scrollEnabled={false}
+            />
+          )}
         </View>
       </ScrollView>
 
-      {/* Quick Note Input - Fixed at bottom */}
-      <Surface
-        style={[
-          styles.inputContainer,
-          { backgroundColor: theme.colors.surface },
-        ]}
-        elevation={4}
-      >
-        <TextInput
-          mode="outlined"
-          placeholder="Add a quick note..."
-          value={newNote}
-          onChangeText={setNewNote}
-          style={{ flex: 1, backgroundColor: theme.colors.surface }}
-          right={
-            <TextInput.Icon
-              icon="send"
-              disabled={!newNote.trim()}
-              onPress={handleAddNote}
-            />
-          }
-          dense
-        />
-      </Surface>
+      {/* ── Add Record Dialog ──────────────────────────────────────────── */}
+      <Portal>
+        <Dialog
+          visible={addDialogVisible}
+          onDismiss={() => setAddDialogVisible(false)}
+          style={{ backgroundColor: theme.colors.surface }}
+        >
+          <Dialog.Title>Add Health Record</Dialog.Title>
+          <Dialog.ScrollArea style={{ paddingHorizontal: 0 }}>
+            <ScrollView style={{ paddingHorizontal: 24 }}>
+              {/* Type Selection */}
+              <Text
+                variant="labelLarge"
+                style={{ marginBottom: 8, marginTop: 8 }}
+              >
+                Type
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  marginBottom: 16,
+                }}
+              >
+                {recordTypes.map((rt) => (
+                  <Chip
+                    key={rt.label}
+                    selected={newRecord.type === rt.label}
+                    onPress={() =>
+                      setNewRecord((prev) => ({
+                        ...prev,
+                        type: rt.label,
+                        unit: rt.unit,
+                        secondValue: "",
+                        value: "",
+                        numericValue: "",
+                      }))
+                    }
+                    showSelectedOverlay
+                  >
+                    {rt.label}
+                  </Chip>
+                ))}
+              </View>
+
+              {/* Primary Value */}
+              <TextInput
+                mode="outlined"
+                label={
+                  selectedTypeConfig?.hasSecond
+                    ? "Systolic (upper)"
+                    : `Value (${newRecord.unit})`
+                }
+                value={newRecord.numericValue}
+                onChangeText={(text) => {
+                  const numVal = text;
+                  setNewRecord((prev) => ({
+                    ...prev,
+                    numericValue: numVal,
+                    value: updateDisplayValue(
+                      prev.type,
+                      numVal,
+                      prev.secondValue,
+                    ),
+                  }));
+                }}
+                keyboardType="numeric"
+                style={{ marginBottom: 12 }}
+              />
+
+              {/* Secondary Value (for BP) */}
+              {selectedTypeConfig?.hasSecond && (
+                <TextInput
+                  mode="outlined"
+                  label="Diastolic (lower)"
+                  value={newRecord.secondValue}
+                  onChangeText={(text) => {
+                    const secVal = text;
+                    setNewRecord((prev) => ({
+                      ...prev,
+                      secondValue: secVal,
+                      value: updateDisplayValue(
+                        prev.type,
+                        prev.numericValue,
+                        secVal,
+                      ),
+                    }));
+                  }}
+                  keyboardType="numeric"
+                  style={{ marginBottom: 12 }}
+                />
+              )}
+
+              {/* Display Value (auto-generated or manual) */}
+              <TextInput
+                mode="outlined"
+                label="Display Value"
+                value={newRecord.value}
+                onChangeText={(text) =>
+                  setNewRecord((prev) => ({ ...prev, value: text }))
+                }
+                style={{ marginBottom: 12 }}
+              />
+
+              {/* Note */}
+              <TextInput
+                mode="outlined"
+                label="Note (optional)"
+                value={newRecord.note}
+                onChangeText={(text) =>
+                  setNewRecord((prev) => ({ ...prev, note: text }))
+                }
+                multiline
+                numberOfLines={2}
+                style={{ marginBottom: 16 }}
+              />
+            </ScrollView>
+          </Dialog.ScrollArea>
+          <Dialog.Actions>
+            <Button onPress={() => setAddDialogVisible(false)}>Cancel</Button>
+            <Button
+              mode="contained"
+              onPress={handleAddRecord}
+              loading={saving}
+              disabled={saving || !newRecord.value.trim()}
+            >
+              Save
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 }
@@ -452,7 +774,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingHorizontal: 16,
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   statCard: {
     flex: 1,
@@ -469,11 +791,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  chartCard: { marginHorizontal: 16, borderRadius: 16, marginBottom: 20 },
-  filterSection: { marginBottom: 10 },
+  chartCard: { marginHorizontal: 16, borderRadius: 16, marginBottom: 16 },
+  filterSection: { marginBottom: 8 },
   filterChip: { marginRight: 8 },
   listSection: { paddingHorizontal: 16 },
   sectionTitle: { marginBottom: 12, fontWeight: "bold" },
+  emptyState: { alignItems: "center", padding: 32 },
+  emptyCard: {
+    alignItems: "center",
+    padding: 32,
+    borderRadius: 16,
+    marginBottom: 16,
+  },
 
   // Timeline Styles
   timelineItem: { flexDirection: "row", marginBottom: 0 },
@@ -500,19 +829,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: "#fff",
     marginLeft: 6,
   },
   recordHeader: { padding: 12, flexDirection: "row", alignItems: "center" },
-  recordType: { fontSize: 12, color: "#666", marginBottom: 2 },
+  recordType: { fontSize: 12, marginBottom: 2 },
   recordValue: { fontSize: 15, fontWeight: "600" },
-
-  inputContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 12,
-    paddingBottom: 24,
-  },
+  recordNote: { fontSize: 12, marginTop: 4, fontStyle: "italic" },
 });

@@ -54,7 +54,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
           router.replace("/profile-setup");
         }
       } else if (hasProfile === true) {
-        if (inAuthGroup || (!inCaregiverTabs && !inElderlyTabs)) {
+        if (inAuthGroup || (!inCaregiverTabs && !inElderlyTabs && currentRoute !== "conversation")) {
           const targetTab = role && tabs[role as keyof typeof tabs];
           if (targetTab) {
             router.replace(targetTab);
