@@ -11,7 +11,7 @@ export async function fetchHealthDataForElderly(
   type?: string,
 ): Promise<HealthData[]> {
   const queries = [
-    Query.equal("elderly", elderlyId),
+    Query.equal("elderly_id", elderlyId),
     Query.orderDesc("time"),
     Query.limit(limit),
   ];
@@ -39,7 +39,7 @@ export async function fetchHealthDataInRange(
   type?: string,
 ): Promise<HealthData[]> {
   const queries = [
-    Query.equal("elderly", elderlyId),
+    Query.equal("elderly_id", elderlyId),
     Query.greaterThanEqual("time", startDate),
     Query.lessThanEqual("time", endDate),
     Query.orderDesc("time"),
@@ -75,6 +75,7 @@ export async function createHealthRecord(input: {
 
   const data: Record<string, any> = {
     elderly: input.elderlyId,
+    elderly_id: input.elderlyId,
     type: input.type,
     value: input.value,
     time: now,
@@ -119,7 +120,7 @@ export async function getLatestMetrics(
           databaseId: DATABASE_ID,
           tableId: HEALTH_DATA_TABLE_ID,
           queries: [
-            Query.equal("elderly", elderlyId),
+            Query.equal("elderly_id", elderlyId),
             Query.equal("type", type),
             Query.orderDesc("time"),
             Query.limit(1),
