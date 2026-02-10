@@ -94,13 +94,6 @@ export default function ElderlyTabsLayout() {
 
       {/* Hidden Screens */}
       <Tabs.Screen
-        name="conversation"
-        options={{
-          href: null,
-          title: "Chat",
-        }}
-      />
-      <Tabs.Screen
         name="health-data"
         options={{
           href: null,

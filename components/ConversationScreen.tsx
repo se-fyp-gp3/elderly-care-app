@@ -7,6 +7,7 @@ import {
 } from "@/lib/messaging";
 import { DirectMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     FlatList,
@@ -49,6 +50,7 @@ export default function ConversationScreen({
   contactRole,
 }: ConversationScreenProps) {
   const theme = useTheme();
+  const router = useRouter();
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -276,6 +278,12 @@ export default function ConversationScreen({
     >
       {/* Chat Header */}
       <View style={[styles.chatHeader, { backgroundColor: theme.colors.surface }]}>
+        <IconButton
+          icon="arrow-left"
+          size={24}
+          onPress={() => router.back()}
+          style={styles.backButton}
+        />
         <Avatar.Text
           size={40}
           label={contactName.substring(0, 2).toUpperCase()}
@@ -380,11 +388,14 @@ const styles = StyleSheet.create({
   chatHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingVertical: 12,
-    gap: 12,
+    gap: 8,
     borderBottomWidth: 0.5,
     borderBottomColor: "rgba(0,0,0,0.08)",
+  },
+  backButton: {
+    margin: 0,
   },
   chatHeaderInfo: {
     flex: 1,

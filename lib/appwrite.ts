@@ -1,8 +1,9 @@
-import { Account, Client, TablesDB } from "appwrite";
+import { Account, Client } from "appwrite";
 import { Client as ServerClient, Users } from "node-appwrite";
 import {
     Account as AccountReactNative,
     Client as ClientReactNative,
+    TablesDB,
 } from "react-native-appwrite";
 
 const APPWRITE_ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!;
@@ -29,7 +30,7 @@ export const serverClient = new ServerClient()
 
 export const account = new AccountReactNative(clientReactNative);
 export const accountWeb = new Account(client);
-export const tablesDB = new TablesDB(client);
+export const tablesDB = new TablesDB(clientReactNative);
 export const users = new Users(serverClient);
 
 export const DATABASE_ID = process.env.EXPO_PUBLIC_DB_ID!;
@@ -54,7 +55,7 @@ export const MEDICATION_LOGS_TABLE_ID =
 export const CHAT_SESSION_TABLE_ID =
   process.env.EXPO_PUBLIC_CHAT_SESSION_TABLE_ID!;
 export const DIRECT_MESSAGES_TABLE_ID =
-  process.env.EXPO_PUBLIC_DIRECT_MESSAGES_TABLE_ID!;
+  process.env.EXPO_PUBLIC_DIRECT_MESSAGES_TABLE_ID || "direct_messages";
 
 export interface RealtimeResponse {
   events: string[];

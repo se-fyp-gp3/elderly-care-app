@@ -86,13 +86,6 @@ export default function TabsLayout() {
 
       {/* Hidden Screens */}
       <Tabs.Screen
-        name="conversation"
-        options={{
-          href: null,
-          title: "Chat",
-        }}
-      />
-      <Tabs.Screen
         name="more"
         options={{
           href: null,
