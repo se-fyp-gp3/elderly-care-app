@@ -1,11 +1,11 @@
 import { MedicationItem } from "@/components/MedicationCard";
 import {
-    DATABASE_ID,
-    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-    ELDERLY_MEDICATION_TABLE_ID,
-    MEDICATION_LOGS_TABLE_ID,
-    MEDICATION_TABLE_ID,
-    tablesDB,
+  DATABASE_ID,
+  ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+  ELDERLY_MEDICATION_TABLE_ID,
+  MEDICATION_LOGS_TABLE_ID,
+  MEDICATION_TABLE_ID,
+  tablesDB,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
@@ -17,29 +17,29 @@ import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    AppState,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  AppState,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { ID, Query } from "react-native-appwrite";
 import {
-    Avatar,
-    Button,
-    Card,
-    Chip,
-    Dialog,
-    Divider,
-    FAB,
-    IconButton,
-    Portal,
-    Searchbar,
-    Text,
-    TextInput,
-    useTheme,
+  Avatar,
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  Divider,
+  FAB,
+  IconButton,
+  Portal,
+  Searchbar,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 // Helper to safely extract ID from relationship
@@ -440,7 +440,7 @@ export default function MedicationManagement() {
             medications: dailyMeds,
           };
         })
-        .filter((g) => g.medications.length > 0 || groups.length > 0); // Keep groups even if empty?
+        .filter((g) => g.medications.length > 0); // Keep groups even if empty?
 
       setElderlyGroups(groups);
     } catch (err) {
