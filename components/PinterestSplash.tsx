@@ -21,7 +21,7 @@ export default function PinterestSplash({
   onAnimationComplete,
   children,
 }: PinterestSplashProps) {
-  // 动画值
+  // Animation values
   const logoScale = useSharedValue(0);
   const logoTranslateY = useSharedValue(0);
   const contentTranslateY = useSharedValue(height);
@@ -53,24 +53,24 @@ export default function PinterestSplash({
   };
 
   useEffect(() => {
-    // Pinterest 风格动画序列
-    // 1. Logo 从中间弹出, Logo 弹出效果 - 调整阻尼和刚度改变弹跳效果
+    // Pinterest-style animation sequence
+    // 1. Logo pops from center - adjust damping/stiffness to control bounce
     logoScale.value = withSpring(1, {
-      damping: 10, // 越小弹跳越多
-      stiffness: 80, // 越大速度越快
+      damping: 10, // smaller = more bounce
+      stiffness: 80, // larger = faster
     });
 
-    // 2. Logo 上移并同时内容上滑, 上移动画 - 调整持续时间和距离
+    // 2. Logo moves up while content slides in
     setTimeout(() => {
       logoTranslateY.value = withTiming(-height * 0.15, {
-        duration: 700, // 持续时间
+        duration: 700, // duration
       });
 
       contentTranslateY.value = withTiming(0, {
         duration: 600,
       });
 
-      // 3. 淡出启动画面, 淡出时间
+      // 3. Fade out splash screen
       setTimeout(() => {
         splashOpacity.value = withTiming(
           0,
@@ -83,19 +83,19 @@ export default function PinterestSplash({
             }
           },
         );
-      }, 400); // 延迟淡出
-    }, 800); // 延迟开始上移
+      }, 400); // delay before fade out
+    }, 800); // delay before moving up
   }, []);
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, splashAnimatedStyle]}>
-      {/* 白色背景 */}
+      {/* White background */}
       <View style={styles.background} />
 
-      {/* Logo 容器 */}
+      {/* Logo container */}
       <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
         <View style={styles.logo}>
-          {/* 使用图片替代 */}
+          {/* Use image instead */}
           <Image
             source={require("@/assets/images/logo.png")}
             style={styles.logoImage}
@@ -104,7 +104,7 @@ export default function PinterestSplash({
         </View>
       </Animated.View>
 
-      {/* 应用内容 - 初始在屏幕下方 */}
+      {/* App content - initially below the screen */}
       <Animated.View style={[styles.contentContainer, contentAnimatedStyle]}>
         {children}
       </Animated.View>
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     position: "absolute",
-    top: height / 2 - 40, // 居中
+    top: height / 2 - 40, // centered
     left: width / 2 - 40,
     alignItems: "center",
     justifyContent: "center",

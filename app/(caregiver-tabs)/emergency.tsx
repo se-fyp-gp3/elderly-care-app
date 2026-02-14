@@ -305,7 +305,7 @@ export default function EmergencyPage() {
         <View style={styles.grid}>
           <Card
             style={[styles.gridCard, { backgroundColor: "#FFEBEE" }]}
-            onPress={() => handleCallEmergency("999")}
+            onPress={() => handleCallEmergency("91361140")}
           >
             <Card.Content style={styles.gridContent}>
               <MaterialCommunityIcons
@@ -314,7 +314,7 @@ export default function EmergencyPage() {
                 color="#D32F2F"
               />
               <Text style={[styles.gridLabel, { color: "#D32F2F" }]}>
-                Call 999
+                Call Emergency
               </Text>
             </Card.Content>
           </Card>

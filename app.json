@@ -13,6 +13,11 @@
       "bundleIdentifier": "com.anonymous.elderlycareapp"
     },
     "android": {
+      "minSdkVersion": 26,
+      "permissions": [
+        "ACTIVITY_RECOGNITION",
+        "android.permission.health.READ_STEPS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -43,11 +48,26 @@
       ],
       "expo-web-browser",
       "react-native-localize",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      "./plugins/withHealthConnect"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3d422aed-12f0-497f-99bb-3cba235c693f"
+      }
     }
   }
 }

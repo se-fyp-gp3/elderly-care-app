@@ -133,3 +133,11 @@ export type ChatSession = Models.Row & {
   title: string;
   messages: string;
 };
+
+export type ElderlyDailySteps = Models.Row & {
+  elderlyId: string;
+  date: string;
+  steps: number;
+  lastUpdated: string;
+  source: string;
+};

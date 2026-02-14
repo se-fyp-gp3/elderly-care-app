@@ -19,7 +19,7 @@ export default function ElderlyEmergency() {
       id: "1",
       name: "Emergency Services",
       relation: "Police/Fire/Ambulance",
-      phone: "999",
+      phone: "91361140",
     },
     {
       id: "2",
@@ -79,7 +79,7 @@ export default function ElderlyEmergency() {
             labelStyle={styles.emergencyButtonText}
             contentStyle={styles.emergencyButtonContent}
           >
-            Call 999 Now
+            Call Emergency Now
           </Button>
         </Card.Content>
       </Card>
@@ -124,7 +124,7 @@ export default function ElderlyEmergency() {
       <View style={styles.quickActionsGrid}>
         <Card
           style={[styles.quickActionCard, { backgroundColor: "#FF980020" }]}
-          onPress={() => handleCall("999", "Ambulance")}
+          onPress={() => handleCall("91361140", "Ambulance")}
         >
           <Card.Content style={styles.quickActionContent}>
             <MaterialCommunityIcons
@@ -137,7 +137,7 @@ export default function ElderlyEmergency() {
         </Card>
         <Card
           style={[styles.quickActionCard, { backgroundColor: "#F4433620" }]}
-          onPress={() => handleCall("999", "Police")}
+          onPress={() => handleCall("91361140", "Police")}
         >
           <Card.Content style={styles.quickActionContent}>
             <MaterialCommunityIcons
@@ -150,7 +150,7 @@ export default function ElderlyEmergency() {
         </Card>
         <Card
           style={[styles.quickActionCard, { backgroundColor: "#FF572220" }]}
-          onPress={() => handleCall("999", "Fire")}
+          onPress={() => handleCall("91361140", "Fire")}
         >
           <Card.Content style={styles.quickActionContent}>
             <MaterialCommunityIcons
@@ -163,7 +163,7 @@ export default function ElderlyEmergency() {
         </Card>
         <Card
           style={[styles.quickActionCard, { backgroundColor: "#2196F320" }]}
-          onPress={() => handleCall("999", "Hospital")}
+          onPress={() => handleCall("91361140", "Hospital")}
         >
           <Card.Content style={styles.quickActionContent}>
             <MaterialCommunityIcons

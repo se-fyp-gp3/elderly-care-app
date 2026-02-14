@@ -25,7 +25,7 @@ export default function SplashScreen({
   const theme = useTheme();
   const [assets] = useAssets([require("@/assets/images/logo.png")]);
 
-  // 动画值
+  // Animation values
   const logoScale = useSharedValue(0);
   const logoPosition = useSharedValue(0);
   const logoOpacity = useSharedValue(0);
@@ -54,7 +54,7 @@ export default function SplashScreen({
   };
 
   useEffect(() => {
-    // 启动动画序列
+    // Start animation sequence
     logoOpacity.value = withTiming(1, { duration: 500 });
 
     logoScale.value = withSequence(
@@ -62,12 +62,12 @@ export default function SplashScreen({
       withTiming(1, { duration: 400 }),
     );
 
-    // logo 移动到顶部
+    // Move logo to top
     logoPosition.value = withDelay(
       1000,
       withTiming(-height * 0.3, { duration: 800 }, (finished) => {
         if (finished) {
-          // logo 移动完成后，开始内容动画
+          // After logo move completes, start content animation
           contentOpacity.value = withTiming(1, { duration: 500 });
           contentTranslateY.value = withTiming(
             0,
@@ -108,7 +108,7 @@ export default function SplashScreen({
         </View>
       </Animated.View>
 
-      {/* 应用内容 - 初始时隐藏，动画时显示 */}
+      {/* App content - hidden initially, shown during animation */}
       <Animated.View style={[styles.content, contentAnimatedStyle]}>
         <Text style={styles.welcomeText} variant="titleLarge">
           Welcome to the Elderly Care

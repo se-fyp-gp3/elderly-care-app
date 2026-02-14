@@ -3,6 +3,7 @@ import {
   fetchElderlySchedulesForUser,
   getElderlyByUserId,
 } from "@/lib/elderly";
+import { useStepSync } from "@/lib/hooks/useStepSync";
 import {
   checkAndMarkSkippedMedications,
   fetchActiveMedicationReminders,
@@ -53,6 +54,7 @@ export default function ElderlyHome() {
   const { user } = useAuth();
   const theme = useTheme();
   const router = useRouter();
+  const { todaySteps } = useStepSync();
   const [refreshing, setRefreshing] = React.useState(false);
   const [elderlyProfile, setElderlyProfile] = React.useState<Elderly | null>(
     null,
@@ -250,7 +252,7 @@ export default function ElderlyHome() {
   ];
 
   const handleEmergencyCall = () => {
-    openURL("tel:999");
+    openURL("tel:91361140");
   };
 
   return (
@@ -275,12 +277,6 @@ export default function ElderlyHome() {
           />
           <View style={styles.welcomeText}>
             <Text
-              variant="headlineSmall"
-              style={{ color: theme.colors.onPrimaryContainer }}
-            >
-              Hello, {elderlyProfile?.name || user?.name || "there"}!
-            </Text>
-            <Text
               variant="bodyMedium"
               style={{ color: theme.colors.onPrimaryContainer }}
             >
@@ -301,7 +297,7 @@ export default function ElderlyHome() {
             labelStyle={styles.emergencyButtonText}
             contentStyle={styles.emergencyButtonContent}
           >
-            Emergency Call (999)
+            Emergency Call
           </Button>
         </Card.Content>
       </Card>
@@ -461,7 +457,7 @@ export default function ElderlyHome() {
               variant="bodySmall"
               style={{ color: theme.colors.onSurfaceVariant }}
             >
-              1,234 steps
+              {todaySteps.toLocaleString()} steps
             </Text>
           </View>
         </Card.Content>
