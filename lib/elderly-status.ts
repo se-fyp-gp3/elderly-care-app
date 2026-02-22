@@ -2,6 +2,8 @@ import { ElderlyStatus, HealthData, MedicationLogs } from "@/types/appwrite";
 import { Query } from "react-native-appwrite";
 import {
     DATABASE_ID,
+    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+    ELDERLY_MEDICATION_TABLE_ID,
     HEALTH_DATA_TABLE_ID,
     MEDICATION_LOGS_TABLE_ID,
     SCHEDULE_TABLE_ID,
@@ -108,51 +110,130 @@ export async function computeElderlyStatus(
       reasons.push("No health data recorded");
     }
 
-    // ── 2. Medication logs (last 24h) ───────────────────────────────────
+    // ── 2. Medication status (based on prescription plans + logs) ──────
     try {
-      const yesterday = new Date(
-        Date.now() - 24 * 60 * 60 * 1000,
-      ).toISOString();
-      const medLogsRes = await tablesDB.listRows<MedicationLogs>({
+      // 2a. Fetch prescriptions for this elderly
+      const prescriptionsRes = await tablesDB.listRows<any>({
         databaseId: DATABASE_ID,
-        tableId: MEDICATION_LOGS_TABLE_ID,
+        tableId: ELDERLY_MEDICATION_TABLE_ID,
         queries: [
-          Query.greaterThanEqual("scheduled_at", yesterday),
-          Query.orderDesc("scheduled_at"),
-          Query.limit(50),
+          Query.equal("elderly", elderlyId),
+          Query.limit(100),
         ],
       });
 
-      // Filter client-side for this elderly (relationship field)
-      const logs = medLogsRes.rows as unknown as MedicationLogs[];
-      const elderlyLogs = logs.filter((log) => {
-        const eld = log.elderly;
-        if (typeof eld === "string") return eld === elderlyId;
-        if (eld && typeof eld === "object" && "$id" in eld)
-          return eld.$id === elderlyId;
-        return false;
-      });
+      const prescriptions = prescriptionsRes.rows;
 
-      missedMedCount = elderlyLogs.filter(
-        (l) => l.status === "Missed",
-      ).length;
-      const pendingCount = elderlyLogs.filter(
-        (l) => l.status === "Pending",
-      ).length;
-
-      if (missedMedCount > 0) {
-        status = ElderlyStatus.WARNING;
-        reasons.push(`${missedMedCount} missed medication(s) today`);
-        medicationSummary = `${missedMedCount} missed`;
-      } else if (pendingCount > 0) {
-        medicationSummary = `${pendingCount} pending`;
-      } else if (elderlyLogs.length > 0) {
-        medicationSummary = "All taken";
-      } else {
+      if (prescriptions.length === 0) {
         medicationSummary = "No schedule";
+      } else {
+        // 2b. Fetch reminders to link prescriptions -> logs
+        const remindersRes = await tablesDB.listRows<any>({
+          databaseId: DATABASE_ID,
+          tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+          queries: [
+            Query.equal("elderly", elderlyId),
+            Query.limit(200),
+          ],
+        });
+
+        // Map prescription ID -> reminder ID
+        const prescriptionToReminder = new Map<string, string>();
+        remindersRes.rows.forEach((rem: any) => {
+          const emId = rem.elderly_medication;
+          const pId = typeof emId === "string" ? emId
+            : emId && typeof emId === "object" && "$id" in emId ? emId.$id
+            : Array.isArray(emId) && emId.length > 0
+              ? (typeof emId[0] === "string" ? emId[0] : emId[0]?.$id)
+              : null;
+          if (pId) prescriptionToReminder.set(pId, rem.$id);
+        });
+
+        // Collect all reminder IDs
+        const reminderIds = Array.from(prescriptionToReminder.values());
+
+        // 2c. Fetch today's logs for these reminders
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
+        let takenLogScheduledTimes: Date[] = [];
+        if (reminderIds.length > 0) {
+          const logsRes = await tablesDB.listRows<any>({
+            databaseId: DATABASE_ID,
+            tableId: MEDICATION_LOGS_TABLE_ID,
+            queries: [
+              Query.equal("elderly", elderlyId),
+              Query.greaterThanEqual("scheduled_at", todayStart.toISOString()),
+              Query.lessThanEqual("scheduled_at", todayEnd.toISOString()),
+              Query.limit(200),
+            ],
+          });
+
+          // Collect scheduled times of taken logs
+          takenLogScheduledTimes = logsRes.rows
+            .filter((l: any) => (l.status || "").toLowerCase() === "taken")
+            .map((l: any) => new Date(l.scheduled_at));
+        }
+
+        // 2d. Count total scheduled slots today, and which are taken/missed/pending
+        const now = new Date();
+        let totalSlots = 0;
+        let takenSlots = 0;
+        let missedSlots = 0;
+        let pendingSlots = 0;
+
+        prescriptions.forEach((prescription: any) => {
+          const times: string[] = prescription.approx_times || [];
+          times.forEach((tStr: string) => {
+            const scheduled = new Date();
+            if (tStr.includes("T")) {
+              const d = new Date(tStr);
+              scheduled.setHours(d.getHours(), d.getMinutes(), 0, 0);
+            } else if (tStr.includes(":")) {
+              const parts = tStr.split(":");
+              scheduled.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+            }
+
+            totalSlots++;
+
+            // Check if there's a matching taken log (within 5 min of scheduled time)
+            const isTaken = takenLogScheduledTimes.some((logTime) => {
+              return Math.abs(logTime.getHours() - scheduled.getHours()) === 0
+                && Math.abs(logTime.getMinutes() - scheduled.getMinutes()) < 5;
+            });
+
+            if (isTaken) {
+              takenSlots++;
+            } else if (scheduled < now) {
+              missedSlots++;
+            } else {
+              pendingSlots++;
+            }
+          });
+        });
+
+        missedMedCount = missedSlots;
+
+        if (missedSlots > 0) {
+          status = ElderlyStatus.WARNING;
+          reasons.push(`${missedSlots} missed medication(s) today`);
+          if (pendingSlots > 0) {
+            medicationSummary = `${missedSlots} missed, ${pendingSlots} pending`;
+          } else {
+            medicationSummary = `${missedSlots} missed`;
+          }
+        } else if (pendingSlots > 0) {
+          medicationSummary = `${pendingSlots} pending`;
+        } else if (takenSlots > 0) {
+          medicationSummary = "All taken";
+        } else {
+          medicationSummary = "No schedule";
+        }
       }
     } catch {
-      // Medication logs query may fail if table is empty; ignore
+      // Medication query may fail if table is empty; ignore
       medicationSummary = "Unknown";
     }
 
