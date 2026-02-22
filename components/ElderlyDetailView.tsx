@@ -3,7 +3,6 @@ import React from "react";
 import { Alert, Linking, ScrollView, StyleSheet, View } from "react-native";
 import {
   Avatar,
-  Button,
   Card,
   Chip,
   Divider,
@@ -18,9 +17,9 @@ export interface ElderlyDetailData {
   id: string;
   name: string;
   age?: number;
+  birth?: string;
   gender?: string;
   bloodType?: string;
-  room?: string;
   phone?: string;
   emergencyContact?: string;
   status?: string;
@@ -29,7 +28,6 @@ export interface ElderlyDetailData {
     hr?: string;
     temp?: string;
   };
-  notes?: string;
 }
 
 interface ElderlyDetailViewProps {
@@ -83,16 +81,13 @@ export default function ElderlyDetailView({
               <Chip icon="identifier" style={styles.chip} compact>
                 ID: {data.id || "null"}
               </Chip>
-              <Chip icon="door" style={styles.chip} compact>
-                {data.room || "null"}
-              </Chip>
               <Chip
                 icon="heart-pulse"
                 style={[styles.chip, { backgroundColor: "#E8F5E9" }]}
                 textStyle={{ color: "#2E7D32" }}
                 compact
               >
-                {data.status || "null"}
+                {data.status || "Normal"}
               </Chip>
             </View>
           </View>
@@ -150,7 +145,7 @@ export default function ElderlyDetailView({
               >
                 Blood Pressure
               </Text>
-              <Text variant="titleLarge">{data.lastVitals?.bp || "null"}</Text>
+              <Text variant="titleLarge">{data.lastVitals?.bp || "N/A"}</Text>
             </View>
             <View style={styles.vitalDivider} />
             <View style={styles.vitalItem}>
@@ -160,7 +155,7 @@ export default function ElderlyDetailView({
               >
                 Heart Rate
               </Text>
-              <Text variant="titleLarge">{data.lastVitals?.hr || "null"}</Text>
+              <Text variant="titleLarge">{data.lastVitals?.hr || "N/A"}</Text>
             </View>
             <View style={styles.vitalDivider} />
             <View style={styles.vitalItem}>
@@ -171,7 +166,7 @@ export default function ElderlyDetailView({
                 Temp
               </Text>
               <Text variant="titleLarge">
-                {data.lastVitals?.temp || "null"}
+                {data.lastVitals?.temp || "N/A"}
               </Text>
             </View>
           </View>
@@ -179,7 +174,7 @@ export default function ElderlyDetailView({
       </Card>
 
       {/* Basic Information */}
-      <Card style={styles.sectionCard}>
+      <Card style={[styles.sectionCard, { marginBottom: 30 }]}>
         <Card.Title
           title="Basic Information"
           left={(props) => (
@@ -193,69 +188,61 @@ export default function ElderlyDetailView({
         <Card.Content style={{ padding: 0 }}>
           <List.Item
             title="Age / Gender"
-            description={`${data.age || "null"} years old / ${data.gender || "null"}`}
+            description={`${
+              data.age !== undefined
+                ? `${data.age} years old`
+                : data.birth
+                  ? new Date(data.birth).toLocaleDateString()
+                  : "Unknown"
+            } / ${data.gender || "Unknown"}`}
             left={(props) => <List.Icon {...props} icon="calendar-account" />}
           />
           <Divider />
+          {data.birth && (
+            <>
+              <List.Item
+                title="Date of Birth"
+                description={new Date(data.birth).toLocaleDateString("en-GB", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+                left={(props) => <List.Icon {...props} icon="cake-variant" />}
+              />
+              <Divider />
+            </>
+          )}
+          <Divider />
           <List.Item
             title="Blood Type"
-            description={data.bloodType || "null"}
+            description={data.bloodType || "Unknown"}
             left={(props) => <List.Icon {...props} icon="water" />}
           />
           <Divider />
           <List.Item
             title="Phone"
-            description={data.phone || "null"}
+            description={data.phone || "Not set"}
             left={(props) => <List.Icon {...props} icon="phone" />}
-            right={(props) => (
-              <IconButton
-                {...props}
-                icon="phone-outline"
-                onPress={() => handleCall(data.phone)}
-              />
-            )}
+            right={(props) =>
+              data.phone ? (
+                <IconButton
+                  {...props}
+                  icon="phone-outline"
+                  onPress={() => handleCall(data.phone)}
+                />
+              ) : null
+            }
           />
           <Divider />
           <List.Item
             title="Emergency Contact"
-            description={data.emergencyContact || "null"}
+            description={data.emergencyContact || "Not set"}
             descriptionNumberOfLines={2}
             left={(props) => (
               <List.Icon {...props} icon="alert-circle-outline" />
             )}
           />
         </Card.Content>
-      </Card>
-
-      {/* Care Notes */}
-      <Card style={[styles.sectionCard, { marginBottom: 30 }]}>
-        <Card.Title
-          title="Care Notes"
-          left={(props) => (
-            <MaterialCommunityIcons
-              {...props}
-              name="notebook-outline"
-              size={24}
-            />
-          )}
-        />
-        <Card.Content>
-          <Surface style={styles.noteSurface} elevation={0}>
-            <Text variant="bodyMedium" style={{ lineHeight: 22 }}>
-              {data.notes || "null"}
-            </Text>
-          </Surface>
-        </Card.Content>
-        <Card.Actions>
-          <Button
-            mode="text"
-            onPress={() =>
-              Alert.alert("Edit Note", "Functionality to combine with backend.")
-            }
-          >
-            Edit Note
-          </Button>
-        </Card.Actions>
       </Card>
     </ScrollView>
   );
@@ -324,10 +311,5 @@ const styles = StyleSheet.create({
     width: 1,
     height: "80%",
     backgroundColor: "#E0E0E0",
-  },
-  noteSurface: {
-    backgroundColor: "#F5F5F5",
-    padding: 12,
-    borderRadius: 8,
   },
 });
