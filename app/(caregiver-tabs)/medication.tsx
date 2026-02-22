@@ -105,7 +105,7 @@ export default function MedicationManagement() {
 
   const isMedCardExpanded = (cardKey: string, slotsCount: number): boolean => {
     if (cardKey in medCardExpandState) return medCardExpandState[cardKey];
-    return slotsCount <= 2; // Default: expanded for ≤2 slots, collapsed for ≥3
+    return slotsCount <= 1; // Default: expanded for single slot, collapsed for ≥2
   };
 
   // AppState handling for auto-refresh
@@ -524,7 +524,67 @@ export default function MedicationManagement() {
                     size={24}
                   />
                 </View>
-                <Divider style={{ marginBottom: 12 }} />
+                <Divider style={{ marginBottom: 8 }} />
+
+                {/* Elderly-level timeline summary */}
+                {group.medications.length > 0 && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={{ marginBottom: 12 }}
+                  >
+                    <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 2 }}>
+                      {[...group.medications]
+                        .sort((a, b) => a.time.localeCompare(b.time))
+                        .map((slot) => {
+                          const bgColor =
+                            slot.status === 'completed'
+                              ? theme.colors.primaryContainer
+                              : slot.status === 'missed'
+                                ? theme.colors.errorContainer
+                                : theme.colors.surfaceVariant;
+                          const textColor =
+                            slot.status === 'completed'
+                              ? theme.colors.onPrimaryContainer
+                              : slot.status === 'missed'
+                                ? theme.colors.onErrorContainer
+                                : theme.colors.onSurfaceVariant;
+                          const iconName =
+                            slot.status === 'completed'
+                              ? 'check-circle'
+                              : slot.status === 'missed'
+                                ? 'alert-circle'
+                                : 'clock-outline';
+                          return (
+                            <View
+                              key={slot.id}
+                              style={{
+                                backgroundColor: bgColor,
+                                borderRadius: 6,
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                              }}
+                            >
+                              <MaterialCommunityIcons
+                                name={iconName as any}
+                                size={12}
+                                color={textColor}
+                              />
+                              <Text style={{ fontSize: 11, color: textColor, fontWeight: '600' }}>
+                                {slot.time}
+                              </Text>
+                              <Text style={{ fontSize: 10, color: textColor, opacity: 0.8 }}>
+                                {slot.name.length > 6 ? slot.name.substring(0, 6) + '…' : slot.name}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                    </View>
+                  </ScrollView>
+                )}
 
                 {!collapsedGroups.has(group.elderlyId) &&
                   (group.medications.length === 0 ? (
@@ -564,16 +624,28 @@ export default function MedicationManagement() {
                       let summaryText = '';
                       let summaryIcon = 'information-outline';
                       if (allSlotsDone) {
-                        summaryText = 'All taken';
+                        if (totalSlots === 1) {
+                          summaryText = `${sortedSlots[0].time} · Taken`;
+                        } else {
+                          summaryText = 'All taken';
+                        }
                         summaryIcon = 'check-circle';
                       } else if (nextPendingSlot) {
-                        summaryText = `Next: ${nextPendingSlot.time}`;
-                        summaryIcon = 'clock-outline';
-                        if (slotsMissed > 0) {
-                          summaryText += ` · ${slotsMissed} missed`;
+                        if (totalSlots === 1) {
+                          summaryText = `${nextPendingSlot.time} · Pending`;
+                        } else {
+                          summaryText = `Next: ${nextPendingSlot.time}`;
+                          if (slotsMissed > 0) {
+                            summaryText += ` · ${slotsMissed} missed`;
+                          }
                         }
+                        summaryIcon = 'clock-outline';
                       } else if (slotsMissed > 0) {
-                        summaryText = `${slotsMissed} missed`;
+                        if (totalSlots === 1) {
+                          summaryText = `${sortedSlots[0].time} · Missed`;
+                        } else {
+                          summaryText = `${slotsMissed} missed`;
+                        }
                         summaryIcon = 'alert-circle-outline';
                       }
 
@@ -600,19 +672,19 @@ export default function MedicationManagement() {
                               color={theme.colors.onPrimaryContainer}
                             />
                           )}
-                          right={totalSlots > 1 ? () => (
+                          right={() => (
                             <IconButton
                               icon={isExpanded ? "chevron-up" : "chevron-down"}
-                              onPress={() => toggleMedCard(medCardKey, totalSlots <= 2)}
+                              onPress={() => toggleMedCard(medCardKey, totalSlots <= 1)}
                               size={24}
                             />
-                          ) : undefined}
+                          )}
                         />
                         <Card.Content>
-                          {/* Summary bar for multi-slot medications */}
-                          {totalSlots > 1 && (
+                          {/* Summary bar */}
+                          {!isExpanded && (
                             <TouchableOpacity
-                              onPress={() => toggleMedCard(medCardKey, totalSlots <= 2)}
+                              onPress={() => toggleMedCard(medCardKey, totalSlots <= 1)}
                               activeOpacity={0.7}
                             >
                               <View
@@ -700,8 +772,8 @@ export default function MedicationManagement() {
                             </TouchableOpacity>
                           )}
 
-                          {/* Time slots — visible when expanded or single slot */}
-                          {(isExpanded || totalSlots <= 1) &&
+                          {/* Time slots — visible when expanded */}
+                          {isExpanded &&
                             sortedSlots.map((slot, index) => (
                               <View
                                 key={slot.id}
