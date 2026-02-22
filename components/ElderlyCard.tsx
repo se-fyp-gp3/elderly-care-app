@@ -120,8 +120,25 @@ export default function ElderlyCard({
             <Text variant="bodySmall"> Final Check: {elderly.lastCheck}</Text>
           </View>
           <View style={styles.statRow}>
-            <MaterialCommunityIcons name="pill" size={16} />
-            <Text variant="bodySmall"> Medication: {elderly.medication}</Text>
+            <MaterialCommunityIcons
+              name="pill"
+              size={16}
+              color={
+                elderly.medication?.includes('missed')
+                  ? '#E65100'
+                  : undefined
+              }
+            />
+            <Text
+              variant="bodySmall"
+              style={
+                elderly.medication?.includes('missed')
+                  ? { color: '#E65100', fontWeight: 'bold' }
+                  : undefined
+              }
+            >
+              {' '}Medication: {elderly.medication}
+            </Text>
           </View>
           <View style={styles.statRow}>
             <MaterialCommunityIcons name="calendar" size={16} />
