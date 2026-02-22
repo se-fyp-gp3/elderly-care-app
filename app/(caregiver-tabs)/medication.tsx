@@ -493,7 +493,7 @@ export default function MedicationManagement() {
             </View>
           ) : (
             filteredGroups.map((group) => (
-              <View key={group.elderlyId} style={styles.groupContainer}>
+              <View key={group.elderlyId} style={[styles.groupContainer, { borderColor: theme.colors.outlineVariant }]}>
                 <View style={styles.groupHeader}>
                   <View
                     style={[
@@ -1530,6 +1530,10 @@ const styles = StyleSheet.create({
   },
   groupContainer: {
     marginBottom: 24,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    overflow: 'hidden',
   },
   groupHeader: {
     flexDirection: "row",
