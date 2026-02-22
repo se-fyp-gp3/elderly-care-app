@@ -515,75 +515,61 @@ export default function HealthDataPage() {
 
         {/* Type Filters */}
         <View style={[styles.filterSection, { paddingHorizontal: 16 }]}>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            {/* All pill */}
-            <TouchableOpacity
-              onPress={() => setSearchType("")}
-              style={[
-                styles.typePill,
-                searchType === ""
-                  ? { backgroundColor: theme.colors.primary }
-                  : { backgroundColor: theme.colors.surfaceVariant },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="view-grid-outline"
-                size={14}
-                color={searchType === "" ? "#fff" : theme.colors.onSurfaceVariant}
-                style={{ marginRight: 4 }}
-              />
-              <Text
-                variant="labelMedium"
-                style={{
-                  color: searchType === "" ? "#fff" : theme.colors.onSurfaceVariant,
-                  fontWeight: searchType === "" ? "700" : "400",
-                }}
-              >
-                All
-              </Text>
-            </TouchableOpacity>
-
-            {[
-              "Blood Pressure",
-              "Heart Rate",
-              "Temperature",
-              "Weight",
-              "Blood Sugar",
-              "Oxygen Saturation",
-            ].map((t) => {
-              const color = getTypeColor(t);
-              const icon = getTypeIcon(t);
-              const selected = searchType === t;
-              return (
-                <TouchableOpacity
-                  key={t}
-                  onPress={() => setSearchType(selected ? "" : t)}
-                  style={[
-                    styles.typePill,
-                    selected
-                      ? { backgroundColor: color }
-                      : { backgroundColor: color + "18", borderColor: color + "55", borderWidth: 1 },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={icon as any}
-                    size={14}
-                    color={selected ? "#fff" : color}
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text
-                    variant="labelMedium"
+          {[
+            [
+              { label: "All",            short: "All",   icon: "view-grid-outline", color: "" },
+              { label: "Blood Pressure", short: "BP",    icon: "heart-pulse",       color: "#2196F3" },
+              { label: "Heart Rate",     short: "HR",    icon: "heart-flash",       color: "#F44336" },
+              { label: "Temperature",    short: "Temp",  icon: "thermometer",       color: "#FF9800" },
+            ],
+            [
+              { label: "Weight",            short: "Weight", icon: "scale-bathroom", color: "#4CAF50" },
+              { label: "Blood Sugar",       short: "Sugar",  icon: "water",           color: "#9C27B0" },
+              { label: "Oxygen Saturation", short: "SpO₂",  icon: "lungs",           color: "#00BCD4" },
+            ],
+          ].map((row, rowIdx) => (
+            <View key={rowIdx} style={{ flexDirection: "row", gap: 8, marginBottom: rowIdx === 0 ? 8 : 0 }}>
+              {row.map(({ label, short, icon, color }) => {
+                const selected = searchType === label || (label === "All" && searchType === "");
+                const activeColor = label === "All" ? theme.colors.primary : color;
+                return (
+                  <TouchableOpacity
+                    key={label}
+                    onPress={() => setSearchType(label === "All" ? "" : selected ? "" : label)}
                     style={{
-                      color: selected ? "#fff" : color,
-                      fontWeight: selected ? "700" : "500",
+                      flex: 1,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      paddingVertical: 9,
+                      paddingHorizontal: 6,
+                      borderRadius: 20,
+                      backgroundColor: selected ? activeColor : theme.colors.surfaceVariant,
+                      borderWidth: 1.5,
+                      borderColor: selected ? activeColor : "transparent",
                     }}
                   >
-                    {t}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                    <MaterialCommunityIcons
+                      name={icon as any}
+                      size={14}
+                      color={selected ? "#fff" : activeColor || theme.colors.onSurfaceVariant}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: selected ? "#fff" : theme.colors.onSurfaceVariant,
+                        fontWeight: selected ? "700" : "500",
+                      }}
+                      numberOfLines={1}
+                    >
+                      {short}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
         </View>
 
         {/* Time Range Filters */}
@@ -897,12 +883,19 @@ const styles = StyleSheet.create({
   chartCard: { marginHorizontal: 16, borderRadius: 16, marginBottom: 16 },
   filterSection: { marginBottom: 8 },
   filterChip: { marginRight: 8 },
-  typePill: {
-    flexDirection: "row",
+  typeGridItem: {
+    borderRadius: 12,
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderWidth: 1.5,
+  },
+  typeGridIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   segmentGroup: {
     flexDirection: "row",
