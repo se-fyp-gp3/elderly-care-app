@@ -2,12 +2,12 @@ import AddElderlyDialog from "@/components/AddElderlyDialog";
 import ElderlyCard from "@/components/ElderlyCard";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
+import { calculateAge } from "@/lib/elderly";
 import {
   computeElderlyStatus,
   ElderlyStatusInfo,
   formatLastCheck,
 } from "@/lib/elderly-status";
-import { calculateAge } from "@/lib/elderly";
 import { Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
