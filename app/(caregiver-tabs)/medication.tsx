@@ -1510,6 +1510,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    paddingHorizontal: 12,
   },
   stat: {
     alignItems: "center",
