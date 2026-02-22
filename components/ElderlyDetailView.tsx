@@ -2,15 +2,15 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { Alert, Linking, ScrollView, StyleSheet, View } from "react-native";
 import {
-  Avatar,
-  Card,
-  Chip,
-  Divider,
-  IconButton,
-  List,
-  Surface,
-  Text,
-  useTheme,
+    Avatar,
+    Card,
+    Chip,
+    Divider,
+    IconButton,
+    List,
+    Surface,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 export interface ElderlyDetailData {
