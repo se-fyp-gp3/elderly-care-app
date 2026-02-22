@@ -29,6 +29,7 @@ import {
     Card,
     Chip,
     Dialog,
+    FAB,
     IconButton,
     Portal,
     Surface,
@@ -85,13 +86,6 @@ export default function HealthDataPage() {
           />
           <Text style={{ marginLeft: 5, fontSize: 16 }}>Back</Text>
         </TouchableOpacity>
-      ),
-      headerRight: () => (
-        <IconButton
-          icon="plus-circle"
-          size={28}
-          onPress={() => setAddDialogVisible(true)}
-        />
       ),
     });
   }, [navigation, router, theme]);
@@ -522,59 +516,118 @@ export default function HealthDataPage() {
         )}
 
         {/* Type Filters */}
-        <View style={styles.filterSection}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16 }}
-          >
-            <Chip
-              selected={searchType === ""}
+        <View style={[styles.filterSection, { paddingHorizontal: 16 }]}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {/* All pill */}
+            <TouchableOpacity
               onPress={() => setSearchType("")}
-              style={styles.filterChip}
-              showSelectedOverlay
+              style={[
+                styles.typePill,
+                searchType === ""
+                  ? { backgroundColor: theme.colors.primary }
+                  : { backgroundColor: theme.colors.surfaceVariant },
+              ]}
             >
-              All
-            </Chip>
+              <MaterialCommunityIcons
+                name="view-grid-outline"
+                size={14}
+                color={searchType === "" ? "#fff" : theme.colors.onSurfaceVariant}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                variant="labelMedium"
+                style={{
+                  color: searchType === "" ? "#fff" : theme.colors.onSurfaceVariant,
+                  fontWeight: searchType === "" ? "700" : "400",
+                }}
+              >
+                All
+              </Text>
+            </TouchableOpacity>
+
             {[
               "Blood Pressure",
               "Heart Rate",
               "Temperature",
               "Weight",
               "Blood Sugar",
-            ].map((t) => (
-              <Chip
-                key={t}
-                selected={searchType === t}
-                onPress={() => setSearchType(searchType === t ? "" : t)}
-                style={styles.filterChip}
-                showSelectedOverlay
-              >
-                {t}
-              </Chip>
-            ))}
-          </ScrollView>
+              "Oxygen Saturation",
+            ].map((t) => {
+              const color = getTypeColor(t);
+              const icon = getTypeIcon(t);
+              const selected = searchType === t;
+              return (
+                <TouchableOpacity
+                  key={t}
+                  onPress={() => setSearchType(selected ? "" : t)}
+                  style={[
+                    styles.typePill,
+                    selected
+                      ? { backgroundColor: color }
+                      : { backgroundColor: color + "18", borderColor: color + "55", borderWidth: 1 },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={icon as any}
+                    size={14}
+                    color={selected ? "#fff" : color}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    variant="labelMedium"
+                    style={{
+                      color: selected ? "#fff" : color,
+                      fontWeight: selected ? "700" : "500",
+                    }}
+                  >
+                    {t}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* Time Range Filters */}
-        <View style={styles.filterSection}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16 }}
+        <View style={[styles.filterSection, { paddingHorizontal: 16, marginBottom: 12 }]}>
+          <View
+            style={[
+              styles.segmentGroup,
+              { backgroundColor: theme.colors.surfaceVariant },
+            ]}
           >
-            {(["all", "24h", "7d", "30d"] as const).map((range) => (
-              <Chip
-                key={range}
-                selected={filterRange === range}
-                onPress={() => setFilterRange(range)}
-                style={styles.filterChip}
-                showSelectedOverlay
-              >
-                {range.toUpperCase()}
-              </Chip>
-            ))}
-          </ScrollView>
+            {(["all", "24h", "7d", "30d"] as const).map((range, idx, arr) => {
+              const selected = filterRange === range;
+              return (
+                <TouchableOpacity
+                  key={range}
+                  onPress={() => setFilterRange(range)}
+                  style={[
+                    styles.segmentItem,
+                    selected && {
+                      backgroundColor: theme.colors.surface,
+                      shadowColor: "#000",
+                      shadowOpacity: 0.08,
+                      shadowRadius: 4,
+                      elevation: 2,
+                    },
+                    idx === 0 && { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 },
+                    idx === arr.length - 1 && { borderTopRightRadius: 10, borderBottomRightRadius: 10 },
+                  ]}
+                >
+                  <Text
+                    variant="labelMedium"
+                    style={{
+                      color: selected ? theme.colors.primary : theme.colors.onSurfaceVariant,
+                      fontWeight: selected ? "700" : "400",
+                    }}
+                  >
+                    {range.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* Records List */}
@@ -641,10 +694,10 @@ export default function HealthDataPage() {
           <Dialog.Title>Add Health Record</Dialog.Title>
           <Dialog.ScrollArea style={{ paddingHorizontal: 0 }}>
             <ScrollView style={{ paddingHorizontal: 24 }}>
-              {/* Type Selection */}
+              {/* Type Selection – icon card grid */}
               <Text
                 variant="labelLarge"
-                style={{ marginBottom: 8, marginTop: 8 }}
+                style={{ marginBottom: 10, marginTop: 8 }}
               >
                 Type
               </Text>
@@ -652,29 +705,74 @@ export default function HealthDataPage() {
                 style={{
                   flexDirection: "row",
                   flexWrap: "wrap",
-                  gap: 8,
+                  gap: 10,
                   marginBottom: 16,
                 }}
               >
-                {recordTypes.map((rt) => (
-                  <Chip
-                    key={rt.label}
-                    selected={newRecord.type === rt.label}
-                    onPress={() =>
-                      setNewRecord((prev) => ({
-                        ...prev,
-                        type: rt.label,
-                        unit: rt.unit,
-                        secondValue: "",
-                        value: "",
-                        numericValue: "",
-                      }))
-                    }
-                    showSelectedOverlay
-                  >
-                    {rt.label}
-                  </Chip>
-                ))}
+                {recordTypes.map((rt) => {
+                  const color = getTypeColor(rt.label);
+                  const icon = getTypeIcon(rt.label);
+                  const selected = newRecord.type === rt.label;
+                  return (
+                    <TouchableOpacity
+                      key={rt.label}
+                      onPress={() =>
+                        setNewRecord((prev) => ({
+                          ...prev,
+                          type: rt.label,
+                          unit: rt.unit,
+                          secondValue: "",
+                          value: "",
+                          numericValue: "",
+                        }))
+                      }
+                      style={{
+                        width: "30%",
+                        borderRadius: 12,
+                        paddingVertical: 12,
+                        paddingHorizontal: 6,
+                        alignItems: "center",
+                        backgroundColor: selected
+                          ? color + "22"
+                          : theme.colors.surfaceVariant,
+                        borderWidth: selected ? 2 : 1,
+                        borderColor: selected
+                          ? color
+                          : theme.colors.outlineVariant,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: selected ? color + "33" : color + "18",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <MaterialCommunityIcons
+                          name={icon as any}
+                          size={20}
+                          color={color}
+                        />
+                      </View>
+                      <Text
+                        variant="labelSmall"
+                        style={{
+                          textAlign: "center",
+                          color: selected ? color : theme.colors.onSurfaceVariant,
+                          fontWeight: selected ? "700" : "400",
+                          lineHeight: 14,
+                        }}
+                        numberOfLines={2}
+                      >
+                        {rt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               {/* Primary Value */}
@@ -763,6 +861,13 @@ export default function HealthDataPage() {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+
+      {/* Floating Action Button */}
+      <FAB
+        icon="plus"
+        style={styles.fab}
+        onPress={() => setAddDialogVisible(true)}
+      />
     </View>
   );
 }
@@ -794,6 +899,24 @@ const styles = StyleSheet.create({
   chartCard: { marginHorizontal: 16, borderRadius: 16, marginBottom: 16 },
   filterSection: { marginBottom: 8 },
   filterChip: { marginRight: 8 },
+  typePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
+  segmentGroup: {
+    flexDirection: "row",
+    borderRadius: 10,
+    padding: 3,
+  },
+  segmentItem: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 8,
+  },
   listSection: { paddingHorizontal: 16 },
   sectionTitle: { marginBottom: 12, fontWeight: "bold" },
   emptyState: { alignItems: "center", padding: 32 },
@@ -835,4 +958,10 @@ const styles = StyleSheet.create({
   recordType: { fontSize: 12, marginBottom: 2 },
   recordValue: { fontSize: 15, fontWeight: "600" },
   recordNote: { fontSize: 12, marginTop: 4, fontStyle: "italic" },
+  fab: {
+    position: "absolute",
+    margin: 16,
+    right: 0,
+    bottom: 0,
+  },
 });
