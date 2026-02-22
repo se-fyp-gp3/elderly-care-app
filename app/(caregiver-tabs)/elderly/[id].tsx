@@ -1,5 +1,5 @@
 import ElderlyDetailView, {
-  ElderlyDetailData,
+    ElderlyDetailData,
 } from "@/components/ElderlyDetailView";
 import { DATABASE_ID, ELDERLY_TABLE_ID, tablesDB } from "@/lib/appwrite";
 import { getLatestMetrics } from "@/lib/health-data";
