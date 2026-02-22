@@ -15,7 +15,7 @@ import {
 } from "@/lib/elderly-status";
 import { CaregiverElderly, Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React from "react";
 import {
   Alert,
@@ -165,9 +165,11 @@ export default function CaregiverDashboard() {
     }
   }, [user]);
 
-  React.useEffect(() => {
-    fetchElderlyData();
-  }, [fetchElderlyData]);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchElderlyData();
+    }, [fetchElderlyData]),
+  );
 
   const router = useRouter();
 
@@ -354,6 +356,21 @@ export default function CaregiverDashboard() {
             <Text variant="titleLarge" style={styles.sectionTitle}>
               Responsible elderly
             </Text>
+            {elderlyList.filter((e) => e.status === ElderlyStatus.WARNING).length > 0 && (
+              <View
+                style={{
+                  backgroundColor: "#FF9800",
+                  borderRadius: 12,
+                  paddingHorizontal: 10,
+                  paddingVertical: 3,
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 13 }}>
+                  {elderlyList.filter((e) => e.status === ElderlyStatus.WARNING).length} needs attention
+                </Text>
+              </View>
+            )}
           </View>
 
           {loading && (
