@@ -2,6 +2,7 @@ import ElderlyDetailView, {
   ElderlyDetailData,
 } from "@/components/ElderlyDetailView";
 import { DATABASE_ID, ELDERLY_TABLE_ID, tablesDB } from "@/lib/appwrite";
+import { getLatestMetrics } from "@/lib/health-data";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -28,30 +29,54 @@ export default function ElderlyDetailPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Fetch document using tablesDB.getRow
-        const doc = await tablesDB.getRow({
-          databaseId: DATABASE_ID,
-          tableId: ELDERLY_TABLE_ID,
-          rowId: docId,
-        });
+        // Fetch elderly document and latest vitals in parallel
+        const [doc, vitals] = await Promise.all([
+          tablesDB.getRow({
+            databaseId: DATABASE_ID,
+            tableId: ELDERLY_TABLE_ID,
+            rowId: docId,
+          }),
+          getLatestMetrics(docId),
+        ]);
+
+        // Calculate age from birth date
+        const birthDate = doc.birth ? new Date(doc.birth) : null;
+        const age = birthDate
+          ? Math.floor(
+              (Date.now() - birthDate.getTime()) /
+                (1000 * 60 * 60 * 24 * 365.25),
+            )
+          : undefined;
+
+        // Map latest vitals from health data
+        const bpData = vitals["Blood Pressure"];
+        const hrData = vitals["Heart Rate"];
+        const tempData = vitals["Temperature"];
+
+        const bp = bpData
+          ? bpData.numeric_value && bpData.second_value
+            ? `${bpData.numeric_value}/${bpData.second_value} mmHg`
+            : bpData.value || undefined
+          : undefined;
+        const hr = hrData
+          ? `${hrData.numeric_value ?? hrData.value} ${hrData.unit || "bpm"}`
+          : undefined;
+        const temp = tempData
+          ? `${tempData.numeric_value ?? tempData.value} ${tempData.unit || "°C"}`
+          : undefined;
 
         // Map Appwrite document to our component data structure
         const mappedData: ElderlyDetailData = {
           id: doc.$id,
           name: doc.name || "Unknown",
-          age: doc.age || 0,
-          gender: doc.gender || "Unknown", // Assuming these fields exist in collection
-          bloodType: doc.bloodType || "Unknown",
-          room: doc.room || "Unknown",
-          phone: doc.phone || "",
-          emergencyContact: doc.emergencyContact || "Not set",
+          age,
+          birth: doc.birth || undefined,
+          gender: doc.gender || undefined,
+          bloodType: doc.blood_type || undefined,
+          phone: doc.phone || undefined,
+          emergencyContact: doc.emergency_contact || undefined,
           status: doc.status || "Normal",
-          lastVitals: {
-            bp: doc.bp || "120/80",
-            hr: doc.hr ? `${doc.hr} bpm` : "70 bpm",
-            temp: doc.temp ? `${doc.temp}°C` : "36.5°C",
-          },
-          notes: doc.notes || "No notes available.",
+          lastVitals: { bp, hr, temp },
         };
 
         setData(mappedData);
