@@ -1,19 +1,14 @@
 import AddElderlyDialog from "@/components/AddElderlyDialog";
-import ElderlyCard from "@/components/ElderlyCard"; // Import the new component
-import {
-  CAREGIVER_ELDERLY_TABLE_ID,
-  DATABASE_ID,
-  ELDERLY_TABLE_ID,
-  tablesDB,
-} from "@/lib/appwrite";
+import ElderlyCard from "@/components/ElderlyCard";
 import { useAuth } from "@/lib/auth-context";
-import { getCaregiverByUserId } from "@/lib/caregiver";
+import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
   computeElderlyStatus,
   ElderlyStatusInfo,
   formatLastCheck,
 } from "@/lib/elderly-status";
-import { CaregiverElderly, Elderly, ElderlyStatus } from "@/types/appwrite";
+import { calculateAge } from "@/lib/elderly";
+import { Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React from "react";
@@ -25,7 +20,6 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { Query } from "react-native-appwrite";
 import {
   Avatar,
   Button,
@@ -47,18 +41,6 @@ interface ElderlyListItem extends Elderly {
   statusInfo?: ElderlyStatusInfo;
 }
 
-const calculateAge = (birthDateString?: string | null): number | undefined => {
-  if (!birthDateString) return undefined;
-  const birthDate = new Date(birthDateString);
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-};
-
 export default function CaregiverDashboard() {
   const { preferences, user } = useAuth();
   const theme = useTheme();
@@ -74,87 +56,45 @@ export default function CaregiverDashboard() {
 
       const caregiver = await getCaregiverByUserId(user.$id);
       if (!caregiver) {
-        // If checking for caregiver profile fails or doesn't exist yet,
-        // we treat it as having no elderly
+        // If caregiver profile does not exist yet, treat it as having no linked elderly
         setElderlyList([]);
         return;
       }
 
-      const response = await tablesDB.listRows<CaregiverElderly>({
-        databaseId: DATABASE_ID,
-        tableId: CAREGIVER_ELDERLY_TABLE_ID,
-        queries: [
-          Query.equal("caregiver", caregiver.$id),
-          Query.orderDesc("$createdAt"),
-        ],
-      });
+      // Use lib helper to resolve linked elderly (handles expanded objects and raw IDs)
+      const linkedElderly = await getLinkedElderly(caregiver.$id);
 
-      // Extract elderly from the relationship rows.
-      // Check if Appwrite returns objects (expanded) or IDs (strings)
-      const rawItems = response.rows.flatMap((row) => row.elderly);
-
-      const loadedElderly: Elderly[] = [];
-      const idsToFetch: string[] = [];
-
-      // Separate already loaded objects from IDs that need fetching
-      for (const item of rawItems) {
-        if (typeof item === "string") {
-          idsToFetch.push(item);
-        } else if (item && typeof item === "object" && "$id" in item) {
-          loadedElderly.push(item as Elderly);
-        }
-      }
-
-      // If we have IDs to fetch, get their details
-      if (idsToFetch.length > 0) {
-        // Remove duplicates IDs before querying
-        const uniqueIds = [...new Set(idsToFetch)];
-
-        // Fetch in chunks if needed, but for now single batch
-        const detailsResponse = await tablesDB.listRows<Elderly>({
-          databaseId: DATABASE_ID,
-          tableId: ELDERLY_TABLE_ID,
-          queries: [Query.equal("$id", uniqueIds), Query.limit(100)],
-        });
-        loadedElderly.push(...detailsResponse.rows);
-      }
-
-      // Deduplicate by ID just in case (mix of expanded and fetched)
-      const uniqueElderly = Array.from(
-        new Map(loadedElderly.map((item) => [item.$id, item])).values(),
-      );
-
-      // First set basic data immediately so UI is not empty
-      const basicData: ElderlyListItem[] = uniqueElderly.map((row) => ({
-        ...row,
-        age: calculateAge(row.birth),
+      // Show placeholder rows immediately so the UI is not empty while statuses load
+      const elderlyListWithPlaceholders: ElderlyListItem[] = linkedElderly.map((elderly) => ({
+        ...elderly,
+        age: calculateAge(elderly.birth),
         lastCheck: "Loading...",
         medication: "Loading...",
         nextAppointment: "Loading...",
       }));
-      setElderlyList(basicData);
+      setElderlyList(elderlyListWithPlaceholders);
 
-      // Then compute real status for each elderly in background
+      // Fetch real statuses for every elderly person in parallel
       const statusResults = await Promise.all(
-        uniqueElderly.map((row) => computeElderlyStatus(row.$id)),
+        linkedElderly.map((elderly) => computeElderlyStatus(elderly.$id)),
       );
 
-      const transformedData: ElderlyListItem[] = uniqueElderly.map(
-        (row, i) => {
-          const info = statusResults[i];
+      const elderlyListWithStatus: ElderlyListItem[] = linkedElderly.map(
+        (elderly, i) => {
+          const statusInfo = statusResults[i];
           return {
-            ...row,
-            age: calculateAge(row.birth),
-            status: info.status,
-            lastCheck: formatLastCheck(info.lastCheckTime),
-            medication: info.medicationSummary,
-            nextAppointment: info.nextAppointment || "None",
-            statusInfo: info,
+            ...elderly,
+            age: calculateAge(elderly.birth),
+            status: statusInfo.status,
+            lastCheck: formatLastCheck(statusInfo.lastCheckTime),
+            medication: statusInfo.medicationSummary,
+            nextAppointment: statusInfo.nextAppointment || "None",
+            statusInfo,
           };
         },
       );
 
-      setElderlyList(transformedData);
+      setElderlyList(elderlyListWithStatus);
     } catch (err: any) {
       console.error("Error fetching elderly data:", err);
       setError(err.message || "Failed to load elderly data");
@@ -235,12 +175,12 @@ export default function CaregiverDashboard() {
 
   const [infoVisible, setInfoVisible] = React.useState(false);
   const [selectedElderly, setSelectedElderly] = React.useState<any>(null);
-  const [selectionVisible, setSelectionVisible] = React.useState(false); // New State for Health Data Selection
+  const [healthDataDialogVisible, setHealthDataDialogVisible] = React.useState(false);
   const [addElderlyVisible, setAddElderlyVisible] = React.useState(false);
 
   const handleQuickAction = (route: string) => {
     if (route === "health-data") {
-      setSelectionVisible(true);
+      setHealthDataDialogVisible(true);
     } else {
       router.push(route as any);
     }
@@ -420,10 +360,10 @@ export default function CaregiverDashboard() {
       </ScrollView>
 
       <Portal>
-        {/* Health Data Selection Dialog */}
+        {/* Health Data Elderly Selection Dialog */}
         <Dialog
-          visible={selectionVisible}
-          onDismiss={() => setSelectionVisible(false)}
+          visible={healthDataDialogVisible}
+          onDismiss={() => setHealthDataDialogVisible(false)}
         >
           <Dialog.Title>Select Health Data</Dialog.Title>
           <Dialog.ScrollArea>
@@ -446,7 +386,7 @@ export default function CaregiverDashboard() {
                       />
                     )}
                     onPress={() => {
-                      setSelectionVisible(false);
+                      setHealthDataDialogVisible(false);
                       router.push(
                         `/health-data?elderlyId=${item.$id}&elderlyName=${encodeURIComponent(item.name)}` as any,
                       );
@@ -464,7 +404,7 @@ export default function CaregiverDashboard() {
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
-            <Button onPress={() => setSelectionVisible(false)}>Cancel</Button>
+            <Button onPress={() => setHealthDataDialogVisible(false)}>Cancel</Button>
           </Dialog.Actions>
         </Dialog>
 

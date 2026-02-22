@@ -2,6 +2,7 @@ import {
   createHealthRecord,
   fetchHealthDataForElderly,
   getLatestMetrics,
+  HEALTH_METRIC_TYPES,
 } from "@/lib/health-data";
 import { HealthData } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -129,8 +130,8 @@ export default function HealthDataPage() {
     })();
 
     return records.filter((r) => {
-      const t = r.time ? new Date(r.time) : null;
-      if (t && t < cutoff) return false;
+      const recordTime = r.time ? new Date(r.time) : null;
+      if (recordTime && recordTime < cutoff) return false;
       if (searchType && r.type?.toLowerCase() !== searchType.toLowerCase())
         return false;
       return true;
@@ -152,8 +153,8 @@ export default function HealthDataPage() {
     return {
       labels: bpRecords.map((r) => {
         if (!r.time) return "";
-        const d = new Date(r.time);
-        return `${d.getMonth() + 1}/${d.getDate()}`;
+        const recordDate = new Date(r.time);
+        return `${recordDate.getMonth() + 1}/${recordDate.getDate()}`;
       }),
       datasets: [
         {
@@ -255,25 +256,15 @@ export default function HealthDataPage() {
 
   const formatTime = (timeStr: string | null) => {
     if (!timeStr) return { time: "--:--", date: "" };
-    const d = new Date(timeStr);
+    const parsedDate = new Date(timeStr);
     return {
-      time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      date: d.toLocaleDateString([], { month: "short", day: "numeric" }),
+      time: parsedDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      date: parsedDate.toLocaleDateString([], { month: "short", day: "numeric" }),
     };
   };
 
-  // Record type options for the add dialog
-  const recordTypes = [
-    { label: "Blood Pressure", unit: "mmHg", hasSecond: true },
-    { label: "Heart Rate", unit: "bpm", hasSecond: false },
-    { label: "Temperature", unit: "°C", hasSecond: false },
-    { label: "Weight", unit: "kg", hasSecond: false },
-    { label: "Blood Sugar", unit: "mg/dL", hasSecond: false },
-    { label: "Oxygen Saturation", unit: "%", hasSecond: false },
-  ];
-
-  const selectedTypeConfig = recordTypes.find(
-    (t) => t.label === newRecord.type,
+  const selectedTypeConfig = HEALTH_METRIC_TYPES.find(
+    (metricType) => metricType.label === newRecord.type,
   );
 
   // Update display value when numeric values change
@@ -282,11 +273,11 @@ export default function HealthDataPage() {
     primary: string,
     secondary: string,
   ) => {
-    const config = recordTypes.find((t) => t.label === type);
-    if (config?.hasSecond && primary && secondary) {
-      return `${primary}/${secondary} ${config.unit}`;
+    const typeConfig = HEALTH_METRIC_TYPES.find((metricType) => metricType.label === type);
+    if (typeConfig?.hasSecond && primary && secondary) {
+      return `${primary}/${secondary} ${typeConfig.unit}`;
     } else if (primary) {
-      return `${primary} ${config?.unit || ""}`;
+      return `${primary} ${typeConfig?.unit || ""}`;
     }
     return "";
   };
@@ -693,18 +684,18 @@ export default function HealthDataPage() {
                   marginBottom: 16,
                 }}
               >
-                {recordTypes.map((rt) => {
-                  const color = getTypeColor(rt.label);
-                  const icon = getTypeIcon(rt.label);
-                  const selected = newRecord.type === rt.label;
+                {HEALTH_METRIC_TYPES.map((recordType) => {
+                  const color = getTypeColor(recordType.label);
+                  const icon = getTypeIcon(recordType.label);
+                  const selected = newRecord.type === recordType.label;
                   return (
                     <TouchableOpacity
-                      key={rt.label}
+                      key={recordType.label}
                       onPress={() =>
                         setNewRecord((prev) => ({
                           ...prev,
-                          type: rt.label,
-                          unit: rt.unit,
+                          type: recordType.label,
+                          unit: recordType.unit,
                           secondValue: "",
                           value: "",
                           numericValue: "",
@@ -752,7 +743,7 @@ export default function HealthDataPage() {
                         }}
                         numberOfLines={2}
                       >
-                        {rt.label}
+                        {recordType.label}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -769,13 +760,13 @@ export default function HealthDataPage() {
                 }
                 value={newRecord.numericValue}
                 onChangeText={(text) => {
-                  const numVal = text;
+                  const primaryValue = text;
                   setNewRecord((prev) => ({
                     ...prev,
-                    numericValue: numVal,
+                    numericValue: primaryValue,
                     value: updateDisplayValue(
                       prev.type,
-                      numVal,
+                      primaryValue,
                       prev.secondValue,
                     ),
                   }));
@@ -791,14 +782,14 @@ export default function HealthDataPage() {
                   label="Diastolic (lower)"
                   value={newRecord.secondValue}
                   onChangeText={(text) => {
-                    const secVal = text;
+                    const secondaryValue = text;
                     setNewRecord((prev) => ({
                       ...prev,
-                      secondValue: secVal,
+                      secondValue: secondaryValue,
                       value: updateDisplayValue(
                         prev.type,
                         prev.numericValue,
-                        secVal,
+                        secondaryValue,
                       ),
                     }));
                   }}

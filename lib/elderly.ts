@@ -22,6 +22,22 @@ import {
   tablesDB,
 } from "./appwrite";
 
+/**
+ * Calculate an elderly person's age from their birth date string.
+ * Returns undefined if no birth date is provided.
+ */
+export function calculateAge(birthDateString?: string | null): number | undefined {
+  if (!birthDateString) return undefined;
+  const birthDate = new Date(birthDateString);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 export async function createElderlyProfile(data: Elderly): Promise<Elderly> {
   const document = await tablesDB.createRow<Elderly>({
     databaseId: DATABASE_ID,
