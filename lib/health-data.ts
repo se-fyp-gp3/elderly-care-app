@@ -3,6 +3,23 @@ import { ID, Query } from "react-native-appwrite";
 import { DATABASE_ID, HEALTH_DATA_TABLE_ID, tablesDB } from "./appwrite";
 
 /**
+ * Configuration for each supported health metric type,
+ * including its unit and whether it requires a secondary value (e.g. diastolic BP).
+ */
+export const HEALTH_METRIC_TYPES: {
+  label: string;
+  unit: string;
+  hasSecond: boolean;
+}[] = [
+  { label: "Blood Pressure",      unit: "mmHg", hasSecond: true  },
+  { label: "Heart Rate",          unit: "bpm",  hasSecond: false },
+  { label: "Temperature",         unit: "°C",   hasSecond: false },
+  { label: "Weight",              unit: "kg",   hasSecond: false },
+  { label: "Blood Sugar",         unit: "mg/dL",hasSecond: false },
+  { label: "Oxygen Saturation",   unit: "%",    hasSecond: false },
+];
+
+/**
  * Fetch health data records for a specific elderly person.
  */
 export async function fetchHealthDataForElderly(

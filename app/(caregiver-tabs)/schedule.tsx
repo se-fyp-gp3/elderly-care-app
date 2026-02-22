@@ -1,23 +1,16 @@
-import {
-  DATABASE_ID,
-  ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-  ELDERLY_MEDICATION_TABLE_ID,
-  MEDICATION_LOGS_TABLE_ID,
-  MEDICATION_TABLE_ID,
-  SCHEDULE_CATEGORY_TABLE_ID,
-  SCHEDULE_TABLE_ID,
-  tablesDB,
-} from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
-  Elderly,
-  ElderlyMedication,
-  Medication,
-  Schedule,
-  ScheduleCategory,
-  ScheduleStatus,
-} from "@/types/appwrite";
+  createScheduleTask,
+  fetchDayMedicationEvents,
+  fetchDayScheduleEvents,
+  fetchScheduleCategories,
+  markScheduleTaskCompleted,
+  recordMedicationTaken,
+  ScheduleEvent,
+  undoMedicationTaken,
+} from "@/lib/schedule";
+import { Elderly, ScheduleCategory, ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Notifications from "expo-notifications";
@@ -37,7 +30,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ID, Query } from "react-native-appwrite";
+
 import {
   Avatar,
   Button,
@@ -54,32 +47,6 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
-
-type ScheduleEvent = {
-  id: string;
-  time: string;
-  title: string;
-  description: string;
-  type: string;
-  status: ScheduleStatus;
-  elderlyName: string;
-  elderlyId: string;
-  rawDate: string;
-  medicationData?: {
-    realId: string;
-    logId?: string;
-    reminderId?: string;
-    name: string;
-    time: string;
-  };
-};
-
-const getRelationshipId = (val: any) => {
-  if (!val) return null;
-  if (typeof val === "string") return val;
-  if (typeof val === "object" && val.$id) return val.$id;
-  return null;
-};
 
 export default function SchedulePage() {
   const theme = useTheme();
@@ -143,11 +110,8 @@ export default function SchedulePage() {
   // Fetch Categories
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await tablesDB.listRows<ScheduleCategory>({
-        databaseId: DATABASE_ID,
-        tableId: SCHEDULE_CATEGORY_TABLE_ID,
-      });
-      setCategories(response.rows);
+      const rows = await fetchScheduleCategories();
+      setCategories(rows);
     } catch (err) {
       console.error("Error fetching categories", err);
     }
@@ -158,283 +122,32 @@ export default function SchedulePage() {
     if (!user) return;
     setLoading(true);
     try {
-      // 1. Get Caregiver & Linked Elderly
       const caregiver = await getCaregiverByUserId(user.$id);
       if (!caregiver) {
         setLoading(false);
         return;
       }
 
-      const elderly = await getLinkedElderly(caregiver.$id);
-      setLinkedElderly(elderly);
+      const elderlyList = await getLinkedElderly(caregiver.$id);
+      setLinkedElderly(elderlyList);
 
-      if (elderly.length === 0) {
+      if (elderlyList.length === 0) {
         setEvents([]);
         setLoading(false);
         return;
       }
 
-      const elderlyIds = elderly.map((e) => e.$id);
-      const elderlyMap = new Map(elderly.map((e) => [e.$id, e.name]));
+      const elderlyIds = elderlyList.map((elderly) => elderly.$id);
+      const elderlyMap = new Map(
+        elderlyList.map((elderly) => [elderly.$id, elderly.name]),
+      );
 
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      // --- FETCH 1: GENERIC SCHEDULES ---
-      const schedulePromise = tablesDB.listRows<Schedule>({
-        databaseId: DATABASE_ID,
-        tableId: SCHEDULE_TABLE_ID,
-        queries: [
-          Query.greaterThanEqual("time", startOfDay.toISOString()),
-          Query.lessThanEqual("time", endOfDay.toISOString()),
-          Query.equal("elderly", elderlyIds),
-          Query.limit(100),
-          Query.orderAsc("time"),
-        ],
-      });
-
-      // --- FETCH 2: MEDICATIONS ---
-      const medicationPromise = (async () => {
-        const emResponse = await tablesDB.listRows<ElderlyMedication>({
-          databaseId: DATABASE_ID,
-          tableId: ELDERLY_MEDICATION_TABLE_ID,
-          queries: [Query.equal("elderly", elderlyIds), Query.limit(100)],
-        });
-
-        const remindersResponse = await tablesDB.listRows<any>({
-          databaseId: DATABASE_ID,
-          tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-          queries: [Query.equal("elderly", elderlyIds), Query.limit(100)],
-        });
-        const emToReminderMap = new Map<string, string>();
-        remindersResponse.rows.forEach((rem) => {
-          const emId = getRelationshipId(rem.elderly_medication);
-          if (emId) emToReminderMap.set(emId, rem.$id);
-        });
-
-        const medIds = new Set<string>();
-        emResponse.rows.forEach((row) => {
-          const mId = getRelationshipId(row.medication);
-          if (mId) medIds.add(mId);
-        });
-        const medMap = new Map<string, Medication>();
-        if (medIds.size > 0) {
-          const medRes = await tablesDB.listRows<Medication>({
-            databaseId: DATABASE_ID,
-            tableId: MEDICATION_TABLE_ID,
-            queries: [Query.equal("$id", Array.from(medIds))],
-          });
-          medRes.rows.forEach((m) => medMap.set(m.$id, m));
-        }
-
-        const logStart = new Date(startOfDay);
-        logStart.setDate(logStart.getDate() - 1);
-        const logEnd = new Date(endOfDay);
-        logEnd.setDate(logEnd.getDate() + 1);
-
-        const logsResponse = await tablesDB.listRows<any>({
-          databaseId: DATABASE_ID,
-          tableId: MEDICATION_LOGS_TABLE_ID,
-          queries: [
-            Query.equal("elderly", elderlyIds),
-            Query.greaterThanEqual("scheduled_at", logStart.toISOString()),
-            Query.lessThanEqual("scheduled_at", logEnd.toISOString()),
-            Query.limit(100),
-          ],
-        });
-
-        const medEvents: ScheduleEvent[] = [];
-
-        emResponse.rows.forEach((em) => {
-          const eId = getRelationshipId(em.elderly);
-          if (!eId) return;
-          const elderlyName = elderlyMap.get(eId) || "Unknown";
-
-          const mId = getRelationshipId(em.medication);
-          const medInfo = mId ? medMap.get(mId) : null;
-          const medName = medInfo?.name || "Unknown Drug";
-          const dosage = `${em.dosage || ""} ${medInfo?.unit || ""}`;
-
-          const times = em.approx_times || [];
-          const reminderId = emToReminderMap.get(em.$id);
-
-          let potentialLogs = [];
-          if (reminderId) {
-            potentialLogs = logsResponse.rows.filter(
-              (l) =>
-                getRelationshipId(l.elderly_medication_reminder) === reminderId,
-            );
-          }
-
-          times.forEach((tStr, index) => {
-            const slotDate = new Date(selectedDate);
-            if (tStr.includes("T")) {
-              const d = new Date(tStr);
-              slotDate.setHours(d.getHours(), d.getMinutes(), 0, 0);
-            } else if (tStr.includes(":")) {
-              const parts = tStr.split(":");
-              slotDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
-            }
-
-            let status = ScheduleStatus.PENDING;
-            let logId = undefined;
-            let bestLog: any = null;
-            let maxScore = -1;
-
-            potentialLogs.forEach((log) => {
-              const logDate = new Date(log.scheduled_at);
-              let score = 0;
-
-              // 0. Strict Time Distance Check (Stop Day-Jumping)
-              const diffHours =
-                Math.abs(logDate.getTime() - slotDate.getTime()) / 36e5;
-              if (diffHours >= 13) return; // REJECT if shift is > 13h (prevents matching adjacent days)
-
-              // 1. Minute check
-              if (Math.abs(logDate.getMinutes() - slotDate.getMinutes()) < 5)
-                score += 20;
-              else return;
-
-              // 2. Hour check
-              const logH = logDate.getHours();
-              const logUTC = logDate.getUTCHours();
-              const slotH = slotDate.getHours();
-
-              if (logH === slotH) score += 50;
-              else if (logUTC === slotH)
-                score += 40; // UTC shift matched
-              else return;
-
-              // 3. Proximity Bonus
-              if (diffHours < 4)
-                score += 30; // Close match
-              else score += 10; // Shift match
-
-              if (score > maxScore) {
-                maxScore = score;
-                bestLog = log;
-              }
-            });
-
-            if (bestLog && maxScore >= 40) {
-              logId = bestLog.$id;
-              if (bestLog.status === "taken") {
-                status = ScheduleStatus.COMPLETED;
-              }
-            }
-
-            if (status === ScheduleStatus.PENDING && new Date() > slotDate) {
-              status = ScheduleStatus.MISSED;
-            }
-
-            medEvents.push({
-              id: `${em.$id}_${index}`,
-              time: slotDate.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              }),
-              title: medName,
-              description: dosage,
-              type: "medication",
-              status: status,
-              elderlyName: elderlyName,
-              elderlyId: eId,
-              rawDate: slotDate.toISOString(),
-              medicationData: {
-                realId: em.$id,
-                logId: logId,
-                reminderId: reminderId,
-                name: medName,
-                time: tStr,
-              },
-            });
-          });
-        });
-        return medEvents;
-      })();
-
-      const [scheduleRes, medEvents] = await Promise.all([
-        schedulePromise,
-        medicationPromise,
+      const [scheduleEvents, medicationEvents] = await Promise.all([
+        fetchDayScheduleEvents(elderlyIds, selectedDate, categories, elderlyMap),
+        fetchDayMedicationEvents(elderlyIds, selectedDate, elderlyMap),
       ]);
 
-      const scheduleEvents: ScheduleEvent[] = scheduleRes.rows.map((row) => {
-        let eName = "Unknown";
-        let eId = "";
-        let elderlyRef: any = Array.isArray(row.elderly)
-          ? row.elderly.length > 0
-            ? row.elderly[0]
-            : null
-          : row.elderly;
-
-        if (elderlyRef) {
-          if (typeof elderlyRef === "object" && "$id" in elderlyRef) {
-            eName = (elderlyRef as any).name || "Unknown";
-            eId = elderlyRef.$id;
-          } else if (typeof elderlyRef === "string") {
-            eId = elderlyRef;
-            const found = elderly.find((e) => e.$id === elderlyRef);
-            if (found) eName = found.name;
-          }
-        }
-
-        let typeName = "activity";
-        let catRef: any = Array.isArray(row.scheduleCategory)
-          ? row.scheduleCategory.length > 0
-            ? row.scheduleCategory[0]
-            : null
-          : row.scheduleCategory;
-
-        if (catRef) {
-          if (typeof catRef === "object" && "name" in catRef) {
-            typeName = (catRef as any).name?.toLowerCase() || "activity";
-          } else if (typeof catRef === "string") {
-            const foundCat = categories.find((c) => c.$id === catRef);
-            if (foundCat && foundCat.name) {
-              typeName = foundCat.name.toLowerCase();
-            }
-          }
-        }
-
-        let displayStatus = row.status || ScheduleStatus.PENDING;
-        if (displayStatus === ScheduleStatus.PENDING && row.time) {
-          const taskTime = new Date(row.time);
-          if (taskTime < new Date()) {
-            displayStatus = ScheduleStatus.MISSED;
-            tablesDB
-              .updateRow({
-                databaseId: DATABASE_ID,
-                tableId: SCHEDULE_TABLE_ID,
-                rowId: row.$id,
-                data: { status: ScheduleStatus.MISSED },
-              })
-              .catch(console.error);
-          }
-        }
-
-        return {
-          id: row.$id,
-          time: row.time
-            ? new Date(row.time).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              })
-            : "--:--",
-          title: row.title || "",
-          description: row.description || "",
-          type: typeName,
-          status: displayStatus,
-          elderlyName: eName,
-          elderlyId: eId,
-          rawDate: row.time || "",
-        };
-      });
-
-      const allEvents = [...scheduleEvents, ...medEvents].sort((a, b) =>
+      const allEvents = [...scheduleEvents, ...medicationEvents].sort((a, b) =>
         a.rawDate.localeCompare(b.rawDate),
       );
       setEvents(allEvents);
@@ -469,13 +182,13 @@ export default function SchedulePage() {
 
   // Generate next 7 days from referenceDate
   const dates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(referenceDate);
-    d.setDate(referenceDate.getDate() + i);
+    const dateItem = new Date(referenceDate);
+    dateItem.setDate(referenceDate.getDate() + i);
     return {
-      day: d.toLocaleDateString("en-US", { weekday: "short" }),
-      date: d.getDate(),
-      fullDate: d,
-      isToday: d.toDateString() === new Date().toDateString(),
+      day: dateItem.toLocaleDateString("en-US", { weekday: "short" }),
+      date: dateItem.getDate(),
+      fullDate: dateItem,
+      isToday: dateItem.toDateString() === new Date().toDateString(),
     };
   });
 
@@ -565,15 +278,7 @@ export default function SchedulePage() {
 
   const handleMarkDone = async (taskId: string) => {
     try {
-      await tablesDB.updateRow({
-        databaseId: DATABASE_ID,
-        tableId: SCHEDULE_TABLE_ID,
-        rowId: taskId,
-        data: {
-          status: ScheduleStatus.COMPLETED,
-        },
-      });
-
+      await markScheduleTaskCompleted(taskId);
       // Optimistically update local state
       setEvents((currentEvents) =>
         currentEvents.map((event) =>
@@ -591,60 +296,28 @@ export default function SchedulePage() {
   const handleTakeMedication = async (event: ScheduleEvent) => {
     if (!event.medicationData) return;
     const { realId, logId, reminderId, time } = event.medicationData;
+    if (!reminderId) return;
 
     try {
-      let activeLogId = logId;
-      const now = new Date();
-
-      if (reminderId) {
-        if (logId) {
-          // Update existing
-          await tablesDB.updateRow({
-            databaseId: DATABASE_ID,
-            tableId: MEDICATION_LOGS_TABLE_ID,
-            rowId: logId,
-            data: { status: "taken", taken_at: now.toISOString() },
-          });
-        } else {
-          // Create new
-          const parts = time.includes(":") ? time.split(":") : ["00", "00"];
-          const scheduledDate = new Date(selectedDate);
-          scheduledDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
-
-          const newLog = await tablesDB.createRow({
-            databaseId: DATABASE_ID,
-            tableId: MEDICATION_LOGS_TABLE_ID,
-            rowId: ID.unique(),
-            data: {
-              status: "taken",
-              taken_at: now.toISOString(),
-              scheduled_at: scheduledDate.toISOString(),
-              elderly: event.elderlyId,
-              elderly_medication_reminder: reminderId,
-            },
-          });
-          activeLogId = newLog.$id;
-        }
-      }
-
-      // Update Prescription last_taken (optional, but good for sync)
-      await tablesDB.updateRow({
-        databaseId: DATABASE_ID,
-        tableId: ELDERLY_MEDICATION_TABLE_ID,
-        rowId: realId,
-        data: { last_taken: now.toISOString() },
+      const activeLogId = await recordMedicationTaken({
+        reminderId,
+        logId,
+        elderlyId: event.elderlyId,
+        medicationTime: time,
+        selectedDate,
+        prescriptionId: realId,
       });
 
       setEvents((prev) =>
-        prev.map((e) => {
-          if (e.id === event.id) {
+        prev.map((existingEvent) => {
+          if (existingEvent.id === event.id) {
             return {
-              ...e,
+              ...existingEvent,
               status: ScheduleStatus.COMPLETED,
-              medicationData: { ...e.medicationData!, logId: activeLogId },
+              medicationData: { ...existingEvent.medicationData!, logId: activeLogId },
             };
           }
-          return e;
+          return existingEvent;
         }),
       );
     } catch (err) {
@@ -657,19 +330,14 @@ export default function SchedulePage() {
     if (!event.medicationData?.logId) return;
 
     try {
-      await tablesDB.updateRow({
-        databaseId: DATABASE_ID,
-        tableId: MEDICATION_LOGS_TABLE_ID,
-        rowId: event.medicationData.logId,
-        data: { status: "pending", taken_at: null },
-      });
+      await undoMedicationTaken(event.medicationData.logId);
 
       setEvents((prev) =>
-        prev.map((e) => {
-          if (e.id === event.id) {
-            return { ...e, status: ScheduleStatus.PENDING }; // Keep logId!
+        prev.map((existingEvent) => {
+          if (existingEvent.id === event.id) {
+            return { ...existingEvent, status: ScheduleStatus.PENDING }; // Keep logId!
           }
-          return e;
+          return existingEvent;
         }),
       );
 
@@ -897,13 +565,13 @@ export default function SchedulePage() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 10 }}
         >
-          {dates.map((d, index) => {
+          {dates.map((dateItem, index) => {
             const isSelected =
-              d.fullDate.toDateString() === selectedDate.toDateString();
+              dateItem.fullDate.toDateString() === selectedDate.toDateString();
             return (
               <TouchableOpacity
                 key={index}
-                onPress={() => setSelectedDate(d.fullDate)}
+                onPress={() => setSelectedDate(dateItem.fullDate)}
                 style={[
                   styles.dateBox,
                   {
@@ -923,7 +591,7 @@ export default function SchedulePage() {
                     },
                   ]}
                 >
-                  {d.day}
+                  {dateItem.day}
                 </Text>
                 <Text
                   style={[
@@ -935,7 +603,7 @@ export default function SchedulePage() {
                     },
                   ]}
                 >
-                  {d.date}
+                  {dateItem.date}
                 </Text>
               </TouchableOpacity>
             );
@@ -1248,7 +916,7 @@ export default function SchedulePage() {
                 mode="outlined"
                 label="Title"
                 value={newTask.title}
-                onChangeText={(t) => setNewTask({ ...newTask, title: t })}
+                onChangeText={(text) => setNewTask({ ...newTask, title: text })}
                 style={styles.input}
               />
 
@@ -1256,7 +924,7 @@ export default function SchedulePage() {
                 mode="outlined"
                 label="Description"
                 value={newTask.description}
-                onChangeText={(t) => setNewTask({ ...newTask, description: t })}
+                onChangeText={(text) => setNewTask({ ...newTask, description: text })}
                 style={styles.input}
                 multiline
               />
@@ -1351,31 +1019,18 @@ export default function SchedulePage() {
 
                   try {
                     setLoading(true);
-                    // Combine date and time
-                    const combinedDate = new Date(newTask.date);
-                    const [hours, minutes] = newTask.time
-                      .split(":")
-                      .map(Number);
-                    combinedDate.setHours(hours, minutes, 0, 0);
+                    // Combine date and time into a single datetime
+                    const combinedDatetime = new Date(newTask.date);
+                    const [hours, minutes] = newTask.time.split(":").map(Number);
+                    combinedDatetime.setHours(hours, minutes, 0, 0);
 
-                    const data: any = {
+                    await createScheduleTask({
                       title: newTask.title,
                       description: newTask.description,
-                      time: combinedDate.toISOString(),
-                      elderly: newTask.elderlyId, // Relationship expects single ID
-                      status: ScheduleStatus.PENDING,
-                      type: newTask.type.toLowerCase(), // Add type enum value
-                    };
-
-                    if (newTask.typeId) {
-                      data.scheduleCategory = newTask.typeId;
-                    }
-
-                    await tablesDB.createRow({
-                      databaseId: DATABASE_ID,
-                      tableId: SCHEDULE_TABLE_ID,
-                      rowId: ID.unique(),
-                      data: data,
+                      datetime: combinedDatetime,
+                      elderlyId: newTask.elderlyId,
+                      typeName: newTask.type,
+                      categoryId: newTask.typeId,
                     });
 
                     setNewTaskVisible(false);
@@ -1391,7 +1046,6 @@ export default function SchedulePage() {
                       status: ScheduleStatus.PENDING,
                     });
 
-                    // Refresh list
                     fetchData();
                   } catch (err) {
                     console.error("Error creating task", err);
