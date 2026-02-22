@@ -620,7 +620,9 @@ export default function MedicationManagement() {
                           ? 'All taken today'
                           : nextPending
                             ? `Next: ${nextPending.time} ${nextPending.name}${missedMedsCount > 0 ? ` · ${missedMedsCount} missed` : ''}`
-                            : `${missedMedsCount} missed`}
+                            : missedMedsCount === 1
+                              ? `1 missed · ${group.medications.find(m => m.status === 'missed')?.name || ''}`
+                              : `${missedMedsCount} missed`}
                       </Text>
                     </View>
                   );
@@ -651,7 +653,29 @@ export default function MedicationManagement() {
                           { common: MedicationItem; slots: MedicationItem[] }
                         >,
                       ),
-                    ).map((groupItem) => {
+                    )
+                    .sort((a, b) => {
+                      // Sort by nearest actionable time: pending/missed first, then completed
+                      const getNextTime = (group: { slots: MedicationItem[] }) => {
+                        const sorted = [...group.slots].sort((x, y) => x.time.localeCompare(y.time));
+                        const pending = sorted.find(s => s.status === 'pending');
+                        if (pending) return pending.time;
+                        const missed = sorted.find(s => s.status === 'missed');
+                        if (missed) return missed.time;
+                        return null;
+                      };
+                      const aTime = getNextTime(a);
+                      const bTime = getNextTime(b);
+                      // Items with actionable slots come first
+                      if (aTime && !bTime) return -1;
+                      if (!aTime && bTime) return 1;
+                      if (aTime && bTime) return aTime.localeCompare(bTime);
+                      // Both completed: sort by earliest time
+                      const aFirst = [...a.slots].sort((x, y) => x.time.localeCompare(y.time))[0]?.time || '';
+                      const bFirst = [...b.slots].sort((x, y) => x.time.localeCompare(y.time))[0]?.time || '';
+                      return aFirst.localeCompare(bFirst);
+                    })
+                    .map((groupItem) => {
                       const sortedSlots = [...groupItem.slots].sort((a, b) => a.time.localeCompare(b.time));
                       const totalSlots = sortedSlots.length;
                       const slotsCompleted = sortedSlots.filter(s => s.status === 'completed').length;
