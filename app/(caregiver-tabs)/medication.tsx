@@ -93,6 +93,21 @@ export default function MedicationManagement() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [editingTimeIndex, setEditingTimeIndex] = useState<number | null>(null);
 
+  // Medication card expand/collapse state
+  const [medCardExpandState, setMedCardExpandState] = useState<Record<string, boolean>>({});
+
+  const toggleMedCard = (cardKey: string, defaultExpanded: boolean) => {
+    setMedCardExpandState((prev) => ({
+      ...prev,
+      [cardKey]: prev[cardKey] !== undefined ? !prev[cardKey] : !defaultExpanded,
+    }));
+  };
+
+  const isMedCardExpanded = (cardKey: string, slotsCount: number): boolean => {
+    if (cardKey in medCardExpandState) return medCardExpandState[cardKey];
+    return slotsCount <= 2; // Default: expanded for ≤2 slots, collapsed for ≥3
+  };
+
   // AppState handling for auto-refresh
   const appState = useRef(AppState.currentState);
 
@@ -536,9 +551,35 @@ export default function MedicationManagement() {
                           { common: MedicationItem; slots: MedicationItem[] }
                         >,
                       ),
-                    ).map((groupItem) => (
+                    ).map((groupItem) => {
+                      const sortedSlots = [...groupItem.slots].sort((a, b) => a.time.localeCompare(b.time));
+                      const totalSlots = sortedSlots.length;
+                      const slotsCompleted = sortedSlots.filter(s => s.status === 'completed').length;
+                      const slotsMissed = sortedSlots.filter(s => s.status === 'missed').length;
+                      const nextPendingSlot = sortedSlots.find(s => s.status === 'pending');
+                      const allSlotsDone = slotsCompleted === totalSlots;
+                      const medCardKey = `${group.elderlyId}_${groupItem.common.name}_${groupItem.common.dosage}`;
+                      const isExpanded = isMedCardExpanded(medCardKey, totalSlots);
+
+                      let summaryText = '';
+                      let summaryIcon = 'information-outline';
+                      if (allSlotsDone) {
+                        summaryText = 'All taken';
+                        summaryIcon = 'check-circle';
+                      } else if (nextPendingSlot) {
+                        summaryText = `Next: ${nextPendingSlot.time}`;
+                        summaryIcon = 'clock-outline';
+                        if (slotsMissed > 0) {
+                          summaryText += ` · ${slotsMissed} missed`;
+                        }
+                      } else if (slotsMissed > 0) {
+                        summaryText = `${slotsMissed} missed`;
+                        summaryIcon = 'alert-circle-outline';
+                      }
+
+                      return (
                       <Card
-                        key={`${groupItem.common.name}_${groupItem.common.dosage}`}
+                        key={medCardKey}
                         style={{
                           marginBottom: 16,
                           backgroundColor: theme.colors.elevation.level1,
@@ -559,11 +600,109 @@ export default function MedicationManagement() {
                               color={theme.colors.onPrimaryContainer}
                             />
                           )}
+                          right={totalSlots > 1 ? () => (
+                            <IconButton
+                              icon={isExpanded ? "chevron-up" : "chevron-down"}
+                              onPress={() => toggleMedCard(medCardKey, totalSlots <= 2)}
+                              size={24}
+                            />
+                          ) : undefined}
                         />
                         <Card.Content>
-                          {groupItem.slots
-                            .sort((a, b) => a.time.localeCompare(b.time))
-                            .map((slot, index) => (
+                          {/* Summary bar for multi-slot medications */}
+                          {totalSlots > 1 && (
+                            <TouchableOpacity
+                              onPress={() => toggleMedCard(medCardKey, totalSlots <= 2)}
+                              activeOpacity={0.7}
+                            >
+                              <View
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  paddingVertical: 8,
+                                  paddingHorizontal: 12,
+                                  backgroundColor: allSlotsDone
+                                    ? theme.colors.primaryContainer
+                                    : slotsMissed > 0 && !nextPendingSlot
+                                      ? theme.colors.errorContainer
+                                      : theme.colors.surfaceVariant,
+                                  borderRadius: 8,
+                                  marginBottom: isExpanded ? 12 : 0,
+                                }}
+                              >
+                                {/* Progress bar */}
+                                <View
+                                  style={{
+                                    width: 48,
+                                    height: 6,
+                                    backgroundColor: 'rgba(0,0,0,0.1)',
+                                    borderRadius: 3,
+                                    marginRight: 10,
+                                    overflow: 'hidden',
+                                  }}
+                                >
+                                  <View
+                                    style={{
+                                      width: `${totalSlots > 0 ? (slotsCompleted / totalSlots) * 100 : 0}%`,
+                                      height: '100%',
+                                      backgroundColor: allSlotsDone ? '#4CAF50' : theme.colors.primary,
+                                      borderRadius: 3,
+                                    }}
+                                  />
+                                </View>
+                                <Text
+                                  variant="labelMedium"
+                                  style={{
+                                    fontWeight: 'bold',
+                                    marginRight: 12,
+                                    color: allSlotsDone
+                                      ? theme.colors.onPrimaryContainer
+                                      : slotsMissed > 0 && !nextPendingSlot
+                                        ? theme.colors.onErrorContainer
+                                        : theme.colors.onSurfaceVariant,
+                                  }}
+                                >
+                                  {slotsCompleted}/{totalSlots}
+                                </Text>
+                                <MaterialCommunityIcons
+                                  name={summaryIcon as any}
+                                  size={16}
+                                  color={
+                                    allSlotsDone
+                                      ? '#4CAF50'
+                                      : slotsMissed > 0 && !nextPendingSlot
+                                        ? theme.colors.error
+                                        : theme.colors.onSurfaceVariant
+                                  }
+                                  style={{ marginRight: 4 }}
+                                />
+                                <Text
+                                  variant="bodySmall"
+                                  style={{
+                                    color: allSlotsDone
+                                      ? '#4CAF50'
+                                      : slotsMissed > 0 && !nextPendingSlot
+                                        ? theme.colors.error
+                                        : theme.colors.onSurfaceVariant,
+                                    flex: 1,
+                                  }}
+                                >
+                                  {summaryText}
+                                </Text>
+                                {!isExpanded && (
+                                  <MaterialCommunityIcons
+                                    name="chevron-down"
+                                    size={18}
+                                    color={theme.colors.outline}
+                                  />
+                                )}
+                              </View>
+                            </TouchableOpacity>
+                          )}
+
+                          {/* Time slots — visible when expanded or single slot */}
+                          {(isExpanded || totalSlots <= 1) &&
+                            sortedSlots.map((slot, index) => (
                               <View
                                 key={slot.id}
                                 style={{
@@ -571,7 +710,7 @@ export default function MedicationManagement() {
                                   alignItems: "center",
                                   justifyContent: "space-between",
                                   paddingVertical: 12,
-                                  borderTopWidth: index > 0 ? 1 : 0,
+                                  borderTopWidth: index > 0 || totalSlots > 1 ? 1 : 0,
                                   borderTopColor: theme.colors.surfaceVariant,
                                 }}
                               >
@@ -710,7 +849,8 @@ export default function MedicationManagement() {
                             ))}
                         </Card.Content>
                       </Card>
-                    ))
+                      );
+                    })
                   ))}
               </View>
             ))
