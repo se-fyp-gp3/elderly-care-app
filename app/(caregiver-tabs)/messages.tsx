@@ -260,19 +260,6 @@ export default function CaregiverMessages() {
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
-        <View style={styles.headerTop}>
-          <Text variant="headlineSmall" style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
-            Messages
-          </Text>
-          <View style={styles.headerBadge}>
-            <Badge
-              size={22}
-              style={{ backgroundColor: theme.colors.primary }}
-            >
-              {contacts.length}
-            </Badge>
-          </View>
-        </View>
         <Searchbar
           placeholder="Search contacts..."
           onChangeText={setSearchQuery}
