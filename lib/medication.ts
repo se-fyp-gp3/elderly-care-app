@@ -517,7 +517,7 @@ export async function confirmMedicationTaking(
       }
     } else if (item.isPrescriptionId && !resolvedReminderId) {
       throw new Error(
-        "Record is missing a linked reminder and auto-repair failed.",
+        `Record is missing a linked reminder and auto-repair failed for prescription ${item.realId}.`,
       );
     }
 
