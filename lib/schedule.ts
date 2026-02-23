@@ -163,7 +163,17 @@ export async function fetchDayScheduleEvents(
             rowId: row.$id,
             data: { status: ScheduleStatus.MISSED },
           })
-          .catch(console.error);
+          .catch((error) => {
+            console.error(
+              "Failed to auto-mark overdue schedule item as MISSED",
+              {
+                scheduleId: row.$id,
+                originalStatus: row.status,
+                targetStatus: ScheduleStatus.MISSED,
+                error,
+              },
+            );
+          });
       }
     }
 
