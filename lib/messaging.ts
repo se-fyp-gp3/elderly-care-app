@@ -95,16 +95,14 @@ export async function markConversationAsRead(
       ],
     });
 
-    await Promise.all(
-      unreadMessages.rows.map((msg) =>
-        tablesDB.updateRow({
-          databaseId: DATABASE_ID,
-          tableId: DIRECT_MESSAGES_TABLE_ID,
-          rowId: msg.$id,
-          data: { is_read: true },
-        }),
-      ),
-    );
+    for (const msg of unreadMessages.rows) {
+      await tablesDB.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: DIRECT_MESSAGES_TABLE_ID,
+        rowId: msg.$id,
+        data: { is_read: true },
+      });
+    }
   } catch (error) {
     console.error("Error marking messages as read:", error);
   }
