@@ -145,8 +145,13 @@ export async function getLatestMetrics(
         if (response.rows.length > 0) {
           results[type] = response.rows[0] as unknown as HealthData;
         }
-      } catch {
-        // Skip if query fails
+      } catch (error) {
+        // Log and skip if query fails for this metric type
+        console.error(
+          "Failed to fetch latest health metric",
+          { elderlyId, type },
+          error,
+        );
       }
     }),
   );
