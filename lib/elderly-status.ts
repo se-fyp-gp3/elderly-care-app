@@ -20,6 +20,24 @@ export interface ElderlyStatusInfo {
 }
 
 /**
+ * Resolve an Appwrite relationship field to its document ID string.
+ * Appwrite relations can be returned as a string ID, an object with `$id`,
+ * or an array of either — this helper normalises all those shapes.
+ */
+function resolveRelationId(field: unknown): string | null {
+  if (typeof field === "string") return field;
+  if (field && typeof field === "object" && "$id" in field)
+    return (field as { $id: string }).$id;
+  if (Array.isArray(field) && field.length > 0) {
+    const first = field[0];
+    if (typeof first === "string") return first;
+    if (first && typeof first === "object" && "$id" in first)
+      return (first as { $id: string }).$id;
+  }
+  return null;
+}
+
+/**
  * Compute a comprehensive status for an elderly person based on real data:
  *  - Health data abnormalities (BP, heart rate)
  *  - Missed medications in the last 24 hours
@@ -140,12 +158,7 @@ export async function computeElderlyStatus(
         // Map prescription ID -> reminder ID
         const prescriptionToReminder = new Map<string, string>();
         remindersRes.rows.forEach((rem: any) => {
-          const emId = rem.elderly_medication;
-          const pId = typeof emId === "string" ? emId
-            : emId && typeof emId === "object" && "$id" in emId ? emId.$id
-            : Array.isArray(emId) && emId.length > 0
-              ? (typeof emId[0] === "string" ? emId[0] : emId[0]?.$id)
-              : null;
+          const pId = resolveRelationId(rem.elderly_medication);
           if (pId) prescriptionToReminder.set(pId, rem.$id);
         });
 
@@ -252,13 +265,9 @@ export async function computeElderlyStatus(
 
       // Filter client-side for this elderly
       const schedules = scheduleRes.rows as any[];
-      const elderlySchedule = schedules.find((s) => {
-        const eld = s.elderly;
-        if (typeof eld === "string") return eld === elderlyId;
-        if (eld && typeof eld === "object" && "$id" in eld)
-          return eld.$id === elderlyId;
-        return false;
-      });
+      const elderlySchedule = schedules.find((s) =>
+        resolveRelationId(s.elderly) === elderlyId,
+      );
 
       if (elderlySchedule?.time) {
         const d = new Date(elderlySchedule.time);
