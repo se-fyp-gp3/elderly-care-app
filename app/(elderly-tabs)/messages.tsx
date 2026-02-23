@@ -73,7 +73,7 @@ export default function ElderlyMessages() {
   const navigateToConversation = useCallback(
     (contact: Contact) => {
       router.push({
-        pathname: "/conversation" as any,
+        pathname: "/conversation",
         params: {
           contactId: contact.id,
           contactName: contact.name,
