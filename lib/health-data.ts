@@ -91,7 +91,6 @@ export async function createHealthRecord(input: {
   const now = new Date().toISOString();
 
   const data: Record<string, any> = {
-    elderly: [input.elderlyId],
     elderly_id: input.elderlyId,
     type: input.type,
     value: input.value,
