@@ -65,13 +65,15 @@ export default function CaregiverDashboard() {
       const linkedElderly = await getLinkedElderly(caregiver.$id);
 
       // Show placeholder rows immediately so the UI is not empty while statuses load
-      const elderlyListWithPlaceholders: ElderlyListItem[] = linkedElderly.map((elderly) => ({
-        ...elderly,
-        age: calculateAge(elderly.birth),
-        lastCheck: "Loading...",
-        medication: "Loading...",
-        nextAppointment: "Loading...",
-      }));
+      const elderlyListWithPlaceholders: ElderlyListItem[] = linkedElderly.map(
+        (elderly) => ({
+          ...elderly,
+          age: calculateAge(elderly.birth),
+          lastCheck: "Loading...",
+          medication: "Loading...",
+          nextAppointment: "Loading...",
+        }),
+      );
       setElderlyList(elderlyListWithPlaceholders);
 
       // Fetch real statuses for every elderly person in parallel
@@ -175,7 +177,8 @@ export default function CaregiverDashboard() {
 
   const [infoVisible, setInfoVisible] = React.useState(false);
   const [selectedElderly, setSelectedElderly] = React.useState<any>(null);
-  const [healthDataDialogVisible, setHealthDataDialogVisible] = React.useState(false);
+  const [healthDataDialogVisible, setHealthDataDialogVisible] =
+    React.useState(false);
   const [addElderlyVisible, setAddElderlyVisible] = React.useState(false);
 
   const handleQuickAction = (route: string) => {
@@ -270,24 +273,33 @@ export default function CaregiverDashboard() {
                     */}
 
           <View style={styles.quickActions}>
-            {quickActions.map((action, index) => (
-              <Card
-                key={index}
-                style={styles.actionCard}
-                onPress={() => handleQuickAction(action.route)}
-              >
-                <Card.Content style={styles.actionContent}>
-                  <MaterialCommunityIcons
-                    name={action.icon as IconName}
-                    size={32}
-                    color={action.color}
-                  />
-                  <Text variant="bodyMedium" style={styles.actionLabel}>
-                    {action.label}
-                  </Text>
-                </Card.Content>
-              </Card>
-            ))}
+            {Array.from(
+              { length: Math.ceil(quickActions.length / 2) },
+              (_, rowIndex) => (
+                <View key={rowIndex} style={styles.actionRow}>
+                  {quickActions
+                    .slice(rowIndex * 2, rowIndex * 2 + 2)
+                    .map((action, index) => (
+                      <Card
+                        key={index}
+                        style={styles.actionCard}
+                        onPress={() => handleQuickAction(action.route)}
+                      >
+                        <Card.Content style={styles.actionContent}>
+                          <MaterialCommunityIcons
+                            name={action.icon as IconName}
+                            size={32}
+                            color={action.color}
+                          />
+                          <Text variant="bodyMedium" style={styles.actionLabel}>
+                            {action.label}
+                          </Text>
+                        </Card.Content>
+                      </Card>
+                    ))}
+                </View>
+              ),
+            )}
           </View>
         </View>
 
@@ -296,7 +308,8 @@ export default function CaregiverDashboard() {
             <Text variant="titleLarge" style={styles.sectionTitle}>
               Responsible elderly
             </Text>
-            {elderlyList.filter((e) => e.status === ElderlyStatus.WARNING).length > 0 && (
+            {elderlyList.filter((e) => e.status === ElderlyStatus.WARNING)
+              .length > 0 && (
               <View
                 style={{
                   backgroundColor: "#FF9800",
@@ -306,8 +319,15 @@ export default function CaregiverDashboard() {
                   marginBottom: 16,
                 }}
               >
-                <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 13 }}>
-                  {elderlyList.filter((e) => e.status === ElderlyStatus.WARNING).length} needs attention
+                <Text
+                  style={{ color: "#fff", fontWeight: "bold", fontSize: 13 }}
+                >
+                  {
+                    elderlyList.filter(
+                      (e) => e.status === ElderlyStatus.WARNING,
+                    ).length
+                  }{" "}
+                  needs attention
                 </Text>
               </View>
             )}
@@ -404,7 +424,9 @@ export default function CaregiverDashboard() {
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
-            <Button onPress={() => setHealthDataDialogVisible(false)}>Cancel</Button>
+            <Button onPress={() => setHealthDataDialogVisible(false)}>
+              Cancel
+            </Button>
           </Dialog.Actions>
         </Dialog>
 
@@ -544,16 +566,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   quickActions: {
+    gap: 12,
+  },
+  actionRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
+    gap: 12,
   },
   actionCard: {
-    width: "48%",
-    marginBottom: 12,
+    flex: 1,
+    height: 110,
   },
   actionContent: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
     padding: 16,
   },
   actionLabel: {
