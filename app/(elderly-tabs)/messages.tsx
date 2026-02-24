@@ -1,8 +1,8 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-    Contact,
-    formatRelativeTime,
-    getContactsForElderly,
+  Contact,
+  formatRelativeTime,
+  getContactsForElderly,
 } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
@@ -11,22 +11,22 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Linking,
-    RefreshControl,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Linking,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Badge,
-    Divider,
-    Searchbar,
-    Text,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  Badge,
+  Divider,
+  Searchbar,
+  Text,
+  useTheme,
 } from "react-native-paper";
 
 export default function ElderlyMessages() {
@@ -39,7 +39,9 @@ export default function ElderlyMessages() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [elderlyProfileId, setElderlyProfileId] = useState<string | null>(null);
-  const [lastMessages, setLastMessages] = useState<Record<string, DirectMessage | null>>({});
+  const [lastMessages, setLastMessages] = useState<
+    Record<string, DirectMessage | null>
+  >({});
 
   const fetchContacts = useCallback(async () => {
     if (!user) return;
@@ -73,7 +75,7 @@ export default function ElderlyMessages() {
   const navigateToConversation = useCallback(
     (contact: Contact) => {
       router.push({
-        pathname: "/conversation",
+        pathname: "/(elderly-tabs)/conversation",
         params: {
           contactId: contact.id,
           contactName: contact.name,
@@ -110,7 +112,11 @@ export default function ElderlyMessages() {
   }, [fetchContacts]);
 
   const handleCall = useCallback((phone?: string | null) => {
-    if (!phone) return Alert.alert("No phone number", "This contact has no phone number on file.");
+    if (!phone)
+      return Alert.alert(
+        "No phone number",
+        "This contact has no phone number on file.",
+      );
     const url = `tel:${phone}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) Linking.openURL(url);
@@ -119,7 +125,11 @@ export default function ElderlyMessages() {
   }, []);
 
   const handleSMS = useCallback((phone?: string | null) => {
-    if (!phone) return Alert.alert("No phone number", "This contact has no phone number on file.");
+    if (!phone)
+      return Alert.alert(
+        "No phone number",
+        "This contact has no phone number on file.",
+      );
     const url = `sms:${phone}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) Linking.openURL(url);
@@ -143,7 +153,11 @@ export default function ElderlyMessages() {
             size={56}
             label={item.avatarLabel}
             style={{ backgroundColor: theme.colors.tertiaryContainer }}
-            labelStyle={{ color: theme.colors.onTertiaryContainer, fontWeight: "600", fontSize: 20 }}
+            labelStyle={{
+              color: theme.colors.onTertiaryContainer,
+              fontWeight: "600",
+              fontSize: 20,
+            }}
           />
           <View
             style={[
@@ -164,7 +178,10 @@ export default function ElderlyMessages() {
             </Text>
             <Text
               variant="bodySmall"
-              style={[styles.timeText, { color: theme.colors.onSurfaceVariant }]}
+              style={[
+                styles.timeText,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
             >
               {formatRelativeTime(lastMsgTime)}
             </Text>
@@ -173,14 +190,23 @@ export default function ElderlyMessages() {
           {preview ? (
             <Text
               variant="bodySmall"
-              style={[styles.previewText, { color: theme.colors.onSurfaceVariant }]}
+              style={[
+                styles.previewText,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
               numberOfLines={1}
             >
-              {lastMsg?.sender_id === elderlyProfileId ? "You: " : ""}{preview}
+              {lastMsg?.sender_id === elderlyProfileId ? "You: " : ""}
+              {preview}
             </Text>
           ) : (
             <View style={styles.contactSubInfo}>
-              <View style={[styles.roleTag, { backgroundColor: theme.colors.tertiaryContainer }]}>
+              <View
+                style={[
+                  styles.roleTag,
+                  { backgroundColor: theme.colors.tertiaryContainer },
+                ]}
+              >
                 <MaterialCommunityIcons
                   name="shield-account"
                   size={13}
@@ -205,8 +231,14 @@ export default function ElderlyMessages() {
 
         <View style={styles.actionButtons}>
           <TouchableOpacity
-            onPress={(e) => { e.stopPropagation(); handleCall(item.phone); }}
-            style={[styles.actionBtn, { backgroundColor: theme.colors.primaryContainer }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleCall(item.phone);
+            }}
+            style={[
+              styles.actionBtn,
+              { backgroundColor: theme.colors.primaryContainer },
+            ]}
           >
             <MaterialCommunityIcons
               name="phone"
@@ -221,7 +253,12 @@ export default function ElderlyMessages() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <View style={[styles.emptyIconCircle, { backgroundColor: theme.colors.surfaceVariant }]}>
+      <View
+        style={[
+          styles.emptyIconCircle,
+          { backgroundColor: theme.colors.surfaceVariant },
+        ]}
+      >
         <MaterialCommunityIcons
           name="chat-plus-outline"
           size={64}
@@ -238,7 +275,8 @@ export default function ElderlyMessages() {
         variant="bodyMedium"
         style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant }]}
       >
-        Your assigned caregivers will appear here.{"\n"}Ask your caregiver to add you to their care list.
+        Your assigned caregivers will appear here.{"\n"}Ask your caregiver to
+        add you to their care list.
       </Text>
     </View>
   );
@@ -257,8 +295,16 @@ export default function ElderlyMessages() {
         >
           My Caregivers
         </Text>
-        <View style={[styles.countBadge, { backgroundColor: theme.colors.primaryContainer }]}>
-          <Text variant="labelSmall" style={{ color: theme.colors.primary, fontWeight: "bold" }}>
+        <View
+          style={[
+            styles.countBadge,
+            { backgroundColor: theme.colors.primaryContainer },
+          ]}
+        >
+          <Text
+            variant="labelSmall"
+            style={{ color: theme.colors.primary, fontWeight: "bold" }}
+          >
             {filteredContacts.length}
           </Text>
         </View>
@@ -267,18 +313,20 @@ export default function ElderlyMessages() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.headerTop}>
-          <Text variant="headlineSmall" style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
+          <Text
+            variant="headlineSmall"
+            style={[styles.headerTitle, { color: theme.colors.onSurface }]}
+          >
             Messages
           </Text>
           <View style={styles.headerActions}>
-            <Badge
-              size={22}
-              style={{ backgroundColor: theme.colors.primary }}
-            >
+            <Badge size={22} style={{ backgroundColor: theme.colors.primary }}>
               {contacts.length}
             </Badge>
           </View>
@@ -287,7 +335,10 @@ export default function ElderlyMessages() {
           placeholder="Search caregivers..."
           onChangeText={setSearchQuery}
           value={searchQuery}
-          style={[styles.searchBar, { backgroundColor: theme.colors.surfaceVariant }]}
+          style={[
+            styles.searchBar,
+            { backgroundColor: theme.colors.surfaceVariant },
+          ]}
           inputStyle={styles.searchInput}
           elevation={0}
         />
@@ -299,7 +350,10 @@ export default function ElderlyMessages() {
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text
             variant="bodyMedium"
-            style={[styles.loadingText, { color: theme.colors.onSurfaceVariant }]}
+            style={[
+              styles.loadingText,
+              { color: theme.colors.onSurfaceVariant },
+            ]}
           >
             Loading caregivers...
           </Text>
@@ -313,7 +367,9 @@ export default function ElderlyMessages() {
             styles.listContent,
             filteredContacts.length === 0 && styles.emptyList,
           ]}
-          ListHeaderComponent={filteredContacts.length > 0 ? renderHeader : null}
+          ListHeaderComponent={
+            filteredContacts.length > 0 ? renderHeader : null
+          }
           ItemSeparatorComponent={() => (
             <Divider style={[styles.divider, { marginLeft: 86 }]} />
           )}

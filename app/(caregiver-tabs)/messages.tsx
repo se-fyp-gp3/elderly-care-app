@@ -25,7 +25,7 @@ import {
   Divider,
   Searchbar,
   Text,
-  useTheme
+  useTheme,
 } from "react-native-paper";
 
 export default function CaregiverMessages() {
@@ -37,8 +37,12 @@ export default function CaregiverMessages() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [caregiverProfileId, setCaregiverProfileId] = useState<string | null>(null);
-  const [lastMessages, setLastMessages] = useState<Record<string, DirectMessage | null>>({});
+  const [caregiverProfileId, setCaregiverProfileId] = useState<string | null>(
+    null,
+  );
+  const [lastMessages, setLastMessages] = useState<
+    Record<string, DirectMessage | null>
+  >({});
 
   const fetchContacts = useCallback(async () => {
     if (!user) return;
@@ -72,7 +76,7 @@ export default function CaregiverMessages() {
   const navigateToConversation = useCallback(
     (contact: Contact) => {
       router.push({
-        pathname: "/conversation",
+        pathname: "/(caregiver-tabs)/conversation",
         params: {
           contactId: contact.id,
           contactName: contact.name,
@@ -109,7 +113,11 @@ export default function CaregiverMessages() {
   }, [fetchContacts]);
 
   const handleCall = useCallback((phone?: string | null) => {
-    if (!phone) return Alert.alert("No phone number", "This contact has no phone number on file.");
+    if (!phone)
+      return Alert.alert(
+        "No phone number",
+        "This contact has no phone number on file.",
+      );
     const url = `tel:${phone}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) Linking.openURL(url);
@@ -118,7 +126,11 @@ export default function CaregiverMessages() {
   }, []);
 
   const handleSMS = useCallback((phone?: string | null) => {
-    if (!phone) return Alert.alert("No phone number", "This contact has no phone number on file.");
+    if (!phone)
+      return Alert.alert(
+        "No phone number",
+        "This contact has no phone number on file.",
+      );
     const url = `sms:${phone}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) Linking.openURL(url);
@@ -155,13 +167,19 @@ export default function CaregiverMessages() {
             size={52}
             label={item.avatarLabel}
             style={{ backgroundColor: theme.colors.primaryContainer }}
-            labelStyle={{ color: theme.colors.onPrimaryContainer, fontWeight: "600" }}
+            labelStyle={{
+              color: theme.colors.onPrimaryContainer,
+              fontWeight: "600",
+            }}
           />
           {item.status && (
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: getStatusColor(item.status), borderColor: theme.colors.surface },
+                {
+                  backgroundColor: getStatusColor(item.status),
+                  borderColor: theme.colors.surface,
+                },
               ]}
             />
           )}
@@ -178,7 +196,10 @@ export default function CaregiverMessages() {
             </Text>
             <Text
               variant="bodySmall"
-              style={[styles.timeText, { color: theme.colors.onSurfaceVariant }]}
+              style={[
+                styles.timeText,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
             >
               {formatRelativeTime(lastMsgTime)}
             </Text>
@@ -187,10 +208,14 @@ export default function CaregiverMessages() {
           {preview ? (
             <Text
               variant="bodySmall"
-              style={[styles.previewText, { color: theme.colors.onSurfaceVariant }]}
+              style={[
+                styles.previewText,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
               numberOfLines={1}
             >
-              {lastMsg?.sender_id === caregiverProfileId ? "You: " : ""}{preview}
+              {lastMsg?.sender_id === caregiverProfileId ? "You: " : ""}
+              {preview}
             </Text>
           ) : (
             <View style={styles.contactSubInfo}>
@@ -202,7 +227,10 @@ export default function CaregiverMessages() {
                 />
                 <Text
                   variant="bodySmall"
-                  style={[styles.roleText, { color: theme.colors.onSurfaceVariant }]}
+                  style={[
+                    styles.roleText,
+                    { color: theme.colors.onSurfaceVariant },
+                  ]}
                 >
                   Elderly
                 </Text>
@@ -219,8 +247,14 @@ export default function CaregiverMessages() {
 
         <View style={styles.actionButtons}>
           <TouchableOpacity
-            onPress={(e) => { e.stopPropagation(); handleCall(item.phone); }}
-            style={[styles.actionBtn, { backgroundColor: theme.colors.primaryContainer }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleCall(item.phone);
+            }}
+            style={[
+              styles.actionBtn,
+              { backgroundColor: theme.colors.primaryContainer },
+            ]}
           >
             <MaterialCommunityIcons
               name="phone"
@@ -250,20 +284,26 @@ export default function CaregiverMessages() {
         variant="bodyMedium"
         style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant }]}
       >
-        Your linked elderly will appear here.{"\n"}Add elderly from the Care Panel to get started.
+        Your linked elderly will appear here.{"\n"}Add elderly from the Care
+        Panel to get started.
       </Text>
     </View>
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <Searchbar
           placeholder="Search contacts..."
           onChangeText={setSearchQuery}
           value={searchQuery}
-          style={[styles.searchBar, { backgroundColor: theme.colors.surfaceVariant }]}
+          style={[
+            styles.searchBar,
+            { backgroundColor: theme.colors.surfaceVariant },
+          ]}
           inputStyle={styles.searchInput}
           elevation={0}
         />
@@ -275,7 +315,10 @@ export default function CaregiverMessages() {
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text
             variant="bodyMedium"
-            style={[styles.loadingText, { color: theme.colors.onSurfaceVariant }]}
+            style={[
+              styles.loadingText,
+              { color: theme.colors.onSurfaceVariant },
+            ]}
           >
             Loading contacts...
           </Text>
