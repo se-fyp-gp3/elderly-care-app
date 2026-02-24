@@ -1,30 +1,31 @@
 import {
-    buildConversationId,
-    fetchConversationMessages,
-    markConversationAsRead,
-    sendDirectMessage,
-    subscribeToConversation,
+  buildConversationId,
+  fetchConversationMessages,
+  markConversationAsRead,
+  sendDirectMessage,
+  subscribeToConversation,
 } from "@/lib/messaging";
 import { DirectMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    FlatList,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    View,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    IconButton,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  IconButton,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface ConversationScreenProps {
   /** Current user's profile doc ID (caregiver.$id or elderly.$id) */
@@ -137,7 +138,10 @@ export default function ConversationScreen({
   const formatMessageTime = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } catch {
       return "";
     }
@@ -170,7 +174,13 @@ export default function ConversationScreen({
     return current !== previous;
   };
 
-  const renderMessage = ({ item, index }: { item: DirectMessage; index: number }) => {
+  const renderMessage = ({
+    item,
+    index,
+  }: {
+    item: DirectMessage;
+    index: number;
+  }) => {
     const isMe = item.sender_id === myProfileId;
     const showDate = shouldShowDateSeparator(index);
 
@@ -178,31 +188,57 @@ export default function ConversationScreen({
       <View>
         {showDate && (
           <View style={styles.dateSeparator}>
-            <View style={[styles.dateLine, { backgroundColor: theme.colors.outlineVariant }]} />
+            <View
+              style={[
+                styles.dateLine,
+                { backgroundColor: theme.colors.outlineVariant },
+              ]}
+            />
             <Text
               variant="labelSmall"
-              style={[styles.dateText, { color: theme.colors.onSurfaceVariant, backgroundColor: theme.colors.background }]}
+              style={[
+                styles.dateText,
+                {
+                  color: theme.colors.onSurfaceVariant,
+                  backgroundColor: theme.colors.background,
+                },
+              ]}
             >
               {formatDateSeparator(item.created_at)}
             </Text>
-            <View style={[styles.dateLine, { backgroundColor: theme.colors.outlineVariant }]} />
+            <View
+              style={[
+                styles.dateLine,
+                { backgroundColor: theme.colors.outlineVariant },
+              ]}
+            />
           </View>
         )}
-        <View style={[styles.messageRow, isMe ? styles.messageRowRight : styles.messageRowLeft]}>
+        <View
+          style={[
+            styles.messageRow,
+            isMe ? styles.messageRowRight : styles.messageRowLeft,
+          ]}
+        >
           {!isMe && (
             <Avatar.Text
               size={32}
               label={contactName.substring(0, 2).toUpperCase()}
-              style={[styles.messageAvatar, {
-                backgroundColor: contactRole === "caregiver"
-                  ? theme.colors.tertiaryContainer
-                  : theme.colors.primaryContainer,
-              }]}
+              style={[
+                styles.messageAvatar,
+                {
+                  backgroundColor:
+                    contactRole === "caregiver"
+                      ? theme.colors.tertiaryContainer
+                      : theme.colors.primaryContainer,
+                },
+              ]}
               labelStyle={{
                 fontSize: 12,
-                color: contactRole === "caregiver"
-                  ? theme.colors.onTertiaryContainer
-                  : theme.colors.onPrimaryContainer,
+                color:
+                  contactRole === "caregiver"
+                    ? theme.colors.onTertiaryContainer
+                    : theme.colors.onPrimaryContainer,
               }}
             />
           )}
@@ -211,13 +247,18 @@ export default function ConversationScreen({
               styles.messageBubble,
               isMe
                 ? [styles.myBubble, { backgroundColor: theme.colors.primary }]
-                : [styles.theirBubble, { backgroundColor: theme.colors.surfaceVariant }],
+                : [
+                    styles.theirBubble,
+                    { backgroundColor: theme.colors.surfaceVariant },
+                  ],
             ]}
           >
             <Text
               style={[
                 styles.messageText,
-                { color: isMe ? theme.colors.onPrimary : theme.colors.onSurface },
+                {
+                  color: isMe ? theme.colors.onPrimary : theme.colors.onSurface,
+                },
               ]}
             >
               {item.body}
@@ -226,7 +267,12 @@ export default function ConversationScreen({
               <Text
                 style={[
                   styles.messageTime,
-                  { color: isMe ? theme.colors.onPrimary : theme.colors.onSurfaceVariant, opacity: 0.7 },
+                  {
+                    color: isMe
+                      ? theme.colors.onPrimary
+                      : theme.colors.onSurfaceVariant,
+                    opacity: 0.7,
+                  },
                 ]}
               >
                 {formatMessageTime(item.created_at)}
@@ -248,7 +294,12 @@ export default function ConversationScreen({
 
   const renderEmptyChat = () => (
     <View style={styles.emptyContainer}>
-      <View style={[styles.emptyIconCircle, { backgroundColor: theme.colors.surfaceVariant }]}>
+      <View
+        style={[
+          styles.emptyIconCircle,
+          { backgroundColor: theme.colors.surfaceVariant },
+        ]}
+      >
         <MaterialCommunityIcons
           name="message-text-outline"
           size={48}
@@ -271,117 +322,140 @@ export default function ConversationScreen({
   );
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.colors.surface }]}
     >
-      {/* Chat Header */}
-      <View style={[styles.chatHeader, { backgroundColor: theme.colors.surface }]}>
-        <IconButton
-          icon="arrow-left"
-          size={24}
-          onPress={() => router.back()}
-          style={styles.backButton}
-        />
-        <Avatar.Text
-          size={40}
-          label={contactName.substring(0, 2).toUpperCase()}
-          style={{
-            backgroundColor: contactRole === "caregiver"
-              ? theme.colors.tertiaryContainer
-              : theme.colors.primaryContainer,
-          }}
-          labelStyle={{
-            color: contactRole === "caregiver"
-              ? theme.colors.onTertiaryContainer
-              : theme.colors.onPrimaryContainer,
-            fontWeight: "600",
-          }}
-        />
-        <View style={styles.chatHeaderInfo}>
-          <Text variant="titleMedium" style={[styles.chatHeaderName, { color: theme.colors.onSurface }]}>
-            {contactName}
-          </Text>
-          <View style={styles.chatHeaderRole}>
-            <MaterialCommunityIcons
-              name={contactRole === "caregiver" ? "shield-account" : "account-heart"}
-              size={14}
-              color={theme.colors.onSurfaceVariant}
-            />
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              {contactRole === "caregiver" ? "Caregiver" : "Elderly"}
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
+        {/* Chat Header */}
+        <View
+          style={[styles.chatHeader, { backgroundColor: theme.colors.surface }]}
+        >
+          <IconButton
+            icon="arrow-left"
+            size={24}
+            onPress={() => router.push("/messages")}
+            style={styles.backButton}
+          />
+          <Avatar.Text
+            size={40}
+            label={contactName.substring(0, 2).toUpperCase()}
+            style={{
+              backgroundColor:
+                contactRole === "caregiver"
+                  ? theme.colors.tertiaryContainer
+                  : theme.colors.primaryContainer,
+            }}
+            labelStyle={{
+              color:
+                contactRole === "caregiver"
+                  ? theme.colors.onTertiaryContainer
+                  : theme.colors.onPrimaryContainer,
+              fontWeight: "600",
+            }}
+          />
+          <View style={styles.chatHeaderInfo}>
+            <Text
+              variant="titleMedium"
+              style={[styles.chatHeaderName, { color: theme.colors.onSurface }]}
+            >
+              {contactName}
             </Text>
+            <View style={styles.chatHeaderRole}>
+              <MaterialCommunityIcons
+                name={
+                  contactRole === "caregiver"
+                    ? "shield-account"
+                    : "account-heart"
+                }
+                size={14}
+                color={theme.colors.onSurfaceVariant}
+              />
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {contactRole === "caregiver" ? "Caregiver" : "Elderly"}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* Messages */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.$id}
-          contentContainerStyle={[
-            styles.messagesList,
-            messages.length === 0 && styles.emptyList,
-          ]}
-          ListEmptyComponent={renderEmptyChat}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: false })
-          }
-        />
-      )}
-
-      {/* Input Bar */}
-      <View style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}>
-        <TextInput
-          mode="outlined"
-          placeholder="Type a message..."
-          value={inputText}
-          onChangeText={setInputText}
-          style={styles.textInput}
-          outlineStyle={styles.textInputOutline}
-          contentStyle={styles.textInputContent}
-          multiline
-          maxLength={2000}
-          right={
-            inputText.trim() ? (
-              <TextInput.Icon
-                icon="send"
-                color={theme.colors.primary}
-                onPress={handleSend}
-                disabled={sending}
-              />
-            ) : undefined
-          }
-          onSubmitEditing={handleSend}
-          blurOnSubmit={false}
-        />
-        {!inputText.trim() && (
-          <IconButton
-            icon="send"
-            mode="contained"
-            containerColor={theme.colors.primary}
-            iconColor={theme.colors.onPrimary}
-            size={22}
-            onPress={handleSend}
-            disabled={!inputText.trim() || sending}
-            style={styles.sendButton}
+        {/* Messages */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.$id}
+            contentContainerStyle={[
+              styles.messagesList,
+              messages.length === 0 && styles.emptyList,
+            ]}
+            ListEmptyComponent={renderEmptyChat}
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={() =>
+              flatListRef.current?.scrollToEnd({ animated: false })
+            }
           />
         )}
-      </View>
-    </KeyboardAvoidingView>
+
+        {/* Input Bar */}
+        <View
+          style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}
+        >
+          <TextInput
+            mode="outlined"
+            placeholder="Type a message..."
+            value={inputText}
+            onChangeText={setInputText}
+            style={styles.textInput}
+            outlineStyle={styles.textInputOutline}
+            contentStyle={styles.textInputContent}
+            multiline
+            maxLength={2000}
+            right={
+              inputText.trim() ? (
+                <TextInput.Icon
+                  icon="send"
+                  color={theme.colors.primary}
+                  onPress={handleSend}
+                  disabled={sending}
+                />
+              ) : undefined
+            }
+            onSubmitEditing={handleSend}
+            blurOnSubmit={false}
+          />
+          {!inputText.trim() && (
+            <IconButton
+              icon="send"
+              mode="contained"
+              containerColor={theme.colors.primary}
+              iconColor={theme.colors.onPrimary}
+              size={22}
+              onPress={handleSend}
+              disabled={!inputText.trim() || sending}
+              style={styles.sendButton}
+            />
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },

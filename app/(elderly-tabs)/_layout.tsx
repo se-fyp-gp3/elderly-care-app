@@ -52,11 +52,7 @@ export default function ElderlyTabsLayout() {
         options={{
           title: "Messages",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="chat"
-              size={size}
-              color={color}
-            />
+            <MaterialCommunityIcons name="chat" size={size} color={color} />
           ),
         }}
       />
@@ -105,6 +101,14 @@ export default function ElderlyTabsLayout() {
         options={{
           href: null,
           title: "Schedule",
+        }}
+      />
+      <Tabs.Screen
+        name="conversation"
+        options={{
+          href: null,
+          title: "Conversation",
+          headerShown: false,
         }}
       />
     </Tabs>

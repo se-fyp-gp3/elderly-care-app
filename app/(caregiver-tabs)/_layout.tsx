@@ -39,11 +39,7 @@ export default function TabsLayout() {
         options={{
           title: "Messages",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="chat"
-              size={size}
-              color={color}
-            />
+            <MaterialCommunityIcons name="chat" size={size} color={color} />
           ),
         }}
       />
@@ -82,7 +78,6 @@ export default function TabsLayout() {
           ),
         }}
       />
-      
 
       {/* Hidden Screens */}
       <Tabs.Screen
@@ -125,6 +120,14 @@ export default function TabsLayout() {
         options={{
           href: null,
           title: "Elderly Detail",
+        }}
+      />
+      <Tabs.Screen
+        name="conversation"
+        options={{
+          href: null,
+          title: "Conversation",
+          headerShown: false,
         }}
       />
       <Tabs.Screen
