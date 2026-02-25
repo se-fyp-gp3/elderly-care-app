@@ -168,6 +168,12 @@ export default function CaregiverDashboard() {
       color: "#FF9800",
       route: "emergency",
     },
+    {
+      icon: "message-text",
+      label: "Messages",
+      color: "#673AB7",
+      route: "messages",
+    },
   ];
 
   const onRefresh = React.useCallback(async () => {

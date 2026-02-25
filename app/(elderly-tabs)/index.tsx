@@ -245,9 +245,9 @@ export default function ElderlyHome() {
     },
     {
       icon: "account-group" as IconName,
-      label: "Community",
+      label: "Message Caregiver",
       color: "#FF9800",
-      route: "chat",
+      route: "messages",
     },
   ];
 

@@ -10,13 +10,19 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.elderlycareapp"
+      "bundleIdentifier": "com.anonymous.elderlycareapp",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app needs microphone access to record voice samples for custom voice cloning.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "minSdkVersion": 26,
       "permissions": [
         "ACTIVITY_RECOGNITION",
-        "android.permission.health.READ_STEPS"
+        "android.permission.health.READ_STEPS",
+        "RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -57,7 +63,13 @@
           }
         }
       ],
-      "./plugins/withHealthConnect"
+      "./plugins/withHealthConnect",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for voice recording."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

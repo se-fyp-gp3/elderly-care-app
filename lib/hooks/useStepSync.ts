@@ -11,15 +11,15 @@
  * and haptic feedback for manual interactions.
  */
 
+import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
-import * as Haptics from "expo-haptics";
 import { useAuth } from "../auth-context";
 import { getElderlyByUserId } from "../elderly";
 import {
   DailyStepRecord,
-  getTodayStepRecord,
   getStepHistory,
+  getTodayStepRecord,
   performStepSync,
   requestHealthAuthorization,
   StepDataSource,

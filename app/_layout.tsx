@@ -31,7 +31,11 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const currentRoute = segments[0];
     const authRoutes = ["start", "signup", "auth", "profile-setup"];
+    const protectedStandaloneRoutes = ["conversation"];
     const inAuthGroup = authRoutes.includes(currentRoute as string);
+    const inProtectedStandaloneRoute = protectedStandaloneRoutes.includes(
+      currentRoute as string,
+    );
     const inCaregiverTabs = currentRoute === "(caregiver-tabs)";
     const inElderlyTabs = currentRoute === "(elderly-tabs)";
 
@@ -54,7 +58,12 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
           router.replace("/profile-setup");
         }
       } else if (hasProfile === true) {
-        if (inAuthGroup || (!inCaregiverTabs && !inElderlyTabs)) {
+        if (
+          inAuthGroup ||
+          (!inCaregiverTabs &&
+            !inElderlyTabs &&
+            !inProtectedStandaloneRoute)
+        ) {
           const targetTab = role && tabs[role as keyof typeof tabs];
           if (targetTab) {
             router.replace(targetTab);
@@ -111,6 +120,10 @@ export default function RootLayout() {
                 <Stack.Screen name="auth" options={{ headerShown: false }} />
                 <Stack.Screen
                   name="profile-setup"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="conversation"
                   options={{ headerShown: false }}
                 />
               </Stack>

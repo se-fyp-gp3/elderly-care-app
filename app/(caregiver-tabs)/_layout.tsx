@@ -85,6 +85,13 @@ export default function TabsLayout() {
 
       {/* Hidden Screens */}
       <Tabs.Screen
+        name="messages"
+        options={{
+          href: null,
+          title: "Messages",
+        }}
+      />
+      <Tabs.Screen
         name="emergency"
         options={{
           href: null,

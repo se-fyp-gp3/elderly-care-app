@@ -1,8 +1,10 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import {
   buildScheduleSummary,
   fetchElderlySchedulesForUser,
 } from "@/lib/elderly";
+import { useChatVoice } from "@/lib/hooks/useChatVoice";
 import { getFormattedTodayMedicationSummary } from "@/lib/medication_tracking";
 import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -80,6 +82,17 @@ interface OpenRouterResponse {
 export default function ElderlyChat() {
   const theme = useTheme();
   const { user } = useAuth();
+
+  // Voice broadcast hook
+  const {
+    voiceEnabled,
+    isSpeaking,
+    toggleVoice,
+    speakResponse,
+    pausePlayback,
+    stopPlayback,
+  } = useChatVoice(user?.$id);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -675,6 +688,11 @@ export default function ElderlyChat() {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+
+      // Auto-speak AI response if voice is enabled
+      if (voiceEnabled && aiResponse) {
+        speakResponse(aiResponse).catch(() => {});
+      }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         return;
@@ -807,6 +825,50 @@ export default function ElderlyChat() {
           iconColor={theme.colors.onSurface}
         />
         <View style={styles.topBarSpacer} />
+
+        {/* Voice toggle button */}
+        <TouchableOpacity
+          onPress={isSpeaking ? stopPlayback : toggleVoice}
+          style={[
+            styles.voiceToggleButton,
+            {
+              backgroundColor: voiceEnabled
+                ? theme.colors.primaryContainer
+                : theme.colors.surfaceVariant,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={voiceEnabled ? "Voice on" : "Voice off"}
+        >
+          <MaterialCommunityIcons
+            name={
+              isSpeaking
+                ? "stop-circle"
+                : voiceEnabled
+                  ? "volume-high"
+                  : "volume-off"
+            }
+            size={20}
+            color={
+              voiceEnabled
+                ? theme.colors.primary
+                : theme.colors.onSurfaceVariant
+            }
+          />
+          <Text
+            style={[
+              styles.voiceToggleText,
+              {
+                color: voiceEnabled
+                  ? theme.colors.primary
+                  : theme.colors.onSurfaceVariant,
+              },
+            ]}
+          >
+            {isSpeaking ? "Stop" : voiceEnabled ? "Voice On" : "Voice Off"}
+          </Text>
+        </TouchableOpacity>
+
         <IconButton
           icon="plus"
           size={22}
@@ -1027,6 +1089,21 @@ const styles = StyleSheet.create({
   topBarButton: {
     borderRadius: 999,
     backgroundColor: "transparent",
+  },
+  voiceToggleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 2,
+    minWidth: 50,
+    minHeight: 36,
+  },
+  voiceToggleText: {
+    fontSize: 12,
+    marginLeft: 4,
+    fontWeight: "600",
   },
   chatContainer: {
     flex: 1,
