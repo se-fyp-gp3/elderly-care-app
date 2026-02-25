@@ -1,10 +1,10 @@
 import AddElderlyDialog from "@/components/AddElderlyDialog";
 import ElderlyCard from "@/components/ElderlyCard"; // Import the new component
 import {
-  CAREGIVER_ELDERLY_TABLE_ID,
-  DATABASE_ID,
-  ELDERLY_TABLE_ID,
-  tablesDB,
+    CAREGIVER_ELDERLY_TABLE_ID,
+    DATABASE_ID,
+    ELDERLY_TABLE_ID,
+    tablesDB,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
@@ -13,24 +13,24 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-  Alert,
-  Linking,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
+    Alert,
+    Linking,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
 import { Query } from "react-native-appwrite";
 import {
-  Avatar,
-  Button,
-  Card,
-  Dialog,
-  FAB,
-  List,
-  Portal,
-  Text,
-  useTheme,
+    Avatar,
+    Button,
+    Card,
+    Dialog,
+    FAB,
+    List,
+    Portal,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];

@@ -17,8 +17,8 @@
  * NOTE: Cannot be tested in Expo Go — use EAS Build dev client.
  */
 
-import { ID, Models, Query } from "react-native-appwrite";
 import * as FileSystem from "expo-file-system";
+import { ID, Models, Query } from "react-native-appwrite";
 import { DATABASE_ID, tablesDB } from "./appwrite";
 
 // ---------------------------------------------------------------------------

@@ -1,31 +1,30 @@
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
-  RECORDING_PROMPTS,
-  useCustomVoice,
+    RECORDING_PROMPTS,
+    useCustomVoice,
 } from "@/lib/hooks/useCustomVoice";
 import { Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
+    Alert,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    View
 } from "react-native";
 import {
-  ActivityIndicator,
-  Button,
-  Card,
-  Chip,
-  Divider,
-  IconButton,
-  List,
-  Menu,
-  Text,
-  useTheme,
+    ActivityIndicator,
+    Button,
+    Card,
+    Chip,
+    Divider,
+    IconButton,
+    List,
+    Menu,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 export default function More() {

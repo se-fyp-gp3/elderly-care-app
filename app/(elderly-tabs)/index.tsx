@@ -1,41 +1,41 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-  fetchElderlySchedulesForUser,
-  getElderlyByUserId,
+    fetchElderlySchedulesForUser,
+    getElderlyByUserId,
 } from "@/lib/elderly";
 import { useStepSync } from "@/lib/hooks/useStepSync";
 import {
-  checkAndMarkSkippedMedications,
-  fetchActiveMedicationReminders,
-  fetchDailyMedicationLogs,
-  logMedicationAction,
+    checkAndMarkSkippedMedications,
+    fetchActiveMedicationReminders,
+    fetchDailyMedicationLogs,
+    logMedicationAction,
 } from "@/lib/medication_tracking";
 import {
-  Elderly,
-  ElderlyMedicationReminder,
-  MedicationLogs,
-  Schedule,
+    Elderly,
+    ElderlyMedicationReminder,
+    MedicationLogs,
+    Schedule,
 } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { openURL } from "expo-linking";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-  Alert,
-  AppState,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
+    Alert,
+    AppState,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
 import {
-  Avatar,
-  Button,
-  Card,
-  Chip,
-  List,
-  Text,
-  useTheme,
+    Avatar,
+    Button,
+    Card,
+    Chip,
+    List,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];

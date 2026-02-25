@@ -13,15 +13,14 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Platform } from "react-native";
 import {
-  CustomVoiceRecord,
-  getCustomVoicesForElderly,
+    CustomVoiceRecord,
+    getCustomVoicesForElderly,
 } from "../azureCustomVoice";
 import {
-  speakText,
-  stopCurrentPlayback,
-  isPlaying as checkIsPlaying,
+    isPlaying as checkIsPlaying,
+    speakText,
+    stopCurrentPlayback,
 } from "../azureTTS";
 
 // ---------------------------------------------------------------------------

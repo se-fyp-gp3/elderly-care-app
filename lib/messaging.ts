@@ -1,10 +1,10 @@
 import { DirectMessage } from "@/types/messaging";
 import { ID, Query } from "react-native-appwrite";
 import {
-  clientReactNative,
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
-  tablesDB,
+    clientReactNative,
+    DATABASE_ID,
+    DIRECT_MESSAGES_TABLE_ID,
+    tablesDB,
 } from "./appwrite";
 
 export function buildConversationId(

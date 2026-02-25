@@ -14,13 +14,13 @@ import * as FileSystem from "expo-file-system";
 import { useCallback, useRef, useState } from "react";
 import { Alert, Platform } from "react-native";
 import {
-  createCustomVoice,
-  CustomVoiceRecord,
-  getCustomVoicesForCaregiver,
-  deleteCustomVoiceRecord as deleteVoiceRecordFromDB,
-  MAX_SAMPLES,
-  saveCustomVoiceRecord,
-  VoiceSample,
+    createCustomVoice,
+    CustomVoiceRecord,
+    deleteCustomVoiceRecord as deleteVoiceRecordFromDB,
+    getCustomVoicesForCaregiver,
+    MAX_SAMPLES,
+    saveCustomVoiceRecord,
+    VoiceSample,
 } from "../azureCustomVoice";
 import { playLocalAudio, stopCurrentPlayback } from "../azureTTS";
 

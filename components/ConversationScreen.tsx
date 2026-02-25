@@ -1,30 +1,30 @@
 import {
-  buildConversationId,
-  fetchConversationMessages,
-  markConversationAsRead,
-  sendDirectMessage,
-  subscribeToConversation,
+    buildConversationId,
+    fetchConversationMessages,
+    markConversationAsRead,
+    sendDirectMessage,
+    subscribeToConversation,
 } from "@/lib/messaging";
 import { DirectMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  View,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  IconButton,
-  Surface,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    IconButton,
+    Surface,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 

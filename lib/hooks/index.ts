@@ -6,12 +6,12 @@
  * providing a cleaner separation between UI and data layers.
  */
 
+export { useChatVoice } from "./useChatVoice";
+export { useCustomVoice } from "./useCustomVoice";
 export { useElderlyHome } from "./useElderlyHome";
 export { useElderlyProfile } from "./useElderlyProfile";
 export { useHealthData } from "./useHealthData";
 export { useMedications } from "./useMedications";
 export { useSchedules } from "./useSchedules";
 export { useStepSync } from "./useStepSync";
-export { useCustomVoice } from "./useCustomVoice";
-export { useChatVoice } from "./useChatVoice";
 

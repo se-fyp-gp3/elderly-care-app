@@ -1,18 +1,18 @@
 import { useAuth } from "@/lib/auth-context";
-import { useChatVoice } from "@/lib/hooks/useChatVoice";
 import { speakText, stopCurrentPlayback } from "@/lib/azureTTS";
+import { useChatVoice } from "@/lib/hooks/useChatVoice";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import {
-  ActivityIndicator,
-  Button,
-  Card,
-  List,
-  Menu,
-  Switch,
-  Text,
-  useTheme,
+    ActivityIndicator,
+    Button,
+    Card,
+    List,
+    Menu,
+    Switch,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 export default function ElderlySettings() {

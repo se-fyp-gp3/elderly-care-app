@@ -1,36 +1,36 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import {
-  buildScheduleSummary,
-  fetchElderlySchedulesForUser,
+    buildScheduleSummary,
+    fetchElderlySchedulesForUser,
 } from "@/lib/elderly";
 import { useChatVoice } from "@/lib/hooks/useChatVoice";
 import { getFormattedTodayMedicationSummary } from "@/lib/medication_tracking";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Card,
-  IconButton,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Card,
+    IconButton,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 interface Message {
