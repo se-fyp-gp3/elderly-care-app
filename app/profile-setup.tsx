@@ -56,7 +56,6 @@ export default function ProfileSetupScreen() {
         phone: phone.trim() || null,
         birth: birthDate ? birthDate.toISOString().split("T")[0] : null,
       };
-      console.log("Creating profile with data:", profileData); // --- IGNORE ---
 
       if (role === Role.Caregiver) {
         await createCaregiverProfile(profileData as Caregiver);
