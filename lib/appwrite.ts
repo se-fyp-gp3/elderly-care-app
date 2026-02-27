@@ -1,5 +1,4 @@
 import { Account, Client } from "appwrite";
-import { Client as ServerClient } from "node-appwrite";
 import {
   Account as AccountReactNative,
   Client as ClientReactNative,
@@ -11,7 +10,6 @@ const APPWRITE_ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!;
 const APPWRITE_PROJECT_ID = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!;
 const APPWRITE_PLATFORM = process.env.EXPO_PUBLIC_APPWRITE_PLATFORM!;
 const APPWRITE_DEV_KEY = process.env.EXPO_PRIVATE_APPWRITE_DEV_KEY!;
-const APPWRITE_KEY = process.env.EXPO_PRIVATE_APPWRITE_KEY!;
 
 export const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
@@ -23,11 +21,6 @@ export const clientReactNative = new ClientReactNative()
   .setProject(APPWRITE_PROJECT_ID)
   .setPlatform(APPWRITE_PLATFORM)
   .setDevKey(APPWRITE_DEV_KEY);
-
-export const serverClient = new ServerClient()
-  .setEndpoint(APPWRITE_ENDPOINT)
-  .setProject(APPWRITE_PROJECT_ID)
-  .setKey(APPWRITE_KEY);
 
 export const account = new AccountReactNative(clientReactNative);
 export const accountWeb = new Account(client);
