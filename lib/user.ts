@@ -1,4 +1,4 @@
-import { functions } from "./appwrite";
+import { functions, ROLE_MANAGEMENT_FUNCTION_ID } from "./appwrite";
 import { getElderlyByUserId } from "./elderly";
 import { getCaregiverByUserId } from "./caregiver";
 import { ExecutionMethod } from "react-native-appwrite";
@@ -36,7 +36,7 @@ export async function addRoleLabel(
 ): Promise<void> {
   try {
     const result = await functions.createExecution({
-      functionId: "699dbc63003c1b31c4bb",
+      functionId: ROLE_MANAGEMENT_FUNCTION_ID,
       body: JSON.stringify({
         role,
       }),
@@ -56,7 +56,7 @@ export async function removeRoleLabel(
 ): Promise<void> {
   try {
     const result = await functions.createExecution({
-      functionId: "699dbc63003c1b31c4bb",
+      functionId: ROLE_MANAGEMENT_FUNCTION_ID,
       body: JSON.stringify({
         role,
       }),
