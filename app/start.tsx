@@ -1,10 +1,10 @@
 import { useAuth } from "@/lib/auth-context";
+import { Role } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Button, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Role } from "@/types/user";
 
 export default function StartScreen() {
   const theme = useTheme();
@@ -13,7 +13,11 @@ export default function StartScreen() {
 
   const handleRoleSelect = (role: Role) => {
     if (!user) {
-      router.push(`/signup?role=${role}`);
+      if (role === Role.Elderly) {
+        router.push("/qr-register");
+      } else {
+        router.push(`/signup?role=${role}`);
+      }
     } else {
       setPreference("role", role);
       router.push("/profile-setup");

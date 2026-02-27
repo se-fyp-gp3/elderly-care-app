@@ -1,38 +1,43 @@
 import {
-    Caregiver,
-    CaregiverElderly,
-    Elderly,
-    ElderlyMedication,
-    ElderlyMedicationStatus,
-    ElderlyStatus,
-    Medication,
-    Schedule,
+  Caregiver,
+  CaregiverElderly,
+  Elderly,
+  ElderlyMedication,
+  ElderlyMedicationStatus,
+  ElderlyStatus,
+  Medication,
+  Schedule,
 } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
-    CAREGIVER_ELDERLY_TABLE_ID,
-    CAREGIVER_TABLE_ID,
-    DATABASE_ID,
-    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-    ELDERLY_MEDICATION_TABLE_ID,
-    ELDERLY_TABLE_ID,
-    MEDICATION_LOGS_TABLE_ID,
-    MEDICATION_TABLE_ID,
-    SCHEDULE_TABLE_ID,
-    tablesDB,
+  CAREGIVER_ELDERLY_TABLE_ID,
+  CAREGIVER_TABLE_ID,
+  DATABASE_ID,
+  ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+  ELDERLY_MEDICATION_TABLE_ID,
+  ELDERLY_TABLE_ID,
+  MEDICATION_LOGS_TABLE_ID,
+  MEDICATION_TABLE_ID,
+  SCHEDULE_TABLE_ID,
+  tablesDB,
 } from "./appwrite";
 
 /**
  * Calculate an elderly person's age from their birth date string.
  * Returns undefined if no birth date is provided.
  */
-export function calculateAge(birthDateString?: string | null): number | undefined {
+export function calculateAge(
+  birthDateString?: string | null,
+): number | undefined {
   if (!birthDateString) return undefined;
   const birthDate = new Date(birthDateString);
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
     age--;
   }
   return age;

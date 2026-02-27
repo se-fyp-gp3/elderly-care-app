@@ -1,4 +1,5 @@
 import AuthProvider, { useAuth } from "@/lib/auth-context";
+import { Role } from "@/types/user";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, useColorScheme, View } from "react-native";
@@ -12,9 +13,34 @@ registerTranslation("en", enGB);
 
 const SKIP_SPLASH = true;
 
-const tabs: Record<string, "/(elderly-tabs)" | "/(caregiver-tabs)"> = {
-  elderly: "/(elderly-tabs)",
-  caregiver: "/(caregiver-tabs)",
+const tabs: Record<Role, "/(elderly-tabs)" | "/(caregiver-tabs)"> = {
+  [Role.Elderly]: "/(elderly-tabs)",
+  [Role.Caregiver]: "/(caregiver-tabs)",
+};
+const authRoutes = ["start", "signup", "auth", "qr-register"];
+
+const getRoleHomeRoute = (role: Role | undefined) => {
+  if (role && tabs[role as keyof typeof tabs]) {
+    return tabs[role as keyof typeof tabs];
+  }
+  return "/start";
+};
+
+const isInMainTab = (inElderlyTabs: boolean, inCaregiverTabs: boolean) => {
+  return inElderlyTabs || inCaregiverTabs;
+};
+
+const isOnCorrectRoute = (params: {
+  inAuthGroup: boolean;
+  inElderlyTabs: boolean;
+  inCaregiverTabs: boolean;
+}) => {
+  const { inAuthGroup, inElderlyTabs, inCaregiverTabs } = params;
+  return !inAuthGroup && isInMainTab(inElderlyTabs, inCaregiverTabs);
+};
+
+const isOnRoute = (currentRoute: string, ...names: string[]) => {
+  return names.includes(currentRoute);
 };
 
 function RouteGuard({ children }: { children: React.ReactNode }) {
@@ -30,58 +56,67 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const currentRoute = segments[0];
-    const authRoutes = ["start", "signup", "auth", "profile-setup"];
     const inAuthGroup = authRoutes.includes(currentRoute as string);
     const inCaregiverTabs = currentRoute === "(caregiver-tabs)";
     const inElderlyTabs = currentRoute === "(elderly-tabs)";
 
-    if (isLoading || !appReady) {
+    if (isLoading) {
       return;
     }
 
+    // If not signed in, always go to start page
     if (!user) {
       if (!inAuthGroup) {
         router.replace("/start");
       }
-    } else {
-      const hasRole = !!role;
-      if (!hasRole) {
-        if (currentRoute !== "start" && currentRoute !== "profile-setup") {
-          router.replace("/profile-setup");
-        }
-      } else if (hasProfile === false) {
-        if (currentRoute !== "profile-setup") {
-          router.replace("/profile-setup");
-        }
-      } else if (hasProfile === true) {
-        if (inAuthGroup || (!inCaregiverTabs && !inElderlyTabs && currentRoute !== "conversation")) {
-          const targetTab = role && tabs[role as keyof typeof tabs];
-          if (targetTab) {
-            router.replace(targetTab);
-          }
-        }
+      return;
+    }
+
+    // If signed in but no profile, go to profile setup
+    if (!hasProfile) {
+      if (!isOnRoute(currentRoute, "profile-setup")) {
+        router.replace("/profile-setup");
       }
+      return;
+    }
+
+    // If signed in and on correct route, do nothing
+    if (isOnCorrectRoute({ inAuthGroup, inCaregiverTabs, inElderlyTabs })) {
+      return;
+    }
+
+    // Send to correct home based on role
+    const targetTab = getRoleHomeRoute(role);
+    if (targetTab) {
+      router.replace(targetTab);
     }
   }, [router, user, segments, isLoading, appReady, hasProfile, role]);
 
-  // Show loading spinner while checking auth and profile state
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
   return (
-    <>
+    <View style={{ flex: 1 }}>
+      {children}
       {!appReady && (
         <PinterestSplash onAnimationComplete={() => setAppReady(true)}>
-          {children}
+          <View />
         </PinterestSplash>
       )}
-      {appReady && children}
-    </>
+      {isLoading && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "#ffffff",
+          }}
+        >
+          <ActivityIndicator size="large" />
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -99,10 +134,6 @@ export default function RootLayout() {
             <RouteGuard>
               <Stack>
                 <Stack.Screen
-                  name="index"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
                   name="(caregiver-tabs)"
                   options={{ headerShown: false }}
                 />
@@ -118,7 +149,7 @@ export default function RootLayout() {
                   options={{ headerShown: false }}
                 />
                 <Stack.Screen
-                  name="conversation"
+                  name="qr-register"
                   options={{ headerShown: false }}
                 />
               </Stack>
