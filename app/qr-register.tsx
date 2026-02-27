@@ -96,6 +96,12 @@ export default function ElderlyQRRegisterScreen() {
         }
       } catch (err) {
         console.error("Polling error:", err);
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        setErrorMsg("Failed to complete registration. Please try again.");
+        setStatus("error");
       }
     }, 3000);
 
