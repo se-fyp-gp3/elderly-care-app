@@ -60,6 +60,9 @@ export const DIRECT_MESSAGES_TABLE_ID =
 export const REGISTRATION_REQUESTS_TABLE_ID =
   process.env.EXPO_PUBLIC_REGISTRATION_REQUESTS_TABLE_ID!;
 
+export const ROLE_MANAGEMENT_FUNCTION_ID =
+  process.env.EXPO_PUBLIC_ROLE_MANAGEMENT_FUNCTION_ID!;
+
 export interface RealtimeResponse {
   events: string[];
   payload: any;
