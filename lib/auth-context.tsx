@@ -17,7 +17,7 @@ type AuthContextType = {
   user: Models.User<Models.Preferences> | null;
   isLoading: boolean;
   preferences: UserPreferences;
-  hasProfile: boolean | null;
+  hasProfile: boolean;
   isTrial: boolean;
   userLabels: string[];
 
@@ -52,7 +52,7 @@ export default function AuthProvider({
   );
   const [preferences, setPreferences] = useState<UserPreferences>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+  const [hasProfile, setHasProfile] = useState<boolean>(false);
   const [userLabels, setUserLabels] = useState<string[]>([]);
   const [isTrial, setIsTrial] = useState<boolean>(false);
 
@@ -76,7 +76,7 @@ export default function AuthProvider({
 
   const refreshProfile = async () => {
     if (!user) {
-      setHasProfile(null);
+      setHasProfile(false);
       return;
     }
 
@@ -222,7 +222,7 @@ export default function AuthProvider({
       await account.deleteSession({ sessionId: "current" });
     }
     setUser(null);
-    setHasProfile(null);
+    setHasProfile(false);
     setPreferences({});
     setUserLabels([]);
     setIsTrial(false);

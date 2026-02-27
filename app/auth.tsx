@@ -81,7 +81,6 @@ export default function AuthScreen() {
 
   const handleGetStarted = () => {
     router.back();
-    // router.push("/start");
   };
 
   return (

@@ -1,7 +1,7 @@
-import { users } from "./appwrite";
+import { functions } from "./appwrite";
 import { getElderlyByUserId } from "./elderly";
 import { getCaregiverByUserId } from "./caregiver";
-import { UserPreferences } from "@/types/user";
+import { ExecutionMethod } from "react-native-appwrite";
 
 export async function checkProfileExists(
   userId: string,
@@ -35,7 +35,15 @@ export async function addRoleLabel(
   role: "elderly" | "caregiver",
 ): Promise<void> {
   try {
-    await users.updateLabels({ userId: userId, labels: [role] });
+    const result = await functions.createExecution({
+      functionId: "699dbc63003c1b31c4bb",
+      body: JSON.stringify({
+        role,
+      }),
+      xpath: `/users/${userId}/labels`,
+      method: ExecutionMethod.POST,
+    });
+    console.log("Role label added successfully:", result);
   } catch (error) {
     console.error("Error adding role label:", error);
     throw error;
@@ -47,10 +55,15 @@ export async function removeRoleLabel(
   role: "elderly" | "caregiver",
 ): Promise<void> {
   try {
-    const user = await users.get<UserPreferences>({ userId });
-    const currentLabels = user.labels || [];
-    const updatedLabels = currentLabels.filter((label) => label !== role);
-    await users.updateLabels({ userId: userId, labels: updatedLabels });
+    const result = await functions.createExecution({
+      functionId: "699dbc63003c1b31c4bb",
+      body: JSON.stringify({
+        role,
+      }),
+      xpath: `/users/${userId}/labels`,
+      method: ExecutionMethod.DELETE,
+    });
+    console.log("Role label removed successfully:", result);
   } catch (error) {
     console.error("Error removing role label:", error);
     throw error;

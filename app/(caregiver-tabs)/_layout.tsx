@@ -137,6 +137,22 @@ export default function TabsLayout() {
           title: "medication_old",
         }}
       />
+      <Tabs.Screen
+        name="scan-qr"
+        options={{
+          href: null,
+          title: "Scan QR",
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="register-elderly"
+        options={{
+          href: null,
+          title: "Register Elderly",
+          headerShown: false,
+        }}
+      />
     </Tabs>
   );
 }

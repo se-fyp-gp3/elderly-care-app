@@ -2,18 +2,20 @@ import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, linkCaregiverToElderly } from "@/lib/caregiver";
 import { getElderlyByPhone } from "@/lib/elderly";
 import { Elderly } from "@/types/appwrite";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Keyboard, StyleSheet, View } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Button,
-  Dialog,
-  HelperText,
-  Portal,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Button,
+    Dialog,
+    Divider,
+    HelperText,
+    Portal,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 interface AddElderlyDialogProps {
@@ -28,6 +30,7 @@ export default function AddElderlyDialog({
   onSuccess,
 }: AddElderlyDialogProps) {
   const theme = useTheme();
+  const router = useRouter();
   const { user } = useAuth();
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -108,6 +111,20 @@ export default function AddElderlyDialog({
         <Dialog.Content>
           {!foundElderly ? (
             <>
+              <Button
+                mode="contained-tonal"
+                icon="qrcode-scan"
+                onPress={() => {
+                  handleDismiss();
+                  router.push("/(caregiver-tabs)/scan-qr" as any);
+                }}
+                style={{ marginBottom: 16 }}
+              >
+                Scan Elderly QR Code
+              </Button>
+
+              <Divider style={{ marginBottom: 12 }} />
+
               <Text
                 variant="bodyMedium"
                 style={{
@@ -116,7 +133,7 @@ export default function AddElderlyDialog({
                   color: theme.colors.secondary,
                 }}
               >
-                Enter the phone number of the elderly person you want to care
+                Or enter the phone number of the elderly person you want to care
                 for.
               </Text>
 

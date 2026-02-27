@@ -111,7 +111,12 @@ export default function SignupScreen() {
   };
 
   const handleGoBack = () => {
-    router.back();
+    if (role === "caregiver") {
+      router.back();
+    } else {
+      router.back();
+      router.back();
+    }
   };
 
   const getRoleIcon = () => {
