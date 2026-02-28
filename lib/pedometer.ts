@@ -5,14 +5,14 @@
  * Uses `react-native-health-connect` to interact with the Health Connect API.
  */
 
+import { Alert, Linking } from "react-native";
 import {
-  initialize,
-  requestPermission,
-  readRecords,
   getSdkStatus,
+  initialize,
+  readRecords,
+  requestPermission,
   SdkAvailabilityStatus,
 } from "react-native-health-connect";
-import { Alert, Linking } from "react-native";
 
 // ---------------------------------------------------------------------------
 // Permission

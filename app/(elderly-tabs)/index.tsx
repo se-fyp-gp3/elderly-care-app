@@ -3,13 +3,13 @@ import {
   fetchElderlySchedulesForUser,
   getElderlyByUserId,
 } from "@/lib/elderly";
-import { getTodaySteps } from "@/lib/pedometer";
 import {
   checkAndMarkSkippedMedications,
   fetchActiveMedicationReminders,
   fetchDailyMedicationLogs,
   logMedicationAction,
 } from "@/lib/medication_tracking";
+import { getTodaySteps } from "@/lib/pedometer";
 import {
   Elderly,
   ElderlyMedicationReminder,
