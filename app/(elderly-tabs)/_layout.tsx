@@ -111,6 +111,13 @@ export default function ElderlyTabsLayout() {
           headerShown: false,
         }}
       />
+      <Tabs.Screen
+        name="steps"
+        options={{
+          href: null,
+          title: "步数",
+        }}
+      />
     </Tabs>
   );
 }

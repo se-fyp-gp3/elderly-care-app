@@ -252,9 +252,7 @@ export default function ElderlyChat() {
           },
         );
 
-        const info = await FileSystem.getInfoAsync(manipulated.uri, {
-          size: true,
-        });
+        const info = await FileSystem.getInfoAsync(manipulated.uri);
         if (!info.exists || !info.size) {
           continue;
         }

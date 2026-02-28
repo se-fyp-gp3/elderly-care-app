@@ -3,6 +3,7 @@ import {
   fetchElderlySchedulesForUser,
   getElderlyByUserId,
 } from "@/lib/elderly";
+import { getTodaySteps } from "@/lib/pedometer";
 import {
   checkAndMarkSkippedMedications,
   fetchActiveMedicationReminders,
@@ -62,6 +63,7 @@ export default function ElderlyHome() {
   );
   const [todayLogs, setTodayLogs] = React.useState<MedicationLogs[]>([]);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
+  const [todaySteps, setTodaySteps] = React.useState<number>(0);
 
   const fetchElderlyData = React.useCallback(async () => {
     if (!user) return;
@@ -94,6 +96,14 @@ export default function ElderlyHome() {
         } catch {
           console.log("No schedules found");
           setSchedules([]);
+        }
+
+        // Fetch today's step count from Health Connect
+        try {
+          const steps = await getTodaySteps();
+          setTodaySteps(steps);
+        } catch (err) {
+          console.log("Could not fetch today steps:", err);
         }
       }
     } catch (err: unknown) {
@@ -447,7 +457,7 @@ export default function ElderlyHome() {
       </Text>
       <Card
         style={[styles.healthCard, { backgroundColor: theme.colors.surface }]}
-        onPress={() => router.push("/health-data" as never)}
+        onPress={() => router.push("/steps" as never)}
       >
         <Card.Content style={styles.healthContent}>
           <View style={styles.healthItem}>
@@ -461,7 +471,7 @@ export default function ElderlyHome() {
               variant="bodySmall"
               style={{ color: theme.colors.onSurfaceVariant }}
             >
-              1,234 steps
+              {todaySteps.toLocaleString()} steps
             </Text>
           </View>
         </Card.Content>

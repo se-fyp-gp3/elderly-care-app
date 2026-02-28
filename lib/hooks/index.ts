@@ -11,3 +11,4 @@ export { useElderlyProfile } from "./useElderlyProfile";
 export { useHealthData } from "./useHealthData";
 export { useMedications } from "./useMedications";
 export { useSchedules } from "./useSchedules";
+export { useSteps } from "./useSteps";
