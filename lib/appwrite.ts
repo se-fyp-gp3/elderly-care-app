@@ -1,8 +1,8 @@
 import { Account, Client, Functions as FunctionsWeb, TablesDB } from "appwrite";
 import { Client as ServerClient, Users } from "node-appwrite";
 import {
-    Account as AccountReactNative,
-    Client as ClientReactNative,
+  Account as AccountReactNative,
+  Client as ClientReactNative,
   Functions as FunctionsReactNative,
 } from "react-native-appwrite";
 
