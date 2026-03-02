@@ -1,8 +1,9 @@
-import { Account, Client, TablesDB } from "appwrite";
+import { Account, Client, Functions as FunctionsWeb, TablesDB } from "appwrite";
 import { Client as ServerClient, Users } from "node-appwrite";
 import {
     Account as AccountReactNative,
     Client as ClientReactNative,
+  Functions as FunctionsReactNative,
 } from "react-native-appwrite";
 
 const APPWRITE_ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!;
@@ -29,6 +30,8 @@ export const serverClient = new ServerClient()
 
 export const account = new AccountReactNative(clientReactNative);
 export const accountWeb = new Account(client);
+export const functions = new FunctionsReactNative(clientReactNative);
+export const functionsWeb = new FunctionsWeb(client);
 export const tablesDB = new TablesDB(client);
 export const users = new Users(serverClient);
 

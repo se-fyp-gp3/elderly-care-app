@@ -18,8 +18,8 @@
  */
 
 import * as FileSystem from "expo-file-system";
-import { ID, Models, Query } from "react-native-appwrite";
-import { DATABASE_ID, tablesDB } from "./appwrite";
+import { ExecutionMethod, ID, Models, Query } from "react-native-appwrite";
+import { DATABASE_ID, functions, tablesDB } from "./appwrite";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -28,10 +28,28 @@ import { DATABASE_ID, tablesDB } from "./appwrite";
 const AZURE_SPEECH_KEY =
   process.env.EXPO_PUBLIC_AZURE_SPEECH_KEY?.trim() || "";
 const AZURE_SPEECH_REGION =
-  process.env.EXPO_PUBLIC_AZURE_SPEECH_REGION?.trim() || "eastasia";
+  process.env.EXPO_PUBLIC_AZURE_SPEECH_REGION?.trim() || "southeastasia";
+const AZURE_CNV_PROJECT_ID =
+  process.env.EXPO_PUBLIC_AZURE_CNV_PROJECT_ID?.trim() || "";
+const AZURE_CNV_LOCALE =
+  process.env.EXPO_PUBLIC_AZURE_CNV_LOCALE?.trim() || "zh-HK";
+const AZURE_CNV_AUDIO_EXTENSION =
+  process.env.EXPO_PUBLIC_AZURE_CNV_AUDIO_EXTENSION?.trim() || ".m4a";
+const AZURE_CNV_AUDIO_CONTENT_TYPE =
+  process.env.EXPO_PUBLIC_AZURE_CNV_AUDIO_CONTENT_TYPE?.trim() ||
+  "audio/mp4";
+const VOICE_CLONE_FUNCTION_ID =
+  process.env.EXPO_PUBLIC_VOICE_CLONE_FUNCTION_ID?.trim() || "";
 
 /** Azure Custom Neural Voice REST API base URL. */
-const CNV_API_BASE = `https://${AZURE_SPEECH_REGION}.customvoice.api.speech.microsoft.com/api/texttospeech/3.1-preview1`;
+const CNV_API_BASE = `https://${AZURE_SPEECH_REGION}.api.cognitive.microsoft.com/customvoice`;
+const CNV_API_VERSION =
+  process.env.EXPO_PUBLIC_AZURE_CNV_API_VERSION?.trim() ||
+  "2024-02-01-preview";
+
+function cnvUrl(path: string): string {
+  return `${CNV_API_BASE}${path}?api-version=${encodeURIComponent(CNV_API_VERSION)}`;
+}
 
 export const CUSTOM_VOICE_TABLE_ID =
   process.env.EXPO_PUBLIC_CUSTOM_VOICE_TABLE_ID || "custom_voice";
@@ -74,6 +92,7 @@ const authHeader = () => ({
 
 /** Cached project ID – created/discovered once per session. */
 let _projectId: string | null = null;
+const DEFAULT_PERSONAL_VOICE_PROJECT_ID = "elderly-care-voice";
 
 /**
  * Ensure an Azure Custom Neural Voice project exists.
@@ -82,45 +101,71 @@ let _projectId: string | null = null;
 async function ensureProject(): Promise<string> {
   if (_projectId) return _projectId;
 
+  if (AZURE_CNV_PROJECT_ID) {
+    const projectCheckRes = await fetch(
+      cnvUrl(`/projects/${AZURE_CNV_PROJECT_ID}`),
+      { headers: authHeader() },
+    );
+
+    if (!projectCheckRes.ok) {
+      const checkErr = await projectCheckRes.text().catch(() => "");
+      console.error("Azure project validation error:", checkErr);
+      throw new Error(
+        `Configured EXPO_PUBLIC_AZURE_CNV_PROJECT_ID is invalid for Personal Voice (${projectCheckRes.status}). Please use a Custom Voice project ID from the Personal Voice/Custom Voice area of Speech Studio (not Custom Speech STT projects).`,
+      );
+    }
+
+    _projectId = AZURE_CNV_PROJECT_ID;
+    return _projectId;
+  }
+
   // 1. Try to find an existing project
-  const listRes = await fetch(`${CNV_API_BASE}/projects`, {
+  const listRes = await fetch(cnvUrl("/projects"), {
     headers: authHeader(),
   });
 
-  if (listRes.ok) {
-    const body = await listRes.json();
-    const projects: any[] = body?.value ?? body ?? [];
-    const existing = projects.find(
-      (p: any) =>
-        (p.displayName || p.projectName) === "elderly-care-voice",
+  if (!listRes.ok) {
+    const listErr = await listRes.text().catch(() => "");
+    console.error("Azure project list error:", listErr);
+    throw new Error(
+      `Voice service initialisation failed (${listRes.status}). Check Azure Custom Voice access for region '${AZURE_SPEECH_REGION}', or set EXPO_PUBLIC_AZURE_CNV_PROJECT_ID to an existing project ID.`,
     );
-    if (existing) {
-      _projectId = existing.id;
-      return _projectId!;
-    }
+  }
+
+  const body = await listRes.json();
+  const projects: any[] = body?.value ?? body ?? [];
+  const existing = projects.find(
+    (p: any) => p?.id === DEFAULT_PERSONAL_VOICE_PROJECT_ID,
+  );
+  if (existing) {
+    _projectId = existing.id;
+    return _projectId!;
   }
 
   // 2. Create a new project
-  const createRes = await fetch(`${CNV_API_BASE}/projects`, {
-    method: "POST",
+  const createRes = await fetch(
+    cnvUrl(`/projects/${DEFAULT_PERSONAL_VOICE_PROJECT_ID}`),
+    {
+    method: "PUT",
     headers: { ...authHeader(), "Content-Type": "application/json" },
     body: JSON.stringify({
       kind: "PersonalVoice",
-      displayName: "elderly-care-voice",
       description: "Elderly Care App – Caregiver Personal Voice Profiles",
     }),
   });
+
 
   if (!createRes.ok) {
     const err = await createRes.text();
     console.error("Azure project creation error:", err);
     throw new Error(
-      "Failed to initialise the voice service. Please try again.",
+      `Failed to create Azure voice project (${createRes.status}). Ensure Custom Voice is enabled for this Speech resource and region '${AZURE_SPEECH_REGION}'.`,
     );
   }
 
   const proj = await createRes.json();
-  _projectId = proj.id ?? proj.projectId;
+  _projectId =
+    proj.id ?? proj.projectId ?? DEFAULT_PERSONAL_VOICE_PROJECT_ID;
   return _projectId!;
 }
 
@@ -131,7 +176,7 @@ async function base64ToTempFile(
   base64: string,
   prefix: string,
 ): Promise<string> {
-  const uri = `${FileSystem.cacheDirectory}${prefix}_${Date.now()}.mp3`;
+  const uri = `${FileSystem.cacheDirectory}${prefix}_${Date.now()}${AZURE_CNV_AUDIO_EXTENSION}`;
   await FileSystem.writeAsStringAsync(uri, base64, {
     encoding: FileSystem.EncodingType.Base64,
   });
@@ -159,9 +204,9 @@ export async function createCustomVoice(
   samplesBase64: string[],
   speakerName: string,
 ): Promise<string> {
-  if (!AZURE_SPEECH_KEY) {
+  if (!VOICE_CLONE_FUNCTION_ID) {
     throw new Error(
-      "Azure Speech key is not configured. Please add EXPO_PUBLIC_AZURE_SPEECH_KEY to your environment.",
+      "Voice clone function is not configured. Please set EXPO_PUBLIC_VOICE_CLONE_FUNCTION_ID.",
     );
   }
 
@@ -169,86 +214,42 @@ export async function createCustomVoice(
     throw new Error(`Please record at least ${MIN_SAMPLES} audio sample(s).`);
   }
 
-  // ---- Step 1: ensure project ----
-  const projectId = await ensureProject();
+  const execution = await functions.createExecution({
+    functionId: VOICE_CLONE_FUNCTION_ID,
+    body: JSON.stringify({ samplesBase64, speakerName }),
+    async: false,
+    xpath: "/",
+    method: ExecutionMethod.POST,
+    headers: {
+      "content-type": "application/json",
+    },
+  });
 
-  // ---- Step 2: create consent (using first sample as consent audio) ----
-  const consentId = `consent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const consentUri = await base64ToTempFile(samplesBase64[0], "consent");
+  const responseStatus = (execution as any).responseStatusCode;
+  const responseBodyRaw = (execution as any).responseBody || "";
 
-  const consentForm = new FormData();
-  consentForm.append("projectId", projectId);
-  consentForm.append("voiceTalentName", speakerName);
-  consentForm.append("companyName", "Elderly Care App");
-  consentForm.append("locale", "zh-CN");
-  consentForm.append("audiodata", {
-    uri: consentUri,
-    type: "audio/mpeg",
-    name: "consent.mp3",
-  } as any);
-
-  const consentRes = await fetch(
-    `${CNV_API_BASE}/consents/${consentId}`,
-    { method: "PUT", headers: authHeader(), body: consentForm },
-  );
-
-  if (!consentRes.ok) {
-    const err = await consentRes.text();
-    console.error("Azure consent error:", err);
-    throw new Error("Voice consent creation failed. Please try again.");
+  let responseBody: any = null;
+  try {
+    responseBody = responseBodyRaw ? JSON.parse(responseBodyRaw) : null;
+  } catch {
+    responseBody = null;
   }
 
-  const consentData = await consentRes.json();
-  const resolvedConsentId: string = consentData?.id ?? consentId;
-
-  // ---- Step 3: write all samples to temp files ----
-  const sampleUris: string[] = [];
-  for (let i = 0; i < samplesBase64.length; i++) {
-    sampleUris.push(
-      await base64ToTempFile(samplesBase64[i], `sample_${i}`),
+  if (responseStatus && responseStatus >= 400) {
+    throw new Error(
+      responseBody?.error ||
+        `Voice function failed with status ${responseStatus}.`,
     );
   }
 
-  // ---- Step 4: create personal voice profile ----
-  const pvForm = new FormData();
-  pvForm.append("projectId", projectId);
-  pvForm.append("consentId", resolvedConsentId);
-  pvForm.append("description", `Personal voice – ${speakerName}`);
-
-  sampleUris.forEach((uri, i) => {
-    pvForm.append("audiodata", {
-      uri,
-      type: "audio/mpeg",
-      name: `sample_${i + 1}.mp3`,
-    } as any);
-  });
-
-  const pvRes = await fetch(`${CNV_API_BASE}/personalvoices`, {
-    method: "POST",
-    headers: authHeader(),
-    body: pvForm,
-  });
-
-  if (!pvRes.ok) {
-    const err = await pvRes.text();
-    console.error("Azure personal voice error:", err);
-    throw new Error("Voice creation failed. Please try again later.");
+  if (!responseBody?.success || !responseBody?.voiceId) {
+    throw new Error(
+      responseBody?.error ||
+        "Voice creation failed. The server function did not return a voice ID.",
+    );
   }
 
-  const pvData = await pvRes.json();
-  const voiceId: string | undefined =
-    pvData?.speakerProfileId ?? pvData?.id ?? pvData?.personalVoiceId;
-
-  if (!voiceId) {
-    throw new Error("Voice creation succeeded but no voice ID was returned.");
-  }
-
-  // Cleanup temp files (fire‑and‑forget)
-  for (const uri of [consentUri, ...sampleUris]) {
-    FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
-  }
-
-  return voiceId;
+  return responseBody.voiceId as string;
 }
 
 /**
@@ -262,7 +263,7 @@ export async function queryVoiceStatus(
   }
 
   const response = await fetch(
-    `${CNV_API_BASE}/personalvoices/${voiceId}`,
+    cnvUrl(`/personalvoices/${voiceId}`),
     { headers: authHeader() },
   );
 

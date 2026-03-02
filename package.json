@@ -10,7 +10,8 @@
     "build-ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "validate:voice-clone": "node ./scripts/validate-voice-clone-setup.js"
   },
   "dependencies": {
     "@ant-design/colors": "^8.0.1",

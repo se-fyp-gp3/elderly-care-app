@@ -146,7 +146,7 @@ export function useCustomVoice(): UseCustomVoiceReturn {
       const recording = new Audio.Recording();
       await recording.prepareToRecordAsync({
         android: {
-          extension: ".mp3",
+          extension: ".m4a",
           outputFormat: Audio.AndroidOutputFormat.MPEG_4,
           audioEncoder: Audio.AndroidAudioEncoder.AAC,
           sampleRate: 16000,
@@ -330,9 +330,11 @@ export function useCustomVoice(): UseCustomVoiceReturn {
         }
       } catch (error) {
         console.error("Voice cloning error:", error);
-        showError(
-          "Voice creation failed. Please check your internet connection and try again.",
-        );
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "Voice creation failed. Please check your internet connection and try again.";
+        showError(message);
       } finally {
         setIsUploading(false);
       }

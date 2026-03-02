@@ -18,9 +18,8 @@
     },
     "android": {
       "permissions": [
-        "ACTIVITY_RECOGNITION",
+        "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.health.READ_STEPS",
-        "RECORD_AUDIO",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
