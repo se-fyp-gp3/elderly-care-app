@@ -19,6 +19,7 @@ import React, {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -107,6 +108,55 @@ export default function SchedulePage() {
     status: ScheduleStatus.PENDING,
   });
 
+  // Filtered view
+  const filteredEvents =
+    selectedElderlyId === "All"
+      ? events
+      : events.filter((item) => item.elderlyId === selectedElderlyId);
+
+  const flatListRef = useRef<FlatList<ScheduleEvent>>(null);
+
+  const scrollToPriorityTask = useCallback(() => {
+    if (!loading && filteredEvents.length > 0) {
+      // Find first missed task (highest priority)
+      let targetIndex = filteredEvents.findIndex(
+        (e) =>
+          e.status === ScheduleStatus.MISSED || e.status === ("missed" as any),
+      );
+
+      // If no missed tasks, find the first pending one (nearest future task)
+      if (targetIndex === -1) {
+        targetIndex = filteredEvents.findIndex(
+          (e) =>
+            e.status === ScheduleStatus.PENDING ||
+            e.status === ("pending" as any),
+        );
+      }
+
+      if (targetIndex !== -1) {
+        flatListRef.current?.scrollToIndex({
+          index: targetIndex,
+          animated: true,
+          viewPosition: 0,
+        });
+      } else {
+         // If all completed, maybe scroll to end or top?
+         // For now, do nothing if no priority tasks found
+      }
+    }
+  }, [loading, filteredEvents]);
+
+  // Auto-scroll logic to nearest missed or pending task
+  useEffect(() => {
+    if (!loading && filteredEvents.length > 0) {
+      // Scroll with a slight delay to allow layout to settle
+      const timer = setTimeout(() => {
+        scrollToPriorityTask();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [scrollToPriorityTask]);
+
   // Fetch Categories
   const fetchCategories = useCallback(async () => {
     try {
@@ -171,12 +221,6 @@ export default function SchedulePage() {
     setRefreshing(true);
     fetchData();
   };
-
-  // Filtered view
-  const filteredEvents =
-    selectedElderlyId === "All"
-      ? events
-      : events.filter((item) => item.elderlyId === selectedElderlyId);
 
   // ... (Keep existing Helper Functions: dates, onConfirmDate etc)
 
@@ -738,9 +782,31 @@ export default function SchedulePage() {
               </Dialog>
             </Portal>
           </View>
-          <Chip compact>{filteredEvents.length} Tasks</Chip>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Button
+              icon="crosshairs-gps"
+              mode="contained-tonal"
+              compact
+              onPress={scrollToPriorityTask}
+              style={{ marginRight: 8 }}
+            >
+              Focus
+            </Button>
+            <Chip compact>{filteredEvents.length} Tasks</Chip>
+          </View>
         </View>
         <FlatList
+          ref={flatListRef}
+          onScrollToIndexFailed={(info) => {
+            const wait = new Promise((resolve) => setTimeout(resolve, 500));
+            wait.then(() => {
+              flatListRef.current?.scrollToIndex({
+                index: info.index,
+                animated: true,
+                viewPosition: 0,
+              });
+            });
+          }}
           data={filteredEvents}
           keyExtractor={(item) => item.id}
           renderItem={renderEvent}

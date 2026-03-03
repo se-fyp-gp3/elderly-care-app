@@ -76,7 +76,7 @@ export default function CaregiverMessages() {
   const navigateToConversation = useCallback(
     (contact: Contact) => {
       router.push({
-        pathname: "/(caregiver-tabs)/conversation",
+        pathname: "/conversation",
         params: {
           contactId: contact.id,
           contactName: contact.name,

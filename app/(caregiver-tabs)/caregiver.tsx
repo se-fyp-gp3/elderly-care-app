@@ -575,9 +575,9 @@ const styles = StyleSheet.create({
   actionCard: {
     flex: 1,
     height: 110,
+    justifyContent: "center",
   },
   actionContent: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 16,

@@ -1,17 +1,17 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-  createRegistrationRequest,
-  deleteRegistrationRequest,
-  getRegistrationRequest,
+    createRegistrationRequest,
+    deleteRegistrationRequest,
+    getRegistrationRequest,
 } from "@/lib/registration";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Crypto from "expo-crypto";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text, useTheme } from "react-native-paper";
 import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as Random from "expo-random";
 
 /**
  * Generates a random UUID-like token for pairing.
@@ -19,7 +19,7 @@ import * as Random from "expo-random";
 function generateToken(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   const length = 32;
-  const randomBytes = Random.getRandomBytes(length);
+  const randomBytes = Crypto.getRandomBytes(length);
   let result = "";
   for (let i = 0; i < length; i++) {
     const index = randomBytes[i] % chars.length;
