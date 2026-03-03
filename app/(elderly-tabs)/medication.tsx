@@ -333,7 +333,7 @@ export default function ElderlyMedicationScreen() {
         });
       }
       return await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: "base64",
       });
     } catch (e) {
       console.error("Base64 error:", e);
