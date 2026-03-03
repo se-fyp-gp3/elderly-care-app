@@ -119,18 +119,17 @@ export default function SchedulePage() {
   const scrollToPriorityTask = useCallback(() => {
     if (!loading && filteredEvents.length > 0) {
       // Find first missed task (highest priority)
-      let targetIndex = filteredEvents.findIndex(
-        (e) =>
-          e.status === ScheduleStatus.MISSED || e.status === ("missed" as any),
-      );
+      let targetIndex = filteredEvents.findIndex((e) => {
+        const status = String(e.status).toLowerCase();
+        return status === ScheduleStatus.MISSED.toLowerCase();
+      });
 
       // If no missed tasks, find the first pending one (nearest future task)
       if (targetIndex === -1) {
-        targetIndex = filteredEvents.findIndex(
-          (e) =>
-            e.status === ScheduleStatus.PENDING ||
-            e.status === ("pending" as any),
-        );
+        targetIndex = filteredEvents.findIndex((e) => {
+          const status = String(e.status).toLowerCase();
+          return status === ScheduleStatus.PENDING.toLowerCase();
+        });
       }
 
       if (targetIndex !== -1) {
