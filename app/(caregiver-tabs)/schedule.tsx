@@ -115,6 +115,7 @@ export default function SchedulePage() {
       : events.filter((item) => item.elderlyId === selectedElderlyId);
 
   const flatListRef = useRef<FlatList<ScheduleEvent>>(null);
+  const hasInitiallyLoaded = useRef(false);
 
   const scrollToPriorityTask = useCallback(() => {
     if (!loading && filteredEvents.length > 0) {
@@ -145,16 +146,17 @@ export default function SchedulePage() {
     }
   }, [loading, filteredEvents]);
 
-  // Auto-scroll logic to nearest missed or pending task
+  // Auto-scroll logic to nearest missed or pending task — only on initial data load
   useEffect(() => {
-    if (!loading && filteredEvents.length > 0) {
+    if (!loading && !hasInitiallyLoaded.current && filteredEvents.length > 0) {
+      hasInitiallyLoaded.current = true;
       // Scroll with a slight delay to allow layout to settle
       const timer = setTimeout(() => {
         scrollToPriorityTask();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [scrollToPriorityTask]);
+  }, [loading, filteredEvents.length, scrollToPriorityTask]);
 
   // Fetch Categories
   const fetchCategories = useCallback(async () => {
