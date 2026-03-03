@@ -58,8 +58,6 @@ export default function CaregiverMessages() {
       }
       setCaregiverProfileId(caregiver.$id);
       const data = await getContactsForCaregiver(caregiver.$id);
-      setContacts(data);
-      setFilteredContacts(data);
 
       // Fetch last messages for each contact
       const lastMsgs: Record<string, DirectMessage | null> = {};
