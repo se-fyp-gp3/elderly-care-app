@@ -911,30 +911,42 @@ export default function ElderlyChat() {
         )}
 
         <View style={styles.inputRow}>
+          <View style={styles.inputPill}>
+            <IconButton
+              icon="camera"
+              size={24}
+              onPress={handleImageOptions}
+              style={styles.photoButton}
+              iconColor="#6B7280"
+            />
+            <TextInput
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Type your message..."
+              mode="flat"
+              style={styles.textInput}
+              contentStyle={styles.textInputContent}
+              multiline
+              maxLength={500}
+              underlineColor="transparent"
+              activeUnderlineColor="transparent"
+            />
+          </View>
           <IconButton
-            icon="camera"
-            size={28}
-            onPress={handleImageOptions}
-            style={styles.photoButton}
-          />
-
-          <TextInput
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Type your message..."
-            mode="outlined"
-            style={styles.textInput}
-            contentStyle={styles.textInputContent}
-            multiline
-            maxLength={500}
-            right={
-              <TextInput.Icon
-                icon="send"
-                onPress={sendMessage}
-                disabled={(!inputText.trim() && !selectedImage) || isLoading}
-                forceTextInputFocus={false}
-              />
-            }
+            icon="send"
+            size={24}
+            onPress={sendMessage}
+            disabled={(!inputText.trim() && !selectedImage) || isLoading}
+            style={[
+              styles.sendButton,
+              {
+                backgroundColor:
+                  (!inputText.trim() && !selectedImage) || isLoading
+                    ? "#B0BEC5"
+                    : "#1565C0",
+              },
+            ]}
+            iconColor="#FFFFFF"
           />
         </View>
       </View>
@@ -1145,25 +1157,40 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 56,
+    gap: 8,
+  },
+  inputPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 28,
+    paddingLeft: 2,
+    paddingRight: 8,
+    minHeight: 52,
   },
   photoButton: {
     margin: 0,
-    width: 52,
-    height: 52,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 26,
+    width: 44,
+    height: 44,
   },
   textInput: {
     backgroundColor: "transparent",
     flex: 1,
     maxHeight: 120,
-    minHeight: 56,
+    minHeight: 48,
     fontSize: 17,
+    paddingHorizontal: 0,
   },
   textInputContent: {
-    paddingVertical: 14,
-    minHeight: 56,
+    paddingVertical: 10,
+    minHeight: 48,
+  },
+  sendButton: {
+    margin: 0,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   imagePreviewContainer: {
     position: "relative",
