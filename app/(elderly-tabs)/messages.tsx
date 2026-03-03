@@ -1,3 +1,8 @@
+import {
+  clientReactNative,
+  DATABASE_ID,
+  DIRECT_MESSAGES_TABLE_ID,
+} from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
   Contact,
@@ -65,6 +70,18 @@ export default function ElderlyMessages() {
         }),
       );
       setLastMessages(lastMsgs);
+
+      // Sort contacts by latest message time
+      data.sort((a, b) => {
+        const msgA = lastMsgs[a.id];
+        const msgB = lastMsgs[b.id];
+        const timeA = msgA?.created_at ?? a.lastActive ?? "";
+        const timeB = msgB?.created_at ?? b.lastActive ?? "";
+        return new Date(timeB).getTime() - new Date(timeA).getTime();
+      });
+
+      setContacts(data);
+      setFilteredContacts(data);
     } catch (error) {
       console.error("Error fetching contacts:", error);
     } finally {
@@ -89,6 +106,50 @@ export default function ElderlyMessages() {
   useEffect(() => {
     fetchContacts();
   }, [fetchContacts]);
+
+  useEffect(() => {
+    if (!elderlyProfileId) return;
+
+    // Subscribe to Direct Messages table for realtime updates
+    const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
+    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+      if (response.events.some((event) => event.endsWith(".create"))) {
+        const payload = response.payload as DirectMessage;
+
+        if (
+          payload.sender_id === elderlyProfileId ||
+          payload.receiver_id === elderlyProfileId
+        ) {
+          const otherUserId =
+            payload.sender_id === elderlyProfileId
+              ? payload.receiver_id
+              : payload.sender_id;
+
+          // Update last message
+          setLastMessages((prev) => ({
+            ...prev,
+            [otherUserId]: payload,
+          }));
+
+          // Reorder contacts: move the contact to top
+          setContacts((prevContacts) => {
+            const index = prevContacts.findIndex((c) => c.id === otherUserId);
+            if (index === -1) return prevContacts;
+
+            const updatedContact = prevContacts[index];
+            const newContacts = [...prevContacts];
+            newContacts.splice(index, 1);
+            newContacts.unshift(updatedContact);
+            return newContacts;
+          });
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [elderlyProfileId]);
 
   useEffect(() => {
     if (searchQuery.trim() === "") {
@@ -371,12 +432,19 @@ export default function ElderlyMessages() {
             filteredContacts.length > 0 ? renderHeader : null
           }
           ItemSeparatorComponent={() => (
-            <Divider style={[styles.divider, { marginLeft: 86 }]} />
+            <View
+              style={{
+                height: 1,
+                marginLeft: 86,
+                backgroundColor: theme.colors.outlineVariant ?? "#E0E0E0",
+              }}
+            />
           )}
           ListEmptyComponent={renderEmptyState}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+          extraData={lastMessages}
           showsVerticalScrollIndicator={false}
         />
       )}
