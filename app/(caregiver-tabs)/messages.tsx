@@ -27,10 +27,9 @@ import {
 import {
   ActivityIndicator,
   Avatar,
-  Divider,
   Searchbar,
   Text,
-  useTheme,
+  useTheme
 } from "react-native-paper";
 
 export default function CaregiverMessages() {
