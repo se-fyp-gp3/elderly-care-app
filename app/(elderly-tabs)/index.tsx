@@ -250,15 +250,27 @@ export default function ElderlyHome() {
   ];
 
   const handleEmergencyCall = () => {
+    // Assume `elderly` contains the current user's elderly profile with an `emergency_contact` field
+    // If no emergency contact is set, inform the user instead of attempting to call a hardcoded number.
+    const emergencyNumber = (elderly as Elderly | null)?.emergency_contact;
+
+    if (!emergencyNumber) {
+      Alert.alert(
+        "No Emergency Contact",
+        "You do not have an emergency contact set. Please ask a caregiver or administrator to configure one for you.",
+      );
+      return;
+    }
+
     Alert.alert(
       "Emergency Call",
-      "Are you sure you want to call your emergency contact (91361140)?",
+      `Are you sure you want to call your emergency contact (${emergencyNumber})?`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Call Now",
           style: "destructive",
-          onPress: () => openURL("tel:91361140"),
+          onPress: () => openURL(`tel:${emergencyNumber}`),
         },
       ],
     );
