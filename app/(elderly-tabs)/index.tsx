@@ -252,7 +252,7 @@ export default function ElderlyHome() {
   const handleEmergencyCall = () => {
     // Assume `elderly` contains the current user's elderly profile with an `emergency_contact` field
     // If no emergency contact is set, inform the user instead of attempting to call a hardcoded number.
-    const emergencyNumber = (elderly as Elderly | null)?.emergency_contact;
+    const emergencyNumber = (elderlyProfile as Elderly | null)?.emergency_contact;
 
     if (!emergencyNumber) {
       Alert.alert(
