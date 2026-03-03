@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { Alert, Linking, ScrollView, StyleSheet, View } from "react-native";
-import { Avatar, Button, Card, List, Text, useTheme } from "react-native-paper";
+import { Button, Card, Text, useTheme } from "react-native-paper";
 
 interface EmergencyContact {
   id: string;
@@ -12,22 +12,6 @@ interface EmergencyContact {
 
 export default function ElderlyEmergency() {
   const theme = useTheme();
-
-  // Placeholder emergency contacts - in production, fetch from database
-  const emergencyContacts: EmergencyContact[] = [
-    {
-      id: "1",
-      name: "Emergency Services",
-      relation: "Police/Fire/Ambulance",
-      phone: "999",
-    },
-    {
-      id: "2",
-      name: "Family Contact",
-      relation: "Primary Caregiver",
-      phone: "+852 1234 5678",
-    },
-  ];
 
   const handleCall = (phone: string, name: string) => {
     Alert.alert(`Call ${name}?`, `Do you want to call ${phone}?`, [
@@ -42,7 +26,7 @@ export default function ElderlyEmergency() {
   const handleEmergencyCall = () => {
     Alert.alert(
       "Emergency Call",
-      "Are you sure you want to call emergency services (91361140)?",
+      "Are you sure you want to call your emergency contact (91361140)?",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -61,16 +45,18 @@ export default function ElderlyEmergency() {
       {/* Main Emergency Button */}
       <Card style={[styles.emergencyCard, { backgroundColor: "#FF3B30" }]}>
         <Card.Content style={styles.emergencyContent}>
-          <MaterialCommunityIcons
-            name="phone-alert"
-            size={64}
-            color="#FFFFFF"
-          />
-          <Text variant="headlineMedium" style={styles.emergencyTitle}>
-            Emergency Call
+          <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" }}>
+            <MaterialCommunityIcons
+              name="phone-alert"
+              size={56}
+              color="#FFFFFF"
+            />
+          </View>
+          <Text variant="headlineLarge" style={styles.emergencyTitle}>
+            Emergency Contact
           </Text>
           <Text variant="bodyLarge" style={styles.emergencySubtitle}>
-            Press the button below to call emergency services
+            Press the button below to call your emergency contact
           </Text>
           <Button
             mode="contained"
@@ -78,100 +64,76 @@ export default function ElderlyEmergency() {
             style={styles.emergencyButton}
             labelStyle={styles.emergencyButtonText}
             contentStyle={styles.emergencyButtonContent}
+            icon="phone"
           >
-            Call 999 Now
+            Call Now
           </Button>
         </Card.Content>
       </Card>
 
-      {/* Emergency Contacts */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>
-        Emergency Contacts
-      </Text>
-      <Card
-        style={[styles.contactsCard, { backgroundColor: theme.colors.surface }]}
-      >
-        {emergencyContacts.map((contact) => (
-          <List.Item
-            key={contact.id}
-            title={contact.name}
-            description={`${contact.relation} • ${contact.phone}`}
-            left={() => (
-              <Avatar.Icon
-                size={48}
-                icon="account"
-                style={{ backgroundColor: theme.colors.primaryContainer }}
-              />
-            )}
-            right={() => (
-              <Button
-                mode="contained-tonal"
-                icon="phone"
-                onPress={() => handleCall(contact.phone, contact.name)}
-              >
-                Call
-              </Button>
-            )}
-            style={styles.contactItem}
-          />
-        ))}
-      </Card>
-
       {/* Quick Actions */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>
+      <Text variant="titleLarge" style={styles.sectionTitle}>
         Quick Actions
       </Text>
       <View style={styles.quickActionsGrid}>
         <Card
-          style={[styles.quickActionCard, { backgroundColor: "#FF980020" }]}
+          style={[styles.quickActionCard, { backgroundColor: "#FFF3E0" }]}
           onPress={() => handleCall("999", "Ambulance")}
         >
           <Card.Content style={styles.quickActionContent}>
-            <MaterialCommunityIcons
-              name="ambulance"
-              size={40}
-              color="#FF9800"
-            />
-            <Text variant="labelLarge">Ambulance</Text>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#FF980020", justifyContent: "center", alignItems: "center" }}>
+              <MaterialCommunityIcons
+                name="ambulance"
+                size={36}
+                color="#E65100"
+              />
+            </View>
+            <Text variant="titleSmall" style={{ marginTop: 10, fontWeight: "bold" }}>Ambulance</Text>
           </Card.Content>
         </Card>
         <Card
-          style={[styles.quickActionCard, { backgroundColor: "#F4433620" }]}
+          style={[styles.quickActionCard, { backgroundColor: "#FFEBEE" }]}
           onPress={() => handleCall("999", "Police")}
         >
           <Card.Content style={styles.quickActionContent}>
-            <MaterialCommunityIcons
-              name="shield-account"
-              size={40}
-              color="#F44336"
-            />
-            <Text variant="labelLarge">Police</Text>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#F4433620", justifyContent: "center", alignItems: "center" }}>
+              <MaterialCommunityIcons
+                name="shield-account"
+                size={36}
+                color="#C62828"
+              />
+            </View>
+            <Text variant="titleSmall" style={{ marginTop: 10, fontWeight: "bold" }}>Police</Text>
           </Card.Content>
         </Card>
         <Card
-          style={[styles.quickActionCard, { backgroundColor: "#FF572220" }]}
+          style={[styles.quickActionCard, { backgroundColor: "#FBE9E7" }]}
           onPress={() => handleCall("999", "Fire")}
         >
           <Card.Content style={styles.quickActionContent}>
-            <MaterialCommunityIcons
-              name="fire-truck"
-              size={40}
-              color="#FF5722"
-            />
-            <Text variant="labelLarge">Fire</Text>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#FF572220", justifyContent: "center", alignItems: "center" }}>
+              <MaterialCommunityIcons
+                name="fire-truck"
+                size={36}
+                color="#BF360C"
+              />
+            </View>
+            <Text variant="titleSmall" style={{ marginTop: 10, fontWeight: "bold" }}>Fire</Text>
           </Card.Content>
         </Card>
         <Card
-          style={[styles.quickActionCard, { backgroundColor: "#2196F320" }]}
+          style={[styles.quickActionCard, { backgroundColor: "#E3F2FD" }]}
           onPress={() => handleCall("999", "Hospital")}
         >
           <Card.Content style={styles.quickActionContent}>
-            <MaterialCommunityIcons
-              name="hospital-building"
-              size={40}
-              color="#2196F3"
-            />
-            <Text variant="labelLarge">Hospital</Text>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#2196F320", justifyContent: "center", alignItems: "center" }}>
+              <MaterialCommunityIcons
+                name="hospital-building"
+                size={36}
+                color="#0D47A1"
+              />
+            </View>
+            <Text variant="titleSmall" style={{ marginTop: 10, fontWeight: "bold" }}>Hospital</Text>
           </Card.Content>
         </Card>
       </View>
@@ -183,23 +145,23 @@ export default function ElderlyEmergency() {
           { backgroundColor: theme.colors.primaryContainer },
         ]}
       >
-        <Card.Content>
+        <Card.Content style={{ padding: 20 }}>
           <View style={styles.tipsHeader}>
             <MaterialCommunityIcons
               name="lightbulb"
-              size={24}
+              size={28}
               color={theme.colors.primary}
             />
             <Text
-              variant="titleSmall"
-              style={{ marginLeft: 8, color: theme.colors.onPrimaryContainer }}
+              variant="titleMedium"
+              style={{ marginLeft: 10, color: theme.colors.onPrimaryContainer, fontWeight: "bold" }}
             >
               Safety Tips
             </Text>
           </View>
           <Text
-            variant="bodyMedium"
-            style={{ color: theme.colors.onPrimaryContainer, marginTop: 8 }}
+            variant="bodyLarge"
+            style={{ color: theme.colors.onPrimaryContainer, marginTop: 12, lineHeight: 28 }}
           >
             • Stay calm and speak clearly when calling for help{"\n"}• Know your
             address and keep it handy{"\n"}• Keep your phone charged and within
@@ -216,74 +178,81 @@ export default function ElderlyEmergency() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: 20,
   },
   emergencyCard: {
-    marginBottom: 24,
-    borderRadius: 20,
+    marginBottom: 28,
+    borderRadius: 28,
+    elevation: 6,
+    shadowColor: "#FF3B30",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
   },
   emergencyContent: {
     alignItems: "center",
-    padding: 24,
+    padding: 32,
   },
   emergencyTitle: {
     color: "#FFFFFF",
     fontWeight: "bold",
-    marginTop: 16,
+    marginTop: 20,
   },
   emergencySubtitle: {
     color: "#FFFFFF",
     opacity: 0.9,
     textAlign: "center",
-    marginTop: 8,
+    marginTop: 10,
+    fontSize: 17,
   },
   emergencyButton: {
-    marginTop: 24,
+    marginTop: 28,
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 32,
+    paddingHorizontal: 40,
+    borderRadius: 28,
+    elevation: 4,
   },
   emergencyButtonText: {
     color: "#FF3B30",
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "bold",
   },
   emergencyButtonContent: {
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
   sectionTitle: {
     fontWeight: "bold",
-    marginBottom: 12,
-  },
-  contactsCard: {
-    marginBottom: 24,
-    borderRadius: 12,
-  },
-  contactItem: {
-    paddingVertical: 12,
+    marginBottom: 14,
   },
   quickActionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 20,
   },
   quickActionCard: {
     width: "48%",
-    marginBottom: 12,
-    borderRadius: 12,
+    marginBottom: 14,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
   quickActionContent: {
     alignItems: "center",
-    paddingVertical: 20,
+    paddingVertical: 24,
   },
   tipsCard: {
-    borderRadius: 12,
+    borderRadius: 20,
+    elevation: 2,
   },
   tipsHeader: {
     flexDirection: "row",
     alignItems: "center",
   },
   bottomSpacer: {
-    height: 32,
+    height: 40,
   },
 });

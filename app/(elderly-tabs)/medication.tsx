@@ -49,13 +49,12 @@ import {
   Divider,
   FAB,
   IconButton,
-  List,
   Modal,
   Portal,
   Switch,
   Text,
   TextInput,
-  useTheme,
+  useTheme
 } from "react-native-paper";
 
 // --- AI / Scan Configuration ---
@@ -662,76 +661,133 @@ export default function ElderlyMedicationScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* NEW: To Take Today (Ci hecklist view) */}
-        <Text variant="titleMedium" style={styles.sectionTitle}>
+        {/* To Take Today */}
+        <Text variant="titleLarge" style={styles.sectionTitle}>
           To Take Today
         </Text>
-        <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-          {todoList.length > 0 ? (
-            todoList.map((item, index) => {
-              const isTaken = item.status === "taken";
-              return (
-                <List.Item
-                  key={`${item.reminder.$id}-${item.time}-${index}`}
-                  title={`${item.medicationName} (${item.dosage})`}
-                  description={`Value time: ${item.time}`}
-                  left={(props) => (
-                    <View style={styles.iconContainer}>
-                      <MaterialCommunityIcons
-                        name={isTaken ? "check-circle" : "clock-outline"}
-                        size={28}
-                        color={isTaken ? "#4CAF50" : theme.colors.primary}
-                      />
-                    </View>
-                  )}
-                  right={() => (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <Text
-                        variant="labelMedium"
-                        style={{
-                          textTransform: "capitalize",
-                          color:
-                            item.status === "taken"
-                              ? "#4CAF50"
-                              : item.status === "missing"
-                                ? "#D32F2F"
-                                : item.status === "pending"
-                                  ? "#FFA000"
-                                  : theme.colors.onSurfaceVariant,
-                        }}
-                      >
-                        {item.status}
-                      </Text>
-                      {!isTaken && (
-                        <Button
-                          mode="contained"
-                          onPress={() => handleTakeMedication(item)}
-                          compact
-                        >
-                          Take
-                        </Button>
-                      )}
-                    </View>
-                  )}
-                  style={[styles.listItem, isTaken && { opacity: 0.6 }]}
-                />
-              );
-            })
-          ) : (
-            <View style={styles.emptyState}>
-              <Text>No medications scheduled for today.</Text>
-            </View>
-          )}
-        </Card>
+        {todoList.length > 0 ? (
+          todoList.map((item, index) => {
+            const isTaken = item.status === "taken";
+            const isMissing = item.status === "missing";
 
-        {/* OLD: My Medications List (Overview) */}
-        <Text variant="titleMedium" style={styles.sectionTitle}>
+            const accentColor = isTaken
+              ? "#4CAF50"
+              : isMissing
+                ? "#E53935"
+                : "#FF8F00";
+            const cardBg = isMissing ? "#FFF5F5" : "#FFFFFF";
+
+            return (
+              <View
+                key={`${item.reminder.$id}-${item.time}-${index}`}
+                style={[
+                  styles.medCard,
+                  {
+                    backgroundColor: cardBg,
+                    borderLeftColor: accentColor,
+                  },
+                ]}
+              >
+                {/* Top: Icon + Drug info */}
+                <View style={styles.medCardTop}>
+                  <View
+                    style={[
+                      styles.medCardIcon,
+                      { backgroundColor: isTaken ? "#E8F5E9" : "#EDE7F6" },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={isTaken ? "check-circle" : "pill"}
+                      size={28}
+                      color={isTaken ? "#4CAF50" : "#5E35B1"}
+                    />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 14 }}>
+                    <Text variant="titleMedium" style={{ fontWeight: "700" }}>
+                      {item.medicationName}
+                    </Text>
+                    <Text
+                      variant="bodyMedium"
+                      style={{ color: "#666", marginTop: 2 }}
+                    >
+                      {item.dosage}
+                    </Text>
+                  </View>
+                  <View style={styles.medCardTime}>
+                    <MaterialCommunityIcons
+                      name="clock-outline"
+                      size={16}
+                      color="#888"
+                    />
+                    <Text
+                      variant="bodyMedium"
+                      style={{ color: "#555", marginLeft: 4, fontWeight: "600" }}
+                    >
+                      {item.time}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Bottom: Full-width action area */}
+                {isTaken ? (
+                  <TouchableOpacity
+                    onPress={() => handleTakeMedication(item)}
+                    style={styles.medCardDone}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons
+                      name="check-circle"
+                      size={20}
+                      color="#2E7D32"
+                    />
+                    <Text style={styles.medCardDoneText}>
+                      Taken — tap to undo
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => handleTakeMedication(item)}
+                    style={[
+                      styles.medCardAction,
+                      {
+                        backgroundColor: isMissing ? "#E53935" : "#4CAF50",
+                      },
+                    ]}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialCommunityIcons
+                      name="check-bold"
+                      size={22}
+                      color="#FFF"
+                    />
+                    <Text style={styles.medCardActionText}>
+                      {isMissing ? "Take Now (Missed)" : "Mark as Taken"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })
+        ) : (
+          <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons
+                name="check-circle-outline"
+                size={48}
+                color="#A5D6A7"
+              />
+              <Text
+                variant="bodyLarge"
+                style={{ marginTop: 8, color: "#666" }}
+              >
+                No medications scheduled for today.
+              </Text>
+            </View>
+          </Card>
+        )}
+
+        {/* My Medications List (Overview) */}
+        <Text variant="titleLarge" style={styles.sectionTitle}>
           Active Prescriptions
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
@@ -804,17 +860,51 @@ export default function ElderlyMedicationScreen() {
 
               return (
                 <Swipeable key={r.$id} renderRightActions={renderRightActions}>
-                  <List.Item
-                    title={name}
-                    description={`${r.reminder_times.length} times daily (${r.reminder_times.join(", ")})`}
-                    left={(props) => <List.Icon {...props} icon="pill" />}
-                  />
+                  <View style={styles.prescriptionItem}>
+                    <View style={styles.prescriptionIconContainer}>
+                      <MaterialCommunityIcons
+                        name="pill"
+                        size={26}
+                        color="#5E35B1"
+                      />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 14 }}>
+                      <Text
+                        variant="titleMedium"
+                        style={{ fontWeight: "700" }}
+                      >
+                        {name}
+                      </Text>
+                      <Text
+                        variant="bodyMedium"
+                        style={{ color: "#666", marginTop: 2 }}
+                      >
+                        {r.reminder_times.length} times daily ({r.reminder_times.join(", ")})
+                      </Text>
+                    </View>
+                    <MaterialCommunityIcons
+                      name="chevron-left"
+                      size={22}
+                      color="#999"
+                      style={{ marginRight: 4 }}
+                    />
+                  </View>
                 </Swipeable>
               );
             })
           ) : (
             <View style={styles.emptyState}>
-              <Text>No active prescriptions.</Text>
+              <MaterialCommunityIcons
+                name="pill"
+                size={48}
+                color="#BDBDBD"
+              />
+              <Text
+                variant="bodyLarge"
+                style={{ marginTop: 8, color: "#666" }}
+              >
+                No active prescriptions.
+              </Text>
             </View>
           )}
         </Card>
@@ -823,29 +913,41 @@ export default function ElderlyMedicationScreen() {
         <Card
           style={[
             styles.notesCard,
-            { backgroundColor: theme.colors.primaryContainer },
+            { backgroundColor: "#E8F5E9" },
           ]}
         >
           <Card.Content>
             <View style={styles.notesHeader}>
-              <MaterialCommunityIcons
-                name="information"
-                size={24}
-                color={theme.colors.primary}
-              />
-              <Text
-                variant="titleSmall"
+              <View
                 style={{
-                  marginLeft: 8,
-                  color: theme.colors.onPrimaryContainer,
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: "#C8E6C9",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <MaterialCommunityIcons
+                  name="information"
+                  size={24}
+                  color="#2E7D32"
+                />
+              </View>
+              <Text
+                variant="titleMedium"
+                style={{
+                  marginLeft: 10,
+                  color: "#1B5E20",
+                  fontWeight: "700",
                 }}
               >
                 Reminder
               </Text>
             </View>
             <Text
-              variant="bodyMedium"
-              style={{ color: theme.colors.onPrimaryContainer, marginTop: 8 }}
+              variant="bodyLarge"
+              style={{ color: "#2E7D32", marginTop: 10, lineHeight: 24 }}
             >
               Take your medications with water. If you miss a dose, take it as
               soon as you remember unless it&apos;s almost time for the next
@@ -1046,7 +1148,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 16,
+    padding: 18,
   },
   header: {
     marginBottom: 24,
@@ -1056,12 +1158,93 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontWeight: "bold",
-    marginTop: 8,
-    marginBottom: 12,
+    marginTop: 12,
+    marginBottom: 14,
+    fontSize: 20,
   },
   card: {
-    marginBottom: 16,
+    marginBottom: 18,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  medCard: {
+    marginBottom: 14,
+    borderRadius: 16,
+    borderLeftWidth: 5,
+    padding: 16,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  medCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  medCardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  medCardTime: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
+  },
+  medCardAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 14,
+    paddingVertical: 13,
+    borderRadius: 14,
+    gap: 8,
+  },
+  medCardActionText: {
+    color: "#FFF",
+    fontSize: 17,
+    fontWeight: "bold",
+  },
+  medCardDone: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#E8F5E9",
+    gap: 6,
+  },
+  medCardDoneText: {
+    color: "#2E7D32",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  prescriptionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#E0E0E0",
+  },
+  prescriptionIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#EDE7F6",
+    justifyContent: "center",
+    alignItems: "center",
   },
   listItem: {
     paddingVertical: 8,
@@ -1073,23 +1256,25 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: "center",
-    padding: 32,
+    padding: 36,
   },
   notesCard: {
-    marginTop: 8,
-    borderRadius: 12,
+    marginTop: 10,
+    borderRadius: 20,
+    elevation: 1,
   },
   notesHeader: {
     flexDirection: "row",
     alignItems: "center",
   },
   bottomSpacer: {
-    height: 32,
+    height: 40,
   },
   fab: {
     position: "absolute",
     right: 16,
     bottom: 16,
+    borderRadius: 28,
   },
   modal: {
     margin: 20,

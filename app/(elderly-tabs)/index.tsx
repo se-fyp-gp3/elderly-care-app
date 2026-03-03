@@ -28,13 +28,13 @@ import {
   View,
 } from "react-native";
 import {
-  Avatar,
   Button,
   Card,
   Chip,
   List,
   Text,
-  useTheme,
+  TouchableRipple,
+  useTheme
 } from "react-native-paper";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -250,7 +250,18 @@ export default function ElderlyHome() {
   ];
 
   const handleEmergencyCall = () => {
-    openURL("tel:999");
+    Alert.alert(
+      "Emergency Call",
+      "Are you sure you want to call your emergency contact (91361140)?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Call Now",
+          style: "destructive",
+          onPress: () => openURL("tel:91361140"),
+        },
+      ],
+    );
   };
 
   return (
@@ -260,54 +271,39 @@ export default function ElderlyHome() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Welcome Header */}
+      {/* Greeting */}
+      <View style={styles.greetingSection}>
+        <Text variant="headlineMedium" style={styles.greetingName}>
+          Hello, {elderlyProfile?.name || user?.name || "there"}!
+        </Text>
+        <Text variant="bodyLarge" style={styles.greetingSubtitle}>
+          How are you feeling today?
+        </Text>
+      </View>
+
+      {/* Emergency Contact */}
       <Card
-        style={[
-          styles.welcomeCard,
-          { backgroundColor: theme.colors.primaryContainer },
-        ]}
+        style={styles.emergencyCard}
+        onPress={handleEmergencyCall}
       >
-        <Card.Content style={styles.welcomeContent}>
-          <Avatar.Icon
-            size={60}
-            icon="account-heart"
-            style={{ backgroundColor: theme.colors.primary }}
-          />
-          <View style={styles.welcomeText}>
-            <Text
-              variant="headlineSmall"
-              style={{ color: theme.colors.onPrimaryContainer }}
-            >
-              Hello, {elderlyProfile?.name || user?.name || "there"}!
+        <Card.Content style={styles.emergencyCardContent}>
+          <View style={styles.emergencyIconCircle}>
+            <MaterialCommunityIcons name="phone-in-talk" size={28} color="#D32F2F" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="titleMedium" style={{ fontWeight: "700", color: "#C62828" }}>
+              Emergency Contact
             </Text>
-            <Text
-              variant="bodyMedium"
-              style={{ color: theme.colors.onPrimaryContainer }}
-            >
-              How are you feeling today?
+            <Text variant="bodyMedium" style={{ color: "#999", marginTop: 2 }}>
+              Tap to call your emergency contact
             </Text>
           </View>
-        </Card.Content>
-      </Card>
-
-      {/* Emergency Button */}
-      <Card style={[styles.emergencyCard, { backgroundColor: "#FF3B30" }]}>
-        <Card.Content>
-          <Button
-            mode="contained"
-            icon="phone-alert"
-            onPress={handleEmergencyCall}
-            style={styles.emergencyButton}
-            labelStyle={styles.emergencyButtonText}
-            contentStyle={styles.emergencyButtonContent}
-          >
-            Emergency Call (999)
-          </Button>
+          <MaterialCommunityIcons name="chevron-right" size={24} color="#E57373" />
         </Card.Content>
       </Card>
 
       {/* Quick Actions */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>
+      <Text variant="titleLarge" style={styles.sectionTitle}>
         Quick Actions
       </Text>
       <View style={styles.quickActionsGrid}>
@@ -321,12 +317,14 @@ export default function ElderlyHome() {
             onPress={() => router.push(action.route as never)}
           >
             <Card.Content style={styles.actionContent}>
-              <MaterialCommunityIcons
-                name={action.icon}
-                size={40}
-                color={action.color}
-              />
-              <Text variant="labelLarge" style={styles.actionLabel}>
+              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: `${action.color}15`, justifyContent: "center", alignItems: "center" }}>
+                <MaterialCommunityIcons
+                  name={action.icon}
+                  size={36}
+                  color={action.color}
+                />
+              </View>
+              <Text variant="titleSmall" style={styles.actionLabel}>
                 {action.label}
               </Text>
             </Card.Content>
@@ -335,65 +333,106 @@ export default function ElderlyHome() {
       </View>
 
       {/* Today's Medications */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>
+      <Text variant="titleLarge" style={styles.sectionTitle}>
         Today&apos;s Medications
       </Text>
-      <Card
-        style={[styles.listCard, { backgroundColor: theme.colors.surface }]}
+      {todoList.length > 0 ? (
+        todoList.slice(0, 3).map((item, index) => {
+          const isTaken = item.status === "taken";
+          const isMissing = item.status === "missing";
+          const accentColor = isTaken
+            ? "#4CAF50"
+            : isMissing
+              ? "#E53935"
+              : "#FF8F00";
+
+          return (
+            <View
+              key={`${item.reminder.$id}-${item.time}-${index}`}
+              style={[
+                styles.medCard,
+                { borderLeftColor: accentColor },
+              ]}
+            >
+              <View style={styles.medCardTop}>
+                <View
+                  style={[
+                    styles.medCardIcon,
+                    { backgroundColor: isTaken ? "#E8F5E9" : "#EDE7F6" },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={isTaken ? "check-circle" : "pill"}
+                    size={26}
+                    color={isTaken ? "#4CAF50" : "#5E35B1"}
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text variant="titleMedium" style={{ fontWeight: "700" }}>
+                    {item.medicationName}
+                  </Text>
+                  <Text variant="bodyMedium" style={{ color: "#666", marginTop: 2 }}>
+                    {item.dosage}
+                  </Text>
+                </View>
+                <View style={styles.medCardTime}>
+                  <MaterialCommunityIcons name="clock-outline" size={15} color="#888" />
+                  <Text variant="bodyMedium" style={{ color: "#555", marginLeft: 4, fontWeight: "600" }}>
+                    {item.time}
+                  </Text>
+                </View>
+              </View>
+              {isTaken ? (
+                <TouchableRipple
+                  onPress={() => handleTakeMedication(item)}
+                  style={styles.medCardDone}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <MaterialCommunityIcons name="check-circle" size={18} color="#2E7D32" />
+                    <Text style={{ color: "#2E7D32", fontSize: 14, fontWeight: "600" }}>
+                      Taken — tap to undo
+                    </Text>
+                  </View>
+                </TouchableRipple>
+              ) : (
+                <TouchableRipple
+                  onPress={() => handleTakeMedication(item)}
+                  style={[
+                    styles.medCardAction,
+                    { backgroundColor: isMissing ? "#E53935" : "#4CAF50" },
+                  ]}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                    <MaterialCommunityIcons name="check-bold" size={20} color="#FFF" />
+                    <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "bold" }}>
+                      {isMissing ? "Take Now (Missed)" : "Mark as Taken"}
+                    </Text>
+                  </View>
+                </TouchableRipple>
+              )}
+            </View>
+          );
+        })
+      ) : (
+        <Card style={[styles.listCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={{ alignItems: "center", padding: 28 }}>
+            <MaterialCommunityIcons name="check-circle-outline" size={44} color="#A5D6A7" />
+            <Text variant="bodyLarge" style={{ marginTop: 8, color: "#666" }}>
+              No medications scheduled for today.
+            </Text>
+          </View>
+        </Card>
+      )}
+      <Button
+        mode="text"
+        onPress={() => router.push("/medication" as never)}
+        style={styles.viewAllButton}
       >
-        {todoList.length > 0 ? (
-          todoList.slice(0, 3).map((item, index) => {
-            const isTaken = item.status === "taken";
-            return (
-              <List.Item
-                key={`${item.reminder.$id}-${item.time}-${index}`}
-                title={`${item.medicationName} (${item.dosage})`}
-                description={`Time: ${item.time}`}
-                left={(props) => (
-                  <View style={styles.iconContainer}>
-                    <MaterialCommunityIcons
-                      name={isTaken ? "check-circle" : "clock-outline"}
-                      size={28}
-                      color={isTaken ? "#4CAF50" : theme.colors.primary}
-                    />
-                  </View>
-                )}
-                right={() => (
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    {!isTaken && (
-                      <Button
-                        mode="contained"
-                        compact
-                        onPress={() => handleTakeMedication(item)}
-                        style={{ marginLeft: 8 }}
-                      >
-                        Take
-                      </Button>
-                    )}
-                  </View>
-                )}
-                style={[styles.listItem, isTaken && { opacity: 0.6 }]}
-              />
-            );
-          })
-        ) : (
-          <List.Item
-            title="No medications scheduled"
-            description="You are all set for today!"
-            left={(props) => <List.Icon {...props} icon="pill-off" />}
-          />
-        )}
-        <Button
-          mode="text"
-          onPress={() => router.push("/medication" as never)}
-          style={styles.viewAllButton}
-        >
-          View Full Schedule
-        </Button>
-      </Card>
+        View All Medications
+      </Button>
 
       {/* Upcoming Schedule */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>
+      <Text variant="titleLarge" style={styles.sectionTitle}>
         Upcoming Schedule
       </Text>
       <Card
@@ -441,32 +480,6 @@ export default function ElderlyHome() {
         </Button>
       </Card>
 
-      {/* Steps Today */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>
-        Steps Today
-      </Text>
-      <Card
-        style={[styles.healthCard, { backgroundColor: theme.colors.surface }]}
-        onPress={() => router.push("/health-data" as never)}
-      >
-        <Card.Content style={styles.healthContent}>
-          <View style={styles.healthItem}>
-            <MaterialCommunityIcons
-              name="shoe-print"
-              size={32}
-              color="#4CAF50"
-            />
-            <Text variant="labelMedium">Steps</Text>
-            <Text
-              variant="bodySmall"
-              style={{ color: theme.colors.onSurfaceVariant }}
-            >
-              1,234 steps
-            </Text>
-          </View>
-        </Card.Content>
-      </Card>
-
       <View style={styles.bottomSpacer} />
     </ScrollView>
   );
@@ -475,87 +488,131 @@ export default function ElderlyHome() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: 20,
   },
-  welcomeCard: {
+  greetingSection: {
     marginBottom: 16,
-    borderRadius: 16,
+    paddingHorizontal: 4,
   },
-  welcomeContent: {
-    flexDirection: "row",
-    alignItems: "center",
+  greetingName: {
+    fontWeight: "bold",
+    color: "#212121",
   },
-  welcomeText: {
-    marginLeft: 16,
-    flex: 1,
+  greetingSubtitle: {
+    color: "#757575",
+    marginTop: 4,
   },
   emergencyCard: {
-    marginBottom: 16,
+    marginBottom: 20,
     borderRadius: 16,
+    backgroundColor: "#FFF5F5",
+    borderWidth: 1.5,
+    borderColor: "#FFCDD2",
+    elevation: 1,
   },
-  emergencyButton: {
-    backgroundColor: "#FFFFFF",
+  emergencyCardContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    gap: 14,
   },
-  emergencyButtonText: {
-    color: "#FF3B30",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  emergencyButtonContent: {
-    paddingVertical: 8,
+  emergencyIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FFEBEE",
+    justifyContent: "center",
+    alignItems: "center",
   },
   sectionTitle: {
     fontWeight: "bold",
-    marginTop: 8,
-    marginBottom: 12,
+    marginTop: 12,
+    marginBottom: 14,
   },
   quickActionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 12,
   },
   actionCard: {
     width: "48%",
-    marginBottom: 12,
-    borderRadius: 12,
+    marginBottom: 14,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
   actionContent: {
     alignItems: "center",
-    paddingVertical: 16,
+    paddingVertical: 22,
+    paddingHorizontal: 8,
   },
   actionLabel: {
-    marginTop: 8,
+    marginTop: 12,
     textAlign: "center",
+    fontWeight: "600",
   },
   listCard: {
-    marginBottom: 16,
-    borderRadius: 12,
+    marginBottom: 20,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
   },
   viewAllButton: {
-    marginTop: 4,
+    marginBottom: 8,
   },
-  listItem: {
-    paddingVertical: 8,
+  medCard: {
+    marginBottom: 12,
+    borderRadius: 16,
+    borderLeftWidth: 5,
+    padding: 14,
+    backgroundColor: "#FFFFFF",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
-  iconContainer: {
+  medCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  medCardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
-    width: 40,
   },
-  healthCard: {
-    marginBottom: 16,
+  medCardTime: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  medCardAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+    paddingVertical: 12,
     borderRadius: 12,
   },
-  healthContent: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+  medCardDone: {
+    marginTop: 10,
     paddingVertical: 8,
-  },
-  healthItem: {
-    alignItems: "center",
+    borderRadius: 10,
+    backgroundColor: "#E8F5E9",
   },
   bottomSpacer: {
-    height: 32,
+    height: 40,
   },
 });

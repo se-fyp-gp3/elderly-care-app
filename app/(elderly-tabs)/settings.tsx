@@ -22,67 +22,77 @@ export default function ElderlySettings() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text variant="headlineSmall" style={styles.title}>
+        <Text variant="headlineMedium" style={styles.title}>
           Settings
         </Text>
         <Text
-          variant="bodyMedium"
-          style={{ color: theme.colors.onSurfaceVariant }}
+          variant="bodyLarge"
+          style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}
         >
           Customize your app experience
         </Text>
       </View>
 
       {/* Notifications */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>
+      <Text variant="titleLarge" style={styles.sectionTitle}>
         Notifications
       </Text>
       <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         <List.Item
           title="Push Notifications"
+          titleStyle={styles.listTitle}
           description="Receive medication and appointment reminders"
+          descriptionStyle={styles.listDescription}
           left={() => (
             <View style={styles.iconContainer}>
               <MaterialCommunityIcons
                 name="bell"
-                size={24}
+                size={26}
                 color={theme.colors.primary}
               />
             </View>
           )}
           right={() => (
-            <Switch
-              value={notifications}
-              onValueChange={handleNotificationToggle}
-            />
+            <View style={styles.rightContainer}>
+              <Switch
+                value={notifications}
+                onValueChange={handleNotificationToggle}
+              />
+            </View>
           )}
+          style={styles.listItem}
         />
       </Card>
 
       {/* Display */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>
+      <Text variant="titleLarge" style={styles.sectionTitle}>
         Display
       </Text>
       <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         <List.Item
           title="Font Size"
+          titleStyle={styles.listTitle}
           description={preferences.fontSize || "Medium"}
+          descriptionStyle={styles.listDescription}
           left={() => (
             <View style={styles.iconContainer}>
               <MaterialCommunityIcons
                 name="format-size"
-                size={24}
+                size={26}
                 color={theme.colors.primary}
               />
             </View>
           )}
           right={() => (
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={24}
-              color={theme.colors.onSurfaceVariant}
-            />
+            <View style={styles.rightContainer}>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={26}
+                color={theme.colors.onSurfaceVariant}
+              />
+            </View>
           )}
+          style={styles.listItem}
         />
         <View
           style={[
@@ -92,43 +102,51 @@ export default function ElderlySettings() {
         />
         <List.Item
           title="Voice Tone"
+          titleStyle={styles.listTitle}
           description={preferences.voiceTone || "Friendly"}
+          descriptionStyle={styles.listDescription}
           left={() => (
             <View style={styles.iconContainer}>
               <MaterialCommunityIcons
                 name="account-voice"
-                size={24}
+                size={26}
                 color={theme.colors.primary}
               />
             </View>
           )}
           right={() => (
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={24}
-              color={theme.colors.onSurfaceVariant}
-            />
+            <View style={styles.rightContainer}>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={26}
+                color={theme.colors.onSurfaceVariant}
+              />
+            </View>
           )}
+          style={styles.listItem}
         />
       </Card>
 
       {/* Account */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>
+      <Text variant="titleLarge" style={styles.sectionTitle}>
         Account
       </Text>
       <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         <List.Item
           title="Role"
+          titleStyle={styles.listTitle}
           description="Elderly"
+          descriptionStyle={styles.listDescription}
           left={() => (
             <View style={styles.iconContainer}>
               <MaterialCommunityIcons
                 name="account-heart"
-                size={24}
+                size={26}
                 color={theme.colors.primary}
               />
             </View>
           )}
+          style={styles.listItem}
         />
       </Card>
 
@@ -139,23 +157,23 @@ export default function ElderlySettings() {
           { backgroundColor: theme.colors.primaryContainer },
         ]}
       >
-        <Card.Content>
+        <Card.Content style={{ padding: 20 }}>
           <View style={styles.infoHeader}>
             <MaterialCommunityIcons
               name="information"
-              size={24}
+              size={28}
               color={theme.colors.primary}
             />
             <Text
-              variant="titleSmall"
-              style={{ marginLeft: 8, color: theme.colors.onPrimaryContainer }}
+              variant="titleMedium"
+              style={{ marginLeft: 10, color: theme.colors.onPrimaryContainer, fontWeight: "bold" }}
             >
               Need Help?
             </Text>
           </View>
           <Text
-            variant="bodyMedium"
-            style={{ color: theme.colors.onPrimaryContainer, marginTop: 8 }}
+            variant="bodyLarge"
+            style={{ color: theme.colors.onPrimaryContainer, marginTop: 12, lineHeight: 26 }}
           >
             Contact your caregiver if you need help with any settings or have
             questions about the app.
@@ -167,16 +185,19 @@ export default function ElderlySettings() {
       <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         <List.Item
           title="About App"
+          titleStyle={styles.listTitle}
           description="Version 1.0.0"
+          descriptionStyle={styles.listDescription}
           left={() => (
             <View style={styles.iconContainer}>
               <MaterialCommunityIcons
                 name="information"
-                size={24}
+                size={26}
                 color={theme.colors.primary}
               />
             </View>
           )}
+          style={styles.listItem}
         />
       </Card>
 
@@ -185,6 +206,7 @@ export default function ElderlySettings() {
         onPress={signOut}
         style={styles.logoutButton}
         contentStyle={styles.logoutButtonContent}
+        labelStyle={styles.logoutButtonLabel}
         icon="logout"
         buttonColor={theme.colors.error}
       >
@@ -199,48 +221,80 @@ export default function ElderlySettings() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: 20,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: 28,
   },
   title: {
     fontWeight: "bold",
   },
   sectionTitle: {
     fontWeight: "bold",
-    marginTop: 8,
-    marginBottom: 12,
+    marginTop: 12,
+    marginBottom: 14,
   },
   card: {
-    marginBottom: 16,
-    borderRadius: 12,
+    marginBottom: 20,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+  },
+  listItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+  },
+  listTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  listDescription: {
+    fontSize: 14,
+    marginTop: 3,
   },
   iconContainer: {
     justifyContent: "center",
     alignItems: "center",
-    width: 40,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#E8F0FE",
+    marginLeft: 8,
+  },
+  rightContainer: {
+    justifyContent: "center",
+    alignItems: "center",
   },
   divider: {
     height: 1,
-    marginHorizontal: 16,
+    marginHorizontal: 20,
   },
   infoCard: {
-    borderRadius: 12,
+    borderRadius: 20,
     marginTop: 8,
+    marginBottom: 20,
+    elevation: 2,
   },
   infoHeader: {
     flexDirection: "row",
     alignItems: "center",
   },
   logoutButton: {
-    marginTop: 24,
-    borderRadius: 12,
+    marginTop: 28,
+    borderRadius: 20,
+    elevation: 3,
   },
   logoutButtonContent: {
-    height: 48,
+    height: 56,
+  },
+  logoutButtonLabel: {
+    fontSize: 18,
+    fontWeight: "bold",
   },
   bottomSpacer: {
-    height: 32,
+    height: 40,
   },
 });

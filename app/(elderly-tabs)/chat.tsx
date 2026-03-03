@@ -703,7 +703,7 @@ export default function ElderlyChat() {
       ]}
     >
       {!item.isUser && (
-        <Avatar.Icon size={36} icon="robot" style={styles.avatarAI} />
+        <Avatar.Icon size={44} icon="robot" style={styles.avatarAI} />
       )}
 
       <View style={styles.messageBubbleContainer}>
@@ -785,7 +785,7 @@ export default function ElderlyChat() {
       </View>
 
       {item.isUser && (
-        <Avatar.Icon size={36} icon="account" style={styles.avatarUser} />
+        <Avatar.Icon size={44} icon="account" style={styles.avatarUser} />
       )}
     </View>
   );
@@ -801,7 +801,7 @@ export default function ElderlyChat() {
       <View style={styles.topBar}>
         <IconButton
           icon="history"
-          size={22}
+          size={28}
           onPress={openHistory}
           style={styles.topBarButton}
           iconColor={theme.colors.onSurface}
@@ -809,7 +809,7 @@ export default function ElderlyChat() {
         <View style={styles.topBarSpacer} />
         <IconButton
           icon="plus"
-          size={22}
+          size={28}
           onPress={startNewChat}
           style={styles.topBarButton}
           iconColor={theme.colors.onSurface}
@@ -879,7 +879,7 @@ export default function ElderlyChat() {
                 }}
               >
                 <Card.Content style={styles.suggestionContent}>
-                  <Text variant="bodySmall">{suggestion}</Text>
+                  <Text variant="bodyMedium">{suggestion}</Text>
                 </Card.Content>
               </Card>
             ))}
@@ -913,7 +913,7 @@ export default function ElderlyChat() {
         <View style={styles.inputRow}>
           <IconButton
             icon="camera"
-            size={24}
+            size={28}
             onPress={handleImageOptions}
             style={styles.photoButton}
           />
@@ -1014,8 +1014,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingTop: 10,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E8ECF0",
   },
   topBarTitle: {
     marginLeft: 4,
@@ -1026,7 +1028,9 @@ const styles = StyleSheet.create({
   },
   topBarButton: {
     borderRadius: 999,
-    backgroundColor: "transparent",
+    backgroundColor: "#F3F4F6",
+    width: 44,
+    height: 44,
   },
   chatContainer: {
     flex: 1,
@@ -1036,12 +1040,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   messagesListContent: {
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingTop: 20,
+    paddingBottom: 12,
   },
   messageRow: {
     flexDirection: "row",
-    marginBottom: 12,
+    marginBottom: 16,
     alignItems: "flex-end",
     paddingHorizontal: 4,
   },
@@ -1052,49 +1056,49 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   avatarAI: {
-    marginRight: 8,
-    backgroundColor: "#E3F2FD",
+    marginRight: 10,
+    backgroundColor: "#E8F5E9",
   },
   avatarUser: {
-    marginLeft: 8,
-    backgroundColor: "#007AFF",
+    marginLeft: 10,
+    backgroundColor: "#1565C0",
   },
   messageBubbleContainer: {
     maxWidth: "75%",
     flexShrink: 1,
   },
   messageCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
   userMessage: {
-    backgroundColor: "#007AFF",
-    borderBottomRightRadius: 4,
+    backgroundColor: "#1565C0",
+    borderBottomRightRadius: 6,
   },
   aiMessage: {
-    backgroundColor: "#F5F5F5",
-    borderBottomLeftRadius: 4,
+    backgroundColor: "#F8F9FA",
+    borderBottomLeftRadius: 6,
   },
   messageContent: {
-    padding: 8,
+    padding: 12,
   },
   messageImage: {
     width: "100%",
     height: 200,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 8,
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 17,
+    lineHeight: 25,
   },
   timestamp: {
-    fontSize: 11,
-    marginTop: 4,
+    fontSize: 12,
+    marginTop: 6,
     alignSelf: "flex-end",
   },
   messageActionsRow: {
@@ -1109,23 +1113,29 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
+    backgroundColor: "#F0F7FF",
+    marginHorizontal: 16,
+    borderRadius: 16,
+    marginBottom: 8,
   },
   loadingText: {
-    marginLeft: 8,
-    fontSize: 14,
+    marginLeft: 10,
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#1565C0",
   },
   inputContainer: {
-    padding: 12,
+    padding: 14,
     borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
+    borderTopColor: "#E8ECF0",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
       },
       android: {
         elevation: 8,
@@ -1139,14 +1149,17 @@ const styles = StyleSheet.create({
   },
   photoButton: {
     margin: 0,
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 26,
   },
   textInput: {
     backgroundColor: "transparent",
     flex: 1,
     maxHeight: 120,
     minHeight: 56,
+    fontSize: 17,
   },
   textInputContent: {
     paddingVertical: 14,
@@ -1154,15 +1167,15 @@ const styles = StyleSheet.create({
   },
   imagePreviewContainer: {
     position: "relative",
-    marginBottom: 8,
-    borderRadius: 8,
+    marginBottom: 10,
+    borderRadius: 12,
     overflow: "hidden",
     alignSelf: "flex-start",
   },
   imagePreview: {
     width: 100,
     height: 100,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   removeImageButton: {
     position: "absolute",
@@ -1172,69 +1185,77 @@ const styles = StyleSheet.create({
     margin: 0,
   },
   suggestionsContainer: {
-    padding: 12,
+    padding: 14,
     borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
+    borderTopColor: "#E8ECF0",
   },
   suggestionsHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   suggestionsToggle: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "600",
   },
   suggestionsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 10,
   },
   suggestionCard: {
-    borderRadius: 20,
+    borderRadius: 24,
+    elevation: 1,
   },
   suggestionContent: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 16,
+    padding: 20,
   },
   historyModal: {
     width: "100%",
     maxHeight: "70%",
-    backgroundColor: "#0F172A",
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#1E293B",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 20,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
   historyTitle: {
-    marginBottom: 12,
-    color: "#F8FAFC",
+    marginBottom: 16,
+    color: "#1F2937",
+    fontWeight: "bold",
   },
   historyCard: {
-    marginBottom: 8,
-    backgroundColor: "#111827",
+    marginBottom: 10,
+    backgroundColor: "#F8F9FA",
+    borderRadius: 16,
+    elevation: 1,
   },
   historyMeta: {
-    color: "#94A3B8",
+    color: "#6B7280",
     marginTop: 4,
   },
   historyEmpty: {
     textAlign: "center",
     paddingVertical: 24,
-    color: "#94A3B8",
+    color: "#9CA3AF",
+    fontSize: 16,
   },
   imagePreviewModal: {
     width: "100%",
     height: "70%",
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: "hidden",
     backgroundColor: "#000",
     justifyContent: "center",
@@ -1246,8 +1267,9 @@ const styles = StyleSheet.create({
   },
   closePreviewButton: {
     position: "absolute",
-    top: 8,
-    right: 8,
+    top: 12,
+    right: 12,
     backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 20,
   },
 });
