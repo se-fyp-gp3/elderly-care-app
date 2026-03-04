@@ -17,12 +17,12 @@ import { AppState, AppStateStatus, Platform } from "react-native";
 import { useAuth } from "../auth-context";
 import { getElderlyByUserId } from "../elderly";
 import {
-  DailyStepRecord,
-  getStepHistory,
-  getTodayStepRecord,
-  performStepSync,
-  requestHealthAuthorization,
-  StepDataSource,
+    DailyStepRecord,
+    getStepHistory,
+    getTodayStepRecord,
+    performStepSync,
+    requestHealthAuthorization,
+    StepDataSource,
 } from "../step-sync";
 
 // Auto-sync interval: 30 minutes (in milliseconds)
