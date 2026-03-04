@@ -10,7 +10,15 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.elderlycareapp"
+      "bundleIdentifier": "com.anonymous.elderlycareapp",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "This app needs access to your Health data to display your daily step count.",
+        "NSHealthUpdateUsageDescription": "This app needs access to update your Health data."
+      },
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": ["health-records"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +29,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.elderlycareapp"
+      "package": "com.anonymous.elderlycareapp",
+      "permissions": [
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.health.READ_STEPS"
+      ]
     },
     "web": {
       "output": "static",
@@ -50,7 +62,18 @@
       "expo-web-browser",
       "react-native-localize",
       "@react-native-community/datetimepicker",
-      "expo-secure-store"
+      "expo-secure-store",
+      "react-native-health-connect",
+      "react-native-health",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      "./plugins/withHealthConnect"
     ],
     "experiments": {
       "typedRoutes": true,

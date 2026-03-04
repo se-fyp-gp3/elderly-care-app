@@ -3,6 +3,7 @@ import {
   fetchElderlySchedulesForUser,
   getElderlyByUserId,
 } from "@/lib/elderly";
+import { useStepSync } from "@/lib/hooks/useStepSync";
 import {
   checkAndMarkSkippedMedications,
   fetchActiveMedicationReminders,
@@ -20,6 +21,7 @@ import { openURL } from "expo-linking";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
+  ActivityIndicator,
   Alert,
   AppState,
   RefreshControl,
@@ -37,8 +39,6 @@ import {
   useTheme
 } from "react-native-paper";
 
-type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-
 type TodoItem = {
   reminder: ElderlyMedicationReminder;
   time: string; // HH:mm
@@ -53,6 +53,14 @@ export default function ElderlyHome() {
   const { user } = useAuth();
   const theme = useTheme();
   const router = useRouter();
+  const {
+    todaySteps,
+    isLoading: stepsLoading,
+    isSyncing,
+    lastSyncTime,
+    source: stepSource,
+    manualSync,
+  } = useStepSync();
   const [refreshing, setRefreshing] = React.useState(false);
   const [elderlyProfile, setElderlyProfile] = React.useState<Elderly | null>(
     null,
@@ -222,33 +230,6 @@ export default function ElderlyHome() {
     setRefreshing(false);
   }, [fetchElderlyData]);
 
-  const quickActions = [
-    {
-      icon: "robot" as IconName,
-      label: "Chat with AI",
-      color: "#673AB7",
-      route: "chat",
-    },
-    {
-      icon: "pill" as IconName,
-      label: "My Medications",
-      color: "#4CAF50",
-      route: "medication",
-    },
-    {
-      icon: "calendar-clock" as IconName,
-      label: "My Schedule",
-      color: "#2196F3",
-      route: "schedule",
-    },
-    {
-      icon: "account-group" as IconName,
-      label: "Community",
-      color: "#FF9800",
-      route: "chat",
-    },
-  ];
-
   const handleEmergencyCall = () => {
     // Assume `elderly` contains the current user's elderly profile with an `emergency_contact` field
     // If no emergency contact is set, inform the user instead of attempting to call a hardcoded number.
@@ -313,36 +294,6 @@ export default function ElderlyHome() {
           <MaterialCommunityIcons name="chevron-right" size={24} color="#E57373" />
         </Card.Content>
       </Card>
-
-      {/* Quick Actions */}
-      <Text variant="titleLarge" style={styles.sectionTitle}>
-        Quick Actions
-      </Text>
-      <View style={styles.quickActionsGrid}>
-        {quickActions.map((action, index) => (
-          <Card
-            key={index}
-            style={[
-              styles.actionCard,
-              { backgroundColor: theme.colors.surface },
-            ]}
-            onPress={() => router.push(action.route as never)}
-          >
-            <Card.Content style={styles.actionContent}>
-              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: `${action.color}15`, justifyContent: "center", alignItems: "center" }}>
-                <MaterialCommunityIcons
-                  name={action.icon}
-                  size={36}
-                  color={action.color}
-                />
-              </View>
-              <Text variant="titleSmall" style={styles.actionLabel}>
-                {action.label}
-              </Text>
-            </Card.Content>
-          </Card>
-        ))}
-      </View>
 
       {/* Today's Medications */}
       <Text variant="titleLarge" style={styles.sectionTitle}>
@@ -492,6 +443,52 @@ export default function ElderlyHome() {
         </Button>
       </Card>
 
+      {/* Today's Steps */}
+      <Text variant="titleLarge" style={styles.sectionTitle}>
+        Today&apos;s Steps
+      </Text>
+      <Card
+        style={[styles.stepCard, { backgroundColor: theme.colors.surface }]}
+        onPress={() => router.push("/health-data" as never)}
+      >
+        <Card.Content>
+          <View style={styles.stepRow}>
+            <View style={styles.stepIconCircle}>
+              <MaterialCommunityIcons name="walk" size={32} color="#9C27B0" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              {stepsLoading ? (
+                <ActivityIndicator size="small" color="#9C27B0" />
+              ) : (
+                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
+                  <Text variant="headlineMedium" style={{ fontWeight: "bold", color: "#9C27B0" }}>
+                    {todaySteps.toLocaleString()}
+                  </Text>
+                  <Text variant="bodyMedium" style={{ color: "#888" }}>steps</Text>
+                </View>
+              )}
+              <Text variant="labelSmall" style={{ color: "#999", marginTop: 2 }}>
+                {lastSyncTime
+                  ? `Updated ${new Date(lastSyncTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                  : "Not synced yet"}
+                {stepSource === "health_connect" ? " · Health Connect" : stepSource === "apple_healthkit" ? " · Apple Health" : ""}
+              </Text>
+            </View>
+            <TouchableRipple
+              onPress={(e) => { e.stopPropagation(); manualSync(); }}
+              disabled={isSyncing}
+              style={styles.stepSyncBtn}
+              rippleColor="#9C27B040"
+            >
+              {isSyncing
+                ? <ActivityIndicator size={20} color="#9C27B0" />
+                : <MaterialCommunityIcons name="refresh" size={22} color="#9C27B0" />
+              }
+            </TouchableRipple>
+          </View>
+        </Card.Content>
+      </Card>
+
       <View style={styles.bottomSpacer} />
     </ScrollView>
   );
@@ -541,31 +538,34 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 14,
   },
-  quickActionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  actionCard: {
-    width: "48%",
-    marginBottom: 14,
+  stepCard: {
     borderRadius: 20,
+    marginBottom: 20,
     elevation: 2,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
-    shadowRadius: 6,
+    shadowRadius: 4,
   },
-  actionContent: {
+  stepRow: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 22,
-    paddingHorizontal: 8,
   },
-  actionLabel: {
-    marginTop: 12,
-    textAlign: "center",
-    fontWeight: "600",
+  stepIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#9C27B015",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  stepSyncBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#9C27B010",
+    justifyContent: "center",
+    alignItems: "center",
   },
   listCard: {
     marginBottom: 20,
