@@ -1,5 +1,9 @@
 import { useAuth } from "@/lib/auth-context";
-import { registerElderlyForCaregiver } from "@/lib/registration";
+import {
+  cancelRegistrationRequest,
+  getRegistrationRequest,
+  registerElderlyForCaregiver,
+} from "@/lib/registration";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
@@ -27,12 +31,9 @@ export default function RegisterElderlyScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();
 
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState<Date | undefined>(undefined);
-  const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,11 +45,6 @@ export default function RegisterElderlyScreen() {
 
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) return "Please enter a valid email address";
-
-    if (!password) return "Password is required";
-    if (password.length < 8)
-      return "Password must be at least 8 characters long";
-    if (password !== confirmPassword) return "Passwords do not match";
 
     return null;
   };
@@ -72,7 +68,6 @@ export default function RegisterElderlyScreen() {
       await registerElderlyForCaregiver({
         token,
         email: email.trim(),
-        password,
         name: name.trim(),
         phone: phone.trim() || undefined,
         birthDate: birthDate?.toISOString().split("T")[0],
@@ -215,38 +210,6 @@ export default function RegisterElderlyScreen() {
             />
 
             <TextInput
-              label="Password *"
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                setError(null);
-              }}
-              mode="outlined"
-              secureTextEntry={!showPassword}
-              left={<TextInput.Icon icon="lock" />}
-              right={
-                <TextInput.Icon
-                  icon={showPassword ? "eye-off" : "eye"}
-                  onPress={() => setShowPassword(!showPassword)}
-                />
-              }
-              style={styles.input}
-            />
-
-            <TextInput
-              label="Confirm Password *"
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                setError(null);
-              }}
-              mode="outlined"
-              secureTextEntry={!showPassword}
-              left={<TextInput.Icon icon="lock-check" />}
-              style={styles.input}
-            />
-
-            <TextInput
               label="Phone Number (Optional)"
               value={phone}
               onChangeText={setPhone}
@@ -285,7 +248,16 @@ export default function RegisterElderlyScreen() {
 
             <Button
               mode="text"
-              onPress={() => router.back()}
+              onPress={async () => {
+                // Mark as cancelled so elderly device gets notified
+                if (token) {
+                  const request = await getRegistrationRequest(token);
+                  if (request) {
+                    await cancelRegistrationRequest(request.$id);
+                  }
+                }
+                router.back();
+              }}
               disabled={loading}
               style={styles.cancelButton}
             >

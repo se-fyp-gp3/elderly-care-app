@@ -1,10 +1,17 @@
 import { makeRedirectUri } from "expo-auth-session";
+import * as LocalAuthentication from "expo-local-authentication";
+import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
-import { ID, Models, OAuthProvider } from "react-native-appwrite";
+import {
+  ExecutionMethod,
+  ID,
+  Models,
+  OAuthProvider,
+} from "react-native-appwrite";
 import { UserPreferences } from "../types/user";
-import { account, accountWeb } from "./appwrite";
+import { account, accountWeb, functions } from "./appwrite";
 import { checkProfileExists, hasTrialLabel } from "./user";
 export class LoginError extends Error {
   constructor(message: string) {
@@ -20,6 +27,7 @@ type AuthContextType = {
   hasProfile: boolean;
   isTrial: boolean;
   userLabels: string[];
+  needsReAuth: boolean;
 
   signUp: (
     email: string,
@@ -27,11 +35,13 @@ type AuthContextType = {
     role: "elderly" | "caregiver",
   ) => Promise<string | null>;
   signIn: (email: string, password: string) => Promise<string | null>;
+  signInWithToken: (userId: string, secret: string) => Promise<string | null>;
   signInWithOAuth2: (
     provider: OAuthProvider,
     role?: "elderly" | "caregiver",
   ) => Promise<string | null>;
   signOut: () => Promise<void>;
+  reAuthenticateElderly: () => Promise<string | null>;
   updatePreferences: (
     newPreferences: UserPreferences,
   ) => Promise<string | null>;
@@ -55,6 +65,7 @@ export default function AuthProvider({
   const [hasProfile, setHasProfile] = useState<boolean>(false);
   const [userLabels, setUserLabels] = useState<string[]>([]);
   const [isTrial, setIsTrial] = useState<boolean>(false);
+  const [needsReAuth, setNeedsReAuth] = useState<boolean>(false);
 
   const refreshLabels = async () => {
     if (!user) {
@@ -122,10 +133,18 @@ export default function AuthProvider({
       }
 
       setUser(session);
+      setNeedsReAuth(false);
       if (session.prefs) {
         setPreferences(session.prefs as UserPreferences);
       }
     } catch {
+      // Session expired or not found — check if elderly user needs re-auth
+      if (Platform.OS !== "web") {
+        const storedUserId = await SecureStore.getItemAsync("elderly_user_id");
+        if (storedUserId) {
+          setNeedsReAuth(true);
+        }
+      }
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -143,6 +162,10 @@ export default function AuthProvider({
       password,
     });
     setPreference("role", role);
+    // New user — clear any stale elderly_user_id
+    if (Platform.OS !== "web") {
+      await SecureStore.deleteItemAsync("elderly_user_id");
+    }
     await signIn(email, password);
     return null;
   };
@@ -155,12 +178,63 @@ export default function AuthProvider({
     } else {
       await account.createEmailPasswordSession({ email, password });
       user = await account.get();
+      // New login — overwrite stored elderly_user_id
+      await SecureStore.deleteItemAsync("elderly_user_id");
     }
     setUser(user);
+    setNeedsReAuth(false);
 
     if (user.prefs) {
       setPreferences(user.prefs as UserPreferences);
     }
+    return null;
+  };
+
+  const signInWithToken = async (userId: string, secret: string) => {
+    await account.createSession({ userId, secret });
+    const user = await account.get();
+    setUser(user);
+    setNeedsReAuth(false);
+    if (user.prefs) {
+      setPreferences(user.prefs as UserPreferences);
+    }
+    return null;
+  };
+
+  const reAuthenticateElderly = async () => {
+    const storedUserId = await SecureStore.getItemAsync("elderly_user_id");
+    if (!storedUserId) {
+      throw new LoginError("No stored elderly user ID found.");
+    }
+
+    const authResult = await LocalAuthentication.authenticateAsync({
+      promptMessage: "Authenticate to continue",
+      fallbackLabel: "Use passcode",
+    });
+
+    if (!authResult.success) {
+      throw new LoginError("Biometric authentication failed.");
+    }
+
+    // Request a new custom token from the cloud function
+    const execution = await functions.createExecution({
+      functionId: "699dbc63003c1b31c4bb",
+      body: JSON.stringify({ length: 64, expire: 900 }),
+      xpath: `/users/${storedUserId}/token`,
+      method: ExecutionMethod.POST,
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (execution.responseStatusCode >= 400) {
+      const errBody = JSON.parse(execution.responseBody || "{}");
+      throw new LoginError(
+        errBody.error ||
+          `Token creation failed (status ${execution.responseStatusCode})`,
+      );
+    }
+
+    const tokenResult = JSON.parse(execution.responseBody);
+    await signInWithToken(tokenResult.userId, tokenResult.secret);
     return null;
   };
 
@@ -202,6 +276,8 @@ export default function AuthProvider({
 
         await account.createSession({ userId, secret });
         user = await account.get();
+        // New OAuth login — clear stale elderly_user_id
+        await SecureStore.deleteItemAsync("elderly_user_id");
 
         if (role && !user.prefs.role) {
           setPreference("role", role);
@@ -216,16 +292,21 @@ export default function AuthProvider({
   };
 
   const signOut = async () => {
-    if (Platform.OS === "web") {
-      await accountWeb.deleteSession({ sessionId: "current" });
-    } else {
-      await account.deleteSession({ sessionId: "current" });
+    try {
+      if (Platform.OS === "web") {
+        await accountWeb.deleteSession({ sessionId: "current" });
+      } else {
+        await account.deleteSession({ sessionId: "current" });
+      }
+    } catch {
+      // Session may already be expired — ignore
     }
     setUser(null);
     setHasProfile(false);
     setPreferences({});
     setUserLabels([]);
     setIsTrial(false);
+    setNeedsReAuth(false);
     setIsLoading(false);
   };
 
@@ -261,10 +342,13 @@ export default function AuthProvider({
         hasProfile,
         isTrial,
         userLabels,
+        needsReAuth,
         signUp,
         signIn,
+        signInWithToken,
         signInWithOAuth2,
         signOut,
+        reAuthenticateElderly,
         updatePreferences,
         setPreference,
         refreshProfile,

@@ -17,7 +17,7 @@ const tabs: Record<Role, "/(elderly-tabs)" | "/(caregiver-tabs)"> = {
   [Role.Elderly]: "/(elderly-tabs)",
   [Role.Caregiver]: "/(caregiver-tabs)",
 };
-const authRoutes = ["start", "signup", "auth", "qr-register"];
+const authRoutes = ["start", "signup", "auth", "qr-register", "reauth"];
 
 const getRoleHomeRoute = (role: Role | undefined) => {
   if (role && tabs[role as keyof typeof tabs]) {
@@ -49,6 +49,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     user,
     isLoading,
     hasProfile,
+    needsReAuth,
     preferences: { role },
   } = useAuth();
   const segments = useSegments();
@@ -64,8 +65,14 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // If not signed in, always go to start page
+    // If not signed in, check for re-auth or go to start page
     if (!user) {
+      if (needsReAuth) {
+        if (!isOnRoute(currentRoute, "reauth")) {
+          router.replace("/reauth");
+        }
+        return;
+      }
       if (!inAuthGroup) {
         router.replace("/start");
       }
@@ -90,7 +97,16 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     if (targetTab) {
       router.replace(targetTab);
     }
-  }, [router, user, segments, isLoading, appReady, hasProfile, role]);
+  }, [
+    router,
+    user,
+    segments,
+    isLoading,
+    appReady,
+    hasProfile,
+    role,
+    needsReAuth,
+  ]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -152,6 +168,7 @@ export default function RootLayout() {
                   name="qr-register"
                   options={{ headerShown: false }}
                 />
+                <Stack.Screen name="reauth" options={{ headerShown: false }} />
               </Stack>
             </RouteGuard>
           </SafeAreaProvider>

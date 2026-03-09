@@ -1,3 +1,7 @@
+import {
+    getRegistrationRequest,
+    markRegistrationScanned,
+} from "@/lib/registration";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -20,7 +24,7 @@ export default function ScanQRScreen() {
     router.navigate("/(caregiver-tabs)/caregiver");
   };
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
     if (processingRef.current || scanned) return;
     processingRef.current = true;
     setScanned(true);
@@ -28,6 +32,11 @@ export default function ScanQRScreen() {
     try {
       const payload = JSON.parse(data);
       if (payload.type === "elderly-register" && payload.token) {
+        // Mark the registration as scanned so elderly device sees the update
+        const request = await getRegistrationRequest(payload.token);
+        if (request) {
+          await markRegistrationScanned(request.$id);
+        }
         router.replace(
           `/(caregiver-tabs)/register-elderly?token=${payload.token}` as any,
         );

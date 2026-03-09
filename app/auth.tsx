@@ -1,7 +1,9 @@
 import { LoginError, useAuth } from "@/lib/auth-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { AppwriteException } from "appwrite";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import * as SecureStore from "expo-secure-store";
+import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { OAuthProvider } from "react-native-appwrite";
 import {
@@ -17,11 +19,21 @@ export default function AuthScreen() {
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [hasStoredElderly, setHasStoredElderly] = useState<boolean>(false);
 
   const theme = useTheme();
   const router = useRouter();
 
-  const { signIn, signInWithOAuth2, preferences } = useAuth();
+  const { signIn, signInWithOAuth2, reAuthenticateElderly, preferences } =
+    useAuth();
+
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      SecureStore.getItemAsync("elderly_user_id").then((id) => {
+        setHasStoredElderly(!!id);
+      });
+    }
+  }, []);
 
   const handleSignIn = async () => {
     if (!email || !password) {
@@ -73,6 +85,24 @@ export default function AuthScreen() {
         setError(error.message);
       } else {
         setError("Authentication was cancelled or failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFaceIdLogin = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await reAuthenticateElderly();
+      router.replace("/");
+    } catch (error: any) {
+      console.error("Face ID login error:", error);
+      if (error instanceof LoginError) {
+        setError(error.message);
+      } else {
+        setError("Biometric authentication failed. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -155,6 +185,24 @@ export default function AuthScreen() {
         >
           Sign In with Google
         </Button>
+
+        {hasStoredElderly && Platform.OS !== "web" && (
+          <Button
+            mode="contained-tonal"
+            onPress={handleFaceIdLogin}
+            style={styles.button}
+            icon={({ size, color }) => (
+              <MaterialCommunityIcons
+                name="face-recognition"
+                size={size}
+                color={color}
+              />
+            )}
+            disabled={loading}
+          >
+            Login with Face ID
+          </Button>
+        )}
 
         <Button
           mode="text"
