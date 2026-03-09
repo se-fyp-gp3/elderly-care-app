@@ -1,4 +1,5 @@
 import { LoginError, useAuth } from "@/lib/auth-context";
+import { Role } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { AppwriteException } from "appwrite";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -13,7 +14,6 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
-import { Role } from "@/types/user";
 
 export default function SignupScreen() {
   const { role } = useLocalSearchParams<{ role: Role }>();
