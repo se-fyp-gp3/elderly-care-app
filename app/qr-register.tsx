@@ -1,12 +1,13 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-    createRegistrationRequest,
-    deleteRegistrationRequest,
-    getRegistrationRequest,
+  createRegistrationRequest,
+  deleteRegistrationRequest,
+  getRegistrationRequest,
 } from "@/lib/registration";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text, useTheme } from "react-native-paper";
@@ -28,18 +29,46 @@ function generateToken(): string {
   return result;
 }
 
+const EXPIRY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
 export default function ElderlyQRRegisterScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signInWithToken } = useAuth();
 
   const [token, setToken] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [status, setStatus] = useState<
-    "loading" | "waiting" | "signing-in" | "done" | "error"
+    | "loading"
+    | "waiting"
+    | "scanned"
+    | "signing-in"
+    | "done"
+    | "expired"
+    | "cancelled"
+    | "error"
   >("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const expiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  const stopExpiry = () => {
+    if (expiryRef.current) {
+      clearTimeout(expiryRef.current);
+      expiryRef.current = null;
+    }
+  };
+
+  const cleanupRequest = (id: string) => {
+    deleteRegistrationRequest(id).catch(() => {});
+  };
 
   // Create the registration request on mount
   useEffect(() => {
@@ -53,6 +82,14 @@ export default function ElderlyQRRegisterScreen() {
         setToken(t);
         setRequestId(request.$id);
         setStatus("waiting");
+
+        // Set expiry timer
+        expiryRef.current = setTimeout(() => {
+          stopPolling();
+          setStatus("expired");
+          cleanupRequest(request.$id);
+          setRequestId(null);
+        }, EXPIRY_TIMEOUT);
       } catch (err: any) {
         console.error("Failed to create registration request:", err);
         if (cancelled) return;
@@ -65,62 +102,128 @@ export default function ElderlyQRRegisterScreen() {
 
     return () => {
       cancelled = true;
+      stopExpiry();
+      stopPolling();
     };
   }, []);
 
-  // Poll for completion
+  // Cleanup registration request on unmount (force restart, navigation away)
   useEffect(() => {
-    if (status !== "waiting" || !token) return;
+    return () => {
+      if (requestId) {
+        cleanupRequest(requestId);
+      }
+    };
+  }, [requestId]);
+
+  // Poll for status changes
+  useEffect(() => {
+    if ((status !== "waiting" && status !== "scanned") || !token) return;
 
     pollingRef.current = setInterval(async () => {
       try {
         const request = await getRegistrationRequest(token);
-        if (
-          request &&
-          request.status === "completed" &&
-          request.elderly_email &&
-          request.elderly_password
-        ) {
-          // Stop polling
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
-          }
+        if (!request) {
+          // Request was deleted (expired or cleaned up)
+          stopPolling();
+          stopExpiry();
+          setStatus("expired");
+          return;
+        }
 
+        // Caregiver scanned the QR
+        if (request.status === "scanned" && status !== "scanned") {
+          setStatus("scanned");
+          stopExpiry(); // Don't expire while caregiver is filling the form
+        }
+
+        // Caregiver cancelled the registration
+        if (request.status === "cancelled") {
+          stopPolling();
+          stopExpiry();
+          setStatus("cancelled");
+          cleanupRequest(request.$id);
+          setRequestId(null);
+          return;
+        }
+
+        // Registration completed
+        if (
+          request.status === "completed" &&
+          request.elderly_user_id &&
+          request.elderly_token_secret
+        ) {
+          stopPolling();
+          stopExpiry();
           setStatus("signing-in");
 
-          // Auto-sign in with the credentials
-          await signIn(request.elderly_email, request.elderly_password);
+          // Auto-sign in with the custom token
+          await signInWithToken(
+            request.elderly_user_id,
+            request.elderly_token_secret,
+          );
 
-          // Clean up the registration request (remove temporary credentials)
-          await deleteRegistrationRequest(request.$id);
+          // Store user ID for future biometric re-auth
+          await SecureStore.setItemAsync(
+            "elderly_user_id",
+            request.elderly_user_id,
+          );
+
+          // Clean up the registration request
+          cleanupRequest(request.$id);
+          setRequestId(null);
 
           setStatus("done");
           // Navigation will be handled by RouteGuard in _layout.tsx
         }
       } catch (err) {
         console.error("Polling error:", err);
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-        }
+        stopPolling();
+        stopExpiry();
         setErrorMsg("Failed to complete registration. Please try again.");
         setStatus("error");
+        if (requestId) {
+          cleanupRequest(requestId);
+          setRequestId(null);
+        }
       }
-    }, 3000);
+    }, 1000);
 
     return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
+      stopPolling();
     };
-  }, [status, token, signIn]);
+  }, [status, token, requestId, signInWithToken]);
+
+  const handleRefresh = async () => {
+    setStatus("loading");
+    setErrorMsg(null);
+    setToken(null);
+    setRequestId(null);
+    try {
+      const t = generateToken();
+      const request = await createRegistrationRequest(t);
+      setToken(t);
+      setRequestId(request.$id);
+      setStatus("waiting");
+
+      expiryRef.current = setTimeout(() => {
+        stopPolling();
+        setStatus("expired");
+        cleanupRequest(request.$id);
+        setRequestId(null);
+      }, EXPIRY_TIMEOUT);
+    } catch (err) {
+      console.error("Failed to create registration request:", err);
+      setErrorMsg("Failed to initialize. Please try again.");
+      setStatus("error");
+    }
+  };
 
   const handleManualRegister = () => {
     // Clean up the pending request in background
     if (requestId) {
       deleteRegistrationRequest(requestId).catch(() => {});
+      setRequestId(null);
     }
     router.push("/signup?role=elderly");
   };
@@ -128,6 +231,7 @@ export default function ElderlyQRRegisterScreen() {
   const handleGoBack = () => {
     if (requestId) {
       deleteRegistrationRequest(requestId).catch(() => {});
+      setRequestId(null);
     }
     router.back();
   };
@@ -160,7 +264,7 @@ export default function ElderlyQRRegisterScreen() {
           </>
         )}
 
-        {status === "waiting" && token && (
+        {(status === "waiting" || status === "scanned") && token && (
           <>
             <MaterialCommunityIcons
               name="human-cane"
@@ -190,16 +294,114 @@ export default function ElderlyQRRegisterScreen() {
                 },
               ]}
             >
-              <QRCode value={qrPayload} size={220} backgroundColor="#FFFFFF" />
+              <View style={styles.qrOverlayWrapper}>
+                {status === "scanned" && (
+                  <View style={styles.qrDimmed}>
+                    <QRCode
+                      value={qrPayload}
+                      size={220}
+                      backgroundColor="#FFFFFF"
+                    />
+                  </View>
+                )}
+                {status === "waiting" && (
+                  <QRCode
+                    value={qrPayload}
+                    size={220}
+                    backgroundColor="#FFFFFF"
+                  />
+                )}
+                {status === "scanned" && (
+                  <View style={styles.overlayIcon}>
+                    <MaterialCommunityIcons
+                      name="check-circle"
+                      size={80}
+                      color="#4CAF50"
+                    />
+                  </View>
+                )}
+              </View>
             </View>
 
-            <Text
-              variant="bodySmall"
-              style={[styles.hint, { color: theme.colors.onSurfaceVariant }]}
-            >
-              Waiting for caregiver to complete registration...
-            </Text>
+            {status === "scanned" && (
+              <Text
+                variant="bodySmall"
+                style={[styles.hint, { color: "#4CAF50" }]}
+              >
+                Scan successful! Caregiver is setting up your account...
+              </Text>
+            )}
+            {status === "waiting" && (
+              <Text
+                variant="bodySmall"
+                style={[styles.hint, { color: theme.colors.onSurfaceVariant }]}
+              >
+                Waiting for caregiver to complete registration...
+              </Text>
+            )}
             <ActivityIndicator size="small" style={{ marginTop: 8 }} />
+          </>
+        )}
+
+        {(status === "expired" || status === "cancelled") && (
+          <>
+            <MaterialCommunityIcons
+              name="human-cane"
+              size={48}
+              color="#FF9800"
+            />
+            <Text variant="headlineSmall" style={styles.title}>
+              {status === "expired"
+                ? "Session Expired"
+                : "Registration Cancelled"}
+            </Text>
+            <Text
+              variant="bodyMedium"
+              style={[
+                styles.subtitle,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
+            >
+              {status === "expired"
+                ? "The QR code has expired. Tap refresh to try again."
+                : "The caregiver cancelled the registration. Tap refresh to try again."}
+            </Text>
+
+            <View
+              style={[
+                styles.qrContainer,
+                {
+                  backgroundColor: "#FFFFFF",
+                  borderColor: theme.colors.outlineVariant,
+                },
+              ]}
+            >
+              <View style={styles.qrOverlayWrapper}>
+                <View style={styles.qrDimmed}>
+                  <QRCode
+                    value={qrPayload || "expired"}
+                    size={220}
+                    backgroundColor="#FFFFFF"
+                  />
+                </View>
+                <View style={styles.overlayIcon}>
+                  <MaterialCommunityIcons
+                    name="refresh-circle"
+                    size={80}
+                    color="#FF9800"
+                  />
+                </View>
+              </View>
+            </View>
+
+            <Button
+              mode="contained"
+              onPress={handleRefresh}
+              icon="refresh"
+              style={{ marginTop: 16 }}
+            >
+              Refresh
+            </Button>
           </>
         )}
 
@@ -259,42 +461,39 @@ export default function ElderlyQRRegisterScreen() {
           </>
         )}
       </View>
-
-      {status === "waiting" && (
-        <View style={styles.footer}>
-          <View style={styles.dividerRow}>
-            <View
-              style={[
-                styles.dividerLine,
-                { backgroundColor: theme.colors.outlineVariant },
-              ]}
-            />
-            <Text
-              variant="bodySmall"
-              style={{
-                color: theme.colors.onSurfaceVariant,
-                marginHorizontal: 12,
-              }}
-            >
-              OR
-            </Text>
-            <View
-              style={[
-                styles.dividerLine,
-                { backgroundColor: theme.colors.outlineVariant },
-              ]}
-            />
-          </View>
-          <Button
-            mode="outlined"
-            onPress={handleManualRegister}
-            icon="account-plus"
-            style={styles.manualButton}
+      <View style={styles.footer}>
+        <View style={styles.dividerRow}>
+          <View
+            style={[
+              styles.dividerLine,
+              { backgroundColor: theme.colors.outlineVariant },
+            ]}
+          />
+          <Text
+            variant="bodySmall"
+            style={{
+              color: theme.colors.onSurfaceVariant,
+              marginHorizontal: 12,
+            }}
           >
-            Register Manually
-          </Button>
+            OR
+          </Text>
+          <View
+            style={[
+              styles.dividerLine,
+              { backgroundColor: theme.colors.outlineVariant },
+            ]}
+          />
         </View>
-      )}
+        <Button
+          mode="outlined"
+          onPress={handleManualRegister}
+          icon="account-plus"
+          style={styles.manualButton}
+        >
+          Register Manually
+        </Button>
+      </View>
     </SafeAreaView>
   );
 }
@@ -364,5 +563,18 @@ const styles = StyleSheet.create({
   },
   manualButton: {
     width: "100%",
+  },
+  qrOverlayWrapper: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qrDimmed: {
+    opacity: 0.3,
+  },
+  overlayIcon: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

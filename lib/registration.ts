@@ -12,10 +12,10 @@ import { createElderlyProfile } from "./elderly";
 
 export type RegistrationRequest = Models.Row & {
   token: string;
-  status: "pending" | "completed";
+  status: "pending" | "scanned" | "completed" | "cancelled";
   elderly_email: string | null;
-  elderly_password: string | null;
   elderly_user_id: string | null;
+  elderly_token_secret: string | null;
   caregiver_user_id: string | null;
 };
 
@@ -34,8 +34,8 @@ export async function createRegistrationRequest(
       token,
       status: "pending",
       elderly_email: null,
-      elderly_password: null,
       elderly_user_id: null,
+      elderly_token_secret: null,
       caregiver_user_id: null,
     },
   });
@@ -73,8 +73,8 @@ export async function completeRegistrationRequest(
   docId: string,
   data: {
     elderlyEmail: string;
-    elderlyPassword: string;
     elderlyUserId: string;
+    elderlyTokenSecret: string;
     caregiverUserId: string;
   },
 ): Promise<void> {
@@ -85,16 +85,40 @@ export async function completeRegistrationRequest(
     data: {
       status: "completed",
       elderly_email: data.elderlyEmail,
-      elderly_password: data.elderlyPassword,
       elderly_user_id: data.elderlyUserId,
+      elderly_token_secret: data.elderlyTokenSecret,
       caregiver_user_id: data.caregiverUserId,
     },
   });
 }
 
 /**
- * Delete a registration request after the elderly device has signed in.
- * Removes the temporary credentials from the database.
+ * Mark a registration request as scanned by the caregiver.
+ */
+export async function markRegistrationScanned(docId: string): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: REGISTRATION_REQUESTS_TABLE_ID,
+    rowId: docId,
+    data: { status: "scanned" },
+  });
+}
+
+/**
+ * Mark a registration request as cancelled by the caregiver.
+ */
+export async function cancelRegistrationRequest(docId: string): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: REGISTRATION_REQUESTS_TABLE_ID,
+    rowId: docId,
+    data: { status: "cancelled" },
+  });
+}
+
+/**
+ * Delete a registration request.
+ * Always called to clean up regardless of outcome.
  */
 export async function deleteRegistrationRequest(docId: string): Promise<void> {
   try {
@@ -103,8 +127,11 @@ export async function deleteRegistrationRequest(docId: string): Promise<void> {
       tableId: REGISTRATION_REQUESTS_TABLE_ID,
       rowId: docId,
     });
-  } catch (error) {
-    console.error("Error deleting registration request:", error);
+  } catch (error: any) {
+    // Silently ignore if already deleted (404)
+    if (error?.code !== 404) {
+      console.error("Error deleting registration request:", error);
+    }
   }
 }
 
@@ -115,14 +142,12 @@ export async function deleteRegistrationRequest(docId: string): Promise<void> {
 export async function registerElderlyForCaregiver(params: {
   token: string;
   email: string;
-  password: string;
   name: string;
   phone?: string;
   birthDate?: string;
   caregiverUserId: string;
 }): Promise<void> {
-  const { token, email, password, name, phone, birthDate, caregiverUserId } =
-    params;
+  const { token, email, name, phone, birthDate, caregiverUserId } = params;
 
   // 1. Find the registration request document
   const request = await getRegistrationRequest(token);
@@ -133,11 +158,10 @@ export async function registerElderlyForCaregiver(params: {
     throw new Error("This registration has already been completed.");
   }
 
-  // 2. Create the elderly's Appwrite user account via server function
+  // 2. Create the elderly's Appwrite user account via server function (no password)
   const userPayload = {
     userId: ID.unique(),
     email,
-    password,
     name,
     phone: phone || null,
   };
@@ -178,7 +202,7 @@ export async function registerElderlyForCaregiver(params: {
   });
 
   // 4. Create the elderly profile in the database
-  await createElderlyProfile({
+  const elderlyProfile = await createElderlyProfile({
     user_id: elderlyUserId,
     name,
     phone: phone || null,
@@ -191,14 +215,32 @@ export async function registerElderlyForCaregiver(params: {
   // 5. Link the caregiver to this elderly
   const caregiver = await getCaregiverByUserId(caregiverUserId);
   if (caregiver) {
-    await linkCaregiverToElderly(caregiver.$id, elderlyUserId);
+    await linkCaregiverToElderly(caregiver.$id, elderlyProfile.$id);
   }
 
-  // 6. Complete the registration request so the elderly device can sign in
+  // 6. Create a custom token for the elderly user to sign in
+  const tokenExecution = await functions.createExecution({
+    functionId: "699dbc63003c1b31c4bb",
+    body: JSON.stringify({ length: 64, expire: 900 }),
+    xpath: `/users/${elderlyUserId}/token`,
+    method: ExecutionMethod.POST,
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (tokenExecution.responseStatusCode >= 400) {
+    const errBody = JSON.parse(tokenExecution.responseBody || "{}");
+    throw new Error(
+      errBody.error ||
+        `Token creation failed (status ${tokenExecution.responseStatusCode})`,
+    );
+  }
+  const tokenResult = JSON.parse(tokenExecution.responseBody);
+
+  // 7. Complete the registration request so the elderly device can sign in via token
   await completeRegistrationRequest(request.$id, {
     elderlyEmail: email,
-    elderlyPassword: password,
     elderlyUserId,
+    elderlyTokenSecret: tokenResult.secret,
     caregiverUserId,
   });
 }
