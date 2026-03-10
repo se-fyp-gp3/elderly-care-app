@@ -34,9 +34,15 @@ export default function ScanQRScreen() {
       if (payload.type === "elderly-register" && payload.token) {
         // Mark the registration as scanned so elderly device sees the update
         const request = await getRegistrationRequest(payload.token);
-        if (request) {
-          await markRegistrationScanned(request.$id);
+        if (!request) {
+          setError(
+            "This registration QR code is no longer valid. Please generate a new QR code and try again.",
+          );
+          processingRef.current = false;
+          setScanned(false);
+          return;
         }
+        await markRegistrationScanned(request.$id);
         router.replace(
           `/(caregiver-tabs)/register-elderly?token=${payload.token}` as any,
         );
