@@ -318,6 +318,101 @@ export async function logMedicationAction(
       },
     });
   }
+
+  // After logging "taken", check if the entire reminder is now finished
+  if (status === "taken") {
+    await checkAndFinishReminder(reminderId);
+  }
+}
+
+/**
+ * After a log is marked "taken", check if ALL logs for that reminder are
+ * now "taken" (i.e. no more "pending" or "missing" logs).  If so, mark the
+ * reminder as is_finished = true with end_date = now.
+ */
+export async function checkAndFinishReminder(
+  reminderId: string,
+): Promise<void> {
+  if (!ELDERLY_MEDICATION_REMINDER_TABLE_ID) return;
+
+  try {
+    // Count remaining non-taken logs (pending or missing)
+    const remaining = await tablesDB.listRows<MedicationLogs>({
+      databaseId: DATABASE_ID,
+      tableId: MEDICATION_LOGS_TABLE_ID,
+      queries: [
+        Query.equal("elderly_medication_reminder", reminderId),
+        Query.notEqual("status", "taken"),
+        Query.notEqual("status", "skipped"),
+        Query.limit(1), // we only need to know if at least 1 exists
+      ],
+    });
+
+    if (remaining.total === 0) {
+      // All logs are taken/skipped – finish the reminder
+      await tablesDB.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+        rowId: reminderId,
+        data: {
+          is_finished: true,
+          end_date: new Date().toISOString(),
+        },
+      });
+      console.log(`Reminder ${reminderId} auto-finished (all logs taken).`);
+    }
+  } catch (e) {
+    console.error("checkAndFinishReminder error:", e);
+  }
+}
+
+/**
+ * At the start of each session (or at midnight), sweep all "pending" logs
+ * whose scheduled_at is before today's 00:00 HK and mark them as "missing".
+ * This ensures yesterday's un-taken meds get properly flagged.
+ */
+export async function markPreviousDaysPendingAsMissing(
+  userId: string,
+): Promise<void> {
+  const profile = await getElderlyByUserId(userId);
+  if (!profile?.$id) return;
+
+  const hkOffset = 8 * 60 * 60 * 1000;
+  const now = new Date();
+  const hkDate = new Date(now.getTime() + hkOffset);
+  const todayStr = hkDate.toISOString().slice(0, 10); // YYYY-MM-DD in HK
+
+  // 00:00 HK today in UTC
+  const todayStart = new Date(new Date(todayStr).getTime() - hkOffset);
+
+  try {
+    const pendingOld = await tablesDB.listRows<MedicationLogs>({
+      databaseId: DATABASE_ID,
+      tableId: MEDICATION_LOGS_TABLE_ID,
+      queries: [
+        Query.equal("elderly", profile.$id),
+        Query.equal("status", "pending"),
+        Query.lessThan("scheduled_at", todayStart.toISOString()),
+        Query.limit(200),
+      ],
+    });
+
+    if (pendingOld.total === 0) return;
+
+    const updates = pendingOld.rows.map((log) =>
+      tablesDB.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: MEDICATION_LOGS_TABLE_ID,
+        rowId: log.$id,
+        data: { status: "missing" },
+      }),
+    );
+
+    await Promise.all(updates);
+    console.log(`Marked ${updates.length} old pending logs as missing.`);
+  } catch (e) {
+    console.error("markPreviousDaysPendingAsMissing error:", e);
+  }
 }
 
 export async function deactivateMedicationReminder(
@@ -360,6 +455,105 @@ export async function deactivateMedicationReminder(
   } catch (error) {
     console.error("Error deactivating medication reminder:", error);
     throw error;
+  }
+}
+
+export async function fetchFinishedMedicationReminders(
+  userId: string,
+): Promise<ElderlyMedicationReminder[]> {
+  const profile = await getElderlyByUserId(userId);
+  if (!profile?.$id) return [];
+
+  if (!ELDERLY_MEDICATION_REMINDER_TABLE_ID) return [];
+
+  try {
+    const response = await tablesDB.listRows<ElderlyMedicationReminder>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+      queries: [
+        Query.equal("elderly", profile.$id),
+        Query.equal("is_finished", true),
+        Query.orderDesc("end_date"),
+        Query.limit(50),
+      ],
+    });
+
+    const rows = response.rows as unknown as ElderlyMedicationReminder[];
+
+    // Hydrate Level 2 Relationship: ElderlyMedication -> Medication (same as active)
+    const elderlyMedicationIds = new Set<string>();
+    rows.forEach((row) => {
+      if (typeof row.elderly_medication === "string") {
+        elderlyMedicationIds.add(row.elderly_medication);
+      }
+    });
+
+    if (elderlyMedicationIds.size > 0) {
+      try {
+        const emResponse = await tablesDB.listRows<any>({
+          databaseId: DATABASE_ID,
+          tableId: ELDERLY_MEDICATION_TABLE_ID,
+          queries: [Query.equal("$id", Array.from(elderlyMedicationIds))],
+        });
+        const emMap = new Map(emResponse.rows.map((r: any) => [r.$id, r]));
+        rows.forEach((row) => {
+          if (typeof row.elderly_medication === "string") {
+            if (emMap.has(row.elderly_medication)) {
+              // @ts-ignore
+              row.elderly_medication = emMap.get(row.elderly_medication);
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Failed to hydrate elderly_medication (finished)", e);
+      }
+    }
+
+    const medicationIds = new Set<string>();
+    rows.forEach((row) => {
+      if (row.elderly_medication && typeof row.elderly_medication !== "string") {
+        const meds = row.elderly_medication.medication;
+        if (Array.isArray(meds)) {
+          meds.forEach((m: any) => {
+            if (typeof m === "string") medicationIds.add(m);
+          });
+        } else if (typeof meds === "string") {
+          medicationIds.add(meds);
+        }
+      }
+    });
+
+    if (medicationIds.size > 0) {
+      const fetchedMedications: Record<string, Medication> = {};
+      try {
+        const medResponse = await tablesDB.listRows<Medication>({
+          databaseId: DATABASE_ID,
+          tableId: MEDICATION_TABLE_ID,
+          queries: [Query.equal("$id", Array.from(medicationIds))],
+        });
+        medResponse.rows.forEach((m: any) => {
+          fetchedMedications[m.$id] = m;
+        });
+        rows.forEach((row) => {
+          if (row.elderly_medication && typeof row.elderly_medication !== "string") {
+            const meds = row.elderly_medication.medication;
+            if (typeof meds === "string") {
+              if (fetchedMedications[meds]) {
+                // @ts-ignore
+                row.elderly_medication.medication = [fetchedMedications[meds]];
+              }
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Failed to hydrate medications (finished)", e);
+      }
+    }
+
+    return rows;
+  } catch (error) {
+    console.error("Error fetching finished medication reminders:", error);
+    return [];
   }
 }
 

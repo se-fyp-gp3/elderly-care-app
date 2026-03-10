@@ -50,10 +50,8 @@ export default function ElderlyTabsLayout() {
       <Tabs.Screen
         name="messages"
         options={{
+          href: null,
           title: "Messages",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="chat" size={size} color={color} />
-          ),
         }}
       />
       <Tabs.Screen

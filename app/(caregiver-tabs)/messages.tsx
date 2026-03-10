@@ -275,17 +275,27 @@ export default function CaregiverMessages() {
           </View>
 
           {preview ? (
-            <Text
-              variant="bodySmall"
-              style={[
-                styles.previewText,
-                { color: theme.colors.onSurfaceVariant },
-              ]}
-              numberOfLines={1}
-            >
-              {lastMsg?.sender_id === caregiverProfileId ? "You: " : ""}
-              {preview}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {lastMsg?.sender_id === caregiverProfileId && (
+                <MaterialCommunityIcons
+                  name={lastMsg?.is_read ? "check-all" : "check"}
+                  size={14}
+                  color={lastMsg?.is_read ? "#4CAF50" : theme.colors.onSurfaceVariant}
+                  style={{ marginRight: 3 }}
+                />
+              )}
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.previewText,
+                  { color: theme.colors.onSurfaceVariant, flex: 1 },
+                ]}
+                numberOfLines={1}
+              >
+                {lastMsg?.sender_id === caregiverProfileId ? "You: " : ""}
+                {lastMsg?.message_type === "voice" ? "\ud83c\udfa4 Voice message" : preview}
+              </Text>
+            </View>
           ) : (
             <View style={styles.contactSubInfo}>
               <View style={styles.roleChip}>
