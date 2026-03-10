@@ -4,12 +4,12 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import {
-  Avatar,
-  Button,
-  Divider,
-  Surface,
-  Text,
-  useTheme,
+    Avatar,
+    Button,
+    Divider,
+    Surface,
+    Text,
+    useTheme,
 } from "react-native-paper";
 import { getStatusColor, getTypeIcon } from "./helpers";
 

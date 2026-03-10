@@ -4,16 +4,16 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import {
-  Avatar,
-  Button,
-  Card,
-  Divider,
-  IconButton,
-  Text,
-  useTheme,
+    Avatar,
+    Button,
+    Card,
+    Divider,
+    IconButton,
+    Text,
+    useTheme,
 } from "react-native-paper";
-import { DisplayItem } from "./types";
 import { getStatusColor } from "./helpers";
+import { DisplayItem } from "./types";
 
 type MedGroupData = Extract<DisplayItem, { kind: "medGroup" }>;
 
