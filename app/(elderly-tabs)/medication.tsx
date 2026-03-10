@@ -13,7 +13,9 @@ import {
   deactivateMedicationReminder,
   fetchActiveMedicationReminders,
   fetchDailyMedicationLogs,
+  fetchFinishedMedicationReminders,
   logMedicationAction,
+  markPreviousDaysPendingAsMissing,
 } from "@/lib/medication_tracking";
 import {
   cancelAllNotifications,
@@ -79,6 +81,11 @@ type TodoItem = {
   dosage: string;
 };
 
+type TimeGroup = {
+  time: string; // HH:mm
+  items: TodoItem[];
+};
+
 export default function ElderlyMedicationScreen() {
   const { user } = useAuth();
   const theme = useTheme();
@@ -87,6 +94,7 @@ export default function ElderlyMedicationScreen() {
   const [reminders, setReminders] = React.useState<ElderlyMedicationReminder[]>(
     [],
   );
+  const [finishedReminders, setFinishedReminders] = React.useState<ElderlyMedicationReminder[]>([]);
   const [todayLogs, setTodayLogs] = React.useState<MedicationLogs[]>([]);
 
   const [caregivers, setCaregivers] = React.useState<Caregiver[]>([]);
@@ -114,17 +122,22 @@ export default function ElderlyMedicationScreen() {
     if (!user) return;
 
     try {
-      if (user) await checkAndMarkSkippedMedications(user.$id); // Check for skipped status first
+      if (user) {
+        await markPreviousDaysPendingAsMissing(user.$id); // Sweep old pending -> missing
+        await checkAndMarkSkippedMedications(user.$id); // Check for skipped status first
+      }
 
-      const [remindersData, logsData, caregiversData] = await Promise.all([
+      const [remindersData, logsData, caregiversData, finishedData] = await Promise.all([
         fetchActiveMedicationReminders(user.$id),
         fetchDailyMedicationLogs(user.$id, new Date()),
         fetchCaregiversForElderly(user.$id),
+        fetchFinishedMedicationReminders(user.$id),
       ]);
 
       setReminders(remindersData);
       setTodayLogs(logsData);
       setCaregivers(caregiversData);
+      setFinishedReminders(finishedData);
     } catch (err) {
       console.error("Error fetching medication data:", err);
     }
@@ -253,6 +266,24 @@ export default function ElderlyMedicationScreen() {
     // Sort by time
     return list.sort((a, b) => a.time.localeCompare(b.time));
   }, [reminders, todayLogs]);
+
+  // Group todoList items by time slot for display
+  const groupedTodoList = React.useMemo(() => {
+    const groupMap = new Map<string, TodoItem[]>();
+    todoList.forEach((item) => {
+      const existing = groupMap.get(item.time);
+      if (existing) {
+        existing.push(item);
+      } else {
+        groupMap.set(item.time, [item]);
+      }
+    });
+    const groups: TimeGroup[] = [];
+    groupMap.forEach((items, time) => {
+      groups.push({ time, items });
+    });
+    return groups.sort((a, b) => a.time.localeCompare(b.time));
+  }, [todoList]);
 
   // Notification Logic: Schedule reminders and alert on missing
   React.useEffect(() => {
@@ -661,110 +692,124 @@ export default function ElderlyMedicationScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* To Take Today */}
+        {/* To Take Today - Grouped by Time */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
           To Take Today
         </Text>
-        {todoList.length > 0 ? (
-          todoList.map((item, index) => {
-            const isTaken = item.status === "taken";
-            const isMissing = item.status === "missing";
+        {groupedTodoList.length > 0 ? (
+          groupedTodoList.map((group) => {
+            const allTaken = group.items.every((i) => i.status === "taken");
+            const hasMissing = group.items.some((i) => i.status === "missing");
 
-            const accentColor = isTaken
+            const groupAccent = allTaken
               ? "#4CAF50"
-              : isMissing
+              : hasMissing
                 ? "#E53935"
                 : "#FF8F00";
-            const cardBg = isMissing ? "#FFF5F5" : "#FFFFFF";
+            const groupBg = hasMissing ? "#FFF5F5" : "#FFFFFF";
 
             return (
               <View
-                key={`${item.reminder.$id}-${item.time}-${index}`}
+                key={`group-${group.time}`}
                 style={[
                   styles.medCard,
                   {
-                    backgroundColor: cardBg,
-                    borderLeftColor: accentColor,
+                    backgroundColor: groupBg,
+                    borderLeftColor: groupAccent,
                   },
                 ]}
               >
-                {/* Top: Icon + Drug info */}
-                <View style={styles.medCardTop}>
-                  <View
-                    style={[
-                      styles.medCardIcon,
-                      { backgroundColor: isTaken ? "#E8F5E9" : "#EDE7F6" },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={isTaken ? "check-circle" : "pill"}
-                      size={28}
-                      color={isTaken ? "#4CAF50" : "#5E35B1"}
-                    />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 14 }}>
-                    <Text variant="titleMedium" style={{ fontWeight: "700" }}>
-                      {item.medicationName}
-                    </Text>
-                    <Text
-                      variant="bodyMedium"
-                      style={{ color: "#666", marginTop: 2 }}
-                    >
-                      {item.dosage}
-                    </Text>
-                  </View>
+                {/* Group Header: Time */}
+                <View style={styles.groupHeader}>
                   <View style={styles.medCardTime}>
                     <MaterialCommunityIcons
                       name="clock-outline"
-                      size={16}
-                      color="#888"
+                      size={18}
+                      color="#555"
                     />
                     <Text
-                      variant="bodyMedium"
-                      style={{ color: "#555", marginLeft: 4, fontWeight: "600" }}
+                      variant="titleMedium"
+                      style={{ color: "#333", marginLeft: 6, fontWeight: "700" }}
                     >
-                      {item.time}
+                      {group.time}
                     </Text>
                   </View>
+                  <Text variant="bodySmall" style={{ color: "#999" }}>
+                    {group.items.length} medication{group.items.length > 1 ? "s" : ""}
+                  </Text>
                 </View>
 
-                {/* Bottom: Full-width action area */}
-                {isTaken ? (
-                  <TouchableOpacity
-                    onPress={() => handleTakeMedication(item)}
-                    style={styles.medCardDone}
-                    activeOpacity={0.7}
-                  >
-                    <MaterialCommunityIcons
-                      name="check-circle"
-                      size={20}
-                      color="#2E7D32"
-                    />
-                    <Text style={styles.medCardDoneText}>
-                      Taken — tap to undo
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    onPress={() => handleTakeMedication(item)}
-                    style={[
-                      styles.medCardAction,
-                      {
-                        backgroundColor: isMissing ? "#E53935" : "#4CAF50",
-                      },
-                    ]}
-                    activeOpacity={0.8}
-                  >
-                    <MaterialCommunityIcons
-                      name="check-bold"
-                      size={22}
-                      color="#FFF"
-                    />
-                    <Text style={styles.medCardActionText}>
-                      {isMissing ? "Take Now (Missed)" : "Mark as Taken"}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                {/* Individual medications within group */}
+                {group.items.map((item, index) => {
+                  const isTaken = item.status === "taken";
+                  const isMissing = item.status === "missing";
+
+                  return (
+                    <View key={`${item.reminder.$id}-${item.time}-${index}`}>
+                      {index > 0 && <Divider style={{ marginVertical: 8 }} />}
+                      <View style={styles.groupItemRow}>
+                        <View
+                          style={[
+                            styles.groupItemIcon,
+                            { backgroundColor: isTaken ? "#E8F5E9" : isMissing ? "#FFEBEE" : "#EDE7F6" },
+                          ]}
+                        >
+                          <MaterialCommunityIcons
+                            name={isTaken ? "check-circle" : isMissing ? "close-circle" : "pill"}
+                            size={22}
+                            color={isTaken ? "#4CAF50" : isMissing ? "#E53935" : "#5E35B1"}
+                          />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text variant="titleSmall" style={{ fontWeight: "700" }}>
+                            {item.medicationName}
+                          </Text>
+                          <Text
+                            variant="bodySmall"
+                            style={{ color: "#666", marginTop: 1 }}
+                          >
+                            {item.dosage}
+                          </Text>
+                        </View>
+                        {/* Per-item action button */}
+                        {isTaken ? (
+                          <TouchableOpacity
+                            onPress={() => handleTakeMedication(item)}
+                            style={styles.groupItemBtnDone}
+                            activeOpacity={0.7}
+                          >
+                            <MaterialCommunityIcons
+                              name="check-circle"
+                              size={18}
+                              color="#2E7D32"
+                            />
+                            <Text style={{ color: "#2E7D32", fontSize: 12, fontWeight: "600", marginLeft: 4 }}>
+                              Taken
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => handleTakeMedication(item)}
+                            style={[
+                              styles.groupItemBtn,
+                              { backgroundColor: isMissing ? "#E53935" : "#4CAF50" },
+                            ]}
+                            activeOpacity={0.8}
+                          >
+                            <MaterialCommunityIcons
+                              name="check-bold"
+                              size={16}
+                              color="#FFF"
+                            />
+                            <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "bold", marginLeft: 4 }}>
+                              {isMissing ? "Take" : "Take"}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
             );
           })
@@ -904,6 +949,91 @@ export default function ElderlyMedicationScreen() {
                 style={{ marginTop: 8, color: "#666" }}
               >
                 No active prescriptions.
+              </Text>
+            </View>
+          )}
+        </Card>
+
+        {/* Finished Medications */}
+        <Text variant="titleLarge" style={styles.sectionTitle}>
+          Finished Medications
+        </Text>
+        <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          {finishedReminders.length > 0 ? (
+            finishedReminders.map((r) => {
+              // @ts-ignore
+              const meds = Array.isArray(r.elderly_medication?.medication)
+                ? r.elderly_medication.medication
+                : [];
+              // @ts-ignore
+              const name = meds[0]?.name || "Medication";
+              // @ts-ignore
+              const medUnit = meds[0]?.unit || "dose";
+              const dosageStr = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+
+              const endDateStr = r.end_date
+                ? new Date(r.end_date).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "—";
+
+              const startDateStr = r.start_date
+                ? new Date(r.start_date).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "—";
+
+              return (
+                <View key={r.$id} style={styles.finishedItem}>
+                  <View style={styles.finishedIconContainer}>
+                    <MaterialCommunityIcons
+                      name="check-decagram"
+                      size={26}
+                      color="#78909C"
+                    />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 14 }}>
+                    <Text
+                      variant="titleMedium"
+                      style={{ fontWeight: "700", color: "#546E7A" }}
+                    >
+                      {name}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{ color: "#90A4AE", marginTop: 2 }}
+                    >
+                      {dosageStr} · {r.reminder_times.length}x daily
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{ color: "#90A4AE", marginTop: 2 }}
+                    >
+                      {startDateStr} → {endDateStr}
+                    </Text>
+                  </View>
+                  <View style={styles.finishedBadge}>
+                    <Text style={styles.finishedBadgeText}>Completed</Text>
+                  </View>
+                </View>
+              );
+            })
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons
+                name="history"
+                size={48}
+                color="#BDBDBD"
+              />
+              <Text
+                variant="bodyLarge"
+                style={{ marginTop: 8, color: "#666" }}
+              >
+                No finished medications yet.
               </Text>
             </View>
           )}
@@ -1345,5 +1475,64 @@ const styles = StyleSheet.create({
   deleteButton: {
     alignItems: "center",
     justifyContent: "center",
+  },
+  groupHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  groupItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  groupItemIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  groupItemBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  groupItemBtnDone: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: "#E8F5E9",
+  },
+  finishedItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#E0E0E0",
+  },
+  finishedIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#ECEFF1",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  finishedBadge: {
+    backgroundColor: "#E0F2F1",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  finishedBadgeText: {
+    color: "#00695C",
+    fontSize: 11,
+    fontWeight: "700",
   },
 });

@@ -1,4 +1,9 @@
 import {
+  ID,
+  storage,
+  VOICE_MESSAGES_BUCKET_ID,
+} from "@/lib/appwrite";
+import {
   buildConversationId,
   fetchConversationMessages,
   markConversationAsRead,
@@ -7,14 +12,25 @@ import {
 } from "@/lib/messaging";
 import { DirectMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import type { AudioPlayer } from "expo-audio";
+import {
+  createAudioPlayer,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+} from "expo-audio";
+import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import {
@@ -42,6 +58,115 @@ interface ConversationScreenProps {
   contactRole: "caregiver" | "elderly";
 }
 
+/** Inline voice message player */
+function VoiceMessageBubble({
+  body,
+  isMe,
+  theme,
+}: {
+  body: string;
+  isMe: boolean;
+  theme: any;
+}) {
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const playerRef = useRef<AudioPlayer | null>(null);
+
+  // Parse "duration|fileId"
+  const pipeIdx = body.indexOf("|");
+  const duration = pipeIdx > 0 ? parseInt(body.substring(0, pipeIdx), 10) || 0 : 0;
+  const fileId = pipeIdx > 0 ? body.substring(pipeIdx + 1) : body;
+
+  const fmtDur = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const handlePlayPause = async () => {
+    if (playing && playerRef.current) {
+      playerRef.current.pause();
+      setPlaying(false);
+      return;
+    }
+
+    if (playerRef.current) {
+      playerRef.current.play();
+      setPlaying(true);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+      });
+      // Download voice file from Appwrite Storage
+      const downloadUrl = storage.getFileDownloadURL(
+        VOICE_MESSAGES_BUCKET_ID,
+        fileId,
+      );
+      const player = createAudioPlayer(downloadUrl.toString());
+      playerRef.current = player;
+      player.addListener("playbackStatusUpdate", (status) => {
+        if (status.didJustFinish) {
+          setPlaying(false);
+        }
+      });
+      player.play();
+      setPlaying(true);
+    } catch (err) {
+      console.error("Playback error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      playerRef.current?.remove();
+    };
+  }, []);
+
+  const iconColor = isMe ? theme.colors.onPrimary : theme.colors.onSurface;
+
+  return (
+    <TouchableOpacity
+      onPress={handlePlayPause}
+      activeOpacity={0.7}
+      style={styles.voiceBubbleRow}
+    >
+      {loading ? (
+        <ActivityIndicator size={20} color={iconColor} />
+      ) : (
+        <MaterialCommunityIcons
+          name={playing ? "pause-circle" : "play-circle"}
+          size={32}
+          color={iconColor}
+        />
+      )}
+      <View style={styles.voiceWaveform}>
+        {Array.from({ length: 12 }).map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.voiceBar,
+              {
+                height: 6 + Math.random() * 14,
+                backgroundColor: iconColor,
+                opacity: playing ? 0.9 : 0.5,
+              },
+            ]}
+          />
+        ))}
+      </View>
+      <Text style={[styles.voiceDuration, { color: iconColor, opacity: 0.8 }]}>
+        {fmtDur(duration)}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function ConversationScreen({
   myProfileId,
   myName,
@@ -57,6 +182,12 @@ export default function ConversationScreen({
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  // ── Voice recording state ──
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const conversationId = buildConversationId(myProfileId, contactId);
 
@@ -133,6 +264,101 @@ export default function ConversationScreen({
     } finally {
       setSending(false);
     }
+  };
+
+  // ── Voice recording helpers ──
+  const startRecording = async () => {
+    try {
+      const { status } = await requestRecordingPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission needed", "Microphone access is required to send voice messages.");
+        return;
+      }
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimer.current = setInterval(() => {
+        setRecordingDuration((d) => d + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Failed to start recording:", err);
+      Alert.alert("Error", "Could not start recording.");
+    }
+  };
+
+  const cancelRecording = async () => {
+    if (recordingTimer.current) clearInterval(recordingTimer.current);
+    setIsRecording(false);
+    setRecordingDuration(0);
+    if (recorder.isRecording) {
+      try {
+        await recorder.stop();
+      } catch { /* ignore */ }
+    }
+  };
+
+  const sendVoiceMessage = async () => {
+    if (!recorder.isRecording) return;
+    if (recordingTimer.current) clearInterval(recordingTimer.current);
+    setIsRecording(false);
+    setSending(true);
+
+    try {
+      await recorder.stop();
+      const uri = recorder.uri;
+      if (!uri) throw new Error("No recording URI");
+
+      // Get file info for upload
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      if (!fileInfo.exists) throw new Error("Recording file not found");
+
+      // Upload voice file to Appwrite Storage
+      const uploadedFile = await storage.createFile({
+        bucketId: VOICE_MESSAGES_BUCKET_ID,
+        fileId: ID.unique(),
+        file: {
+          name: `voice_${Date.now()}.m4a`,
+          type: "audio/m4a",
+          size: fileInfo.size ?? 0,
+          uri,
+        },
+      });
+
+      // Build a payload: duration|fileId
+      const payload = `${recordingDuration}|${uploadedFile.$id}`;
+
+      const newMsg = await sendDirectMessage({
+        conversationId,
+        senderId: myProfileId,
+        senderName: myName,
+        senderRole: myRole,
+        receiverId: contactId,
+        body: payload,
+        messageType: "voice",
+      });
+
+      setMessages((prev) => {
+        if (prev.some((m) => m.$id === newMsg.$id)) return prev;
+        return [...prev, newMsg];
+      });
+      setRecordingDuration(0);
+    } catch (error) {
+      console.error("Error sending voice message:", error);
+      Alert.alert("Error", "Failed to send voice message.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
   const formatMessageTime = (dateString: string) => {
@@ -253,16 +479,20 @@ export default function ConversationScreen({
                   ],
             ]}
           >
-            <Text
-              style={[
-                styles.messageText,
-                {
-                  color: isMe ? theme.colors.onPrimary : theme.colors.onSurface,
-                },
-              ]}
-            >
-              {item.body}
-            </Text>
+            {item.message_type === "voice" ? (
+              <VoiceMessageBubble body={item.body} isMe={isMe} theme={theme} />
+            ) : (
+              <Text
+                style={[
+                  styles.messageText,
+                  {
+                    color: isMe ? theme.colors.onPrimary : theme.colors.onSurface,
+                  },
+                ]}
+              >
+                {item.body}
+              </Text>
+            )}
             <View style={styles.messageFooter}>
               <Text
                 style={[
@@ -337,7 +567,7 @@ export default function ConversationScreen({
           <IconButton
             icon="arrow-left"
             size={24}
-            onPress={() => router.push("/messages")}
+            onPress={() => router.push("/emergency")}
             style={styles.backButton}
           />
           <Avatar.Text
@@ -408,45 +638,71 @@ export default function ConversationScreen({
         )}
 
         {/* Input Bar */}
-        <View
-          style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}
-        >
-          <TextInput
-            mode="outlined"
-            placeholder="Type a message..."
-            value={inputText}
-            onChangeText={setInputText}
-            style={styles.textInput}
-            outlineStyle={styles.textInputOutline}
-            contentStyle={styles.textInputContent}
-            multiline
-            maxLength={2000}
-            right={
-              inputText.trim() ? (
-                <TextInput.Icon
-                  icon="send"
-                  color={theme.colors.primary}
-                  onPress={handleSend}
-                  disabled={sending}
-                />
-              ) : undefined
-            }
-            onSubmitEditing={handleSend}
-            blurOnSubmit={false}
-          />
-          {!inputText.trim() && (
-            <IconButton
-              icon="send"
-              mode="contained"
-              containerColor={theme.colors.primary}
-              iconColor={theme.colors.onPrimary}
-              size={22}
-              onPress={handleSend}
-              disabled={!inputText.trim() || sending}
-              style={styles.sendButton}
+        {isRecording ? (
+          <View style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}>
+            <View style={styles.recordingBar}>
+              <TouchableOpacity onPress={cancelRecording} style={styles.cancelRecordBtn}>
+                <MaterialCommunityIcons name="close" size={22} color={theme.colors.error} />
+              </TouchableOpacity>
+              <View style={styles.recordingIndicator}>
+                <View style={[styles.recordingDot, { backgroundColor: "#D32F2F" }]} />
+                <Text variant="bodyMedium" style={{ color: theme.colors.onSurface, fontWeight: "600" }}>
+                  {formatDuration(recordingDuration)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={sendVoiceMessage}
+                style={[styles.sendVoiceBtn, { backgroundColor: theme.colors.primary }]}
+              >
+                {sending ? (
+                  <ActivityIndicator size={20} color={theme.colors.onPrimary} />
+                ) : (
+                  <MaterialCommunityIcons name="send" size={20} color={theme.colors.onPrimary} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View
+            style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}
+          >
+            <TextInput
+              mode="outlined"
+              placeholder="Type a message..."
+              value={inputText}
+              onChangeText={setInputText}
+              style={styles.textInput}
+              outlineStyle={styles.textInputOutline}
+              contentStyle={styles.textInputContent}
+              multiline
+              maxLength={2000}
+              right={
+                inputText.trim() ? (
+                  <TextInput.Icon
+                    icon="send"
+                    color={theme.colors.primary}
+                    onPress={handleSend}
+                    disabled={sending}
+                  />
+                ) : undefined
+              }
+              onSubmitEditing={handleSend}
+              blurOnSubmit={false}
             />
-          )}
-        </View>
+            {!inputText.trim() && (
+              <IconButton
+                icon="microphone"
+                mode="contained"
+                containerColor={theme.colors.primary}
+                iconColor={theme.colors.onPrimary}
+                size={22}
+                onPress={startRecording}
+                disabled={sending}
+                style={styles.sendButton}
+              />
+            )}
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -594,5 +850,64 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     marginBottom: 4,
+  },
+  // Voice message bubble styles
+  voiceBubbleRow: {
+    flexDirection: "row" as const,
+    alignItems: "center",
+    gap: 10,
+    minWidth: 180,
+  },
+  voicePlayBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  voiceWaveform: {
+    flexDirection: "row" as const,
+    alignItems: "center",
+    flex: 1,
+    gap: 2,
+    height: 28,
+  },
+  voiceBar: {
+    width: 3,
+    borderRadius: 2,
+  },
+  voiceDuration: {
+    fontSize: 12,
+    marginLeft: 4,
+    minWidth: 32,
+    textAlign: "right" as const,
+  },
+  // Recording UI styles
+  recordingBar: {
+    flex: 1,
+    flexDirection: "row" as const,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+  },
+  cancelRecordBtn: {
+    padding: 8,
+  },
+  recordingIndicator: {
+    flexDirection: "row" as const,
+    alignItems: "center",
+    gap: 8,
+  },
+  recordingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  sendVoiceBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
   },
 });

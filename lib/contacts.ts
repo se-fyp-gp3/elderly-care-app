@@ -1,9 +1,10 @@
-import { Caregiver, CaregiverElderly, Elderly } from "@/types/appwrite";
-import { Query } from "react-native-appwrite";
+import { Caregiver, CaregiverElderly, Elderly, ElderlyConnection } from "@/types/appwrite";
+import { ID, Query } from "react-native-appwrite";
 import {
     CAREGIVER_ELDERLY_TABLE_ID,
     CAREGIVER_TABLE_ID,
     DATABASE_ID,
+    ELDERLY_CONNECTIONS_TABLE_ID,
     ELDERLY_TABLE_ID,
     tablesDB,
 } from "./appwrite";
@@ -132,6 +133,83 @@ export async function getContactsForElderly(
 }
 
 /**
+ * Search for a caregiver by phone number.
+ * Returns the caregiver if found, null otherwise.
+ */
+export async function searchCaregiverByPhone(
+  phone: string,
+): Promise<Caregiver | null> {
+  try {
+    const normalised = phone.replace(/\s+/g, "").replace(/^(\+852)/, "");
+    const response = await tablesDB.listRows<Caregiver>({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_TABLE_ID,
+      queries: [Query.limit(100)],
+    });
+    const match = response.rows.find((c) => {
+      const p = (c.phone ?? "").replace(/\s+/g, "").replace(/^(\+852)/, "");
+      return p === normalised;
+    });
+    return match ?? null;
+  } catch (error) {
+    console.error("Error searching caregiver by phone:", error);
+    return null;
+  }
+}
+
+/**
+ * Check if a caregiver–elderly relationship already exists.
+ */
+export async function relationshipExists(
+  caregiverId: string,
+  elderlyId: string,
+): Promise<boolean> {
+  try {
+    const response = await tablesDB.listRows<CaregiverElderly>({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_ELDERLY_TABLE_ID,
+      queries: [
+        Query.equal("caregiver", caregiverId),
+        Query.equal("elderly", elderlyId),
+        Query.limit(1),
+      ],
+    });
+    return response.total > 0;
+  } catch (error) {
+    console.error("Error checking relationship:", error);
+    return false;
+  }
+}
+
+/**
+ * Create a new caregiver–elderly relationship.
+ * Returns true on success.
+ */
+export async function addCaregiverContact(
+  caregiverId: string,
+  elderlyId: string,
+): Promise<boolean> {
+  try {
+    const exists = await relationshipExists(caregiverId, elderlyId);
+    if (exists) return false;
+
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_ELDERLY_TABLE_ID,
+      rowId: ID.unique(),
+      data: {
+        caregiver: caregiverId,
+        elderly: elderlyId,
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error("Error adding caregiver contact:", error);
+    return false;
+  }
+}
+
+/**
  * Format a timestamp to a relative time string
  */
 export function formatRelativeTime(dateString?: string): string {
@@ -155,5 +233,230 @@ export function formatRelativeTime(dateString?: string): string {
     });
   } catch {
     return "";
+  }
+}
+
+// ────────────────────────────────────────────────────
+// Elderly-to-Elderly connection helpers
+// ────────────────────────────────────────────────────
+
+/**
+ * Search for an elderly user by phone number.
+ * Returns the elderly if found, null otherwise.
+ */
+export async function searchElderlyByPhone(
+  phone: string,
+): Promise<Elderly | null> {
+  try {
+    const normalised = phone.replace(/\s+/g, "").replace(/^(\+852)/, "");
+    const response = await tablesDB.listRows<Elderly>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_TABLE_ID,
+      queries: [Query.limit(100)],
+    });
+    const match = response.rows.find((e) => {
+      const p = (e.phone ?? "").replace(/\s+/g, "").replace(/^(\+852)/, "");
+      return p === normalised;
+    });
+    return match ?? null;
+  } catch (error) {
+    console.error("Error searching elderly by phone:", error);
+    return null;
+  }
+}
+
+/**
+ * Check if an elderly-to-elderly connection already exists (in either direction).
+ */
+export async function elderlyConnectionExists(
+  elderlyId1: string,
+  elderlyId2: string,
+): Promise<boolean> {
+  try {
+    // Check both directions: (id1, id2) and (id2, id1)
+    const [fwd, rev] = await Promise.all([
+      tablesDB.listRows<ElderlyConnection>({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+        queries: [
+          Query.equal("elderly_id_1", elderlyId1),
+          Query.equal("elderly_id_2", elderlyId2),
+          Query.limit(1),
+        ],
+      }),
+      tablesDB.listRows<ElderlyConnection>({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+        queries: [
+          Query.equal("elderly_id_1", elderlyId2),
+          Query.equal("elderly_id_2", elderlyId1),
+          Query.limit(1),
+        ],
+      }),
+    ]);
+    return fwd.total > 0 || rev.total > 0;
+  } catch (error) {
+    console.error("Error checking elderly connection:", error);
+    return false;
+  }
+}
+
+/**
+ * Create a new elderly-to-elderly connection request (pending approval).
+ * Returns true on success, false if already exists.
+ */
+export async function addElderlyConnection(
+  elderlyId1: string,
+  elderlyId2: string,
+): Promise<boolean> {
+  try {
+    const exists = await elderlyConnectionExists(elderlyId1, elderlyId2);
+    if (exists) return false;
+
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+      rowId: ID.unique(),
+      data: {
+        elderly_id_1: elderlyId1,
+        elderly_id_2: elderlyId2,
+        status: "pending",
+        created_at: new Date().toISOString(),
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error("Error adding elderly connection:", error);
+    return false;
+  }
+}
+
+/**
+ * Accept a pending connection request. Sets status to "active".
+ */
+export async function acceptElderlyConnection(
+  connectionDocId: string,
+): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+    rowId: connectionDocId,
+    data: { status: "active" },
+  });
+}
+
+/**
+ * Reject / decline a pending connection request. Deletes the row.
+ */
+export async function rejectElderlyConnection(
+  connectionDocId: string,
+): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+    rowId: connectionDocId,
+    data: { status: "rejected" },
+  });
+}
+
+/**
+ * Get incoming pending connection requests for an elderly user.
+ * These are rows where *this* user is elderly_id_2 and status = "pending".
+ */
+export async function getPendingConnectionRequests(
+  elderlyId: string,
+): Promise<{ connectionId: string; from: Elderly }[]> {
+  try {
+    const response = await tablesDB.listRows<ElderlyConnection>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+      queries: [
+        Query.equal("elderly_id_2", elderlyId),
+        Query.equal("status", "pending"),
+        Query.limit(50),
+      ],
+    });
+
+    if (response.rows.length === 0) return [];
+
+    const senderIds = response.rows.map((r) => r.elderly_id_1);
+    const unique = [...new Set(senderIds)];
+    const details = await tablesDB.listRows<Elderly>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_TABLE_ID,
+      queries: [Query.equal("$id", unique), Query.limit(100)],
+    });
+
+    const elderlyMap = new Map(details.rows.map((e) => [e.$id, e]));
+
+    return response.rows
+      .filter((r) => elderlyMap.has(r.elderly_id_1))
+      .map((r) => ({
+        connectionId: r.$id,
+        from: elderlyMap.get(r.elderly_id_1)!,
+      }));
+  } catch (error) {
+    console.error("Error fetching pending requests:", error);
+    return [];
+  }
+}
+
+/**
+ * Get all elderly contacts for an elderly user (from elderly_connections table).
+ * Looks up connections in both directions.
+ */
+export async function getElderlyContacts(
+  elderlyId: string,
+): Promise<Contact[]> {
+  try {
+    // Fetch connections where this elderly is on either side
+    const [asId1, asId2] = await Promise.all([
+      tablesDB.listRows<ElderlyConnection>({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+        queries: [
+          Query.equal("elderly_id_1", elderlyId),
+          Query.equal("status", "active"),
+          Query.limit(100),
+        ],
+      }),
+      tablesDB.listRows<ElderlyConnection>({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+        queries: [
+          Query.equal("elderly_id_2", elderlyId),
+          Query.equal("status", "active"),
+          Query.limit(100),
+        ],
+      }),
+    ]);
+
+    // Collect all connected elderly IDs
+    const connectedIds = new Set<string>();
+    for (const row of asId1.rows) connectedIds.add(row.elderly_id_2);
+    for (const row of asId2.rows) connectedIds.add(row.elderly_id_1);
+
+    if (connectedIds.size === 0) return [];
+
+    // Fetch the elderly profiles
+    const ids = [...connectedIds];
+    const detailsResponse = await tablesDB.listRows<Elderly>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_TABLE_ID,
+      queries: [Query.equal("$id", ids), Query.limit(100)],
+    });
+
+    return detailsResponse.rows.map((elderly) => ({
+      id: elderly.$id,
+      name: elderly.name || "Unknown",
+      phone: elderly.phone,
+      role: "elderly" as const,
+      avatarLabel: (elderly.name || "??").substring(0, 2).toUpperCase(),
+      status: elderly.status,
+      lastActive: elderly.$updatedAt,
+    }));
+  } catch (error) {
+    console.error("Error fetching elderly contacts:", error);
+    return [];
   }
 }
