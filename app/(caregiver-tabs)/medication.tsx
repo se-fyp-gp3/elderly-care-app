@@ -640,106 +640,78 @@ export default function MedicationManagement() {
                       No medications scheduled.
                     </Text>
                   ) : (
-                    Object.values(
+                    /* Group medications by TIME instead of by drug name */
+                    Object.entries(
                       group.medications.reduce(
                         (acc, med) => {
-                          const key = `${med.name}_${med.dosage}`;
-                          if (!acc[key]) acc[key] = { common: med, slots: [] };
-                          acc[key].slots.push(med);
+                          const key = med.time;
+                          if (!acc[key]) acc[key] = [];
+                          acc[key].push(med);
                           return acc;
                         },
-                        {} as Record<
-                          string,
-                          { common: MedicationItem; slots: MedicationItem[] }
-                        >,
+                        {} as Record<string, MedicationItem[]>,
                       ),
                     )
-                    .sort((a, b) => {
-                      // Sort by nearest actionable time: pending/missed first, then completed
-                      const getNextTime = (group: { slots: MedicationItem[] }) => {
-                        const sorted = [...group.slots].sort((x, y) => x.time.localeCompare(y.time));
-                        const pending = sorted.find(s => s.status === 'pending');
-                        if (pending) return pending.time;
-                        const missed = sorted.find(s => s.status === 'missed');
-                        if (missed) return missed.time;
-                        return null;
-                      };
-                      const aTime = getNextTime(a);
-                      const bTime = getNextTime(b);
-                      // Items with actionable slots come first
-                      if (aTime && !bTime) return -1;
-                      if (!aTime && bTime) return 1;
-                      if (aTime && bTime) return aTime.localeCompare(bTime);
-                      // Both completed: sort by earliest time
-                      const aFirst = [...a.slots].sort((x, y) => x.time.localeCompare(y.time))[0]?.time || '';
-                      const bFirst = [...b.slots].sort((x, y) => x.time.localeCompare(y.time))[0]?.time || '';
-                      return aFirst.localeCompare(bFirst);
-                    })
-                    .map((groupItem) => {
-                      const sortedSlots = [...groupItem.slots].sort((a, b) => a.time.localeCompare(b.time));
-                      const totalSlots = sortedSlots.length;
-                      const slotsCompleted = sortedSlots.filter(s => s.status === 'completed').length;
-                      const slotsMissed = sortedSlots.filter(s => s.status === 'missed').length;
-                      const nextPendingSlot = sortedSlots.find(s => s.status === 'pending');
-                      const allSlotsDone = slotsCompleted === totalSlots;
-                      const medCardKey = `${group.elderlyId}_${groupItem.common.name}_${groupItem.common.dosage}`;
-                      const isExpanded = isMedCardExpanded(medCardKey, totalSlots);
+                    .sort(([timeA], [timeB]) => timeA.localeCompare(timeB))
+                    .map(([timeSlot, meds]) => {
+                      const totalMeds = meds.length;
+                      const completedMeds = meds.filter(m => m.status === 'completed').length;
+                      const missedMeds = meds.filter(m => m.status === 'missed').length;
+                      const allDone = completedMeds === totalMeds;
+                      const progress = totalMeds > 0 ? completedMeds / totalMeds : 0;
+                      const timeCardKey = `${group.elderlyId}_time_${timeSlot}`;
+                      const isExpanded = isMedCardExpanded(timeCardKey, totalMeds);
 
                       let summaryText = '';
                       let summaryIcon = 'information-outline';
-                      if (allSlotsDone) {
-                        if (totalSlots === 1) {
-                          summaryText = `${sortedSlots[0].time} · Taken`;
-                        } else {
-                          summaryText = 'All taken';
-                        }
+                      if (allDone) {
+                        summaryText = 'All taken';
                         summaryIcon = 'check-circle';
-                      } else if (nextPendingSlot) {
-                        if (totalSlots === 1) {
-                          summaryText = `${nextPendingSlot.time} · Pending`;
-                        } else {
-                          summaryText = `Next: ${nextPendingSlot.time}`;
-                          if (slotsMissed > 0) {
-                            summaryText += ` · ${slotsMissed} missed`;
-                          }
-                        }
-                        summaryIcon = 'clock-outline';
-                      } else if (slotsMissed > 0) {
-                        if (totalSlots === 1) {
-                          summaryText = `${sortedSlots[0].time} · Missed`;
-                        } else {
-                          summaryText = `${slotsMissed} missed`;
-                        }
+                      } else if (missedMeds > 0 && completedMeds + missedMeds === totalMeds) {
+                        summaryText = `${missedMeds} missed`;
                         summaryIcon = 'alert-circle-outline';
+                      } else {
+                        const pendingCount = totalMeds - completedMeds - missedMeds;
+                        summaryText = `${pendingCount} pending`;
+                        if (missedMeds > 0) summaryText += ` · ${missedMeds} missed`;
+                        summaryIcon = 'clock-outline';
                       }
 
                       return (
                       <Card
-                        key={medCardKey}
+                        key={timeCardKey}
                         style={{
                           marginBottom: 16,
                           backgroundColor: theme.colors.elevation.level1,
                         }}
                       >
                         <Card.Title
-                          title={groupItem.common.name}
-                          titleStyle={{ fontWeight: "bold" }}
-                          subtitle={`${groupItem.common.dosage} • ${groupItem.common.frequency}`}
+                          title={timeSlot}
+                          titleStyle={{ fontWeight: "bold", fontSize: 20 }}
+                          subtitle={`${totalMeds} medication${totalMeds > 1 ? 's' : ''}`}
                           left={(props) => (
                             <Avatar.Icon
                               {...props}
-                              icon="pill"
+                              icon="clock-outline"
                               size={40}
                               style={{
-                                backgroundColor: theme.colors.primaryContainer,
+                                backgroundColor: allDone
+                                  ? '#E8F5E9'
+                                  : missedMeds > 0
+                                    ? theme.colors.errorContainer
+                                    : theme.colors.primaryContainer,
                               }}
-                              color={theme.colors.onPrimaryContainer}
+                              color={allDone
+                                ? '#4CAF50'
+                                : missedMeds > 0
+                                  ? theme.colors.error
+                                  : theme.colors.onPrimaryContainer}
                             />
                           )}
                           right={() => (
                             <IconButton
                               icon={isExpanded ? "chevron-up" : "chevron-down"}
-                              onPress={() => toggleMedCard(medCardKey, totalSlots <= 1)}
+                              onPress={() => toggleMedCard(timeCardKey, totalMeds <= 1)}
                               size={24}
                             />
                           )}
@@ -748,7 +720,7 @@ export default function MedicationManagement() {
                           {/* Summary bar */}
                           {!isExpanded && (
                             <TouchableOpacity
-                              onPress={() => toggleMedCard(medCardKey, totalSlots <= 1)}
+                              onPress={() => toggleMedCard(timeCardKey, totalMeds <= 1)}
                               activeOpacity={0.7}
                             >
                               <View
@@ -757,13 +729,12 @@ export default function MedicationManagement() {
                                   alignItems: 'center',
                                   paddingVertical: 8,
                                   paddingHorizontal: 12,
-                                  backgroundColor: allSlotsDone
+                                  backgroundColor: allDone
                                     ? theme.colors.primaryContainer
-                                    : slotsMissed > 0 && !nextPendingSlot
+                                    : missedMeds > 0
                                       ? theme.colors.errorContainer
                                       : theme.colors.surfaceVariant,
                                   borderRadius: 8,
-                                  marginBottom: isExpanded ? 12 : 0,
                                 }}
                               >
                                 {/* Progress bar */}
@@ -779,9 +750,9 @@ export default function MedicationManagement() {
                                 >
                                   <View
                                     style={{
-                                      width: `${totalSlots > 0 ? (slotsCompleted / totalSlots) * 100 : 0}%`,
+                                      width: `${progress * 100}%`,
                                       height: '100%',
-                                      backgroundColor: allSlotsDone ? '#4CAF50' : theme.colors.primary,
+                                      backgroundColor: allDone ? '#4CAF50' : theme.colors.primary,
                                       borderRadius: 3,
                                     }}
                                   />
@@ -791,22 +762,22 @@ export default function MedicationManagement() {
                                   style={{
                                     fontWeight: 'bold',
                                     marginRight: 12,
-                                    color: allSlotsDone
+                                    color: allDone
                                       ? theme.colors.onPrimaryContainer
-                                      : slotsMissed > 0 && !nextPendingSlot
+                                      : missedMeds > 0
                                         ? theme.colors.onErrorContainer
                                         : theme.colors.onSurfaceVariant,
                                   }}
                                 >
-                                  {slotsCompleted}/{totalSlots}
+                                  {completedMeds}/{totalMeds}
                                 </Text>
                                 <MaterialCommunityIcons
                                   name={summaryIcon as any}
                                   size={16}
                                   color={
-                                    allSlotsDone
+                                    allDone
                                       ? '#4CAF50'
-                                      : slotsMissed > 0 && !nextPendingSlot
+                                      : missedMeds > 0
                                         ? theme.colors.error
                                         : theme.colors.onSurfaceVariant
                                   }
@@ -815,9 +786,9 @@ export default function MedicationManagement() {
                                 <Text
                                   variant="bodySmall"
                                   style={{
-                                    color: allSlotsDone
+                                    color: allDone
                                       ? '#4CAF50'
-                                      : slotsMissed > 0 && !nextPendingSlot
+                                      : missedMeds > 0
                                         ? theme.colors.error
                                         : theme.colors.onSurfaceVariant,
                                     flex: 1,
@@ -825,28 +796,26 @@ export default function MedicationManagement() {
                                 >
                                   {summaryText}
                                 </Text>
-                                {!isExpanded && (
-                                  <MaterialCommunityIcons
-                                    name="chevron-down"
-                                    size={18}
-                                    color={theme.colors.outline}
-                                  />
-                                )}
+                                <MaterialCommunityIcons
+                                  name="chevron-down"
+                                  size={18}
+                                  color={theme.colors.outline}
+                                />
                               </View>
                             </TouchableOpacity>
                           )}
 
-                          {/* Time slots — visible when expanded */}
+                          {/* Medications in this time slot — visible when expanded */}
                           {isExpanded &&
-                            sortedSlots.map((slot, index) => (
+                            meds.map((med, index) => (
                               <View
-                                key={slot.id}
+                                key={med.id}
                                 style={{
                                   flexDirection: "row",
                                   alignItems: "center",
                                   justifyContent: "space-between",
                                   paddingVertical: 12,
-                                  borderTopWidth: index > 0 || totalSlots > 1 ? 1 : 0,
+                                  borderTopWidth: index > 0 ? 1 : 0,
                                   borderTopColor: theme.colors.surfaceVariant,
                                 }}
                               >
@@ -857,56 +826,68 @@ export default function MedicationManagement() {
                                     flex: 1,
                                   }}
                                 >
-                                  <MaterialCommunityIcons
-                                    name="clock-time-four-outline"
-                                    size={20}
-                                    color={theme.colors.onSurfaceVariant}
-                                    style={{ marginRight: 8 }}
-                                  />
-                                  <Text
-                                    variant="bodyLarge"
+                                  <Avatar.Icon
+                                    icon="pill"
+                                    size={32}
                                     style={{
-                                      fontWeight: "500",
-                                      marginRight: 12,
-                                      width: 60,
+                                      backgroundColor: med.status === 'completed'
+                                        ? '#E8F5E9'
+                                        : theme.colors.primaryContainer,
+                                      marginRight: 10,
                                     }}
-                                  >
-                                    {slot.time}
-                                  </Text>
+                                    color={med.status === 'completed'
+                                      ? '#4CAF50'
+                                      : theme.colors.onPrimaryContainer}
+                                  />
+                                  <View style={{ flex: 1 }}>
+                                    <Text
+                                      variant="bodyLarge"
+                                      style={{ fontWeight: "600" }}
+                                    >
+                                      {med.name}
+                                    </Text>
+                                    <Text
+                                      variant="bodySmall"
+                                      style={{ color: theme.colors.outline }}
+                                    >
+                                      {med.dosage} • {med.frequency}
+                                    </Text>
+                                  </View>
 
                                   <View
                                     style={{
                                       backgroundColor:
-                                        slot.status === "completed"
+                                        med.status === "completed"
                                           ? theme.colors.primaryContainer
-                                          : slot.status === "missed"
+                                          : med.status === "missed"
                                             ? theme.colors.errorContainer
                                             : theme.colors.surfaceVariant,
                                       paddingHorizontal: 8,
                                       paddingVertical: 2,
                                       borderRadius: 4,
+                                      marginRight: 4,
                                     }}
                                   >
                                     <Text
                                       style={{
                                         color:
-                                          slot.status === "completed"
+                                          med.status === "completed"
                                             ? theme.colors.onPrimaryContainer
-                                            : slot.status === "missed"
+                                            : med.status === "missed"
                                               ? theme.colors.onErrorContainer
                                               : theme.colors.onSurfaceVariant,
                                         fontSize: 12,
                                         fontWeight: "bold",
                                       }}
                                     >
-                                      {slot.status === "completed"
+                                      {med.status === "completed"
                                         ? "Taken"
-                                        : slot.status === "pending"
+                                        : med.status === "pending"
                                           ? "Pending"
-                                          : slot.status
+                                          : med.status
                                               .charAt(0)
                                               .toUpperCase() +
-                                            slot.status.slice(1)}
+                                            med.status.slice(1)}
                                     </Text>
                                   </View>
                                 </View>
@@ -917,21 +898,21 @@ export default function MedicationManagement() {
                                     alignItems: "center",
                                   }}
                                 >
-                                  {slot.status === "pending" ||
-                                  slot.status === "missed" ? (
+                                  {med.status === "pending" ||
+                                  med.status === "missed" ? (
                                     <>
                                       <IconButton
                                         icon="bell-outline"
                                         size={20}
-                                        onPress={() => onRemindLater(slot.id)}
+                                        onPress={() => onRemindLater(med.id)}
                                         style={{ margin: 0 }}
                                       />
                                       <Button
                                         mode="contained"
                                         compact
                                         onPress={() => {
-                                          setConfirmingMedItem(slot);
-                                          setNoteText(slot.notes || "");
+                                          setConfirmingMedItem(med);
+                                          setNoteText(med.notes || "");
                                         }}
                                         style={{ marginLeft: 4 }}
                                       >
@@ -939,7 +920,7 @@ export default function MedicationManagement() {
                                       </Button>
                                     </>
                                   ) : (
-                                    slot.status === "completed" && (
+                                    med.status === "completed" && (
                                       <View
                                         style={{
                                           flexDirection: "row",
@@ -959,20 +940,20 @@ export default function MedicationManagement() {
                                             marginRight: 8,
                                           }}
                                         >
-                                          {slot.takenAtIso
+                                          {med.takenAtIso
                                             ? new Date(
-                                                slot.takenAtIso,
+                                                med.takenAtIso,
                                               ).toLocaleTimeString([], {
                                                 hour: "2-digit",
                                                 minute: "2-digit",
                                               })
-                                            : slot.lastTaken}
+                                            : med.lastTaken}
                                         </Text>
                                         <Button
                                           icon="undo"
                                           compact
                                           mode="text"
-                                          onPress={() => onUndoTaking(slot)}
+                                          onPress={() => onUndoTaking(med)}
                                           labelStyle={{ fontSize: 12 }}
                                         >
                                           Undo
