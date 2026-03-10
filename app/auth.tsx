@@ -1,6 +1,7 @@
 import { LoginError, useAuth } from "@/lib/auth-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { AppwriteException } from "appwrite";
+import * as LocalAuthentication from "expo-local-authentication";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
@@ -20,6 +21,7 @@ export default function AuthScreen() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [hasStoredElderly, setHasStoredElderly] = useState<boolean>(false);
+  const [biometricLabel, setBiometricLabel] = useState<string>("Biometrics");
 
   const theme = useTheme();
   const router = useRouter();
@@ -32,6 +34,17 @@ export default function AuthScreen() {
       SecureStore.getItemAsync("elderly_user_id").then((id) => {
         setHasStoredElderly(!!id);
       });
+      LocalAuthentication.supportedAuthenticationTypesAsync()
+        .then((types) => {
+          if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+            setBiometricLabel("Face ID");
+          } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+            setBiometricLabel("Fingerprint");
+          }
+        })
+        .catch(() => {
+          // Keep default "Biometrics" label on error
+        });
     }
   }, []);
 
@@ -200,7 +213,7 @@ export default function AuthScreen() {
             )}
             disabled={loading}
           >
-            Login with Face ID
+            Login with {biometricLabel}
           </Button>
         )}
 
