@@ -158,6 +158,13 @@ export type ElderlyDailySteps = Models.Row & {
     source: string;
 }
 
+export type ElderlyConnection = Models.Row & {
+    elderly_id_1: string;
+    elderly_id_2: string;
+    status: string;
+    created_at: string | null;
+}
+
 export type DirectMessages = Models.Row & {
     conversation_id: string;
     sender_id: string;

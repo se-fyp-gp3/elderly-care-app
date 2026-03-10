@@ -15,10 +15,12 @@ export type DirectMessage = Models.Row & {
   sender_role: string;
   /** Receiver's profile doc ID */
   receiver_id: string;
-  /** The text content */
+  /** The text content (or base64 audio for voice messages) */
   body: string;
   /** ISO-8601 timestamp when the message was created */
   created_at: string;
   /** Whether the receiver has read the message */
   is_read: boolean;
+  /** "text" | "voice" — defaults to "text" */
+  message_type?: string;
 };

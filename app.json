@@ -17,7 +17,9 @@
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,
-        "com.apple.developer.healthkit.access": ["health-records"]
+        "com.apple.developer.healthkit.access": [
+          "health-records"
+        ]
       }
     },
     "android": {
@@ -72,7 +74,8 @@
           }
         }
       ],
-      "./plugins/withHealthConnect"
+      "./plugins/withHealthConnect",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

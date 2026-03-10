@@ -240,6 +240,13 @@ export async function createElderlyMedicationWithReminder(
 
   if (ELDERLY_MEDICATION_REMINDER_TABLE_ID) {
     try {
+      const startMs = input.startDate
+        ? new Date(input.startDate).getTime()
+        : Date.now();
+      const endDate = new Date(
+        startMs + input.durationDays * 24 * 60 * 60 * 1000,
+      ).toISOString();
+
       const reminder = await tablesDB.createRow({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
@@ -253,6 +260,7 @@ export async function createElderlyMedicationWithReminder(
           after_meal: input.afterMeal,
           reminder_times: approxTimes,
           active: input.active ?? true,
+          end_date: endDate,
         },
       });
 
@@ -455,6 +463,69 @@ export async function fetchCaregiversForElderly(
     return caregivers;
   } catch (error) {
     console.error("Error fetching caregivers for elderly:", error);
+    return [];
+  }
+}
+
+/**
+ * Update the emergency_contact field on an elderly profile.
+ */
+export async function updateElderlyEmergencyContact(
+  elderlyDocId: string,
+  emergencyContact: string | null,
+): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: ELDERLY_TABLE_ID,
+    rowId: elderlyDocId,
+    data: { emergency_contact: emergencyContact },
+  });
+}
+
+/**
+ * Get caregivers linked to an elderly user via the caregiver_elderly table.
+ * Returns full Caregiver profiles.
+ */
+export async function getLinkedCaregivers(
+  elderlyDocId: string,
+): Promise<Caregiver[]> {
+  try {
+    const response = await tablesDB.listRows<CaregiverElderly>({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_ELDERLY_TABLE_ID,
+      queries: [
+        Query.equal("elderly", elderlyDocId),
+        Query.limit(100),
+      ],
+    });
+
+    const rawItems = response.rows.flatMap((row) => row.caregiver);
+    const loaded: Caregiver[] = [];
+    const idsToFetch: string[] = [];
+
+    for (const item of rawItems) {
+      if (typeof item === "string") {
+        idsToFetch.push(item);
+      } else if (item && typeof item === "object" && "$id" in item) {
+        loaded.push(item as Caregiver);
+      }
+    }
+
+    if (idsToFetch.length > 0) {
+      const unique = [...new Set(idsToFetch)];
+      const details = await tablesDB.listRows<Caregiver>({
+        databaseId: DATABASE_ID,
+        tableId: CAREGIVER_TABLE_ID,
+        queries: [Query.equal("$id", unique), Query.limit(100)],
+      });
+      loaded.push(...details.rows);
+    }
+
+    return Array.from(
+      new Map(loaded.map((c) => [c.$id, c])).values(),
+    );
+  } catch (error) {
+    console.error("Error fetching linked caregivers:", error);
     return [];
   }
 }

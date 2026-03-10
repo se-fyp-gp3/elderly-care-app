@@ -386,6 +386,11 @@ export async function addMedication(data: AddMedicationData): Promise<void> {
   });
 
   // 3. Create Reminder
+  const reminderStartDate = new Date();
+  const reminderEndDate = new Date(
+    reminderStartDate.getTime() + 365 * 24 * 60 * 60 * 1000,
+  );
+
   await tablesDB.createRow({
     databaseId: DATABASE_ID,
     tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
@@ -393,12 +398,13 @@ export async function addMedication(data: AddMedicationData): Promise<void> {
     data: {
       elderly: data.elderlyId,
       elderly_medication: prescriptionRow.$id,
-      start_date: new Date().toISOString(),
+      start_date: reminderStartDate.toISOString(),
       duration_days: 365,
       active: true,
       reminder_times: approxTimes,
       is_finished: false,
       after_meal: false,
+      end_date: reminderEndDate.toISOString(),
     },
   });
 }
@@ -444,6 +450,9 @@ async function recoverReminder(
           reminder_times: plan.approx_times || [],
           is_finished: false,
           after_meal: false,
+          end_date: new Date(
+            Date.now() + 365 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
         },
       });
       return newReminder.$id;

@@ -1,13 +1,19 @@
 import { useAuth } from "@/lib/auth-context";
 import {
+  createChatSession,
+  deleteChatSession,
+  listChatSessionsForUser,
+  updateChatSession,
+} from "@/lib/chat";
+import {
   buildScheduleSummary,
   fetchElderlySchedulesForUser,
 } from "@/lib/elderly";
 import { getFormattedTodayMedicationSummary } from "@/lib/medication_tracking";
-import * as FileSystem from "expo-file-system";
+import type { ChatSession as AppwriteChatSession } from "@/types/appwrite";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -44,13 +50,6 @@ interface SelectedImage {
   mimeType: string;
 }
 
-interface ChatSession {
-  id: string;
-  title: string;
-  messages: Message[];
-  updatedAt: Date;
-}
-
 type ChatContent =
   | string
   | Array<
@@ -66,7 +65,7 @@ interface ChatMessage {
   content: ChatContent;
 }
 
-interface OpenRouterResponse {
+interface AIAPIResponse {
   choices?: Array<{
     message?: {
       content?: ChatContent;
@@ -88,25 +87,68 @@ export default function ElderlyChat() {
   );
   const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
+  const [chatHistory, setChatHistory] = useState<AppwriteChatSession[]>([]);
   const [isSuggestionsExpanded, setIsSuggestionsExpanded] = useState(false);
-  const [currentChatId, setCurrentChatId] = useState(`chat-${Date.now()}`);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY?.trim();
-  const OPENROUTER_API_URL =
-    process.env.EXPO_PUBLIC_OPENROUTER_API_URL?.trim() ||
-    "https://openrouter.ai/api/v1";
-  const OPENROUTER_TEXT_MODEL =
-    process.env.EXPO_PUBLIC_OPENROUTER_MODEL?.trim() ||
-    "google/gemini-3-flash-preview";
-  const OPENROUTER_IMAGE_MODEL =
-    process.env.EXPO_PUBLIC_OPENROUTER_IMAGE_MODEL?.trim() ||
-    "google/gemini-3-pro-preview";
+  const serializeMessages = (msgs: Message[]): string =>
+    JSON.stringify(
+      msgs.map((m) => ({
+        id: m.id,
+        text: m.text,
+        isUser: m.isUser,
+        timestamp: m.timestamp.toISOString(),
+        imageUri: m.imageUri,
+      })),
+    );
+
+  const deserializeMessages = (json: string): Message[] => {
+    try {
+      const arr = JSON.parse(json) as Array<{
+        id: string;
+        text: string;
+        isUser: boolean;
+        timestamp: string;
+        imageUri?: string;
+      }>;
+      return arr.map((m) => ({
+        id: m.id,
+        text: m.text,
+        isUser: m.isUser,
+        timestamp: new Date(m.timestamp),
+        imageUri: m.imageUri,
+      }));
+    } catch {
+      return [];
+    }
+  };
+
+  const loadHistory = useCallback(async () => {
+    if (!user?.$id) return;
+    try {
+      const sessions = await listChatSessionsForUser(user.$id);
+      setChatHistory(sessions);
+    } catch (e) {
+      console.warn("Failed to load chat history", e);
+    }
+  }, [user?.$id]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  const DASHSCOPE_API_KEY = process.env.EXPO_PUBLIC_DASHSCOPE_API_KEY?.trim();
+  const DASHSCOPE_API_URL =
+    process.env.EXPO_PUBLIC_DASHSCOPE_API_URL?.trim();
+  const DASHSCOPE_TEXT_MODEL =
+    process.env.EXPO_PUBLIC_DASHSCOPE_MODEL?.trim();
+  const DASHSCOPE_IMAGE_MODEL =
+    process.env.EXPO_PUBLIC_DASHSCOPE_IMAGE_MODEL?.trim();
   const REQUEST_TIMEOUT_MS = 90000;
-  const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
+  const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
   const USE_MOCK_MODE = false;
 
   useEffect(() => {
@@ -129,6 +171,7 @@ export default function ElderlyChat() {
       "What medicine do I need to take today?",
       "What is my schedule today?",
       "I feel unwell",
+      "📷 拍照識藥 (Photo Medication ID)",
     ],
     [],
   );
@@ -169,7 +212,7 @@ export default function ElderlyChat() {
       {
         role: "system",
         content:
-          "You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.",
+          "You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor. Respond in the same language the user uses (Chinese or English).",
       },
       ...history,
       {
@@ -177,43 +220,6 @@ export default function ElderlyChat() {
         content: latestUserMessage,
       },
     ];
-  };
-
-  const getImageBase64 = async (uri: string) => {
-    try {
-      let base64String = "";
-
-      if (Platform.OS === "web") {
-        const response = await fetch(uri);
-        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-        const blob = await response.blob();
-
-        base64String = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onerror = () => reject(new Error("FileReader parsing failed"));
-          reader.onloadend = () => {
-            const dataUrl = reader.result as string;
-            const split = dataUrl.split(",");
-            if (split.length < 2) reject(new Error("Invalid Base64 format"));
-            resolve(split[1]);
-          };
-          reader.readAsDataURL(blob);
-        });
-      } else {
-        base64String = await FileSystem.readAsStringAsync(uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-      }
-
-      if (!base64String || base64String.length % 4 !== 0) {
-        throw new Error("Invalid or incomplete Base64 string");
-      }
-
-      return base64String;
-    } catch (error) {
-      console.error("Failed to get Base64:", error);
-      throw error;
-    }
   };
 
   const compressImage = async (image: SelectedImage) => {
@@ -236,44 +242,31 @@ export default function ElderlyChat() {
     }
   };
 
-  const prepareImageForUpload = async (image: SelectedImage) => {
-    const maxRetry = 4;
-    const qualitySteps = [0.8, 0.7, 0.6, 0.5];
-    const widthSteps = [1024, 896, 768, 640];
+  const prepareImageForUpload = async (
+    image: SelectedImage,
+  ): Promise<{ uri: string; mimeType: string; base64: string }> => {
+    const manipulated = await ImageManipulator.manipulateAsync(
+      image.uri,
+      [{ resize: { width: 1024 } }],
+      {
+        compress: 0.7,
+        format: ImageManipulator.SaveFormat.JPEG,
+        base64: true,
+      },
+    );
 
-    for (let i = 0; i < maxRetry; i += 1) {
-      try {
-        const manipulated = await ImageManipulator.manipulateAsync(
-          image.uri,
-          [{ resize: { width: widthSteps[i] } }],
-          {
-            compress: qualitySteps[i],
-            format: ImageManipulator.SaveFormat.JPEG,
-          },
-        );
-
-        const info = await FileSystem.getInfoAsync(manipulated.uri, {
-          size: true,
-        });
-        if (!info.exists || !info.size) {
-          continue;
-        }
-
-        if (info.size <= MAX_IMAGE_BYTES) {
-          return {
-            uri: manipulated.uri,
-            mimeType: "image/jpeg",
-          } as SelectedImage;
-        }
-      } catch (error) {
-        console.warn(`Image compression attempt ${i + 1} failed`, error);
-      }
+    if (!manipulated.base64) {
+      throw new Error("Failed to encode image to base64");
     }
 
-    throw new Error("Image still exceeds 1.5MB after compression.");
+    return {
+      uri: manipulated.uri,
+      mimeType: "image/jpeg",
+      base64: manipulated.base64,
+    };
   };
 
-  const callOpenRouterAPI = async (
+  const callAIAPI = async (
     userMessage: string,
     image?: SelectedImage | null,
     allowImageFallback = true,
@@ -305,14 +298,14 @@ export default function ElderlyChat() {
       }
     }
 
-    if (!OPENROUTER_API_KEY) {
-      return "I'm ready to chat freely, but the AI key isn't configured yet. Please add EXPO_PUBLIC_OPENROUTER_API_KEY to enable full conversation.";
+    if (!DASHSCOPE_API_KEY) {
+      return "I'm ready to chat freely, but the AI key isn't configured yet. Please add EXPO_PUBLIC_DASHSCOPE_API_KEY to enable full conversation.";
     }
 
     const preparedImage = image ? await prepareImageForUpload(image) : null;
     const resolvedModel = preparedImage
-      ? OPENROUTER_IMAGE_MODEL
-      : OPENROUTER_TEXT_MODEL;
+      ? DASHSCOPE_IMAGE_MODEL
+      : DASHSCOPE_TEXT_MODEL;
     const baseMessages = buildConversationMessages(userMessage);
     const messagesPayload: ChatMessage[] = preparedImage
       ? baseMessages.slice(0, -1).concat({
@@ -322,9 +315,7 @@ export default function ElderlyChat() {
             {
               type: "image_url",
               image_url: {
-                url: `data:${preparedImage.mimeType};base64,${await getImageBase64(
-                  preparedImage.uri,
-                )}`,
+                url: `data:${preparedImage.mimeType};base64,${preparedImage.base64}`,
                 detail: "high",
               },
             },
@@ -348,14 +339,11 @@ export default function ElderlyChat() {
           abortControllerRef.current?.abort();
         }, REQUEST_TIMEOUT_MS);
 
-        const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
+        const response = await fetch(`${DASHSCOPE_API_URL}/chat/completions`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-            "HTTP-Referer": "https://elderly-care-app.local",
-            "X-Title": "elderly-care-app",
-            "X-OpenRouter-Enable-Multimodal": "true",
+            Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
           },
           signal: abortControllerRef.current?.signal,
           body: JSON.stringify(payload),
@@ -365,11 +353,11 @@ export default function ElderlyChat() {
         clearTimeout(timeoutId);
 
         if (response.ok) {
-          const data: OpenRouterResponse = rawText ? JSON.parse(rawText) : {};
+          const data: AIAPIResponse = rawText ? JSON.parse(rawText) : {};
           const content = data.choices?.[0]?.message?.content;
           if (!content) {
             throw new Error(
-              data.error?.message || "No response from OpenRouter API",
+              data.error?.message || "No response from AI API",
             );
           }
 
@@ -385,10 +373,10 @@ export default function ElderlyChat() {
             return textParts.join("\n");
           }
 
-          throw new Error("No response from OpenRouter API");
+          throw new Error("No response from AI API");
         }
 
-        const errorData: OpenRouterResponse = rawText
+        const errorData: AIAPIResponse = rawText
           ? JSON.parse(rawText)
           : {};
 
@@ -440,7 +428,7 @@ export default function ElderlyChat() {
 
     if (image && allowImageFallback) {
       try {
-        return await callOpenRouterAPI(userMessage, null, false);
+        return await callAIAPI(userMessage, null, false);
       } catch {
         // fall through to surface the original error
       }
@@ -592,48 +580,71 @@ export default function ElderlyChat() {
     setPendingMessageId(null);
   };
 
-  const saveCurrentChatToHistory = () => {
-    if (messages.length === 0) return;
+  const saveCurrentChatToHistory = async () => {
+    if (messages.length === 0 || !user?.$id) return;
 
     const titleSource = messages.find((msg) => msg.isUser)?.text;
     const title = titleSource ? titleSource.slice(0, 40) : "New chat";
-    const session: ChatSession = {
-      id: currentChatId,
-      title,
-      messages,
-      updatedAt: new Date(),
-    };
+    const serialized = serializeMessages(messages);
 
-    setChatHistory((prev) => {
-      const existingIndex = prev.findIndex((chat) => chat.id === currentChatId);
-      if (existingIndex >= 0) {
-        const next = [...prev];
-        next[existingIndex] = session;
-        return next;
+    try {
+      if (currentChatId) {
+        // Update existing session
+        const updated = await updateChatSession(currentChatId, {
+          title,
+          messages: serialized,
+        });
+        setChatHistory((prev) =>
+          prev.map((c) => (c.$id === currentChatId ? updated : c)),
+        );
+      } else {
+        // Create new session
+        const created = await createChatSession({
+          userId: user.$id,
+          title,
+          messages: serialized,
+        });
+        setCurrentChatId(created.$id);
+        setChatHistory((prev) => [created, ...prev]);
       }
-      return [session, ...prev];
-    });
+    } catch (e) {
+      console.warn("Failed to save chat session", e);
+    }
   };
 
-  const startNewChat = () => {
-    saveCurrentChatToHistory();
+  const startNewChat = async () => {
+    await saveCurrentChatToHistory();
     setMessages([]);
     setInputText("");
     setSelectedImage(null);
     setIsLoading(false);
     setPendingMessageId(null);
-    setCurrentChatId(`chat-${Date.now()}`);
+    setCurrentChatId(null);
   };
 
-  const openHistory = () => {
-    saveCurrentChatToHistory();
+  const openHistory = async () => {
+    await saveCurrentChatToHistory();
+    await loadHistory();
     setIsHistoryVisible(true);
   };
 
-  const loadChatFromHistory = (chat: ChatSession) => {
-    setCurrentChatId(chat.id);
-    setMessages(chat.messages);
+  const loadChatFromHistory = (chat: AppwriteChatSession) => {
+    setCurrentChatId(chat.$id);
+    setMessages(deserializeMessages(chat.messages));
     setIsHistoryVisible(false);
+  };
+
+  const handleDeleteChat = async (chatId: string) => {
+    try {
+      await deleteChatSession(chatId);
+      setChatHistory((prev) => prev.filter((c) => c.$id !== chatId));
+      if (currentChatId === chatId) {
+        setMessages([]);
+        setCurrentChatId(null);
+      }
+    } catch (e) {
+      console.warn("Failed to delete chat session", e);
+    }
   };
 
   const sendMessage = async () => {
@@ -658,14 +669,24 @@ export default function ElderlyChat() {
     Keyboard.dismiss();
 
     try {
-      const messageForAPI = selectedImage
-        ? `${userMessage.text}\n[User has shared an image]`
-        : userMessage.text;
+      let messageForAPI: string;
+      if (selectedImage) {
+        const userText = userMessage.text;
+        const isMedQuery =
+          /識藥|识药|medication|medicine|pill|藥|药|capsule|tablet/i.test(
+            userText,
+          );
+        messageForAPI = isMedQuery
+          ? `${userText}\n[User has shared a photo of medication. Please identify the medication, including its name, common uses, dosage, and any important warnings or side effects. Respond in the same language the user used.]`
+          : `${userText}\n[User has shared an image]`;
+      } else {
+        messageForAPI = userMessage.text;
+      }
 
       const localResponse = await tryHandleLocalDataRequest(messageForAPI);
       const aiResponse =
         localResponse ??
-        (await callOpenRouterAPI(messageForAPI, selectedImage));
+        (await callAIAPI(messageForAPI, selectedImage));
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -694,6 +715,20 @@ export default function ElderlyChat() {
       setPendingMessageId(null);
     }
   };
+
+  // Auto-save after each AI response
+  const prevMessagesLenRef = useRef(0);
+  useEffect(() => {
+    if (
+      messages.length > 0 &&
+      messages.length > prevMessagesLenRef.current &&
+      !isLoading
+    ) {
+      saveCurrentChatToHistory();
+    }
+    prevMessagesLenRef.current = messages.length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, isLoading]);
 
   const renderMessage = ({ item }: { item: Message }) => (
     <View
@@ -875,7 +910,12 @@ export default function ElderlyChat() {
                   { backgroundColor: theme.colors.surfaceVariant },
                 ]}
                 onPress={() => {
-                  setInputText(suggestion);
+                  if (suggestion.includes("拍照識藥")) {
+                    setInputText("請幫我識別這個藥物的名稱、用途和注意事項。");
+                    handleImageOptions();
+                  } else {
+                    setInputText(suggestion);
+                  }
                 }}
               >
                 <Card.Content style={styles.suggestionContent}>
@@ -967,17 +1007,28 @@ export default function ElderlyChat() {
             </Text>
             <FlatList
               data={chatHistory}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item.$id}
               renderItem={({ item }) => (
                 <Card
                   style={styles.historyCard}
                   onPress={() => loadChatFromHistory(item)}
                 >
-                  <Card.Content>
-                    <Text variant="titleSmall">{item.title}</Text>
-                    <Text variant="bodySmall" style={styles.historyMeta}>
-                      {item.updatedAt.toLocaleString()}
-                    </Text>
+                  <Card.Content style={styles.historyCardContent}>
+                    <View style={styles.historyCardRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="titleSmall">{item.title}</Text>
+                        <Text variant="bodySmall" style={styles.historyMeta}>
+                          {new Date(item.$updatedAt).toLocaleString()}
+                        </Text>
+                      </View>
+                      <IconButton
+                        icon="delete-outline"
+                        size={20}
+                        onPress={() => handleDeleteChat(item.$id)}
+                        iconColor="#EF4444"
+                        style={{ margin: 0 }}
+                      />
+                    </View>
                   </Card.Content>
                 </Card>
               )}
@@ -1272,6 +1323,13 @@ const styles = StyleSheet.create({
   historyMeta: {
     color: "#6B7280",
     marginTop: 4,
+  },
+  historyCardContent: {
+    paddingVertical: 8,
+  },
+  historyCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   historyEmpty: {
     textAlign: "center",

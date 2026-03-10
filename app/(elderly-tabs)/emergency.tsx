@@ -1,258 +1,761 @@
+import {
+  clientReactNative,
+  DATABASE_ID,
+  DIRECT_MESSAGES_TABLE_ID,
+} from "@/lib/appwrite";
+import { useAuth } from "@/lib/auth-context";
+import {
+  acceptElderlyConnection,
+  addElderlyConnection,
+  Contact,
+  formatRelativeTime,
+  getContactsForElderly,
+  getElderlyContacts,
+  getPendingConnectionRequests,
+  rejectElderlyConnection,
+  searchElderlyByPhone,
+} from "@/lib/contacts";
+import { getElderlyByUserId } from "@/lib/elderly";
+import { Elderly } from "@/types/appwrite";
+import { buildConversationId, getLastMessage } from "@/lib/messaging";
+import { DirectMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React from "react";
-import { Alert, Linking, ScrollView, StyleSheet, View } from "react-native";
-import { Button, Card, Text, useTheme } from "react-native-paper";
-
-interface EmergencyContact {
-  id: string;
-  name: string;
-  relation: string;
-  phone: string;
-}
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  FlatList,
+  Keyboard,
+  Linking,
+  Modal,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
+import {
+  ActivityIndicator,
+  Avatar,
+  Button,
+  Searchbar,
+  Text,
+  TextInput,
+  useTheme,
+} from "react-native-paper";
 
 export default function ElderlyEmergency() {
   const theme = useTheme();
+  const { user } = useAuth();
+  const router = useRouter();
 
-  const handleCall = (phone: string, name: string) => {
-    Alert.alert(`Call ${name}?`, `Do you want to call ${phone}?`, [
+  // ── Elderly profile ──
+  const [elderlyProfile, setElderlyProfile] = useState<Elderly | null>(null);
+
+  // ── Contacts & messages state ──
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [lastMessages, setLastMessages] = useState<
+    Record<string, DirectMessage | null>
+  >({});
+
+  // ── Add contact dialog state ──
+  const [addDialogVisible, setAddDialogVisible] = useState(false);
+  const [phoneSearch, setPhoneSearch] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [foundElderly, setFoundElderly] = useState<Elderly | null>(null);
+  const [addingContact, setAddingContact] = useState(false);
+  const [searchDone, setSearchDone] = useState(false);
+
+  // ── Pending requests state ──
+  const [pendingRequests, setPendingRequests] = useState<
+    { connectionId: string; from: Elderly }[]
+  >([]);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+
+  // ── Fetch contacts & last messages ──
+  const fetchContacts = useCallback(async () => {
+    if (!user) return;
+    try {
+      const elderly = await getElderlyByUserId(user.$id);
+      if (!elderly) {
+        setContacts([]);
+        return;
+      }
+      setElderlyProfile(elderly);
+
+      // Get both caregiver contacts and elderly-to-elderly contacts
+      const [caregiverData, elderlyData, pending] = await Promise.all([
+        getContactsForElderly(elderly.$id),
+        getElderlyContacts(elderly.$id),
+        getPendingConnectionRequests(elderly.$id),
+      ]);
+      setPendingRequests(pending);
+      const data = [...caregiverData, ...elderlyData];
+
+      const lastMsgs: Record<string, DirectMessage | null> = {};
+      await Promise.all(
+        data.map(async (contact) => {
+          const convId = buildConversationId(elderly.$id, contact.id);
+          lastMsgs[contact.id] = await getLastMessage(convId);
+        }),
+      );
+      setLastMessages(lastMsgs);
+
+      // Sort by most recent message first
+      data.sort((a, b) => {
+        const msgA = lastMsgs[a.id];
+        const msgB = lastMsgs[b.id];
+        const timeA = msgA?.created_at ?? a.lastActive ?? "";
+        const timeB = msgB?.created_at ?? b.lastActive ?? "";
+        return new Date(timeB).getTime() - new Date(timeA).getTime();
+      });
+
+      setContacts(data);
+      setFilteredContacts(data);
+    } catch (error) {
+      console.error("Error fetching contacts:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchContacts();
+  }, [fetchContacts]);
+
+  // ── Realtime message subscription ──
+  useEffect(() => {
+    if (!elderlyProfile) return;
+    const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
+    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+      if (response.events.some((event) => event.endsWith(".create"))) {
+        const payload = response.payload as DirectMessage;
+        if (
+          payload.sender_id === elderlyProfile.$id ||
+          payload.receiver_id === elderlyProfile.$id
+        ) {
+          const otherUserId =
+            payload.sender_id === elderlyProfile.$id
+              ? payload.receiver_id
+              : payload.sender_id;
+          setLastMessages((prev) => ({ ...prev, [otherUserId]: payload }));
+          setContacts((prev) => {
+            const idx = prev.findIndex((c) => c.id === otherUserId);
+            if (idx === -1) return prev;
+            const updated = [...prev];
+            const [moved] = updated.splice(idx, 1);
+            updated.unshift(moved);
+            return updated;
+          });
+        }
+      }
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [elderlyProfile]);
+
+  // ── Search filter ──
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredContacts(contacts);
+    } else {
+      const q = searchQuery.toLowerCase();
+      setFilteredContacts(
+        contacts.filter(
+          (c) =>
+            c.name.toLowerCase().includes(q) ||
+            (c.phone && c.phone.includes(q)),
+        ),
+      );
+    }
+  }, [searchQuery, contacts]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchContacts();
+    setRefreshing(false);
+  }, [fetchContacts]);
+
+  // ── Navigation & actions ──
+  const navigateToConversation = useCallback(
+    (contact: Contact) => {
+      router.push({
+        pathname: "/conversation",
+        params: {
+          contactId: contact.id,
+          contactName: contact.name,
+          contactRole: contact.role,
+        },
+      });
+    },
+    [router],
+  );
+
+  const handleCall = useCallback((phone?: string | null) => {
+    if (!phone)
+      return Alert.alert("No phone number", "This contact has no phone number on file.");
+    Linking.openURL(`tel:${phone}`);
+  }, []);
+
+  // ── Add contact dialog handlers ──
+  const openAddDialog = useCallback(() => {
+    setPhoneSearch("");
+    setFoundElderly(null);
+    setSearchDone(false);
+    setAddDialogVisible(true);
+  }, []);
+
+  const closeAddDialog = useCallback(() => {
+    setAddDialogVisible(false);
+    setPhoneSearch("");
+    setFoundElderly(null);
+    setSearchDone(false);
+  }, []);
+
+  const handlePhoneSearch = useCallback(async () => {
+    const trimmed = phoneSearch.trim();
+    if (!trimmed) return;
+    Keyboard.dismiss();
+    setSearching(true);
+    setFoundElderly(null);
+    setSearchDone(false);
+    try {
+      const result = await searchElderlyByPhone(trimmed);
+      // Don't show self in results
+      if (result && result.$id === elderlyProfile?.$id) {
+        setFoundElderly(null);
+      } else {
+        setFoundElderly(result);
+      }
+      setSearchDone(true);
+    } catch (error) {
+      Alert.alert("Error", "Failed to search. Please try again.");
+    } finally {
+      setSearching(false);
+    }
+  }, [phoneSearch, elderlyProfile]);
+
+  const handleAddContact = useCallback(async () => {
+    if (!foundElderly || !elderlyProfile) return;
+    setAddingContact(true);
+    try {
+      // Check if already in contacts
+      const alreadyExists = contacts.some((c) => c.id === foundElderly.$id);
+      if (alreadyExists) {
+        Alert.alert("Already added", `${foundElderly.name ?? "This user"} is already in your contacts.`);
+        setAddingContact(false);
+        return;
+      }
+
+      const success = await addElderlyConnection(elderlyProfile.$id, foundElderly.$id);
+      if (success) {
+        Alert.alert("Request Sent!", `A friend request has been sent to ${foundElderly.name ?? "User"}. They need to accept before you can chat.`);
+        closeAddDialog();
+        await fetchContacts();
+      } else {
+        Alert.alert("Already sent", `A request to ${foundElderly.name ?? "this user"} already exists.`);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to add contact. Please try again.");
+    } finally {
+      setAddingContact(false);
+    }
+  }, [foundElderly, elderlyProfile, contacts, closeAddDialog, fetchContacts]);
+
+  // ── Accept / Reject connection request handlers ──
+  const handleAcceptRequest = useCallback(async (connectionId: string, name: string) => {
+    setAcceptingId(connectionId);
+    try {
+      await acceptElderlyConnection(connectionId);
+      Alert.alert("Accepted", `${name} is now your contact!`);
+      await fetchContacts();
+    } catch (e) {
+      Alert.alert("Error", "Failed to accept request.");
+    } finally {
+      setAcceptingId(null);
+    }
+  }, [fetchContacts]);
+
+  const handleRejectRequest = useCallback(async (connectionId: string, name: string) => {
+    Alert.alert("Decline Request", `Decline friend request from ${name}?`, [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Call",
-        onPress: () => Linking.openURL(`tel:${phone.replace(/\s/g, "")}`),
+        text: "Decline",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await rejectElderlyConnection(connectionId);
+            setPendingRequests((prev) => prev.filter((r) => r.connectionId !== connectionId));
+          } catch (e) {
+            Alert.alert("Error", "Failed to decline request.");
+          }
+        },
       },
     ]);
-  };
+  }, []);
 
-  const handleEmergencyCall = () => {
-    Alert.alert(
-      "Emergency Call",
-      "Are you sure you want to call your emergency contact (91361140)?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Call 91361140",
-          style: "destructive",
-          onPress: () => Linking.openURL("tel:91361140"),
-        },
-      ],
+  // ── Render conversation card ──
+  const renderConversation = ({ item }: { item: Contact }) => {
+    const lastMsg = lastMessages[item.id];
+    const lastMsgTime = lastMsg?.created_at || item.lastActive;
+    const preview = lastMsg?.body;
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => navigateToConversation(item)}
+        style={[styles.conversationCard, { backgroundColor: theme.colors.surface }]}
+      >
+        {/* Avatar */}
+        <View style={styles.avatarWrap}>
+          <Avatar.Text
+            size={52}
+            label={item.avatarLabel}
+            style={{ backgroundColor: theme.colors.tertiaryContainer }}
+            labelStyle={{ color: theme.colors.onTertiaryContainer, fontWeight: "600", fontSize: 18 }}
+          />
+          <View style={[styles.onlineDot, { backgroundColor: "#4CAF50", borderColor: theme.colors.surface }]} />
+        </View>
+
+        {/* Name / preview */}
+        <View style={styles.conversationInfo}>
+          <View style={styles.nameRow}>
+            <Text variant="titleMedium" style={{ fontWeight: "600", flex: 1 }} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+              {formatRelativeTime(lastMsgTime)}
+            </Text>
+          </View>
+          <View style={styles.roleRow}>
+            <MaterialCommunityIcons
+              name={item.role === "caregiver" ? "shield-account" : "account-heart"}
+              size={12}
+              color={theme.colors.tertiary}
+            />
+            <Text variant="labelSmall" style={{ color: theme.colors.tertiary, marginLeft: 3 }}>
+              {item.role === "caregiver" ? "Caregiver" : "Friend"}
+            </Text>
+          </View>
+          {preview ? (
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 3 }}>
+              {lastMsg?.sender_id === elderlyProfile?.$id && (
+                <MaterialCommunityIcons
+                  name={lastMsg?.is_read ? "check-all" : "check"}
+                  size={14}
+                  color={lastMsg?.is_read ? "#4CAF50" : theme.colors.onSurfaceVariant}
+                  style={{ marginRight: 3 }}
+                />
+              )}
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, flex: 1 }} numberOfLines={1}>
+                {lastMsg?.sender_id === elderlyProfile?.$id ? "You: " : ""}
+                {lastMsg?.message_type === "voice" ? "🎤 Voice message" : preview}
+              </Text>
+            </View>
+          ) : (
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 3 }}>
+              Tap to start chatting
+            </Text>
+          )}
+        </View>
+
+        {/* Quick call button */}
+        <TouchableOpacity
+          onPress={(e) => { e.stopPropagation(); handleCall(item.phone); }}
+          style={[styles.callBtn, { backgroundColor: "#E8F5E9" }]}
+        >
+          <MaterialCommunityIcons name="phone" size={20} color="#2E7D32" />
+        </TouchableOpacity>
+      </TouchableOpacity>
     );
   };
 
-  return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
-      {/* Main Emergency Button */}
-      <Card style={[styles.emergencyCard, { backgroundColor: "#FF3B30" }]}>
-        <Card.Content style={styles.emergencyContent}>
-          <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" }}>
-            <MaterialCommunityIcons
-              name="phone-alert"
-              size={56}
-              color="#FFFFFF"
-            />
-          </View>
-          <Text variant="headlineLarge" style={styles.emergencyTitle}>
-            Emergency Contact
-          </Text>
-          <Text variant="bodyLarge" style={styles.emergencySubtitle}>
-            Press the button below to call your emergency contact
-          </Text>
-          <Button
-            mode="contained"
-            onPress={handleEmergencyCall}
-            style={styles.emergencyButton}
-            labelStyle={styles.emergencyButtonText}
-            contentStyle={styles.emergencyButtonContent}
-            icon="phone"
-          >
-            Call Now
-          </Button>
-        </Card.Content>
-      </Card>
-
-      {/* Quick Actions */}
-      <Text variant="titleLarge" style={styles.sectionTitle}>
-        Quick Actions
+  // ── Empty state ──
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <MaterialCommunityIcons name="chat-plus-outline" size={56} color={theme.colors.outlineVariant} />
+      <Text variant="bodyLarge" style={{ marginTop: 12, color: theme.colors.onSurfaceVariant }}>
+        No conversations yet
       </Text>
-      <View style={styles.quickActionsGrid}>
-        <Card
-          style={[styles.quickActionCard, { backgroundColor: "#FFF3E0" }]}
-          onPress={() => handleCall("999", "Ambulance")}
+      <Text variant="bodySmall" style={{ marginTop: 4, color: theme.colors.onSurfaceVariant, textAlign: "center" }}>
+        Your contacts will appear here
+      </Text>
+    </View>
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Search bar + Add button */}
+      <View style={styles.searchWrap}>
+        <Searchbar
+          placeholder="Search contacts..."
+          onChangeText={setSearchQuery}
+          value={searchQuery}
+          style={[styles.searchBar, { backgroundColor: theme.colors.surfaceVariant, flex: 1 }]}
+          inputStyle={styles.searchInput}
+          elevation={0}
+        />
+        <TouchableOpacity
+          onPress={openAddDialog}
+          style={[styles.addBtn, { backgroundColor: theme.colors.primary }]}
+          activeOpacity={0.8}
         >
-          <Card.Content style={styles.quickActionContent}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#FF980020", justifyContent: "center", alignItems: "center" }}>
-              <MaterialCommunityIcons
-                name="ambulance"
-                size={36}
-                color="#E65100"
-              />
-            </View>
-            <Text variant="titleSmall" style={{ marginTop: 10, fontWeight: "bold" }}>Ambulance</Text>
-          </Card.Content>
-        </Card>
-        <Card
-          style={[styles.quickActionCard, { backgroundColor: "#FFEBEE" }]}
-          onPress={() => handleCall("999", "Police")}
-        >
-          <Card.Content style={styles.quickActionContent}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#F4433620", justifyContent: "center", alignItems: "center" }}>
-              <MaterialCommunityIcons
-                name="shield-account"
-                size={36}
-                color="#C62828"
-              />
-            </View>
-            <Text variant="titleSmall" style={{ marginTop: 10, fontWeight: "bold" }}>Police</Text>
-          </Card.Content>
-        </Card>
-        <Card
-          style={[styles.quickActionCard, { backgroundColor: "#FBE9E7" }]}
-          onPress={() => handleCall("999", "Fire")}
-        >
-          <Card.Content style={styles.quickActionContent}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#FF572220", justifyContent: "center", alignItems: "center" }}>
-              <MaterialCommunityIcons
-                name="fire-truck"
-                size={36}
-                color="#BF360C"
-              />
-            </View>
-            <Text variant="titleSmall" style={{ marginTop: 10, fontWeight: "bold" }}>Fire</Text>
-          </Card.Content>
-        </Card>
-        <Card
-          style={[styles.quickActionCard, { backgroundColor: "#E3F2FD" }]}
-          onPress={() => handleCall("999", "Hospital")}
-        >
-          <Card.Content style={styles.quickActionContent}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#2196F320", justifyContent: "center", alignItems: "center" }}>
-              <MaterialCommunityIcons
-                name="hospital-building"
-                size={36}
-                color="#0D47A1"
-              />
-            </View>
-            <Text variant="titleSmall" style={{ marginTop: 10, fontWeight: "bold" }}>Hospital</Text>
-          </Card.Content>
-        </Card>
+          <MaterialCommunityIcons name="account-plus" size={22} color={theme.colors.onPrimary} />
+        </TouchableOpacity>
       </View>
 
-      {/* Safety Tips */}
-      <Card
-        style={[
-          styles.tipsCard,
-          { backgroundColor: theme.colors.primaryContainer },
-        ]}
-      >
-        <Card.Content style={{ padding: 20 }}>
-          <View style={styles.tipsHeader}>
-            <MaterialCommunityIcons
-              name="lightbulb"
-              size={28}
-              color={theme.colors.primary}
-            />
-            <Text
-              variant="titleMedium"
-              style={{ marginLeft: 10, color: theme.colors.onPrimaryContainer, fontWeight: "bold" }}
-            >
-              Safety Tips
+      {/* Pending Friend Requests */}
+      {pendingRequests.length > 0 && !loading && (
+        <View style={styles.pendingSection}>
+          <View style={styles.pendingHeader}>
+            <MaterialCommunityIcons name="account-clock" size={20} color={theme.colors.primary} />
+            <Text variant="titleSmall" style={{ marginLeft: 6, fontWeight: "700", color: theme.colors.primary }}>
+              Friend Requests ({pendingRequests.length})
             </Text>
           </View>
-          <Text
-            variant="bodyLarge"
-            style={{ color: theme.colors.onPrimaryContainer, marginTop: 12, lineHeight: 28 }}
-          >
-            • Stay calm and speak clearly when calling for help{"\n"}• Know your
-            address and keep it handy{"\n"}• Keep your phone charged and within
-            reach{"\n"}• Inform your caregiver about any emergencies
-          </Text>
-        </Card.Content>
-      </Card>
+          {pendingRequests.map((req) => (
+            <View
+              key={req.connectionId}
+              style={[styles.pendingCard, { backgroundColor: theme.colors.primaryContainer }]}
+            >
+              <Avatar.Text
+                size={40}
+                label={(req.from.name ?? "??").substring(0, 2).toUpperCase()}
+                style={{ backgroundColor: theme.colors.tertiaryContainer }}
+                labelStyle={{ color: theme.colors.onTertiaryContainer, fontWeight: "600" }}
+              />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text variant="titleSmall" style={{ fontWeight: "600" }}>
+                  {req.from.name ?? "Unknown"}
+                </Text>
+                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                  {req.from.phone ?? ""}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => handleAcceptRequest(req.connectionId, req.from.name ?? "User")}
+                disabled={acceptingId === req.connectionId}
+                style={[styles.acceptBtn, { backgroundColor: "#4CAF50" }]}
+              >
+                {acceptingId === req.connectionId ? (
+                  <ActivityIndicator size={16} color="#fff" />
+                ) : (
+                  <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleRejectRequest(req.connectionId, req.from.name ?? "User")}
+                style={[styles.rejectBtn, { backgroundColor: "#FFCDD2" }]}
+              >
+                <MaterialCommunityIcons name="close" size={18} color="#D32F2F" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
 
-      <View style={styles.bottomSpacer} />
-    </ScrollView>
+      {/* Conversations list */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text variant="bodyMedium" style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>
+            Loading...
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredContacts}
+          renderItem={renderConversation}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[styles.listContent, filteredContacts.length === 0 && styles.emptyList]}
+          ListEmptyComponent={renderEmpty}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ItemSeparatorComponent={() => (
+            <View style={{ height: 1, marginLeft: 80, backgroundColor: theme.colors.outlineVariant ?? "#E0E0E0" }} />
+          )}
+          extraData={lastMessages}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      {/* ── Add Contact Modal ── */}
+      <Modal
+        visible={addDialogVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeAddDialog}
+      >
+        <TouchableWithoutFeedback onPress={closeAddDialog}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+                {/* Header */}
+                <View style={styles.modalHeader}>
+                  <Text variant="titleLarge" style={{ fontWeight: "700" }}>
+                    Add Contact
+                  </Text>
+                  <TouchableOpacity onPress={closeAddDialog}>
+                    <MaterialCommunityIcons name="close" size={24} color={theme.colors.onSurface} />
+                  </TouchableOpacity>
+                </View>
+
+                <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 16 }}>
+                  Search for a friend by their phone number
+                </Text>
+
+                {/* Phone input + Search button */}
+                <View style={styles.phoneRow}>
+                  <TextInput
+                    mode="outlined"
+                    label="Phone number"
+                    value={phoneSearch}
+                    onChangeText={setPhoneSearch}
+                    keyboardType="phone-pad"
+                    style={{ flex: 1 }}
+                    dense
+                    left={<TextInput.Icon icon="phone" />}
+                    onSubmitEditing={handlePhoneSearch}
+                    returnKeyType="search"
+                  />
+                  <Button
+                    mode="contained"
+                    onPress={handlePhoneSearch}
+                    loading={searching}
+                    disabled={!phoneSearch.trim() || searching}
+                    style={styles.searchBtn}
+                    compact
+                  >
+                    Search
+                  </Button>
+                </View>
+
+                {/* Search result */}
+                {searching && (
+                  <View style={styles.resultArea}>
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                    <Text variant="bodySmall" style={{ marginLeft: 8, color: theme.colors.onSurfaceVariant }}>
+                      Searching...
+                    </Text>
+                  </View>
+                )}
+
+                {searchDone && !searching && foundElderly && (
+                  <View style={[styles.resultCard, { backgroundColor: theme.colors.secondaryContainer }]}>
+                    <Avatar.Text
+                      size={44}
+                      label={(foundElderly.name ?? "??").substring(0, 2).toUpperCase()}
+                      style={{ backgroundColor: theme.colors.tertiaryContainer }}
+                      labelStyle={{ color: theme.colors.onTertiaryContainer, fontWeight: "600", fontSize: 16 }}
+                    />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text variant="titleMedium" style={{ fontWeight: "600" }}>
+                        {foundElderly.name ?? "Unknown"}
+                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+                        <MaterialCommunityIcons name="phone" size={13} color={theme.colors.onSecondaryContainer} />
+                        <Text variant="bodySmall" style={{ marginLeft: 4, color: theme.colors.onSecondaryContainer }}>
+                          {foundElderly.phone ?? "N/A"}
+                        </Text>
+                      </View>
+                    </View>
+                    <Button
+                      mode="contained"
+                      onPress={handleAddContact}
+                      loading={addingContact}
+                      disabled={addingContact}
+                      compact
+                    >
+                      Add
+                    </Button>
+                  </View>
+                )}
+
+                {searchDone && !searching && !foundElderly && (
+                  <View style={styles.resultArea}>
+                    <MaterialCommunityIcons name="account-search" size={28} color={theme.colors.outlineVariant} />
+                    <Text variant="bodyMedium" style={{ marginLeft: 8, color: theme.colors.onSurfaceVariant }}>
+                      No user found with that number
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
   },
-  emergencyCard: {
-    marginBottom: 28,
-    borderRadius: 28,
-    elevation: 6,
-    shadowColor: "#FF3B30",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-  },
-  emergencyContent: {
-    alignItems: "center",
-    padding: 32,
-  },
-  emergencyTitle: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-    marginTop: 20,
-  },
-  emergencySubtitle: {
-    color: "#FFFFFF",
-    opacity: 0.9,
-    textAlign: "center",
-    marginTop: 10,
-    fontSize: 17,
-  },
-  emergencyButton: {
-    marginTop: 28,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 40,
-    borderRadius: 28,
-    elevation: 4,
-  },
-  emergencyButtonText: {
-    color: "#FF3B30",
-    fontSize: 22,
-    fontWeight: "bold",
-  },
-  emergencyButtonContent: {
-    paddingVertical: 12,
-  },
-  sectionTitle: {
-    fontWeight: "bold",
-    marginBottom: 14,
-  },
-  quickActionsGrid: {
+  // ── Search ──
+  searchWrap: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+    gap: 10,
+  },
+  searchBar: {
+    borderRadius: 12,
+    height: 42,
+  },
+  searchInput: {
+    fontSize: 15,
+    minHeight: 42,
+  },
+  addBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 2,
+  },
+  // ── Conversation card ──
+  conversationCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  avatarWrap: {
+    position: "relative",
+  },
+  onlineDot: {
+    position: "absolute",
+    bottom: 1,
+    right: 1,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 2.5,
+  },
+  conversationInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  nameRow: {
+    flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  quickActionCard: {
-    width: "48%",
-    marginBottom: 14,
-    borderRadius: 20,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-  },
-  quickActionContent: {
     alignItems: "center",
-    paddingVertical: 24,
   },
-  tipsCard: {
-    borderRadius: 20,
-    elevation: 2,
-  },
-  tipsHeader: {
+  roleRow: {
     flexDirection: "row",
     alignItems: "center",
+    marginTop: 1,
   },
-  bottomSpacer: {
-    height: 40,
+  callBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  // ── Shared ──
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  listContent: {
+    paddingTop: 6,
+    paddingBottom: 16,
+  },
+  emptyList: {
+    flexGrow: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 60,
+  },
+  // ── Add Contact Modal ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 24,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  phoneRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchBtn: {
+    marginTop: 6,
+    borderRadius: 8,
+  },
+  resultArea: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    justifyContent: "center",
+  },
+  resultCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    borderRadius: 14,
+    padding: 14,
+  },
+  // ── Pending requests ──
+  pendingSection: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  pendingHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  pendingCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+  },
+  acceptBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  rejectBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 6,
   },
 });

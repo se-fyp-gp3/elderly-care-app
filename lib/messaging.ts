@@ -28,6 +28,7 @@ export async function sendDirectMessage(input: {
   senderRole: "caregiver" | "elderly";
   receiverId: string;
   body: string;
+  messageType?: "text" | "voice";
 }): Promise<DirectMessage> {
   const now = new Date().toISOString();
   const doc = await tablesDB.createRow<DirectMessage>({
@@ -43,6 +44,7 @@ export async function sendDirectMessage(input: {
       body: input.body,
       created_at: now,
       is_read: false,
+      message_type: input.messageType ?? "text",
     },
   });
   return doc as unknown as DirectMessage;
