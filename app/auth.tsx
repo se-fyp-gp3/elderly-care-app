@@ -37,7 +37,7 @@ export default function AuthScreen() {
       LocalAuthentication.supportedAuthenticationTypesAsync()
         .then((types) => {
           if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-            setBiometricLabel("Face ID");
+            setBiometricLabel("Facial Recognition");
           } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
             setBiometricLabel("Fingerprint");
           }
