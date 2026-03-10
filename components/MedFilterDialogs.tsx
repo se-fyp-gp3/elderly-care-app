@@ -1,16 +1,16 @@
 import { MedicationItem } from "@/components/MedicationCard";
+import { Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { ScrollView, StyleSheet, TouchableOpacity } from "react-native";
 import {
-  Avatar,
-  Button,
-  Dialog,
-  Searchbar,
-  Text,
-  useTheme,
+    Avatar,
+    Button,
+    Dialog,
+    Searchbar,
+    Text,
+    useTheme,
 } from "react-native-paper";
-import { Elderly } from "@/types/appwrite";
 
 /* ─── Elderly Filter Dialog ─── */
 

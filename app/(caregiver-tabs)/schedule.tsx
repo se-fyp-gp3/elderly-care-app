@@ -19,6 +19,7 @@ import React, {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -35,6 +36,7 @@ import {
 import {
   Avatar,
   Button,
+  Card,
   Chip,
   Dialog,
   Divider,
@@ -114,24 +116,61 @@ export default function SchedulePage() {
       ? events
       : events.filter((item) => item.elderlyId === selectedElderlyId);
 
-  const flatListRef = useRef<FlatList<ScheduleEvent>>(null);
+  // Group medication events by time + elderlyId
+  type DisplayItem =
+    | { kind: 'single'; event: ScheduleEvent }
+    | { kind: 'medGroup'; key: string; time: string; elderlyName: string; elderlyId: string; rawDate: string; events: ScheduleEvent[] };
+
+  const displayItems = useMemo<DisplayItem[]>(() => {
+    const singles: DisplayItem[] = [];
+    const medGroupMap = new Map<string, ScheduleEvent[]>();
+
+    for (const ev of filteredEvents) {
+      if (ev.type === 'medication') {
+        const gk = `${ev.time}_${ev.elderlyId}`;
+        if (!medGroupMap.has(gk)) medGroupMap.set(gk, []);
+        medGroupMap.get(gk)!.push(ev);
+      } else {
+        singles.push({ kind: 'single', event: ev });
+      }
+    }
+
+    const groups: DisplayItem[] = [];
+    for (const [key, evts] of medGroupMap) {
+      groups.push({
+        kind: 'medGroup',
+        key,
+        time: evts[0].time,
+        elderlyName: evts[0].elderlyName,
+        elderlyId: evts[0].elderlyId,
+        rawDate: evts[0].rawDate,
+        events: evts,
+      });
+    }
+
+    return [...singles, ...groups].sort((a, b) => {
+      const rawA = a.kind === 'single' ? a.event.rawDate : a.rawDate;
+      const rawB = b.kind === 'single' ? b.event.rawDate : b.rawDate;
+      return rawA.localeCompare(rawB);
+    });
+  }, [filteredEvents]);
+
+  const flatListRef = useRef<FlatList<DisplayItem>>(null);
   const hasInitiallyLoaded = useRef(false);
 
   const scrollToPriorityTask = useCallback(() => {
-    if (!loading && filteredEvents.length > 0) {
-      // Find first missed task (highest priority)
-      let targetIndex = filteredEvents.findIndex((e) => {
-        const status = String(e.status).toLowerCase();
-        return status === ScheduleStatus.MISSED.toLowerCase();
-      });
+    if (!loading && displayItems.length > 0) {
+      const hasMissed = (item: DisplayItem) => {
+        if (item.kind === 'single') return String(item.event.status).toLowerCase() === ScheduleStatus.MISSED.toLowerCase();
+        return item.events.some(e => String(e.status).toLowerCase() === ScheduleStatus.MISSED.toLowerCase());
+      };
+      const hasPending = (item: DisplayItem) => {
+        if (item.kind === 'single') return String(item.event.status).toLowerCase() === ScheduleStatus.PENDING.toLowerCase();
+        return item.events.some(e => String(e.status).toLowerCase() === ScheduleStatus.PENDING.toLowerCase());
+      };
 
-      // If no missed tasks, find the first pending one (nearest future task)
-      if (targetIndex === -1) {
-        targetIndex = filteredEvents.findIndex((e) => {
-          const status = String(e.status).toLowerCase();
-          return status === ScheduleStatus.PENDING.toLowerCase();
-        });
-      }
+      let targetIndex = displayItems.findIndex(hasMissed);
+      if (targetIndex === -1) targetIndex = displayItems.findIndex(hasPending);
 
       if (targetIndex !== -1) {
         flatListRef.current?.scrollToIndex({
@@ -139,24 +178,20 @@ export default function SchedulePage() {
           animated: true,
           viewPosition: 0,
         });
-      } else {
-         // If all completed, maybe scroll to end or top?
-         // For now, do nothing if no priority tasks found
       }
     }
-  }, [loading, filteredEvents]);
+  }, [loading, displayItems]);
 
   // Auto-scroll logic to nearest missed or pending task — only on initial data load
   useEffect(() => {
-    if (!loading && !hasInitiallyLoaded.current && filteredEvents.length > 0) {
+    if (!loading && !hasInitiallyLoaded.current && displayItems.length > 0) {
       hasInitiallyLoaded.current = true;
-      // Scroll with a slight delay to allow layout to settle
       const timer = setTimeout(() => {
         scrollToPriorityTask();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [loading, filteredEvents.length, scrollToPriorityTask]);
+  }, [loading, displayItems.length, scrollToPriorityTask]);
 
   // Fetch Categories
   const fetchCategories = useCallback(async () => {
@@ -340,16 +375,14 @@ export default function SchedulePage() {
 
   const handleTakeMedication = async (event: ScheduleEvent) => {
     if (!event.medicationData) return;
-    const { realId, logId, reminderId, time } = event.medicationData;
-    if (!reminderId) return;
+    const { realId, logId, reminderId } = event.medicationData;
 
     try {
       const activeLogId = await recordMedicationTaken({
         reminderId,
         logId,
         elderlyId: event.elderlyId,
-        medicationTime: time,
-        selectedDate,
+        scheduledAt: event.rawDate,
         prescriptionId: realId,
       });
 
@@ -414,7 +447,7 @@ export default function SchedulePage() {
     }
   };
 
-  const renderEvent = ({ item }: { item: ScheduleEvent }) => (
+  const renderSingleEvent = (item: ScheduleEvent) => (
     <View style={styles.timelineRow}>
       <View style={styles.timeColumn}>
         <Text style={styles.timeText}>{item.time}</Text>
@@ -506,61 +539,283 @@ export default function SchedulePage() {
             {item.description}
           </Text>
 
-          {item.type === "medication" ? (
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "flex-end",
-                marginTop: 12,
-                alignItems: "center",
-              }}
-            >
-              {item.status === ScheduleStatus.PENDING ||
-              item.status === ScheduleStatus.MISSED ? (
-                <>
-                  <IconButton
-                    icon="bell-outline"
-                    size={20}
-                    onPress={() => handleRemindMedication(item)}
-                  />
-                  <Button
-                    mode="contained"
-                    compact
-                    onPress={() => handleTakeMedication(item)}
-                  >
-                    Take
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  icon="undo"
-                  compact
-                  mode="text"
-                  onPress={() => handleUndoMedication(item)}
-                >
-                  Undo
-                </Button>
-              )}
+          {(item.status === ScheduleStatus.PENDING ||
+            item.status === ScheduleStatus.MISSED) && (
+            <View style={{ alignItems: "flex-end", marginTop: 12 }}>
+              <Button
+                mode="contained-tonal"
+                compact
+                uppercase={false}
+                onPress={() => handleMarkDone(item.id)}
+              >
+                Mark Done
+              </Button>
             </View>
-          ) : (
-            (item.status === ScheduleStatus.PENDING ||
-              item.status === ScheduleStatus.MISSED) && (
-              <View style={{ alignItems: "flex-end", marginTop: 12 }}>
-                <Button
-                  mode="contained-tonal"
-                  compact
-                  uppercase={false}
-                  onPress={() => handleMarkDone(item.id)}
-                >
-                  Mark Done
-                </Button>
-              </View>
-            )
           )}
         </View>
       </Surface>
     </View>
   );
+
+  const renderMedGroup = (group: Extract<DisplayItem, { kind: 'medGroup' }>) => {
+    const allCompleted = group.events.every(
+      (e) => String(e.status).toLowerCase() === ScheduleStatus.COMPLETED.toLowerCase(),
+    );
+    const anyMissed = group.events.some(
+      (e) => String(e.status).toLowerCase() === ScheduleStatus.MISSED.toLowerCase(),
+    );
+    const groupStatus = allCompleted
+      ? ScheduleStatus.COMPLETED
+      : anyMissed
+        ? ScheduleStatus.MISSED
+        : ScheduleStatus.PENDING;
+    const completedCount = group.events.filter(
+      (e) => String(e.status).toLowerCase() === ScheduleStatus.COMPLETED.toLowerCase(),
+    ).length;
+
+    return (
+      <View style={styles.timelineRow}>
+        <View style={styles.timeColumn}>
+          <Text style={styles.timeText}>{group.time}</Text>
+          {allCompleted && (
+            <MaterialCommunityIcons
+              name="check-circle"
+              size={16}
+              color={theme.colors.primary}
+              style={{ marginTop: 4 }}
+            />
+          )}
+          {!allCompleted && anyMissed && (
+            <MaterialCommunityIcons
+              name="alert-circle"
+              size={16}
+              color={theme.colors.error}
+              style={{ marginTop: 4 }}
+            />
+          )}
+        </View>
+
+        <View style={styles.timelineLineContainer}>
+          <View
+            style={[
+              styles.timelineLine,
+              { backgroundColor: theme.colors.outlineVariant },
+            ]}
+          />
+          <View
+            style={[
+              styles.timelineDot,
+              { backgroundColor: getStatusColor(groupStatus) },
+            ]}
+          />
+        </View>
+
+        <Card
+          style={{
+            flex: 1,
+            marginLeft: 8,
+            marginBottom: 20,
+            borderRadius: 16,
+            overflow: 'hidden',
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
+            <Avatar.Icon
+              icon="pill"
+              size={40}
+              style={{
+                backgroundColor: allCompleted
+                  ? '#E8F5E9'
+                  : anyMissed
+                    ? theme.colors.errorContainer
+                    : theme.colors.secondaryContainer,
+                marginRight: 12,
+              }}
+              color={
+                allCompleted
+                  ? '#4CAF50'
+                  : anyMissed
+                    ? theme.colors.error
+                    : theme.colors.onSecondaryContainer
+              }
+            />
+            <View style={{ flex: 1 }}>
+              <Text variant="titleMedium" style={{ fontWeight: 'bold', fontSize: 16 }}>
+                {group.events.length} medication{group.events.length > 1 ? 's' : ''}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                <MaterialCommunityIcons
+                  name="account"
+                  size={14}
+                  color={theme.colors.secondary}
+                />
+                <Text variant="bodySmall" style={{ color: theme.colors.secondary, marginLeft: 4 }}>
+                  {group.elderlyName}
+                </Text>
+              </View>
+            </View>
+          </View>
+          {/* Progress bar */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View
+                style={{
+                  flex: 1,
+                  height: 4,
+                  backgroundColor: 'rgba(0,0,0,0.1)',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                }}
+              >
+                <View
+                  style={{
+                    width: `${(completedCount / group.events.length) * 100}%`,
+                    height: '100%',
+                    backgroundColor: allCompleted ? '#4CAF50' : theme.colors.primary,
+                    borderRadius: 2,
+                  }}
+                />
+              </View>
+              <Text
+                variant="labelSmall"
+                style={{ marginLeft: 8, color: theme.colors.outline }}
+              >
+                {completedCount}/{group.events.length}
+              </Text>
+            </View>
+          </View>
+          <Divider />
+          <Card.Content>
+            {group.events.map((med, index) => (
+              <View
+                key={med.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 10,
+                  borderTopWidth: index > 0 ? 1 : 0,
+                  borderTopColor: theme.colors.surfaceVariant,
+                }}
+              >
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                >
+                  <Avatar.Icon
+                    icon="pill"
+                    size={28}
+                    style={{
+                      backgroundColor:
+                        String(med.status).toLowerCase() ===
+                        ScheduleStatus.COMPLETED.toLowerCase()
+                          ? '#E8F5E9'
+                          : theme.colors.primaryContainer,
+                      marginRight: 8,
+                    }}
+                    color={
+                      String(med.status).toLowerCase() ===
+                      ScheduleStatus.COMPLETED.toLowerCase()
+                        ? '#4CAF50'
+                        : theme.colors.onPrimaryContainer
+                    }
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyLarge" style={{ fontWeight: '600' }}>
+                      {med.title}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      numberOfLines={1}
+                      style={{ color: theme.colors.outline }}
+                    >
+                      {med.description}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor:
+                        String(med.status).toLowerCase() ===
+                        ScheduleStatus.COMPLETED.toLowerCase()
+                          ? theme.colors.primaryContainer
+                          : String(med.status).toLowerCase() ===
+                              ScheduleStatus.MISSED.toLowerCase()
+                            ? theme.colors.errorContainer
+                            : theme.colors.surfaceVariant,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 4,
+                      marginRight: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 'bold',
+                        color:
+                          String(med.status).toLowerCase() ===
+                          ScheduleStatus.COMPLETED.toLowerCase()
+                            ? theme.colors.onPrimaryContainer
+                            : String(med.status).toLowerCase() ===
+                                ScheduleStatus.MISSED.toLowerCase()
+                              ? theme.colors.onErrorContainer
+                              : theme.colors.onSurfaceVariant,
+                      }}
+                    >
+                      {String(med.status).toLowerCase() ===
+                      ScheduleStatus.COMPLETED.toLowerCase()
+                        ? 'Taken'
+                        : String(med.status).toLowerCase() ===
+                            ScheduleStatus.MISSED.toLowerCase()
+                          ? 'Missed'
+                          : 'Pending'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {String(med.status).toLowerCase() ===
+                    ScheduleStatus.PENDING.toLowerCase() ||
+                  String(med.status).toLowerCase() ===
+                    ScheduleStatus.MISSED.toLowerCase() ? (
+                    <>
+                      <IconButton
+                        icon="bell-outline"
+                        size={18}
+                        onPress={() => handleRemindMedication(med)}
+                        style={{ margin: 0 }}
+                      />
+                      <Button
+                        mode="contained"
+                        compact
+                        onPress={() => handleTakeMedication(med)}
+                        labelStyle={{ fontSize: 12 }}
+                      >
+                        Take
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      icon="undo"
+                      compact
+                      mode="text"
+                      onPress={() => handleUndoMedication(med)}
+                      labelStyle={{ fontSize: 12 }}
+                    >
+                      Undo
+                    </Button>
+                  )}
+                </View>
+              </View>
+            ))}
+          </Card.Content>
+        </Card>
+      </View>
+    );
+  };
+
+  const renderDisplayItem = ({ item }: { item: DisplayItem }) => {
+    if (item.kind === 'single') return renderSingleEvent(item.event);
+    return renderMedGroup(item);
+  };
 
   return (
     <View
@@ -808,9 +1063,11 @@ export default function SchedulePage() {
               });
             });
           }}
-          data={filteredEvents}
-          keyExtractor={(item) => item.id}
-          renderItem={renderEvent}
+          data={displayItems}
+          keyExtractor={(item) =>
+            item.kind === 'single' ? item.event.id : item.key
+          }
+          renderItem={renderDisplayItem}
           contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
