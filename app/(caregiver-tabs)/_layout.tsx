@@ -131,13 +131,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="medication_old"
-        options={{
-          href: null,
-          title: "medication_old",
-        }}
-      />
-      <Tabs.Screen
         name="scan-qr"
         options={{
           href: null,
