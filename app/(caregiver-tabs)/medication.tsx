@@ -1,4 +1,13 @@
+import { AddMedicationDialog, MedicationFormData } from "@/components/AddMedicationDialog";
+import ElderlyGroupSummary from "@/components/ElderlyGroupSummary";
 import { MedicationItem } from "@/components/MedicationCard";
+import {
+  ConfirmMedicationDialog,
+  ElderlyFilterDialog,
+  StatusFilterDialog,
+} from "@/components/MedFilterDialogs";
+import MedStatsCard from "@/components/MedStatsCard";
+import TimeSlotCard from "@/components/TimeSlotCard";
 import { useAuth } from "@/lib/auth-context";
 import {
   addMedication,
@@ -9,8 +18,6 @@ import {
   undoMedicationTaking,
 } from "@/lib/medication";
 import { Elderly } from "@/types/appwrite";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
@@ -21,22 +28,15 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from "react-native";
 import {
-  Avatar,
   Button,
-  Card,
-  Chip,
-  Dialog,
   Divider,
   FAB,
   IconButton,
   Portal,
-  Searchbar,
   Text,
-  TextInput,
   useTheme,
 } from "react-native-paper";
 
@@ -81,9 +81,9 @@ export default function MedicationManagement() {
     "form" | "elderly" | "frequency"
   >("form");
   const [addMedElderlySearch, setAddMedElderlySearch] = useState("");
-  const [medicationFormData, setMedicationFormData] = useState({
+  const [medicationFormData, setMedicationFormData] = useState<MedicationFormData>({
     elderlyId: "",
-    elderlyName: "", // Added for display
+    elderlyName: "",
     name: "",
     unit: "mg",
     dosage: "1",
@@ -402,45 +402,12 @@ export default function MedicationManagement() {
         }
       >
         <View style={styles.section}>
-          <Card>
-            <Card.Content>
-              <View style={styles.statsRow}>
-                <View style={styles.stat}>
-                  <Text variant="headlineSmall" style={styles.statNumber}>
-                    {totalCount}
-                  </Text>
-                  <Text variant="bodyMedium">Total</Text>
-                </View>
-                <View style={styles.stat}>
-                  <Text
-                    variant="headlineSmall"
-                    style={[styles.statNumber, styles.pending]}
-                  >
-                    {pendingCount}
-                  </Text>
-                  <Text variant="bodyMedium">Pending</Text>
-                </View>
-                <View style={styles.stat}>
-                  <Text
-                    variant="headlineSmall"
-                    style={[styles.statNumber, styles.completed]}
-                  >
-                    {completedCount}
-                  </Text>
-                  <Text variant="bodyMedium">Done</Text>
-                </View>
-                <View style={styles.stat}>
-                  <Text
-                    variant="headlineSmall"
-                    style={[styles.statNumber, styles.overdue]}
-                  >
-                    {missedCount}
-                  </Text>
-                  <Text variant="bodyMedium">Missed</Text>
-                </View>
-              </View>
-            </Card.Content>
-          </Card>
+          <MedStatsCard
+            totalCount={totalCount}
+            pendingCount={pendingCount}
+            completedCount={completedCount}
+            missedCount={missedCount}
+          />
         </View>
 
         <View style={styles.section}>
@@ -527,106 +494,9 @@ export default function MedicationManagement() {
                 <Divider style={{ marginBottom: 8 }} />
 
                 {/* Elderly-level compact summary */}
-                {group.medications.length > 0 && (() => {
-                  const totalMeds = group.medications.length;
-                  const completedMeds = group.medications.filter(m => m.status === 'completed').length;
-                  const missedMedsCount = group.medications.filter(m => m.status === 'missed').length;
-                  const nextPending = [...group.medications]
-                    .sort((a, b) => a.time.localeCompare(b.time))
-                    .find(m => m.status === 'pending');
-                  const allDone = completedMeds === totalMeds;
-                  const progress = totalMeds > 0 ? completedMeds / totalMeds : 0;
-
-                  return (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: allDone
-                          ? theme.colors.primaryContainer
-                          : missedMedsCount > 0 && !nextPending
-                            ? theme.colors.errorContainer
-                            : theme.colors.surfaceVariant,
-                        borderRadius: 8,
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        marginBottom: 12,
-                      }}
-                    >
-                      {/* Progress bar */}
-                      <View
-                        style={{
-                          width: 56,
-                          height: 6,
-                          backgroundColor: 'rgba(0,0,0,0.1)',
-                          borderRadius: 3,
-                          marginRight: 10,
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <View
-                          style={{
-                            width: `${progress * 100}%`,
-                            height: '100%',
-                            backgroundColor: allDone ? '#4CAF50' : theme.colors.primary,
-                            borderRadius: 3,
-                          }}
-                        />
-                      </View>
-                      <Text
-                        variant="labelMedium"
-                        style={{
-                          fontWeight: 'bold',
-                          marginRight: 10,
-                          color: allDone
-                            ? theme.colors.onPrimaryContainer
-                            : missedMedsCount > 0 && !nextPending
-                              ? theme.colors.onErrorContainer
-                              : theme.colors.onSurfaceVariant,
-                        }}
-                      >
-                        {completedMeds}/{totalMeds}
-                      </Text>
-                      <MaterialCommunityIcons
-                        name={
-                          allDone
-                            ? 'check-circle'
-                            : nextPending
-                              ? 'clock-outline'
-                              : 'alert-circle-outline'
-                        }
-                        size={14}
-                        color={
-                          allDone
-                            ? '#4CAF50'
-                            : missedMedsCount > 0 && !nextPending
-                              ? theme.colors.error
-                              : theme.colors.onSurfaceVariant
-                        }
-                        style={{ marginRight: 4 }}
-                      />
-                      <Text
-                        variant="bodySmall"
-                        style={{
-                          flex: 1,
-                          color: allDone
-                            ? '#4CAF50'
-                            : missedMedsCount > 0 && !nextPending
-                              ? theme.colors.error
-                              : theme.colors.onSurfaceVariant,
-                        }}
-                      >
-                        {allDone
-                          ? 'All taken today'
-                          : nextPending
-                            ? `Next: ${nextPending.time} ${nextPending.name}${missedMedsCount > 0 ? ` · ${missedMedsCount} missed` : ''}`
-                            : missedMedsCount === 1
-                              ? `1 missed · ${group.medications.find(m => m.status === 'missed')?.name || ''}`
-                              : `${missedMedsCount} missed`}
-                      </Text>
-                    </View>
-                  );
-                })()}
+                {group.medications.length > 0 && (
+                  <ElderlyGroupSummary medications={group.medications} />
+                )}
 
                 {!collapsedGroups.has(group.elderlyId) &&
                   (group.medications.length === 0 ? (
@@ -640,7 +510,7 @@ export default function MedicationManagement() {
                       No medications scheduled.
                     </Text>
                   ) : (
-                    /* Group medications by TIME instead of by drug name */
+                    /* Group medications by TIME */
                     Object.entries(
                       group.medications.reduce(
                         (acc, med) => {
@@ -652,320 +522,34 @@ export default function MedicationManagement() {
                         {} as Record<string, MedicationItem[]>,
                       ),
                     )
-                    .sort(([timeA], [timeB]) => timeA.localeCompare(timeB))
+                    .sort(([timeA, medsA], [timeB, medsB]) => {
+                      const allDoneA = medsA.every(m => m.status === 'completed');
+                      const allDoneB = medsB.every(m => m.status === 'completed');
+                      if (allDoneA && !allDoneB) return 1;
+                      if (!allDoneA && allDoneB) return -1;
+                      return timeA.localeCompare(timeB);
+                    })
                     .map(([timeSlot, meds]) => {
-                      const totalMeds = meds.length;
-                      const completedMeds = meds.filter(m => m.status === 'completed').length;
-                      const missedMeds = meds.filter(m => m.status === 'missed').length;
-                      const allDone = completedMeds === totalMeds;
-                      const progress = totalMeds > 0 ? completedMeds / totalMeds : 0;
                       const timeCardKey = `${group.elderlyId}_time_${timeSlot}`;
-                      const isExpanded = isMedCardExpanded(timeCardKey, totalMeds);
-
-                      let summaryText = '';
-                      let summaryIcon = 'information-outline';
-                      if (allDone) {
-                        summaryText = 'All taken';
-                        summaryIcon = 'check-circle';
-                      } else if (missedMeds > 0 && completedMeds + missedMeds === totalMeds) {
-                        summaryText = `${missedMeds} missed`;
-                        summaryIcon = 'alert-circle-outline';
-                      } else {
-                        const pendingCount = totalMeds - completedMeds - missedMeds;
-                        summaryText = `${pendingCount} pending`;
-                        if (missedMeds > 0) summaryText += ` · ${missedMeds} missed`;
-                        summaryIcon = 'clock-outline';
-                      }
+                      const slotsCount = meds.length;
+                      const isExpanded = isMedCardExpanded(timeCardKey, slotsCount);
 
                       return (
-                      <Card
-                        key={timeCardKey}
-                        style={{
-                          marginBottom: 16,
-                          backgroundColor: theme.colors.elevation.level1,
-                        }}
-                      >
-                        <Card.Title
-                          title={timeSlot}
-                          titleStyle={{ fontWeight: "bold", fontSize: 20 }}
-                          subtitle={`${totalMeds} medication${totalMeds > 1 ? 's' : ''}`}
-                          left={(props) => (
-                            <Avatar.Icon
-                              {...props}
-                              icon="clock-outline"
-                              size={40}
-                              style={{
-                                backgroundColor: allDone
-                                  ? '#E8F5E9'
-                                  : missedMeds > 0
-                                    ? theme.colors.errorContainer
-                                    : theme.colors.primaryContainer,
-                              }}
-                              color={allDone
-                                ? '#4CAF50'
-                                : missedMeds > 0
-                                  ? theme.colors.error
-                                  : theme.colors.onPrimaryContainer}
-                            />
-                          )}
-                          right={() => (
-                            <IconButton
-                              icon={isExpanded ? "chevron-up" : "chevron-down"}
-                              onPress={() => toggleMedCard(timeCardKey, totalMeds <= 1)}
-                              size={24}
-                            />
-                          )}
+                        <TimeSlotCard
+                          key={timeCardKey}
+                          timeSlot={timeSlot}
+                          meds={meds}
+                          groupElderlyId={group.elderlyId}
+                          isExpanded={isExpanded}
+                          onToggleExpand={() => toggleMedCard(timeCardKey, slotsCount <= 1)}
+                          onRemindLater={onRemindLater}
+                          onConfirmTaking={(med: MedicationItem) => {
+                            setConfirmingMedItem(med);
+                            setNoteText(med.notes || "");
+                          }}
+                          onUndoTaking={onUndoTaking}
+                          setNoteText={setNoteText}
                         />
-                        <Card.Content>
-                          {/* Summary bar */}
-                          {!isExpanded && (
-                            <TouchableOpacity
-                              onPress={() => toggleMedCard(timeCardKey, totalMeds <= 1)}
-                              activeOpacity={0.7}
-                            >
-                              <View
-                                style={{
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  paddingVertical: 8,
-                                  paddingHorizontal: 12,
-                                  backgroundColor: allDone
-                                    ? theme.colors.primaryContainer
-                                    : missedMeds > 0
-                                      ? theme.colors.errorContainer
-                                      : theme.colors.surfaceVariant,
-                                  borderRadius: 8,
-                                }}
-                              >
-                                {/* Progress bar */}
-                                <View
-                                  style={{
-                                    width: 48,
-                                    height: 6,
-                                    backgroundColor: 'rgba(0,0,0,0.1)',
-                                    borderRadius: 3,
-                                    marginRight: 10,
-                                    overflow: 'hidden',
-                                  }}
-                                >
-                                  <View
-                                    style={{
-                                      width: `${progress * 100}%`,
-                                      height: '100%',
-                                      backgroundColor: allDone ? '#4CAF50' : theme.colors.primary,
-                                      borderRadius: 3,
-                                    }}
-                                  />
-                                </View>
-                                <Text
-                                  variant="labelMedium"
-                                  style={{
-                                    fontWeight: 'bold',
-                                    marginRight: 12,
-                                    color: allDone
-                                      ? theme.colors.onPrimaryContainer
-                                      : missedMeds > 0
-                                        ? theme.colors.onErrorContainer
-                                        : theme.colors.onSurfaceVariant,
-                                  }}
-                                >
-                                  {completedMeds}/{totalMeds}
-                                </Text>
-                                <MaterialCommunityIcons
-                                  name={summaryIcon as any}
-                                  size={16}
-                                  color={
-                                    allDone
-                                      ? '#4CAF50'
-                                      : missedMeds > 0
-                                        ? theme.colors.error
-                                        : theme.colors.onSurfaceVariant
-                                  }
-                                  style={{ marginRight: 4 }}
-                                />
-                                <Text
-                                  variant="bodySmall"
-                                  style={{
-                                    color: allDone
-                                      ? '#4CAF50'
-                                      : missedMeds > 0
-                                        ? theme.colors.error
-                                        : theme.colors.onSurfaceVariant,
-                                    flex: 1,
-                                  }}
-                                >
-                                  {summaryText}
-                                </Text>
-                                <MaterialCommunityIcons
-                                  name="chevron-down"
-                                  size={18}
-                                  color={theme.colors.outline}
-                                />
-                              </View>
-                            </TouchableOpacity>
-                          )}
-
-                          {/* Medications in this time slot — visible when expanded */}
-                          {isExpanded &&
-                            meds.map((med, index) => (
-                              <View
-                                key={med.id}
-                                style={{
-                                  flexDirection: "row",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  paddingVertical: 12,
-                                  borderTopWidth: index > 0 ? 1 : 0,
-                                  borderTopColor: theme.colors.surfaceVariant,
-                                }}
-                              >
-                                <View
-                                  style={{
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    flex: 1,
-                                  }}
-                                >
-                                  <Avatar.Icon
-                                    icon="pill"
-                                    size={32}
-                                    style={{
-                                      backgroundColor: med.status === 'completed'
-                                        ? '#E8F5E9'
-                                        : theme.colors.primaryContainer,
-                                      marginRight: 10,
-                                    }}
-                                    color={med.status === 'completed'
-                                      ? '#4CAF50'
-                                      : theme.colors.onPrimaryContainer}
-                                  />
-                                  <View style={{ flex: 1 }}>
-                                    <Text
-                                      variant="bodyLarge"
-                                      style={{ fontWeight: "600" }}
-                                    >
-                                      {med.name}
-                                    </Text>
-                                    <Text
-                                      variant="bodySmall"
-                                      style={{ color: theme.colors.outline }}
-                                    >
-                                      {med.dosage} • {med.frequency}
-                                    </Text>
-                                  </View>
-
-                                  <View
-                                    style={{
-                                      backgroundColor:
-                                        med.status === "completed"
-                                          ? theme.colors.primaryContainer
-                                          : med.status === "missed"
-                                            ? theme.colors.errorContainer
-                                            : theme.colors.surfaceVariant,
-                                      paddingHorizontal: 8,
-                                      paddingVertical: 2,
-                                      borderRadius: 4,
-                                      marginRight: 4,
-                                    }}
-                                  >
-                                    <Text
-                                      style={{
-                                        color:
-                                          med.status === "completed"
-                                            ? theme.colors.onPrimaryContainer
-                                            : med.status === "missed"
-                                              ? theme.colors.onErrorContainer
-                                              : theme.colors.onSurfaceVariant,
-                                        fontSize: 12,
-                                        fontWeight: "bold",
-                                      }}
-                                    >
-                                      {med.status === "completed"
-                                        ? "Taken"
-                                        : med.status === "pending"
-                                          ? "Pending"
-                                          : med.status
-                                              .charAt(0)
-                                              .toUpperCase() +
-                                            med.status.slice(1)}
-                                    </Text>
-                                  </View>
-                                </View>
-
-                                <View
-                                  style={{
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                  }}
-                                >
-                                  {med.status === "pending" ||
-                                  med.status === "missed" ? (
-                                    <>
-                                      <IconButton
-                                        icon="bell-outline"
-                                        size={20}
-                                        onPress={() => onRemindLater(med.id)}
-                                        style={{ margin: 0 }}
-                                      />
-                                      <Button
-                                        mode="contained"
-                                        compact
-                                        onPress={() => {
-                                          setConfirmingMedItem(med);
-                                          setNoteText(med.notes || "");
-                                        }}
-                                        style={{ marginLeft: 4 }}
-                                      >
-                                        Take
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    med.status === "completed" && (
-                                      <View
-                                        style={{
-                                          flexDirection: "row",
-                                          alignItems: "center",
-                                        }}
-                                      >
-                                        <MaterialCommunityIcons
-                                          name="check-circle"
-                                          size={16}
-                                          color={theme.colors.primary}
-                                          style={{ marginRight: 4 }}
-                                        />
-                                        <Text
-                                          variant="bodySmall"
-                                          style={{
-                                            color: theme.colors.outline,
-                                            marginRight: 8,
-                                          }}
-                                        >
-                                          {med.takenAtIso
-                                            ? new Date(
-                                                med.takenAtIso,
-                                              ).toLocaleTimeString([], {
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                              })
-                                            : med.lastTaken}
-                                        </Text>
-                                        <Button
-                                          icon="undo"
-                                          compact
-                                          mode="text"
-                                          onPress={() => onUndoTaking(med)}
-                                          labelStyle={{ fontSize: 12 }}
-                                        >
-                                          Undo
-                                        </Button>
-                                      </View>
-                                    )
-                                  )}
-                                </View>
-                              </View>
-                            ))}
-                        </Card.Content>
-                      </Card>
                       );
                     })
                   ))}
@@ -976,488 +560,60 @@ export default function MedicationManagement() {
       </ScrollView>
 
       <Portal>
-        <Dialog
+        <ElderlyFilterDialog
           visible={elderlyFilterVisible}
           onDismiss={() => setElderlyFilterVisible(false)}
-          style={{ backgroundColor: theme.colors.surface }}
-        >
-          <Dialog.Title>Select Elderly</Dialog.Title>
-          <Dialog.Content style={{ paddingBottom: 0 }}>
-            <Searchbar
-              placeholder="Search"
-              onChangeText={setElderlySearchQuery}
-              value={elderlySearchQuery}
-              style={{
-                backgroundColor: theme.colors.surfaceVariant,
-                height: 40,
-                marginBottom: 10,
-              }}
-              inputStyle={{ minHeight: 0 }}
-            />
-            <ScrollView style={{ maxHeight: 300 }}>
-              <TouchableOpacity
-                style={[
-                  styles.selectionRow,
-                  {
-                    backgroundColor:
-                      selectedElderlyId === "All"
-                        ? theme.colors.secondaryContainer
-                        : "transparent",
-                  },
-                ]}
-                onPress={() => {
-                  setSelectedElderlyId("All");
-                  setElderlyFilterVisible(false);
-                }}
-              >
-                <Avatar.Icon
-                  size={40}
-                  icon="account-group"
-                  style={{
-                    marginRight: 16,
-                    backgroundColor: theme.colors.secondary,
-                  }}
-                />
-                <Text variant="titleMedium">Everyone</Text>
-                {selectedElderlyId === "All" && (
-                  <MaterialCommunityIcons
-                    name="check"
-                    size={24}
-                    color={theme.colors.onSecondaryContainer}
-                    style={{ marginLeft: "auto" }}
-                  />
-                )}
-              </TouchableOpacity>
-              {linkedElderly
-                .filter((e) =>
-                  e.name
-                    .toLowerCase()
-                    .includes(elderlySearchQuery.toLowerCase()),
-                )
-                .map((item) => (
-                  <TouchableOpacity
-                    key={item.$id}
-                    style={[
-                      styles.selectionRow,
-                      {
-                        backgroundColor:
-                          selectedElderlyId === item.$id
-                            ? theme.colors.secondaryContainer
-                            : "transparent",
-                      },
-                    ]}
-                    onPress={() => {
-                      setSelectedElderlyId(item.$id);
-                      setElderlyFilterVisible(false);
-                    }}
-                  >
-                    <Avatar.Text
-                      size={40}
-                      label={item.name.substring(0, 2)}
-                      style={{
-                        marginRight: 16,
-                        backgroundColor: theme.colors.secondary,
-                      }}
-                    />
-                    <Text variant="titleMedium">{item.name}</Text>
-                    {selectedElderlyId === item.$id && (
-                      <MaterialCommunityIcons
-                        name="check"
-                        size={24}
-                        color={theme.colors.onSecondaryContainer}
-                        style={{ marginLeft: "auto" }}
-                      />
-                    )}
-                  </TouchableOpacity>
-                ))}
-            </ScrollView>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setElderlyFilterVisible(false)}>
-              Cancel
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
+          linkedElderly={linkedElderly}
+          selectedElderlyId={selectedElderlyId}
+          onSelect={(id) => {
+            setSelectedElderlyId(id);
+            setElderlyFilterVisible(false);
+          }}
+          searchQuery={elderlySearchQuery}
+          onSearchChange={setElderlySearchQuery}
+        />
 
-        <Dialog
+        <StatusFilterDialog
           visible={statusFilterVisible}
           onDismiss={() => setStatusFilterVisible(false)}
-          style={{ backgroundColor: theme.colors.surface }}
-        >
-          <Dialog.Title>Filter Status</Dialog.Title>
-          <Dialog.Content>
-            {["all", "pending", "completed", "missed"].map((status) => (
-              <TouchableOpacity
-                key={status}
-                style={[
-                  styles.selectionRow,
-                  {
-                    backgroundColor:
-                      statusFilter === status
-                        ? theme.colors.secondaryContainer
-                        : "transparent",
-                  },
-                ]}
-                onPress={() => {
-                  setStatusFilter(status);
-                  setStatusFilterVisible(false);
-                }}
-              >
-                <MaterialCommunityIcons
-                  name={
-                    status === "all"
-                      ? "filter-variant"
-                      : status === "pending"
-                        ? "clock-outline"
-                        : status === "completed"
-                          ? "check-circle-outline"
-                          : "alert-circle-outline"
-                  }
-                  size={24}
-                  color={theme.colors.onSurface}
-                  style={{ marginRight: 16 }}
-                />
-                <Text variant="titleMedium">
-                  {status === "all"
-                    ? "All Status"
-                    : status.charAt(0).toUpperCase() + status.slice(1)}
-                </Text>
-                {statusFilter === status && (
-                  <MaterialCommunityIcons
-                    name="check"
-                    size={24}
-                    color={theme.colors.onSecondaryContainer}
-                    style={{ marginLeft: "auto" }}
-                  />
-                )}
-              </TouchableOpacity>
-            ))}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setStatusFilterVisible(false)}>
-              Cancel
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
+          statusFilter={statusFilter}
+          onSelect={(status) => {
+            setStatusFilter(status);
+            setStatusFilterVisible(false);
+          }}
+        />
 
-        <Dialog
-          visible={confirmingMedItem !== null}
-          onDismiss={() => setConfirmingMedItem(null)}
-        >
-          <Dialog.Title>Confirm Medication</Dialog.Title>
-          <Dialog.Content>
-            <Text>
-              Confirm {confirmingMedItem?.name} for {confirmingMedItem?.elderly}?
-            </Text>
-            {/* Note: Medication Logs table doesn't have notes column in standard schema, but we can't save it if it doesn't exist. 
-                            Assuming we just confirm status. */}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button
-              onPress={() => {
-                setConfirmingMedItem(null);
-                setNoteText("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onPress={() => {
-                if (confirmingMedItem) onConfirmTaking(confirmingMedItem);
-              }}
-            >
-              Confirm
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
+        <ConfirmMedicationDialog
+          medItem={confirmingMedItem}
+          onDismiss={() => {
+            setConfirmingMedItem(null);
+            setNoteText("");
+          }}
+          onConfirm={() => {
+            if (confirmingMedItem) onConfirmTaking(confirmingMedItem);
+          }}
+        />
 
-        <Dialog
+        <AddMedicationDialog
           visible={addMedDialogVisible}
           onDismiss={() => {
             setAddMedDialogVisible(false);
             setAddDialogStep("form");
           }}
-          style={{ maxHeight: "80%" }}
-        >
-          {addDialogStep === "form" ? (
-            <View>
-              <Dialog.Title>Add New Medication</Dialog.Title>
-              <Dialog.ScrollArea>
-                <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
-                  <TouchableOpacity
-                    onPress={() => setAddDialogStep("elderly")}
-                  >
-                    <TextInput
-                      label="Select Elderly"
-                      value={
-                        medicationFormData.elderlyName ||
-                        linkedElderly.find(
-                          (e) => e.$id === medicationFormData.elderlyId,
-                        )?.name ||
-                        ""
-                      }
-                      editable={false}
-                      right={
-                        <TextInput.Icon
-                          icon="chevron-right"
-                          onPress={() => setAddDialogStep("elderly")}
-                        />
-                      }
-                      mode="outlined"
-                      style={{ marginBottom: 10 }}
-                    />
-                  </TouchableOpacity>
-
-                  <TextInput
-                    label="Medication Name"
-                    value={medicationFormData.name}
-                    onChangeText={(val) =>
-                      setMedicationFormData((prev) => ({ ...prev, name: val }))
-                    }
-                    style={{ marginBottom: 10 }}
-                    mode="outlined"
-                  />
-                  <View
-                    style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}
-                  >
-                    <TextInput
-                      label="Dosage"
-                      value={medicationFormData.dosage}
-                      keyboardType="numeric"
-                      onChangeText={(val) =>
-                        setMedicationFormData((prev) => ({ ...prev, dosage: val }))
-                      }
-                      style={{ flex: 1 }}
-                      mode="outlined"
-                    />
-                    <TextInput
-                      label="Unit"
-                      value={medicationFormData.unit}
-                      onChangeText={(val) =>
-                        setMedicationFormData((prev) => ({ ...prev, unit: val }))
-                      }
-                      style={{ flex: 1 }}
-                      mode="outlined"
-                    />
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => setAddDialogStep("frequency")}
-                  >
-                    <TextInput
-                      label="Frequency"
-                      value={medicationFormData.frequency}
-                      editable={false}
-                      right={
-                        <TextInput.Icon
-                          icon="chevron-right"
-                          onPress={() => setAddDialogStep("frequency")}
-                        />
-                      }
-                      mode="outlined"
-                      style={{ marginBottom: 10 }}
-                    />
-                  </TouchableOpacity>
-
-                  <Text style={{ marginBottom: 5 }}>Reminder Times:</Text>
-                  <View
-                    style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
-                  >
-                    {medicationFormData.times.map((t, idx) => (
-                      <Chip
-                        key={idx}
-                        icon="clock"
-                        onClose={() =>
-                          setMedicationFormData((prev) => ({
-                            ...prev,
-                            times: prev.times.filter((_, i) => i !== idx),
-                          }))
-                        }
-                        onPress={() => {
-                          setEditingTimeIndex(idx);
-                          setShowTimePicker(true);
-                        }}
-                      >
-                        {t.toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </Chip>
-                    ))}
-                    <Chip
-                      icon="plus"
-                      onPress={() => {
-                        setEditingTimeIndex(-1);
-                        setShowTimePicker(true);
-                      }}
-                    >
-                      Add Time
-                    </Chip>
-                  </View>
-                </ScrollView>
-              </Dialog.ScrollArea>
-              <Dialog.Actions>
-                <Button onPress={() => setAddMedDialogVisible(false)}>Cancel</Button>
-                <Button onPress={handleAddMedication}>Save</Button>
-              </Dialog.Actions>
-            </View>
-          ) : (
-            <View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  padding: 10,
-                }}
-              >
-                <IconButton
-                  icon="arrow-left"
-                  onPress={() => setAddDialogStep("form")}
-                />
-                <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-                  {addDialogStep === "elderly"
-                    ? "Select Elderly"
-                    : "Select Frequency"}
-                </Text>
-              </View>
-              <Divider />
-              {addDialogStep === "elderly" && (
-                <View style={{ padding: 10 }}>
-                  <Searchbar
-                    placeholder="Search"
-                    onChangeText={setAddMedElderlySearch}
-                    value={addMedElderlySearch}
-                    style={{
-                      backgroundColor: theme.colors.surfaceVariant,
-                      height: 40,
-                    }}
-                    inputStyle={{ minHeight: 0 }}
-                  />
-                </View>
-              )}
-              <Dialog.ScrollArea>
-                <ScrollView style={{ maxHeight: 300 }}>
-                  {addDialogStep === "elderly"
-                    ? linkedElderly
-                        .filter((e) =>
-                          e.name
-                            .toLowerCase()
-                            .includes(addMedElderlySearch.toLowerCase()),
-                        )
-                        .map((item) => (
-                          <TouchableOpacity
-                            key={item.$id}
-                            style={[
-                              styles.selectionRow,
-                              {
-                                backgroundColor:
-                                  medicationFormData.elderlyId === item.$id
-                                    ? theme.colors.secondaryContainer
-                                    : "transparent",
-                              },
-                            ]}
-                            onPress={() => {
-                              setMedicationFormData((prev) => ({
-                                ...prev,
-                                elderlyId: item.$id,
-                                elderlyName: item.name,
-                              }));
-                              setAddDialogStep("form");
-                            }}
-                          >
-                            <Avatar.Text
-                              size={40}
-                              label={item.name.substring(0, 2)}
-                              style={{
-                                marginRight: 16,
-                                backgroundColor: theme.colors.secondary,
-                              }}
-                            />
-                            <Text variant="titleMedium">{item.name}</Text>
-                            {medicationFormData.elderlyId === item.$id && (
-                              <MaterialCommunityIcons
-                                name="check"
-                                size={24}
-                                color={theme.colors.onSecondaryContainer}
-                                style={{ marginLeft: "auto" }}
-                              />
-                            )}
-                          </TouchableOpacity>
-                        ))
-                    : ["Daily", "Twice a day", "3 times/day", "Weekly"].map(
-                        (f) => (
-                          <TouchableOpacity
-                            key={f}
-                            style={[
-                              styles.selectionRow,
-                              {
-                                backgroundColor:
-                                  medicationFormData.frequency === f
-                                    ? theme.colors.secondaryContainer
-                                    : "transparent",
-                              },
-                            ]}
-                            onPress={() => {
-                              setMedicationFormData((prev) => ({
-                                ...prev,
-                                frequency: f,
-                              }));
-                              setAddDialogStep("form");
-                            }}
-                          >
-                            <Text variant="titleMedium">{f}</Text>
-                            {medicationFormData.frequency === f && (
-                              <MaterialCommunityIcons
-                                name="check"
-                                size={24}
-                                color={theme.colors.onSecondaryContainer}
-                                style={{ marginLeft: "auto" }}
-                              />
-                            )}
-                          </TouchableOpacity>
-                        ),
-                      )}
-                </ScrollView>
-              </Dialog.ScrollArea>
-              <Dialog.Actions>
-                <Button onPress={() => setAddDialogStep("form")}>
-                  Back
-                </Button>
-              </Dialog.Actions>
-            </View>
-          )}
-        </Dialog>
-      </Portal>
-
-      {showTimePicker && (
-        <DateTimePicker
-          value={
-            editingTimeIndex !== null && editingTimeIndex >= 0
-              ? medicationFormData.times[editingTimeIndex]
-              : new Date()
-          }
-          mode="time"
-          display="default"
-          onChange={(event, selectedDate) => {
-            setShowTimePicker(false);
-            if (selectedDate) {
-              if (editingTimeIndex === -1) {
-                // Add new
-                setMedicationFormData((prev) => ({
-                  ...prev,
-                  times: [...prev.times, selectedDate],
-                }));
-              } else if (editingTimeIndex !== null) {
-                // Update existing
-                const newTimes = [...medicationFormData.times];
-                newTimes[editingTimeIndex] = selectedDate;
-                setMedicationFormData((prev) => ({ ...prev, times: newTimes }));
-              }
-            }
-            setEditingTimeIndex(null);
-          }}
+          onSave={handleAddMedication}
+          step={addDialogStep}
+          onStepChange={setAddDialogStep}
+          formData={medicationFormData}
+          onFormDataChange={setMedicationFormData}
+          linkedElderly={linkedElderly}
+          elderlySearch={addMedElderlySearch}
+          onElderlySearchChange={setAddMedElderlySearch}
+          showTimePicker={showTimePicker}
+          onShowTimePicker={setShowTimePicker}
+          editingTimeIndex={editingTimeIndex}
+          onEditingTimeIndexChange={setEditingTimeIndex}
         />
-      )}
+      </Portal>
 
       <FAB
         icon="plus"
@@ -1472,42 +628,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    padding: 16,
-  },
-  searchbar: {
-    marginBottom: 12,
-  },
-  segmentedButtons: {
-    marginBottom: 8,
-  },
   section: {
     padding: 16,
-  },
-  sectionTitle: {
-    fontWeight: "bold",
-    marginBottom: 16,
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-  },
-  stat: {
-    alignItems: "center",
-  },
-  statNumber: {
-    fontWeight: "bold",
-    color: "#2196F3",
-  },
-  pending: {
-    color: "#FF9800",
-  },
-  completed: {
-    color: "#4CAF50",
-  },
-  overdue: {
-    color: "#F44336",
   },
   groupContainer: {
     marginBottom: 24,
@@ -1531,16 +653,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-  },
-  dialogInput: {
-    marginTop: 12,
-  },
-  selectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
   },
   fab: {
     position: "absolute",
