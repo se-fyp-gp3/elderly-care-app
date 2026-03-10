@@ -1,14 +1,14 @@
 import {
-  clientReactNative,
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
+    clientReactNative,
+    DATABASE_ID,
+    DIRECT_MESSAGES_TABLE_ID,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
-  Contact,
-  formatRelativeTime,
-  getContactsForCaregiver,
+    Contact,
+    formatRelativeTime,
+    getContactsForCaregiver,
 } from "@/lib/contacts";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
 import { DirectMessage } from "@/types/messaging";
@@ -16,20 +16,20 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Linking,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Linking,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Searchbar,
-  Text,
-  useTheme
+    ActivityIndicator,
+    Avatar,
+    Searchbar,
+    Text,
+    useTheme
 } from "react-native-paper";
 
 export default function CaregiverMessages() {
