@@ -2,23 +2,22 @@ import { Elderly, ScheduleCategory, ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View
 } from "react-native";
 import {
-  Avatar,
-  Button,
-  Divider,
-  IconButton,
-  Modal,
-  Portal,
-  Searchbar,
-  Text,
-  TextInput,
-  useTheme,
+    Avatar,
+    Button,
+    Divider,
+    IconButton,
+    Modal,
+    Portal,
+    Searchbar,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 export interface NewTaskData {
