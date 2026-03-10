@@ -3,12 +3,12 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { TouchableOpacity, View } from "react-native";
 import {
-  Avatar,
-  Button,
-  Card,
-  IconButton,
-  Text,
-  useTheme,
+    Avatar,
+    Button,
+    Card,
+    IconButton,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 interface TimeSlotCardProps {

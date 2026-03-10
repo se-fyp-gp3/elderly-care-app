@@ -401,23 +401,88 @@ export async function markScheduleTaskCompleted(taskId: string): Promise<void> {
 }
 
 /**
+ * Auto-recover a missing reminder link for a prescription.
+ * First searches for an existing reminder; if none found, creates a new one.
+ */
+async function recoverReminder(
+  prescriptionId: string,
+  elderlyId: string,
+): Promise<string | null> {
+  try {
+    const reminderSearchResult = await tablesDB.listRows<any>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+      queries: [Query.equal("elderly_medication", prescriptionId)],
+    });
+
+    if (reminderSearchResult.rows.length > 0) {
+      return reminderSearchResult.rows[0].$id;
+    }
+
+    // Fetch the original prescription to create a new reminder
+    const prescriptionSearchResult = await tablesDB.listRows<any>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_MEDICATION_TABLE_ID,
+      queries: [Query.equal("$id", prescriptionId)],
+    });
+
+    if (prescriptionSearchResult.rows.length > 0) {
+      const plan = prescriptionSearchResult.rows[0];
+      const newReminder = await tablesDB.createRow({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+        rowId: ID.unique(),
+        data: {
+          elderly: elderlyId,
+          elderly_medication: prescriptionId,
+          start_date: new Date().toISOString(),
+          duration_days: 365,
+          active: true,
+          reminder_times: plan.approx_times || [],
+          is_finished: false,
+          after_meal: false,
+        },
+      });
+      return newReminder.$id;
+    }
+
+    return null;
+  } catch (recoveryError) {
+    console.warn("Auto-recovery of reminder failed", recoveryError);
+    return null;
+  }
+}
+
+/**
  * Record a medication as taken for the given slot.
  * Creates a new log if none exists yet, or updates the existing one.
+ * Auto-recovers a missing reminderId if needed.
  * Returns the (potentially new) log ID.
  */
 export async function recordMedicationTaken(params: {
-  reminderId: string;
+  reminderId?: string;
   logId?: string;
   elderlyId: string;
-  /** Original approx_times string for this slot */
-  medicationTime: string;
-  selectedDate: Date;
+  /** Pre-computed ISO string for scheduled_at (matches the slot time shown on the timeline) */
+  scheduledAt: string;
   prescriptionId: string;
 }): Promise<string | undefined> {
-  const { reminderId, logId, elderlyId, medicationTime, selectedDate, prescriptionId } =
+  const { logId, elderlyId, scheduledAt, prescriptionId } =
     params;
+  let resolvedReminderId = params.reminderId;
   const now = new Date();
   let activeLogId = logId;
+
+  // Auto-recover missing reminder link
+  if (!resolvedReminderId && elderlyId && prescriptionId) {
+    resolvedReminderId = (await recoverReminder(prescriptionId, elderlyId)) ?? undefined;
+  }
+
+  if (!resolvedReminderId) {
+    throw new Error(
+      `Missing reminder link for prescription ${prescriptionId} and auto-recovery failed.`,
+    );
+  }
 
   if (logId) {
     // Update existing log ────────────────────────────────────────────────────
@@ -429,10 +494,6 @@ export async function recordMedicationTaken(params: {
     });
   } else {
     // Create new log ─────────────────────────────────────────────────────────
-    const timeParts = medicationTime.includes(":") ? medicationTime.split(":") : ["00", "00"];
-    const scheduledDate = new Date(selectedDate);
-    scheduledDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
-
     const newLog = await tablesDB.createRow({
       databaseId: DATABASE_ID,
       tableId: MEDICATION_LOGS_TABLE_ID,
@@ -440,9 +501,9 @@ export async function recordMedicationTaken(params: {
       data: {
         status: "taken",
         taken_at: now.toISOString(),
-        scheduled_at: scheduledDate.toISOString(),
+        scheduled_at: scheduledAt,
         elderly: elderlyId,
-        elderly_medication_reminder: reminderId,
+        elderly_medication_reminder: resolvedReminderId,
       },
     });
     activeLogId = newLog.$id;

@@ -1,21 +1,21 @@
 import { Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker, {
-  DateTimePickerEvent,
+    DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import React from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import {
-  Avatar,
-  Button,
-  Chip,
-  Dialog,
-  Divider,
-  IconButton,
-  Searchbar,
-  Text,
-  TextInput,
-  useTheme,
+    Avatar,
+    Button,
+    Chip,
+    Dialog,
+    Divider,
+    IconButton,
+    Searchbar,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 export interface MedicationFormData {
