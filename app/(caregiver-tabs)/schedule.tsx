@@ -1,3 +1,13 @@
+﻿import {
+  DisplayItem,
+  NewTaskData,
+  NewTaskModal,
+  ScheduleCalendarStrip,
+  ScheduleFilterDialog,
+  ScheduleMedGroupCard,
+  ScheduleMonthPicker,
+  ScheduleSingleEventCard,
+} from "@/components/schedule";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
@@ -27,27 +37,16 @@ import {
   Alert,
   FlatList,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
 
 import {
-  Avatar,
   Button,
-  Card,
   Chip,
-  Dialog,
-  Divider,
   FAB,
-  IconButton,
-  Modal,
-  Portal,
-  Searchbar,
-  Surface,
   Text,
-  TextInput,
   useTheme,
 } from "react-native-paper";
 
@@ -82,24 +81,14 @@ export default function SchedulePage() {
 
   // Filters
   const [filterVisible, setFilterVisible] = useState(false);
-  const [selectedElderlyId, setSelectedElderlyId] = useState<string>("All"); // Store ID instead of name
+  const [selectedElderlyId, setSelectedElderlyId] = useState<string>("All");
 
   // New Task Management
   const [newTaskVisible, setNewTaskVisible] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [newTaskDatePickerVisible, setNewTaskDatePickerVisible] =
     useState(false);
-  const [newTask, setNewTask] = useState<{
-    title: string;
-    description: string;
-    date: Date;
-    time: string;
-    type: string; // Category ID or Name? Let's use Category Name for UI, ID for save
-    typeId?: string;
-    elderlyName: string;
-    elderlyId: string;
-    status: ScheduleStatus;
-  }>({
+  const [newTask, setNewTask] = useState<NewTaskData>({
     title: "",
     description: "",
     date: new Date(),
@@ -117,10 +106,6 @@ export default function SchedulePage() {
       : events.filter((item) => item.elderlyId === selectedElderlyId);
 
   // Group medication events by time + elderlyId
-  type DisplayItem =
-    | { kind: 'single'; event: ScheduleEvent }
-    | { kind: 'medGroup'; key: string; time: string; elderlyName: string; elderlyId: string; rawDate: string; events: ScheduleEvent[] };
-
   const displayItems = useMemo<DisplayItem[]>(() => {
     const singles: DisplayItem[] = [];
     const medGroupMap = new Map<string, ScheduleEvent[]>();
@@ -182,7 +167,7 @@ export default function SchedulePage() {
     }
   }, [loading, displayItems]);
 
-  // Auto-scroll logic to nearest missed or pending task — only on initial data load
+  // Auto-scroll logic to nearest missed or pending task - only on initial data load
   useEffect(() => {
     if (!loading && !hasInitiallyLoaded.current && displayItems.length > 0) {
       hasInitiallyLoaded.current = true;
@@ -258,8 +243,6 @@ export default function SchedulePage() {
     fetchData();
   };
 
-  // ... (Keep existing Helper Functions: dates, onConfirmDate etc)
-
   // Generate next 7 days from referenceDate
   const dates = Array.from({ length: 7 }, (_, i) => {
     const dateItem = new Date(referenceDate);
@@ -333,33 +316,11 @@ export default function SchedulePage() {
     });
   }, [navigation, router, theme]);
 
-  const getStatusColor = (status: string) => {
-    if (status === ScheduleStatus.COMPLETED) return theme.colors.primary; // '#4CAF50';
-    if (status === ScheduleStatus.MISSED) return theme.colors.error;
-    return theme.colors.secondary;
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "medication":
-        return "pill";
-      case "appointment":
-        return "doctor";
-      case "meal":
-        return "food";
-      case "activity":
-        return "walk";
-      case "checkup":
-        return "heart-pulse";
-      default:
-        return "calendar-check";
-    }
-  };
+  // -- Event handlers ---------------------------------------------------------
 
   const handleMarkDone = async (taskId: string) => {
     try {
       await markScheduleTaskCompleted(taskId);
-      // Optimistically update local state
       setEvents((currentEvents) =>
         currentEvents.map((event) =>
           event.id === taskId
@@ -413,7 +374,7 @@ export default function SchedulePage() {
       setEvents((prev) =>
         prev.map((existingEvent) => {
           if (existingEvent.id === event.id) {
-            return { ...existingEvent, status: ScheduleStatus.PENDING }; // Keep logId!
+            return { ...existingEvent, status: ScheduleStatus.PENDING };
           }
           return existingEvent;
         }),
@@ -447,469 +408,88 @@ export default function SchedulePage() {
     }
   };
 
-  const renderSingleEvent = (item: ScheduleEvent) => (
-    <View style={styles.timelineRow}>
-      <View style={styles.timeColumn}>
-        <Text style={styles.timeText}>{item.time}</Text>
-        {(item.status === ScheduleStatus.COMPLETED ||
-          item.status === ("completed" as any)) && (
-          <MaterialCommunityIcons
-            name="check-circle"
-            size={16}
-            color={theme.colors.primary}
-            style={{ marginTop: 4 }}
-          />
-        )}
-        {(item.status === ScheduleStatus.MISSED ||
-          item.status === ("missed" as any)) && (
-          <MaterialCommunityIcons
-            name="alert-circle"
-            size={16}
-            color={theme.colors.error}
-            style={{ marginTop: 4 }}
-          />
-        )}
-      </View>
+  const handleSaveTask = async () => {
+    if (!newTask.title || !newTask.elderlyId || !newTask.time) {
+      Alert.alert(
+        "Missing Information",
+        "Please enter a title, select a time, and choose an elderly person.",
+      );
+      return;
+    }
 
-      <View style={styles.timelineLineContainer}>
-        <View
-          style={[
-            styles.timelineLine,
-            { backgroundColor: theme.colors.outlineVariant },
-          ]}
-        />
-        <View
-          style={[
-            styles.timelineDot,
-            { backgroundColor: getStatusColor(item.status) },
-          ]}
-        />
-      </View>
+    try {
+      setLoading(true);
+      const combinedDatetime = new Date(newTask.date);
+      const [hours, minutes] = newTask.time.split(":").map(Number);
+      combinedDatetime.setHours(hours, minutes, 0, 0);
 
-      <Surface
-        style={[styles.eventCard, { backgroundColor: theme.colors.surface }]}
-        elevation={1}
-      >
-        <View
-          style={[
-            styles.eventHeader,
-            {
-              borderLeftColor: getStatusColor(item.status),
-              borderLeftWidth: 4,
-            },
-          ]}
-        >
-          <View style={{ flex: 1 }}>
-            <Text variant="titleMedium" style={{ fontWeight: "bold" }}>
-              {item.title}
-            </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginTop: 2,
-              }}
-            >
-              <MaterialCommunityIcons
-                name="account"
-                size={14}
-                color={theme.colors.secondary}
-              />
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.secondary, marginLeft: 4 }}
-              >
-                {item.elderlyName}
-              </Text>
-            </View>
-          </View>
-          <Avatar.Icon
-            size={40}
-            icon={getTypeIcon(item.type)}
-            style={{ backgroundColor: theme.colors.secondaryContainer }}
-          />
-        </View>
-        <Divider />
-        <View style={styles.eventBody}>
-          <Text
-            variant="bodyMedium"
-            numberOfLines={2}
-            style={{ color: theme.colors.onSurfaceVariant }}
-          >
-            {item.description}
-          </Text>
+      await createScheduleTask({
+        title: newTask.title,
+        description: newTask.description,
+        datetime: combinedDatetime,
+        elderlyId: newTask.elderlyId,
+        typeName: newTask.type,
+        categoryId: newTask.typeId,
+      });
 
-          {(item.status === ScheduleStatus.PENDING ||
-            item.status === ScheduleStatus.MISSED) && (
-            <View style={{ alignItems: "flex-end", marginTop: 12 }}>
-              <Button
-                mode="contained-tonal"
-                compact
-                uppercase={false}
-                onPress={() => handleMarkDone(item.id)}
-              >
-                Mark Done
-              </Button>
-            </View>
-          )}
-        </View>
-      </Surface>
-    </View>
-  );
+      setNewTaskVisible(false);
+      setNewTask({
+        title: "",
+        description: "",
+        date: new Date(),
+        time: "",
+        type: "Activity",
+        elderlyName: "All",
+        elderlyId: "",
+        status: ScheduleStatus.PENDING,
+      });
 
-  const renderMedGroup = (group: Extract<DisplayItem, { kind: 'medGroup' }>) => {
-    const allCompleted = group.events.every(
-      (e) => String(e.status).toLowerCase() === ScheduleStatus.COMPLETED.toLowerCase(),
-    );
-    const anyMissed = group.events.some(
-      (e) => String(e.status).toLowerCase() === ScheduleStatus.MISSED.toLowerCase(),
-    );
-    const groupStatus = allCompleted
-      ? ScheduleStatus.COMPLETED
-      : anyMissed
-        ? ScheduleStatus.MISSED
-        : ScheduleStatus.PENDING;
-    const completedCount = group.events.filter(
-      (e) => String(e.status).toLowerCase() === ScheduleStatus.COMPLETED.toLowerCase(),
-    ).length;
-
-    return (
-      <View style={styles.timelineRow}>
-        <View style={styles.timeColumn}>
-          <Text style={styles.timeText}>{group.time}</Text>
-          {allCompleted && (
-            <MaterialCommunityIcons
-              name="check-circle"
-              size={16}
-              color={theme.colors.primary}
-              style={{ marginTop: 4 }}
-            />
-          )}
-          {!allCompleted && anyMissed && (
-            <MaterialCommunityIcons
-              name="alert-circle"
-              size={16}
-              color={theme.colors.error}
-              style={{ marginTop: 4 }}
-            />
-          )}
-        </View>
-
-        <View style={styles.timelineLineContainer}>
-          <View
-            style={[
-              styles.timelineLine,
-              { backgroundColor: theme.colors.outlineVariant },
-            ]}
-          />
-          <View
-            style={[
-              styles.timelineDot,
-              { backgroundColor: getStatusColor(groupStatus) },
-            ]}
-          />
-        </View>
-
-        <Card
-          style={{
-            flex: 1,
-            marginLeft: 8,
-            marginBottom: 20,
-            borderRadius: 16,
-            overflow: 'hidden',
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
-            <Avatar.Icon
-              icon="pill"
-              size={40}
-              style={{
-                backgroundColor: allCompleted
-                  ? '#E8F5E9'
-                  : anyMissed
-                    ? theme.colors.errorContainer
-                    : theme.colors.secondaryContainer,
-                marginRight: 12,
-              }}
-              color={
-                allCompleted
-                  ? '#4CAF50'
-                  : anyMissed
-                    ? theme.colors.error
-                    : theme.colors.onSecondaryContainer
-              }
-            />
-            <View style={{ flex: 1 }}>
-              <Text variant="titleMedium" style={{ fontWeight: 'bold', fontSize: 16 }}>
-                {group.events.length} medication{group.events.length > 1 ? 's' : ''}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                <MaterialCommunityIcons
-                  name="account"
-                  size={14}
-                  color={theme.colors.secondary}
-                />
-                <Text variant="bodySmall" style={{ color: theme.colors.secondary, marginLeft: 4 }}>
-                  {group.elderlyName}
-                </Text>
-              </View>
-            </View>
-          </View>
-          {/* Progress bar */}
-          <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View
-                style={{
-                  flex: 1,
-                  height: 4,
-                  backgroundColor: 'rgba(0,0,0,0.1)',
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                }}
-              >
-                <View
-                  style={{
-                    width: `${(completedCount / group.events.length) * 100}%`,
-                    height: '100%',
-                    backgroundColor: allCompleted ? '#4CAF50' : theme.colors.primary,
-                    borderRadius: 2,
-                  }}
-                />
-              </View>
-              <Text
-                variant="labelSmall"
-                style={{ marginLeft: 8, color: theme.colors.outline }}
-              >
-                {completedCount}/{group.events.length}
-              </Text>
-            </View>
-          </View>
-          <Divider />
-          <Card.Content>
-            {group.events.map((med, index) => (
-              <View
-                key={med.id}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingVertical: 10,
-                  borderTopWidth: index > 0 ? 1 : 0,
-                  borderTopColor: theme.colors.surfaceVariant,
-                }}
-              >
-                <View
-                  style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
-                >
-                  <Avatar.Icon
-                    icon="pill"
-                    size={28}
-                    style={{
-                      backgroundColor:
-                        String(med.status).toLowerCase() ===
-                        ScheduleStatus.COMPLETED.toLowerCase()
-                          ? '#E8F5E9'
-                          : theme.colors.primaryContainer,
-                      marginRight: 8,
-                    }}
-                    color={
-                      String(med.status).toLowerCase() ===
-                      ScheduleStatus.COMPLETED.toLowerCase()
-                        ? '#4CAF50'
-                        : theme.colors.onPrimaryContainer
-                    }
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text variant="bodyLarge" style={{ fontWeight: '600' }}>
-                      {med.title}
-                    </Text>
-                    <Text
-                      variant="bodySmall"
-                      numberOfLines={1}
-                      style={{ color: theme.colors.outline }}
-                    >
-                      {med.description}
-                    </Text>
-                  </View>
-                  <View
-                    style={{
-                      backgroundColor:
-                        String(med.status).toLowerCase() ===
-                        ScheduleStatus.COMPLETED.toLowerCase()
-                          ? theme.colors.primaryContainer
-                          : String(med.status).toLowerCase() ===
-                              ScheduleStatus.MISSED.toLowerCase()
-                            ? theme.colors.errorContainer
-                            : theme.colors.surfaceVariant,
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      borderRadius: 4,
-                      marginRight: 4,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 'bold',
-                        color:
-                          String(med.status).toLowerCase() ===
-                          ScheduleStatus.COMPLETED.toLowerCase()
-                            ? theme.colors.onPrimaryContainer
-                            : String(med.status).toLowerCase() ===
-                                ScheduleStatus.MISSED.toLowerCase()
-                              ? theme.colors.onErrorContainer
-                              : theme.colors.onSurfaceVariant,
-                      }}
-                    >
-                      {String(med.status).toLowerCase() ===
-                      ScheduleStatus.COMPLETED.toLowerCase()
-                        ? 'Taken'
-                        : String(med.status).toLowerCase() ===
-                            ScheduleStatus.MISSED.toLowerCase()
-                          ? 'Missed'
-                          : 'Pending'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {String(med.status).toLowerCase() ===
-                    ScheduleStatus.PENDING.toLowerCase() ||
-                  String(med.status).toLowerCase() ===
-                    ScheduleStatus.MISSED.toLowerCase() ? (
-                    <>
-                      <IconButton
-                        icon="bell-outline"
-                        size={18}
-                        onPress={() => handleRemindMedication(med)}
-                        style={{ margin: 0 }}
-                      />
-                      <Button
-                        mode="contained"
-                        compact
-                        onPress={() => handleTakeMedication(med)}
-                        labelStyle={{ fontSize: 12 }}
-                      >
-                        Take
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      icon="undo"
-                      compact
-                      mode="text"
-                      onPress={() => handleUndoMedication(med)}
-                      labelStyle={{ fontSize: 12 }}
-                    >
-                      Undo
-                    </Button>
-                  )}
-                </View>
-              </View>
-            ))}
-          </Card.Content>
-        </Card>
-      </View>
-    );
+      fetchData();
+    } catch (err) {
+      console.error("Error creating task", err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // -- Render helpers ---------------------------------------------------------
 
   const renderDisplayItem = ({ item }: { item: DisplayItem }) => {
-    if (item.kind === 'single') return renderSingleEvent(item.event);
-    return renderMedGroup(item);
+    if (item.kind === 'single') {
+      return (
+        <ScheduleSingleEventCard
+          item={item.event}
+          onMarkDone={handleMarkDone}
+        />
+      );
+    }
+    return (
+      <ScheduleMedGroupCard
+        group={item}
+        onTakeMedication={handleTakeMedication}
+        onUndoMedication={handleUndoMedication}
+        onRemindMedication={handleRemindMedication}
+      />
+    );
   };
+
+  // -- JSX --------------------------------------------------------------------
 
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
       {/* Header Date Strip */}
-      <View
-        style={[
-          styles.calendarStrip,
-          { backgroundColor: theme.colors.background },
-        ]}
-      >
-        <TouchableOpacity
-          onPress={() => {
-            setPickerYear(referenceDate.getFullYear());
-            setMonthPickerVisible(true);
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 16,
-              marginBottom: 16,
-              marginTop: 10,
-            }}
-          >
-            <Text
-              variant="headlineSmall"
-              style={{ fontWeight: "bold", marginRight: 8 }}
-            >
-              {referenceDate.toLocaleDateString("en-US", {
-                month: "long",
-                year: "numeric",
-              })}
-            </Text>
-            <MaterialCommunityIcons
-              name="chevron-down"
-              size={24}
-              color={theme.colors.onSurface}
-            />
-          </View>
-        </TouchableOpacity>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 10 }}
-        >
-          {dates.map((dateItem, index) => {
-            const isSelected =
-              dateItem.fullDate.toDateString() === selectedDate.toDateString();
-            return (
-              <TouchableOpacity
-                key={index}
-                onPress={() => setSelectedDate(dateItem.fullDate)}
-                style={[
-                  styles.dateBox,
-                  {
-                    backgroundColor: isSelected
-                      ? theme.colors.primary
-                      : theme.colors.surfaceVariant,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.dayText,
-                    {
-                      color: isSelected
-                        ? theme.colors.onPrimary
-                        : theme.colors.onSurfaceVariant,
-                    },
-                  ]}
-                >
-                  {dateItem.day}
-                </Text>
-                <Text
-                  style={[
-                    styles.dateText,
-                    {
-                      color: isSelected
-                        ? theme.colors.onPrimary
-                        : theme.colors.onSurface,
-                    },
-                  ]}
-                >
-                  {dateItem.date}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+      <ScheduleCalendarStrip
+        referenceDate={referenceDate}
+        selectedDate={selectedDate}
+        dates={dates}
+        onSelectDate={setSelectedDate}
+        onOpenMonthPicker={() => {
+          setPickerYear(referenceDate.getFullYear());
+          setMonthPickerVisible(true);
+        }}
+      />
 
       <View style={styles.taskListContainer}>
         <View style={styles.listHeader}>
@@ -933,110 +513,18 @@ export default function SchedulePage() {
                 : linkedElderly.find((e) => e.$id === selectedElderlyId)
                     ?.name || "Unknown"}
             </Button>
-            <Portal>
-              <Dialog
-                visible={filterVisible}
-                onDismiss={() => setFilterVisible(false)}
-                style={{ backgroundColor: theme.colors.surface }}
-              >
-                <Dialog.Title>Select Elderly</Dialog.Title>
-                <Dialog.Content style={{ paddingBottom: 0 }}>
-                  <Searchbar
-                    placeholder="Search"
-                    onChangeText={setFilterSearchQuery}
-                    value={filterSearchQuery}
-                    style={{
-                      backgroundColor: theme.colors.surfaceVariant,
-                      height: 40,
-                      marginBottom: 10,
-                    }}
-                    inputStyle={{ minHeight: 0 }}
-                  />
-                  <ScrollView style={{ maxHeight: 300 }}>
-                    <TouchableOpacity
-                      style={[
-                        styles.selectionRow,
-                        {
-                          backgroundColor:
-                            selectedElderlyId === "All"
-                              ? theme.colors.secondaryContainer
-                              : "transparent",
-                        },
-                      ]}
-                      onPress={() => {
-                        setSelectedElderlyId("All");
-                        setFilterVisible(false);
-                      }}
-                    >
-                      <Avatar.Icon
-                        size={40}
-                        icon="account-group"
-                        style={{
-                          marginRight: 16,
-                          backgroundColor: theme.colors.secondary,
-                        }}
-                      />
-                      <Text variant="titleMedium">Everyone</Text>
-                      {selectedElderlyId === "All" && (
-                        <MaterialCommunityIcons
-                          name="check"
-                          size={24}
-                          color={theme.colors.onSecondaryContainer}
-                          style={{ marginLeft: "auto" }}
-                        />
-                      )}
-                    </TouchableOpacity>
-                    {linkedElderly
-                      .filter((e) =>
-                        e.name
-                          .toLowerCase()
-                          .includes(filterSearchQuery.toLowerCase()),
-                      )
-                      .map((elderly) => (
-                        <TouchableOpacity
-                          key={elderly.$id}
-                          style={[
-                            styles.selectionRow,
-                            {
-                              backgroundColor:
-                                selectedElderlyId === elderly.$id
-                                  ? theme.colors.secondaryContainer
-                                  : "transparent",
-                            },
-                          ]}
-                          onPress={() => {
-                            setSelectedElderlyId(elderly.$id);
-                            setFilterVisible(false);
-                          }}
-                        >
-                          <Avatar.Text
-                            size={40}
-                            label={elderly.name.substring(0, 2)}
-                            style={{
-                              marginRight: 16,
-                              backgroundColor: theme.colors.secondary,
-                            }}
-                          />
-                          <Text variant="titleMedium">{elderly.name}</Text>
-                          {selectedElderlyId === elderly.$id && (
-                            <MaterialCommunityIcons
-                              name="check"
-                              size={24}
-                              color={theme.colors.onSecondaryContainer}
-                              style={{ marginLeft: "auto" }}
-                            />
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                  </ScrollView>
-                </Dialog.Content>
-                <Dialog.Actions>
-                  <Button onPress={() => setFilterVisible(false)}>
-                    Cancel
-                  </Button>
-                </Dialog.Actions>
-              </Dialog>
-            </Portal>
+            <ScheduleFilterDialog
+              visible={filterVisible}
+              onDismiss={() => setFilterVisible(false)}
+              linkedElderly={linkedElderly}
+              selectedElderlyId={selectedElderlyId}
+              onSelectElderly={(id) => {
+                setSelectedElderlyId(id);
+                setFilterVisible(false);
+              }}
+              searchQuery={filterSearchQuery}
+              onSearchChange={setFilterSearchQuery}
+            />
           </View>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Button
@@ -1106,7 +594,7 @@ export default function SchedulePage() {
       {/* Native Time Picker for New Task */}
       {timePickerVisible && (
         <DateTimePicker
-          value={new Date()} // Ideally should use current time from newTask.time parse
+          value={new Date()}
           mode="time"
           display="default"
           onChange={onConfirmTime}
@@ -1124,439 +612,42 @@ export default function SchedulePage() {
       )}
 
       {/* Custom Month Picker Dialog */}
-      <Portal>
-        <Dialog
-          visible={monthPickerVisible}
-          onDismiss={() => setMonthPickerVisible(false)}
-          style={{ backgroundColor: theme.colors.surface }}
-        >
-          <Dialog.Content>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 20,
-              }}
-            >
-              <Button
-                icon="chevron-left"
-                onPress={() => setPickerYear(pickerYear - 1)}
-                compact
-              >
-                Prev
-              </Button>
-              <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-                {pickerYear}
-              </Text>
-              <Button
-                icon="chevron-right"
-                contentStyle={{ flexDirection: "row-reverse" }}
-                onPress={() => setPickerYear(pickerYear + 1)}
-                compact
-              >
-                Next
-              </Button>
-            </View>
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                justifyContent: "space-between",
-              }}
-            >
-              {[
-                "Jan",
-                "Feb",
-                "Mar",
-                "Apr",
-                "May",
-                "Jun",
-                "Jul",
-                "Aug",
-                "Sep",
-                "Oct",
-                "Nov",
-                "Dec",
-              ].map((month, index) => (
-                <TouchableOpacity
-                  key={month}
-                  style={[
-                    styles.monthButton,
-                    {
-                      backgroundColor:
-                        index === referenceDate.getMonth() &&
-                        pickerYear === referenceDate.getFullYear()
-                          ? theme.colors.primaryContainer
-                          : "transparent",
-                    },
-                  ]}
-                  onPress={() => handleMonthSelect(index)}
-                >
-                  <Text
-                    style={{
-                      color:
-                        index === referenceDate.getMonth() &&
-                        pickerYear === referenceDate.getFullYear()
-                          ? theme.colors.onPrimaryContainer
-                          : theme.colors.onSurface,
-                    }}
-                  >
-                    {month}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setMonthPickerVisible(false)}>Cancel</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+      <ScheduleMonthPicker
+        visible={monthPickerVisible}
+        onDismiss={() => setMonthPickerVisible(false)}
+        pickerYear={pickerYear}
+        onChangeYear={setPickerYear}
+        referenceDate={referenceDate}
+        onSelectMonth={handleMonthSelect}
+      />
 
       {/* New Task Modal */}
-      <Portal>
-        <Modal
-          visible={newTaskVisible}
-          onDismiss={() => {
-            setNewTaskVisible(false);
-            setSelectionMode("form");
-          }}
-          contentContainerStyle={[
-            styles.modalContent,
-            { backgroundColor: theme.colors.surface },
-          ]}
-        >
-          {selectionMode === "form" ? (
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text
-                variant="headlineSmall"
-                style={{ marginBottom: 20, fontWeight: "bold" }}
-              >
-                New Task
-              </Text>
-
-              <TextInput
-                mode="outlined"
-                label="Title"
-                value={newTask.title}
-                onChangeText={(text) => setNewTask({ ...newTask, title: text })}
-                style={styles.input}
-              />
-
-              <TextInput
-                mode="outlined"
-                label="Description"
-                value={newTask.description}
-                onChangeText={(text) => setNewTask({ ...newTask, description: text })}
-                style={styles.input}
-                multiline
-              />
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <TouchableOpacity
-                  onPress={() => setNewTaskDatePickerVisible(true)}
-                  style={{ flex: 1, marginRight: 8 }}
-                >
-                  <TextInput
-                    mode="outlined"
-                    label="Date"
-                    value={newTask.date.toLocaleDateString()}
-                    editable={false}
-                    style={styles.input}
-                    right={
-                      <TextInput.Icon
-                        icon="calendar"
-                        onPress={() => setNewTaskDatePickerVisible(true)}
-                      />
-                    }
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setTimePickerVisible(true)}
-                  style={{ flex: 1 }}
-                >
-                  <TextInput
-                    mode="outlined"
-                    label="Time"
-                    value={newTask.time}
-                    editable={false}
-                    style={styles.input}
-                    right={
-                      <TextInput.Icon
-                        icon="clock"
-                        onPress={() => setTimePickerVisible(true)}
-                      />
-                    }
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity onPress={() => setSelectionMode("elderly")}>
-                <TextInput
-                  mode="outlined"
-                  label="Who is this for?"
-                  value={newTask.elderlyName}
-                  editable={false}
-                  style={styles.input}
-                  right={
-                    <TextInput.Icon
-                      icon="chevron-right"
-                      onPress={() => setSelectionMode("elderly")}
-                    />
-                  }
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => setSelectionMode("type")}>
-                <TextInput
-                  mode="outlined"
-                  label="Type"
-                  value={newTask.type}
-                  editable={false}
-                  style={styles.input}
-                  right={
-                    <TextInput.Icon
-                      icon="chevron-right"
-                      onPress={() => setSelectionMode("type")}
-                    />
-                  }
-                />
-              </TouchableOpacity>
-
-              <Button
-                mode="contained"
-                onPress={async () => {
-                  if (!newTask.title || !newTask.elderlyId || !newTask.time) {
-                    Alert.alert(
-                      "Missing Information",
-                      "Please enter a title, select a time, and choose an elderly person.",
-                    );
-                    return;
-                  }
-
-                  try {
-                    setLoading(true);
-                    // Combine date and time into a single datetime
-                    const combinedDatetime = new Date(newTask.date);
-                    const [hours, minutes] = newTask.time.split(":").map(Number);
-                    combinedDatetime.setHours(hours, minutes, 0, 0);
-
-                    await createScheduleTask({
-                      title: newTask.title,
-                      description: newTask.description,
-                      datetime: combinedDatetime,
-                      elderlyId: newTask.elderlyId,
-                      typeName: newTask.type,
-                      categoryId: newTask.typeId,
-                    });
-
-                    setNewTaskVisible(false);
-                    // Reset form
-                    setNewTask({
-                      title: "",
-                      description: "",
-                      date: new Date(),
-                      time: "",
-                      type: "Activity",
-                      elderlyName: "All",
-                      elderlyId: "",
-                      status: ScheduleStatus.PENDING,
-                    });
-
-                    fetchData();
-                  } catch (err) {
-                    console.error("Error creating task", err);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                style={{ marginTop: 10, paddingVertical: 5 }}
-                loading={loading}
-                disabled={loading}
-              >
-                Save Task
-              </Button>
-            </ScrollView>
-          ) : (
-            <View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginBottom: 10,
-                }}
-              >
-                <IconButton
-                  icon="arrow-left"
-                  onPress={() => setSelectionMode("form")}
-                />
-                <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-                  {selectionMode === "elderly"
-                    ? "Select Elderly"
-                    : "Select Type"}
-                </Text>
-              </View>
-              <Divider />
-              {selectionMode === "elderly" && (
-                <View style={{ paddingVertical: 10 }}>
-                  <Searchbar
-                    placeholder="Search"
-                    onChangeText={setSearchQuery}
-                    value={searchQuery}
-                    style={{
-                      backgroundColor: theme.colors.surfaceVariant,
-                      height: 40,
-                    }}
-                    inputStyle={{ minHeight: 0 }}
-                  />
-                </View>
-              )}
-              <ScrollView style={{ maxHeight: 300 }}>
-                {selectionMode === "elderly" ? (
-                  linkedElderly
-                    .filter((e) =>
-                      e.name.toLowerCase().includes(searchQuery.toLowerCase()),
-                    )
-                    .map((item) => (
-                      <TouchableOpacity
-                        key={item.$id}
-                        style={[
-                          styles.selectionRow,
-                          {
-                            backgroundColor:
-                              newTask.elderlyId === item.$id
-                                ? theme.colors.secondaryContainer
-                                : "transparent",
-                          },
-                        ]}
-                        onPress={() => {
-                          setNewTask({
-                            ...newTask,
-                            elderlyName: item.name,
-                            elderlyId: item.$id,
-                          });
-                          setSelectionMode("form");
-                        }}
-                      >
-                        <Avatar.Text
-                          size={40}
-                          label={item.name.substring(0, 2)}
-                          style={{
-                            marginRight: 16,
-                            backgroundColor: theme.colors.secondary,
-                          }}
-                        />
-                        <Text variant="titleMedium">{item.name}</Text>
-                        {newTask.elderlyId === item.$id && (
-                          <MaterialCommunityIcons
-                            name="check"
-                            size={24}
-                            color={theme.colors.onSecondaryContainer}
-                            style={{ marginLeft: "auto" }}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    ))
-                ) : categories.length > 0 ? (
-                  categories.map((cat) => (
-                    <TouchableOpacity
-                      key={cat.$id}
-                      style={[
-                        styles.selectionRow,
-                        {
-                          backgroundColor:
-                            newTask.typeId === cat.$id
-                              ? theme.colors.secondaryContainer
-                              : "transparent",
-                        },
-                      ]}
-                      onPress={() => {
-                        setNewTask({
-                          ...newTask,
-                          type: cat.name || "Activity",
-                          typeId: cat.$id,
-                        });
-                        setSelectionMode("form");
-                      }}
-                    >
-                      {/* TODO: Icon mapping for categories if needed */}
-                      <Avatar.Icon
-                        size={40}
-                        icon={"calendar-check"}
-                        style={{
-                          marginRight: 16,
-                          backgroundColor: theme.colors.secondary,
-                        }}
-                      />
-                      <View>
-                        <Text variant="titleMedium">
-                          {cat.name || "Activity"}
-                        </Text>
-                      </View>
-                      {newTask.typeId === cat.$id && (
-                        <MaterialCommunityIcons
-                          name="check"
-                          size={24}
-                          color={theme.colors.onSecondaryContainer}
-                          style={{ marginLeft: "auto" }}
-                        />
-                      )}
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <View style={{ padding: 20, alignItems: "center" }}>
-                    <Text
-                      style={{
-                        marginBottom: 10,
-                        color: theme.colors.secondary,
-                      }}
-                    >
-                      No categories found.
-                    </Text>
-                    <Button mode="outlined" onPress={fetchCategories}>
-                      Retry Loading
-                    </Button>
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-          )}
-        </Modal>
-      </Portal>
+      <NewTaskModal
+        visible={newTaskVisible}
+        onDismiss={() => {
+          setNewTaskVisible(false);
+          setSelectionMode("form");
+        }}
+        selectionMode={selectionMode}
+        onSelectionModeChange={setSelectionMode}
+        newTask={newTask}
+        onNewTaskChange={setNewTask}
+        linkedElderly={linkedElderly}
+        categories={categories}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        loading={loading}
+        onSave={handleSaveTask}
+        onOpenDatePicker={() => setNewTaskDatePickerVisible(true)}
+        onOpenTimePicker={() => setTimePickerVisible(true)}
+        onRetryCategories={fetchCategories}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  calendarStrip: {
-    paddingBottom: 16,
-  },
-  dateBox: {
-    width: 60,
-    height: 80,
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 6,
-    borderRadius: 16,
-  },
-  dayText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    marginBottom: 4,
-    textTransform: "uppercase",
-  },
-  dateText: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
   taskListContainer: {
     flex: 1,
     paddingHorizontal: 16,
@@ -1567,82 +658,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginVertical: 16,
   },
-  timelineRow: {
-    flexDirection: "row",
-    marginBottom: 0,
-  },
-  timeColumn: {
-    width: 50,
-    alignItems: "flex-end",
-    paddingRight: 12,
-    paddingTop: 16,
-  },
-  timeText: {
-    fontWeight: "bold",
-    color: "#666",
-  },
-  timelineLineContainer: {
-    width: 20,
-    alignItems: "center",
-  },
-  timelineLine: {
-    width: 2,
-    flex: 1,
-  },
-  timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    position: "absolute",
-    top: 20,
-    zIndex: 1,
-    borderWidth: 2,
-    borderColor: "white",
-  },
-  eventCard: {
-    flex: 1,
-    marginLeft: 8,
-    marginBottom: 20,
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  eventHeader: {
-    flexDirection: "row",
-    padding: 12,
-    alignItems: "center",
-  },
-  eventBody: {
-    padding: 12,
-  },
   fab: {
     position: "absolute",
     margin: 16,
     right: 0,
     bottom: 0,
-  },
-  modalContent: {
-    margin: 20,
-    padding: 20,
-    borderRadius: 16,
-    maxHeight: "80%",
-  },
-  input: {
-    marginBottom: 10,
-  },
-  monthButton: {
-    width: "30%",
-    paddingVertical: 10,
-    alignItems: "center",
-    marginVertical: 5,
-    borderRadius: 8,
-  },
-  selectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ccc",
-    borderRadius: 12,
   },
 });
