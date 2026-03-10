@@ -19,9 +19,9 @@ export default function ReAuthScreen() {
     LocalAuthentication.supportedAuthenticationTypesAsync()
       .then((types) => {
         if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-          setBiometricLabel("Facial Recognition");
+          setBiometricLabel("Face ID");
         } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-          setBiometricLabel("Fingerprint");
+          setBiometricLabel("Touch ID");
         }
       })
       .catch(() => {
