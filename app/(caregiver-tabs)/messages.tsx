@@ -207,23 +207,29 @@ export default function CaregiverMessages() {
     });
   }, []);
 
-  const getStatusColor = (status?: string | null) => {
-    switch (status) {
-      case "Normal":
-        return "#4CAF50";
-      case "Warning":
-        return "#FF9800";
-      case "Danger":
-        return "#F44336";
-      default:
-        return theme.colors.outline;
+  const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+  const isOnline = (lastActive?: string): boolean => {
+    if (!lastActive) return false;
+    try {
+      return Date.now() - new Date(lastActive).getTime() < ONLINE_THRESHOLD_MS;
+    } catch {
+      return false;
     }
+  };
+
+  const formatLastSeen = (lastActive?: string): string => {
+    if (!lastActive) return "";
+    if (isOnline(lastActive)) return "Online";
+    return `Last seen ${formatRelativeTime(lastActive)}`;
   };
 
   const renderContactItem = ({ item }: { item: Contact }) => {
     const lastMsg = lastMessages[item.id];
     const lastMsgTime = lastMsg?.created_at || item.lastActive;
     const preview = lastMsg?.body;
+    const online = isOnline(item.lastActive);
+    const lastSeenText = formatLastSeen(item.lastActive);
 
     return (
       <TouchableOpacity
@@ -241,28 +247,40 @@ export default function CaregiverMessages() {
               fontWeight: "600",
             }}
           />
-          {item.status && (
-            <View
-              style={[
-                styles.statusDot,
-                {
-                  backgroundColor: getStatusColor(item.status),
-                  borderColor: theme.colors.surface,
-                },
-              ]}
-            />
-          )}
+          <View
+            style={[
+              styles.statusDot,
+              {
+                backgroundColor: online ? "#4CAF50" : "#BDBDBD",
+                borderColor: theme.colors.surface,
+              },
+            ]}
+          />
         </View>
 
         <View style={styles.contactInfo}>
           <View style={styles.contactHeader}>
-            <Text
-              variant="titleMedium"
-              style={[styles.contactName, { color: theme.colors.onSurface }]}
-              numberOfLines={1}
-            >
-              {item.name}
-            </Text>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text
+                variant="titleMedium"
+                style={[styles.contactName, { color: theme.colors.onSurface }]}
+                numberOfLines={1}
+              >
+                {item.name}
+              </Text>
+              {lastSeenText ? (
+                <Text
+                  variant="bodySmall"
+                  style={{
+                    color: online ? "#4CAF50" : theme.colors.onSurfaceVariant,
+                    fontSize: 12,
+                    marginTop: 1,
+                  }}
+                >
+                  {lastSeenText}
+                </Text>
+              ) : null}
+            </View>
             <Text
               variant="bodySmall"
               style={[
