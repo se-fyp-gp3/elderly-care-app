@@ -1,7 +1,8 @@
 import { useAuth } from "@/lib/auth-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as LocalAuthentication from "expo-local-authentication";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -12,6 +13,21 @@ export default function ReAuthScreen() {
   const { reAuthenticateElderly, signOut } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [biometricLabel, setBiometricLabel] = useState<string>("Biometrics");
+
+  useEffect(() => {
+    LocalAuthentication.supportedAuthenticationTypesAsync()
+      .then((types) => {
+        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+          setBiometricLabel("Face ID");
+        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+          setBiometricLabel("Fingerprint");
+        }
+      })
+      .catch(() => {
+        // Keep default "Biometrics" label on error
+      });
+  }, []);
 
   const handleReAuth = async () => {
     setLoading(true);
@@ -70,7 +86,7 @@ export default function ReAuthScreen() {
               icon="fingerprint"
               style={styles.authButton}
             >
-              Authenticate with Face ID
+              Authenticate with {biometricLabel}
             </Button>
             <Button
               mode="text"
