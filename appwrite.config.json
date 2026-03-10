@@ -887,7 +887,12 @@
     },
     {
       "$id": "chat_session",
-      "$permissions": [],
+      "$permissions": [
+        "create(\"users\")",
+        "read(\"users\")",
+        "update(\"users\")",
+        "delete(\"users\")"
+      ],
       "databaseId": "elderly-care-app-db",
       "name": "Chat_Session",
       "enabled": true,
@@ -1112,6 +1117,15 @@
           "array": false,
           "default": null,
           "format": ""
+        },
+        {
+          "key": "message_type",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "default": "text",
+          "format": "enum",
+          "elements": ["text", "voice"]
         }
       ],
       "indexes": [
@@ -1322,15 +1336,6 @@
           "encrypt": false
         },
         {
-          "key": "elderly_password",
-          "type": "string",
-          "required": false,
-          "array": false,
-          "size": 255,
-          "default": null,
-          "encrypt": false
-        },
-        {
           "key": "elderly_user_id",
           "type": "string",
           "required": false,
@@ -1341,6 +1346,15 @@
         },
         {
           "key": "caregiver_user_id",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "elderly_token_secret",
           "type": "string",
           "required": false,
           "array": false,
@@ -1371,6 +1385,95 @@
           "status": "available",
           "error": "",
           "columns": ["status"],
+          "lengths": [0],
+          "orders": []
+        }
+      ]
+    },
+    {
+      "$id": "elderly_connections",
+      "$permissions": [
+        "create(\"users\")",
+        "read(\"users\")",
+        "update(\"users\")",
+        "delete(\"users\")"
+      ],
+      "databaseId": "elderly-care-app-db",
+      "name": "Elderly Connections",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "elderly_id_1",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 36,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "elderly_id_2",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 36,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 20,
+          "default": "active",
+          "encrypt": false
+        },
+        {
+          "key": "created_at",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 30,
+          "default": null,
+          "encrypt": false
+        }
+      ],
+      "indexes": [
+        {
+          "$id": "1_27_ux_pair",
+          "$createdAt": "2026-03-04T06:12:52.140+00:00",
+          "$updatedAt": "2026-03-04T06:12:52.212+00:00",
+          "key": "ux_pair",
+          "type": "unique",
+          "status": "available",
+          "error": "",
+          "columns": ["elderly_id_1", "elderly_id_2"],
+          "lengths": [0, 0],
+          "orders": []
+        },
+        {
+          "$id": "1_27_idx_elderly_1",
+          "$createdAt": "2026-03-04T06:12:53.273+00:00",
+          "$updatedAt": "2026-03-04T06:12:53.345+00:00",
+          "key": "idx_elderly_1",
+          "type": "key",
+          "status": "available",
+          "error": "",
+          "columns": ["elderly_id_1"],
+          "lengths": [0],
+          "orders": []
+        },
+        {
+          "$id": "1_27_idx_elderly_2",
+          "$createdAt": "2026-03-04T06:12:54.418+00:00",
+          "$updatedAt": "2026-03-04T06:12:54.481+00:00",
+          "key": "idx_elderly_2",
+          "type": "key",
+          "status": "available",
+          "error": "",
+          "columns": ["elderly_id_2"],
           "lengths": [0],
           "orders": []
         }

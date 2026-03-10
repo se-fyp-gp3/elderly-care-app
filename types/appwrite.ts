@@ -40,6 +40,11 @@ export enum DirectMessagesSenderRole {
     ELDERLY = "elderly"
 }
 
+export enum DirectMessagesMessageType {
+    TEXT = "text",
+    VOICE = "voice"
+}
+
 export enum CustomVoiceStatus {
     PENDING = "pending",
     TRAINING = "training",
@@ -158,13 +163,6 @@ export type ElderlyDailySteps = Models.Row & {
     source: string;
 }
 
-export type ElderlyConnection = Models.Row & {
-    elderly_id_1: string;
-    elderly_id_2: string;
-    status: string;
-    created_at: string | null;
-}
-
 export type DirectMessages = Models.Row & {
     conversation_id: string;
     sender_id: string;
@@ -174,6 +172,7 @@ export type DirectMessages = Models.Row & {
     is_read: boolean;
     sender_role: DirectMessagesSenderRole;
     created_at: string;
+    message_type: DirectMessagesMessageType;
 }
 
 export type CustomVoice = Models.Row & {
@@ -190,7 +189,14 @@ export type RegistrationRequests = Models.Row & {
     token: string;
     status: string;
     elderly_email: string | null;
-    elderly_password: string | null;
     elderly_user_id: string | null;
     caregiver_user_id: string | null;
+    elderly_token_secret: string | null;
+}
+
+export type ElderlyConnections = Models.Row & {
+    elderly_id_1: string;
+    elderly_id_2: string;
+    status: string;
+    created_at: string | null;
 }
