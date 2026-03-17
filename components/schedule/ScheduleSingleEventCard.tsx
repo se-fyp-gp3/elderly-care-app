@@ -31,6 +31,9 @@ export default function ScheduleSingleEventCard({
   onRemind,
 }: ScheduleSingleEventCardProps) {
   const theme = useTheme();
+  const isCompleted =
+    String(item.status).toLowerCase() ===
+    String(ScheduleStatus.COMPLETED).toLowerCase();
 
   return (
     <View style={styles.timelineRow}>
@@ -161,8 +164,7 @@ export default function ScheduleSingleEventCard({
             </View>
           )}
 
-          {(item.status === ScheduleStatus.COMPLETED ||
-            item.status === ("completed" as any)) &&
+          {isCompleted &&
             onUndoTask && (
             <View style={{ alignItems: "flex-end", marginTop: 12 }}>
               <Button
