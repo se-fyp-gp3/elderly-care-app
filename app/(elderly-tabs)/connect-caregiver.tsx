@@ -200,10 +200,15 @@ export default function ConnectCaregiverScreen() {
   };
 
   const handleGoBack = () => {
+    // Stop any active polling or expiry timers before leaving this screen
+    stopPolling();
+    stopExpiry();
+
     if (requestId) {
       deleteRegistrationRequest(requestId).catch(() => {});
       setRequestId(null);
     }
+
     router.navigate("/(elderly-tabs)/settings");
   };
 
