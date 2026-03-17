@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Modal, ScrollView, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { ActivityIndicator, Avatar, Button, Card, List, Switch, Text, useTheme } from "react-native-paper";
+import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 
 export default function ElderlySettings() {
   const { user, preferences, updatePreferences, setPreference, signOut } = useAuth();
@@ -492,11 +493,7 @@ export default function ElderlySettings() {
                 Select a layout that works best for you
               </Text>
 
-              {([
-                { key: UIVersion.Default, label: "Default", desc: "5 tabs — Full features", icon: "view-dashboard" },
-                { key: UIVersion.Accessible, label: "Accessible", desc: "3 pages — Larger text & buttons", icon: "text-box-outline" },
-                { key: UIVersion.Simplified, label: "Super Simplified", desc: "1 page — Emergency, Meds & Messages", icon: "cellphone" },
-              ] as const).map((option) => {
+              {VERSION_OPTIONS.map((option) => {
                 const isSelected = currentVersion === option.key;
                 return (
                   <TouchableOpacity
