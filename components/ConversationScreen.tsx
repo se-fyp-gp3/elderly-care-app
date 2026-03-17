@@ -576,7 +576,7 @@ export default function ConversationScreen({
           <IconButton
             icon="arrow-left"
             size={24}
-            onPress={() => router.replace(myRole === "caregiver" ? "/(caregiver-tabs)/messages" : "/(elderly-tabs)/messages")}
+            onPress={() => router.back()}
             style={styles.backButton}
           />
           <Avatar.Text
