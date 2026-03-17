@@ -78,15 +78,20 @@ export default function ConnectCaregiverScreen() {
       try {
         const t = generateToken();
         const request = await createConnectionRequest(t, user.$id);
-        if (cancelled) return;
+        const createdRequestId = request.$id;
+        if (cancelled) {
+          // Component unmounted after request creation; clean up the pending request.
+          cleanupRequest(createdRequestId);
+          return;
+        }
         setToken(t);
-        setRequestId(request.$id);
+        setRequestId(createdRequestId);
         setStatus("waiting");
 
         expiryRef.current = setTimeout(() => {
           stopPolling();
           setStatus("expired");
-          cleanupRequest(request.$id);
+          cleanupRequest(createdRequestId);
           setRequestId(null);
         }, EXPIRY_TIMEOUT);
       } catch (err: any) {
