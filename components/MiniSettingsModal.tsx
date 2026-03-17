@@ -17,7 +17,7 @@ interface MiniSettingsModalProps {
   onDismiss: () => void;
 }
 
-const VERSION_OPTIONS: {
+export const VERSION_OPTIONS: {
   key: UIVersion;
   label: string;
   desc: string;
