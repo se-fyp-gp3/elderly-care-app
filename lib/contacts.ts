@@ -1,4 +1,4 @@
-import { Caregiver, CaregiverElderly, Elderly, ElderlyConnection } from "@/types/appwrite";
+import { Caregiver, CaregiverElderly, Elderly, ElderlyConnections } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
     CAREGIVER_ELDERLY_TABLE_ID,
@@ -275,7 +275,7 @@ export async function elderlyConnectionExists(
   try {
     // Check both directions: (id1, id2) and (id2, id1)
     const [fwd, rev] = await Promise.all([
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
@@ -284,7 +284,7 @@ export async function elderlyConnectionExists(
           Query.limit(1),
         ],
       }),
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
@@ -367,7 +367,7 @@ export async function getPendingConnectionRequests(
   elderlyId: string,
 ): Promise<{ connectionId: string; from: Elderly }[]> {
   try {
-    const response = await tablesDB.listRows<ElderlyConnection>({
+    const response = await tablesDB.listRows<ElderlyConnections>({
       databaseId: DATABASE_ID,
       tableId: ELDERLY_CONNECTIONS_TABLE_ID,
       queries: [
@@ -411,7 +411,7 @@ export async function getElderlyContacts(
   try {
     // Fetch connections where this elderly is on either side
     const [asId1, asId2] = await Promise.all([
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
@@ -420,7 +420,7 @@ export async function getElderlyContacts(
           Query.limit(100),
         ],
       }),
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
