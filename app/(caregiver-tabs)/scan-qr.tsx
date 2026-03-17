@@ -71,7 +71,9 @@ export default function ScanQRScreen() {
           `/(caregiver-tabs)/confirm-connect?token=${payload.token}` as any,
         );
       } else {
-        setError("Invalid QR code. Please scan the elderly registration QR.");
+        setError(
+          "Invalid QR code. Please scan the elderly registration or connection QR code.",
+        );
         processingRef.current = false;
         setScanned(false);
       }
