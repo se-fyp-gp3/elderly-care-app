@@ -177,7 +177,7 @@ export function useQRPairing({
     return () => {
       stopPolling();
     };
-  }, [status, token, requestId]);
+  }, [status, token, requestId, onCompleted, stopPolling, stopExpiry, cleanup]);
 
   const refresh = async () => {
     stopPolling();
