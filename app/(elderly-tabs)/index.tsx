@@ -133,19 +133,25 @@ export default function ElderlyHome() {
   const [simplifiedContacts, setSimplifiedContacts] = React.useState<Contact[]>([]);
 
   React.useEffect(() => {
-    if (uiVersion !== UIVersion.Simplified) return;
+    if (uiVersion !== UIVersion.Simplified) {
+      // Clear contacts when not in simplified mode
+      setSimplifiedContacts([]);
+      return;
+    }
+
+    if (!elderlyProfile) {
+      return;
+    }
+
     (async () => {
-      if (!user) return;
       try {
-        const profile = await getElderlyByUserId(user.$id);
-        if (!profile) return;
-        const contactData = await getContactsForElderly(profile.$id);
+        const contactData = await getContactsForElderly(elderlyProfile.$id);
         setSimplifiedContacts(contactData);
       } catch (e) {
         console.error("Error fetching contacts for simplified view:", e);
       }
     })();
-  }, [user, uiVersion]);
+  }, [elderlyProfile, uiVersion]);
 
   // Compute "To Take Today" list
   const todoList = React.useMemo(() => {
