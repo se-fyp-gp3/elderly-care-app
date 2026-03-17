@@ -13,9 +13,17 @@ export default function ConnectCaregiverScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
+  if (!user) {
+    return (
+      <Text style={{ textAlign: "center", marginTop: 24 }}>
+        Loading...
+      </Text>
+    );
+  }
+
   const { status, qrPayload, errorMsg, refresh, cleanupAndLeave } =
     useQRPairing({
-      createRequest: (t) => createConnectionRequest(t, user!.$id),
+      createRequest: (t) => createConnectionRequest(t, user.$id),
       onCompleted: async (request, { setStatus, cleanup }) => {
         cleanup(request.$id);
         setStatus("done");
