@@ -146,6 +146,14 @@ export default function TabsLayout() {
           headerShown: false,
         }}
       />
+      <Tabs.Screen
+        name="confirm-connect"
+        options={{
+          href: null,
+          title: "Confirm Connect",
+          headerShown: false,
+        }}
+      />
     </Tabs>
   );
 }

@@ -8,7 +8,7 @@ import {
   tablesDB,
 } from "./appwrite";
 import { getCaregiverByUserId, linkCaregiverToElderly } from "./caregiver";
-import { createElderlyProfile } from "./elderly";
+import { createElderlyProfile, getElderlyByUserId } from "./elderly";
 
 export type RegistrationRequest = Models.Row & {
   token: string;
@@ -243,4 +243,81 @@ export async function registerElderlyForCaregiver(params: {
     elderlyTokenSecret: tokenResult.secret,
     caregiverUserId,
   });
+}
+
+/**
+ * Create a connection request for an already-registered elderly to pair with a caregiver.
+ * The elderly_user_id is set upfront since the elderly is already signed in.
+ */
+export async function createConnectionRequest(
+  token: string,
+  elderlyUserId: string,
+): Promise<RegistrationRequest> {
+  const doc = await tablesDB.createRow<RegistrationRequest>({
+    databaseId: DATABASE_ID,
+    tableId: REGISTRATION_REQUESTS_TABLE_ID,
+    rowId: ID.unique(),
+    data: {
+      token,
+      status: "pending",
+      elderly_email: null,
+      elderly_user_id: elderlyUserId,
+      elderly_token_secret: null,
+      caregiver_user_id: null,
+    },
+  });
+  return doc as unknown as RegistrationRequest;
+}
+
+/**
+ * Complete a connection request after the caregiver confirms the link.
+ */
+export async function completeConnectionRequest(
+  docId: string,
+  caregiverUserId: string,
+): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: REGISTRATION_REQUESTS_TABLE_ID,
+    rowId: docId,
+    data: {
+      status: "completed",
+      caregiver_user_id: caregiverUserId,
+    },
+  });
+}
+
+/**
+ * Full connection flow executed by the caregiver.
+ * Links an existing elderly account to the caregiver.
+ */
+export async function connectCaregiverToElderly(params: {
+  token: string;
+  caregiverUserId: string;
+}): Promise<void> {
+  const { token, caregiverUserId } = params;
+
+  const request = await getRegistrationRequest(token);
+  if (!request) {
+    throw new Error("Connection request not found or expired.");
+  }
+  if (request.status === "completed") {
+    throw new Error("This connection has already been completed.");
+  }
+  if (!request.elderly_user_id) {
+    throw new Error("Invalid connection request: missing elderly user.");
+  }
+
+  const elderlyProfile = await getElderlyByUserId(request.elderly_user_id);
+  if (!elderlyProfile) {
+    throw new Error("Elderly profile not found.");
+  }
+
+  const caregiver = await getCaregiverByUserId(caregiverUserId);
+  if (!caregiver) {
+    throw new Error("Caregiver profile not found.");
+  }
+
+  await linkCaregiverToElderly(caregiver.$id, elderlyProfile.$id);
+  await completeConnectionRequest(request.$id, caregiverUserId);
 }
