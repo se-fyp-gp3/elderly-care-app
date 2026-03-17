@@ -318,6 +318,28 @@ export async function connectCaregiverToElderly(params: {
     throw new Error("Caregiver profile not found.");
   }
 
-  await linkCaregiverToElderly(caregiver.$id, elderlyProfile.$id);
+  try {
+    await linkCaregiverToElderly(caregiver.$id, elderlyProfile.$id);
+  } catch (error: unknown) {
+    const message =
+      error && typeof error === "object" && "message" in error
+        ? String((error as { message?: unknown }).message)
+        : "";
+
+    const lowerMessage = message.toLowerCase();
+    const isDuplicateError =
+      lowerMessage.includes("duplicate") ||
+      lowerMessage.includes("unique") ||
+      lowerMessage.includes("already exists") ||
+      lowerMessage.includes("already linked");
+
+    if (!isDuplicateError) {
+      // If it's not a duplicate/unique-constraint error, preserve existing behavior.
+      throw error;
+    }
+    // If the caregiver is already linked to this elderly, we still want
+    // to mark the connection request as completed so the UI can proceed.
+  }
+
   await completeConnectionRequest(request.$id, caregiverUserId);
 }
