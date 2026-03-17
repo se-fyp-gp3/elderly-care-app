@@ -43,6 +43,19 @@ export default function ConfirmConnectScreen() {
           setLoading(false);
           return;
         }
+
+        if (request.status === "completed") {
+          setError("This connection request has already been completed.");
+          setLoading(false);
+          return;
+        }
+
+        if (request.status === "cancelled") {
+          setError("This connection request has been cancelled.");
+          setLoading(false);
+          return;
+        }
+
         setRequestDocId(request.$id);
 
         const profile = await getElderlyByUserId(request.elderly_user_id);
