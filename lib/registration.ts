@@ -304,6 +304,9 @@ export async function connectCaregiverToElderly(params: {
   if (request.status === "completed") {
     throw new Error("This connection has already been completed.");
   }
+  if (request.status === "cancelled") {
+    throw new Error("This connection request has been cancelled.");
+  }
   if (!request.elderly_user_id) {
     throw new Error("Invalid connection request: missing elderly user.");
   }
