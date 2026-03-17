@@ -138,7 +138,13 @@ export function useQRPairing({
   useEffect(() => {
     if ((status !== "waiting" && status !== "scanned") || !token) return;
 
-    pollingRef.current = setInterval(async () => {
+    let isCancelled = false;
+
+   const poll = async () => {
+      if (isCancelled) {
+        return;
+      }
+
       try {
         const request = await getRegistrationRequest(token);
         if (!request) {
@@ -166,6 +172,7 @@ export function useQRPairing({
           stopPolling();
           stopExpiry();
           await onCompleted(request, { setStatus, cleanup });
+          return;
         }
       } catch (err) {
         console.error("Polling error:", err);
@@ -177,10 +184,20 @@ export function useQRPairing({
           cleanup(requestId);
           setRequestId(null);
         }
+        return;
       }
-    }, 1000);
+
+      // Schedule next poll only if still active
+      if (!isCancelled && (status === "waiting" || status === "scanned") && token) {
+        pollingRef.current = setTimeout(poll, 1000);
+      }
+    };
+
+    // Start the polling loop
+    poll();
 
     return () => {
+      isCancelled = true;
       stopPolling();
     };
   }, [status, token, requestId, onCompleted, stopPolling, stopExpiry, cleanup]);
