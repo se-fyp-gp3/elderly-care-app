@@ -307,10 +307,6 @@ export default function ElderlyHome() {
         greetingName: { fontSize: 28 },
         greetingSubtitle: { fontSize: 20 },
         sectionTitle: { fontSize: 24 },
-        medName: { fontSize: 20 },
-        medDosage: { fontSize: 17 },
-        scheduleTitle: { fontSize: 18 },
-        buttonMinHeight: { minHeight: 56 },
       }
     : null;
 
