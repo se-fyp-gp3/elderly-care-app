@@ -130,6 +130,10 @@ export default function ScheduleSingleEventCard({
               {onRemind && (
                 <TouchableOpacity
                   onPress={() => onRemind(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Set reminder for this event"
+                  accessibilityHint="Sends you a reminder notification for this event"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   style={{
                     width: 36,
                     height: 36,
