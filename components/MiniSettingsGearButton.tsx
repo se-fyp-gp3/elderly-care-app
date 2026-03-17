@@ -13,6 +13,8 @@ export default function MiniSettingsGearButton() {
       <TouchableOpacity
         onPress={() => setVisible(true)}
         style={{ marginRight: 12, padding: 4 }}
+        accessibilityRole="button"
+        accessibilityLabel="Open settings"
       >
         <MaterialCommunityIcons
           name="cog"
