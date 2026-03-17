@@ -401,6 +401,18 @@ export async function markScheduleTaskCompleted(taskId: string): Promise<void> {
 }
 
 /**
+ * Undo a completed schedule task back to pending.
+ */
+export async function undoScheduleTaskCompleted(taskId: string): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: SCHEDULE_TABLE_ID,
+    rowId: taskId,
+    data: { status: ScheduleStatus.PENDING },
+  });
+}
+
+/**
  * Auto-recover a missing reminder link for a prescription.
  * First searches for an existing reminder; if none found, creates a new one.
  */

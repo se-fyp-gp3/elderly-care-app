@@ -15,10 +15,17 @@ export enum VoiceTone {
   Professional = "professional",
 }
 
+export enum UIVersion {
+  Default = "default",
+  Accessible = "accessible",
+  Simplified = "simplified",
+}
+
 export type UserPreferences = {
   role?: Role;
   fontSize?: FontSize;
   voiceTone?: VoiceTone;
   notifications?: boolean;
+  uiVersion?: UIVersion;
   [key: string]: any;
 };
