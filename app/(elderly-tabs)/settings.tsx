@@ -1,3 +1,4 @@
+import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 import { useAuth } from "@/lib/auth-context";
 import { getElderlyByUserId, getLinkedCaregivers, updateElderlyEmergencyContact } from "@/lib/elderly";
 import { Caregiver, Elderly } from "@/types/appwrite";
@@ -7,7 +8,6 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Modal, ScrollView, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { ActivityIndicator, Avatar, Button, Card, List, Switch, Text, useTheme } from "react-native-paper";
-import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 
 export default function ElderlySettings() {
   const { user, preferences, updatePreferences, setPreference, signOut } = useAuth();
@@ -510,12 +510,12 @@ export default function ElderlySettings() {
                     ]}
                   >
                     <View style={[styles.iconContainer, {
-                      backgroundColor: isSelected ? theme.colors.primary + "20" : "#E8F0FE",
+                      backgroundColor: isSelected ? theme.colors.primary : "#E8F0FE",
                     }]}>
                       <MaterialCommunityIcons
                         name={option.icon as any}
                         size={26}
-                        color={isSelected ? theme.colors.primary : theme.colors.onSurfaceVariant}
+                        color={isSelected ? "#FFFFFF" : theme.colors.onSurfaceVariant}
                       />
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>

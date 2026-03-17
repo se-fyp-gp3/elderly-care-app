@@ -1,3 +1,4 @@
+import MiniSettingsModal from "@/components/MiniSettingsModal";
 import { Contact } from "@/lib/contacts";
 import { Elderly, ElderlyMedicationReminder } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -45,6 +46,7 @@ export default function SimplifiedHomeView({
 }: SimplifiedHomeViewProps) {
   const theme = useTheme();
   const router = useRouter();
+  const [settingsVisible, setSettingsVisible] = useState(false);
   
   const handleEmergencyCall = () => {
     const num = elderlyProfile?.emergency_contact;
