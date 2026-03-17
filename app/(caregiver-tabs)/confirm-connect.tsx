@@ -8,7 +8,7 @@ import {
 import { Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
@@ -32,6 +32,7 @@ export default function ConfirmConnectScreen() {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     async function loadElderly() {
@@ -73,6 +74,13 @@ export default function ConfirmConnectScreen() {
       }
     }
     loadElderly();
+
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+        redirectTimeoutRef.current = null;
+      }
+    };
   }, [token]);
 
   const handleConfirm = async () => {
@@ -85,7 +93,10 @@ export default function ConfirmConnectScreen() {
         caregiverUserId: user.$id,
       });
       setSuccess(true);
-      setTimeout(() => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+      redirectTimeoutRef.current = setTimeout(() => {
         router.replace("/(caregiver-tabs)/caregiver");
       }, 2000);
     } catch (err: any) {
