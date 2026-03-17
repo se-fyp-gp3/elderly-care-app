@@ -3,6 +3,7 @@ import {
     storage,
     VOICE_MESSAGES_BUCKET_ID,
 } from "@/lib/appwrite";
+import { useAuth } from "@/lib/auth-context";
 import {
     buildConversationId,
     fetchConversationMessages,
@@ -11,6 +12,7 @@ import {
     subscribeToConversation,
 } from "@/lib/messaging";
 import { DirectMessage } from "@/types/messaging";
+import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
 import {
@@ -177,6 +179,19 @@ export default function ConversationScreen({
 }: ConversationScreenProps) {
   const theme = useTheme();
   const router = useRouter();
+  const { preferences } = useAuth();
+  const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
+
+  const handleBack = () => {
+    if (myRole === "caregiver") {
+      router.replace("/(caregiver-tabs)/messages" as any);
+    } else if (uiVersion === UIVersion.Simplified) {
+      router.replace("/(elderly-tabs)/" as any);
+    } else {
+      router.replace("/(elderly-tabs)/emergency" as any);
+    }
+  };
+
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -576,7 +591,7 @@ export default function ConversationScreen({
           <IconButton
             icon="arrow-left"
             size={24}
-            onPress={() => router.back()}
+            onPress={handleBack}
             style={styles.backButton}
           />
           <Avatar.Text
