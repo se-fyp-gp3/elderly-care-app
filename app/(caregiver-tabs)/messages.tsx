@@ -1,17 +1,17 @@
 import {
-    clientReactNative,
-    DATABASE_ID,
-    DIRECT_MESSAGES_TABLE_ID,
+  clientReactNative,
+  DATABASE_ID,
+  DIRECT_MESSAGES_TABLE_ID,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
-    addCaregiverConnection,
-    addCaregiverContact,
-    Contact,
-    formatRelativeTime,
-    getContactsForCaregiver,
-    searchUserByPhone,
+  addCaregiverConnection,
+  addCaregiverContact,
+  Contact,
+  formatRelativeTime,
+  getContactsForCaregiver,
+  searchUserByPhone,
 } from "@/lib/contacts";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
 import { Caregiver, Elderly } from "@/types/appwrite";
@@ -20,25 +20,25 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Keyboard,
-    Linking,
-    Modal,
-    RefreshControl,
-    StyleSheet,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Alert,
+  FlatList,
+  Keyboard,
+  Linking,
+  Modal,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Button,
-    Searchbar,
-    Text,
-    TextInput,
-    useTheme
+  ActivityIndicator,
+  Avatar,
+  Button,
+  Searchbar,
+  Text,
+  TextInput,
+  useTheme
 } from "react-native-paper";
 
 export default function CaregiverMessages() {
