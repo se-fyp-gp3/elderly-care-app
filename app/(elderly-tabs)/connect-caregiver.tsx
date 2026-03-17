@@ -175,10 +175,22 @@ export default function ConnectCaregiverScreen() {
 
   const handleRefresh = async () => {
     if (!user) return;
+
+    // Stop any existing timers before starting a new request to avoid
+    // old callbacks affecting the new request / UI state.
+    stopPolling();
+    stopExpiry();
+
+    // Optionally clean up any previous pending request to avoid orphans.
+    if (requestId) {
+      cleanupRequest(requestId);
+      setRequestId(null);
+    }
+
     setStatus("loading");
     setErrorMsg(null);
     setToken(null);
-    setRequestId(null);
+
     try {
       const t = generateToken();
       const request = await createConnectionRequest(t, user.$id);
