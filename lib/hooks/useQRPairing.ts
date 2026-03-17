@@ -79,6 +79,12 @@ export function useQRPairing({
     deleteRegistrationRequest(id).catch(() => {});
   };
 
+  const createRequestRef = useRef(createRequest);
+
+  useEffect(() => {
+    createRequestRef.current = createRequest;
+  }, [createRequest]);
+
   // Create the request on mount
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +92,7 @@ export function useQRPairing({
     async function init() {
       try {
         const t = generateToken();
-        const request = await createRequest(t);
+        const request = await createRequestRef.current(t);
         const createdId = request.$id;
         if (cancelled) {
           cleanup(createdId);
