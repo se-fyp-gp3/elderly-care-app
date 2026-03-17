@@ -1,17 +1,31 @@
 import { useAuth } from "@/lib/auth-context";
 import { getElderlyByUserId, getLinkedCaregivers, updateElderlyEmergencyContact } from "@/lib/elderly";
 import { Caregiver, Elderly } from "@/types/appwrite";
+import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Modal, ScrollView, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { ActivityIndicator, Avatar, Button, Card, List, Switch, Text, useTheme } from "react-native-paper";
+import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 
 export default function ElderlySettings() {
-  const { user, preferences, updatePreferences, signOut } = useAuth();
+  const { user, preferences, updatePreferences, setPreference, signOut } = useAuth();
   const theme = useTheme();
+  const router = useRouter();
   const [notifications, setNotifications] = React.useState(
     preferences.notifications ?? true,
   );
+
+  // ── UI Version state ──
+  const [versionPickerVisible, setVersionPickerVisible] = useState(false);
+  const currentVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
+
+  const handleVersionChange = async (version: UIVersion) => {
+    await setPreference("uiVersion", version);
+    setVersionPickerVisible(false);
+    router.replace("/(elderly-tabs)/" as any);
+  };
 
   // ── Emergency contact state ──
   const [elderlyProfile, setElderlyProfile] = useState<Elderly | null>(null);
@@ -183,6 +197,45 @@ export default function ElderlySettings() {
             />
           </View>
         )}
+      </Card>
+
+      {/* Interface Style */}
+      <Text variant="titleLarge" style={styles.sectionTitle}>
+        Interface Style
+      </Text>
+      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <List.Item
+          title="UI Version"
+          titleStyle={styles.listTitle}
+          description={
+            currentVersion === UIVersion.Simplified
+              ? "Super Simplified (1 page)"
+              : currentVersion === UIVersion.Accessible
+                ? "Accessible (3 pages)"
+                : "Default (5 tabs)"
+          }
+          descriptionStyle={styles.listDescription}
+          left={() => (
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons
+                name="monitor-cellphone"
+                size={26}
+                color={theme.colors.primary}
+              />
+            </View>
+          )}
+          right={() => (
+            <View style={styles.rightContainer}>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={26}
+                color={theme.colors.onSurfaceVariant}
+              />
+            </View>
+          )}
+          onPress={() => setVersionPickerVisible(true)}
+          style={styles.listItem}
+        />
       </Card>
 
       {/* Display */}
@@ -410,6 +463,75 @@ export default function ElderlySettings() {
                   );
                 })
               )}
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+
+    {/* ── UI Version Picker Modal ── */}
+    <Modal
+      visible={versionPickerVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setVersionPickerVisible(false)}
+    >
+      <TouchableWithoutFeedback onPress={() => setVersionPickerVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.modalHeader}>
+                <Text variant="titleLarge" style={{ fontWeight: "700" }}>
+                  Choose Interface Style
+                </Text>
+                <TouchableOpacity onPress={() => setVersionPickerVisible(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color={theme.colors.onSurface} />
+                </TouchableOpacity>
+              </View>
+
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 16 }}>
+                Select a layout that works best for you
+              </Text>
+
+              {VERSION_OPTIONS.map((option) => {
+                const isSelected = currentVersion === option.key;
+                return (
+                  <TouchableOpacity
+                    key={option.key}
+                    onPress={() => handleVersionChange(option.key)}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.caregiverRow,
+                      {
+                        backgroundColor: isSelected
+                          ? theme.colors.primaryContainer
+                          : theme.colors.surfaceVariant,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.iconContainer, {
+                      backgroundColor: isSelected ? theme.colors.primary + "20" : "#E8F0FE",
+                    }]}>
+                      <MaterialCommunityIcons
+                        name={option.icon as any}
+                        size={26}
+                        color={isSelected ? theme.colors.primary : theme.colors.onSurfaceVariant}
+                      />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text variant="titleMedium" style={{ fontWeight: "600" }}>
+                        {option.label}
+                      </Text>
+                      <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                        {option.desc}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <MaterialCommunityIcons name="check-circle" size={24} color={theme.colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </TouchableWithoutFeedback>
         </View>

@@ -19,6 +19,7 @@ import {
   recordMedicationTaken,
   ScheduleEvent,
   undoMedicationTaken,
+  undoScheduleTaskCompleted,
 } from "@/lib/schedule";
 import { Elderly, ScheduleCategory, ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -334,6 +335,22 @@ export default function SchedulePage() {
     }
   };
 
+  const handleUndoTask = async (taskId: string) => {
+    try {
+      await undoScheduleTaskCompleted(taskId);
+      setEvents((currentEvents) =>
+        currentEvents.map((event) =>
+          event.id === taskId
+            ? { ...event, status: ScheduleStatus.PENDING }
+            : event,
+        ),
+      );
+    } catch (err) {
+      console.error("Error undoing task", err);
+      Alert.alert("Error", "Could not undo task.");
+    }
+  };
+
   const handleTakeMedication = async (event: ScheduleEvent) => {
     if (!event.medicationData) return;
     const { realId, logId, reminderId } = event.medicationData;
@@ -383,6 +400,28 @@ export default function SchedulePage() {
       await fetchData();
     } catch (err) {
       Alert.alert("Error", "Failed to undo.");
+    }
+  };
+
+  const handleRemindTask = async (event: ScheduleEvent) => {
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Please enable notifications.");
+        return;
+      }
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Task Reminder",
+          body: `Reminder: ${event.title} (${event.elderlyName})`,
+          data: { eventId: event.id },
+        },
+        trigger: { type: "timeInterval", seconds: 5, repeats: false } as any,
+      });
+      Alert.alert("Reminder set", "Notification in 5 seconds.");
+    } catch (e) {
+      console.warn(e);
+      Alert.alert("Error", "Could not schedule reminder.");
     }
   };
 
@@ -460,6 +499,8 @@ export default function SchedulePage() {
         <ScheduleSingleEventCard
           item={item.event}
           onMarkDone={handleMarkDone}
+          onUndoTask={handleUndoTask}
+          onRemind={handleRemindTask}
         />
       );
     }

@@ -1,4 +1,6 @@
+import SimplifiedHomeView from "@/components/SimplifiedHomeView";
 import { useAuth } from "@/lib/auth-context";
+import { Contact, getContactsForElderly } from "@/lib/contacts";
 import {
     fetchElderlySchedulesForUser,
     getElderlyByUserId,
@@ -16,6 +18,7 @@ import {
     MedicationLogs,
     Schedule,
 } from "@/types/appwrite";
+import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { openURL } from "expo-linking";
 import { useRouter } from "expo-router";
@@ -50,9 +53,11 @@ type TodoItem = {
 };
 
 export default function ElderlyHome() {
-  const { user } = useAuth();
+  const { user, preferences } = useAuth();
   const theme = useTheme();
   const router = useRouter();
+  const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
+  const isAccessible = uiVersion === UIVersion.Accessible;
   const {
     todaySteps,
     isLoading: stepsLoading,
@@ -123,6 +128,30 @@ export default function ElderlyHome() {
       subscription.remove();
     };
   }, [fetchElderlyData]);
+
+  // ── Contacts for simplified view ──
+  const [simplifiedContacts, setSimplifiedContacts] = React.useState<Contact[]>([]);
+
+  React.useEffect(() => {
+    if (uiVersion !== UIVersion.Simplified) {
+      // Clear contacts when not in simplified mode
+      setSimplifiedContacts([]);
+      return;
+    }
+
+    if (!elderlyProfile) {
+      return;
+    }
+
+    (async () => {
+      try {
+        const contactData = await getContactsForElderly(elderlyProfile.$id);
+        setSimplifiedContacts(contactData);
+      } catch (e) {
+        console.error("Error fetching contacts for simplified view:", e);
+      }
+    })();
+  }, [elderlyProfile, uiVersion]);
 
   // Compute "To Take Today" list
   const todoList = React.useMemo(() => {
@@ -257,6 +286,30 @@ export default function ElderlyHome() {
     );
   };
 
+  // ── Simplified version ──
+  if (uiVersion === UIVersion.Simplified) {
+    return (
+      <SimplifiedHomeView
+        elderlyProfile={elderlyProfile}
+        userName={elderlyProfile?.name || user?.name || "there"}
+        todoList={todoList}
+        contacts={simplifiedContacts}
+        onTakeMedication={handleTakeMedication}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+      />
+    );
+  }
+
+  // ── Accessible version: scale up styles ──
+  const accessibleStyles = isAccessible
+    ? {
+        greetingName: { fontSize: 28 },
+        greetingSubtitle: { fontSize: 20 },
+        sectionTitle: { fontSize: 24 },
+      }
+    : null;
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
@@ -266,10 +319,10 @@ export default function ElderlyHome() {
     >
       {/* Greeting */}
       <View style={styles.greetingSection}>
-        <Text variant="headlineMedium" style={styles.greetingName}>
+        <Text variant="headlineMedium" style={[styles.greetingName, accessibleStyles?.greetingName]}>
           Hello, {elderlyProfile?.name || user?.name || "there"}!
         </Text>
-        <Text variant="bodyLarge" style={styles.greetingSubtitle}>
+        <Text variant="bodyLarge" style={[styles.greetingSubtitle, accessibleStyles?.greetingSubtitle]}>
           How are you feeling today?
         </Text>
       </View>
@@ -296,7 +349,7 @@ export default function ElderlyHome() {
       </Card>
 
       {/* Today's Medications */}
-      <Text variant="titleLarge" style={styles.sectionTitle}>
+      <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>
         Today&apos;s Medications
       </Text>
       {todoList.length > 0 ? (
@@ -395,7 +448,7 @@ export default function ElderlyHome() {
       </Button>
 
       {/* Upcoming Schedule */}
-      <Text variant="titleLarge" style={styles.sectionTitle}>
+      <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>
         Upcoming Schedule
       </Text>
       <Card
@@ -444,7 +497,7 @@ export default function ElderlyHome() {
       </Card>
 
       {/* Today's Steps */}
-      <Text variant="titleLarge" style={styles.sectionTitle}>
+      <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>
         Today&apos;s Steps
       </Text>
       <Card

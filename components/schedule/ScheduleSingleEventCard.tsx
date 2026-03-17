@@ -2,7 +2,11 @@ import { ScheduleEvent } from "@/lib/schedule";
 import { ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import {
+    StyleSheet,
+    TouchableOpacity,
+    View,
+} from "react-native";
 import {
     Avatar,
     Button,
@@ -16,13 +20,20 @@ import { getStatusColor, getTypeIcon } from "./helpers";
 interface ScheduleSingleEventCardProps {
   item: ScheduleEvent;
   onMarkDone: (taskId: string) => void;
+  onUndoTask?: (taskId: string) => void;
+  onRemind?: (item: ScheduleEvent) => void;
 }
 
 export default function ScheduleSingleEventCard({
   item,
   onMarkDone,
+  onUndoTask,
+  onRemind,
 }: ScheduleSingleEventCardProps) {
   const theme = useTheme();
+  const isCompleted =
+    String(item.status).toLowerCase() ===
+    String(ScheduleStatus.COMPLETED).toLowerCase();
 
   return (
     <View style={styles.timelineRow}>
@@ -118,7 +129,30 @@ export default function ScheduleSingleEventCard({
 
           {(item.status === ScheduleStatus.PENDING ||
             item.status === ScheduleStatus.MISSED) && (
-            <View style={{ alignItems: "flex-end", marginTop: 12 }}>
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginTop: 12, gap: 8 }}>
+              {onRemind && (
+                <TouchableOpacity
+                  onPress={() => onRemind(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Set reminder for this event"
+                  accessibilityHint="Sends you a reminder notification for this event"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: theme.colors.secondaryContainer,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name="bell-ring-outline"
+                    size={20}
+                    color={theme.colors.secondary}
+                  />
+                </TouchableOpacity>
+              )}
               <Button
                 mode="contained-tonal"
                 compact
@@ -126,6 +160,21 @@ export default function ScheduleSingleEventCard({
                 onPress={() => onMarkDone(item.id)}
               >
                 Mark Done
+              </Button>
+            </View>
+          )}
+
+          {isCompleted &&
+            onUndoTask && (
+            <View style={{ alignItems: "flex-end", marginTop: 12 }}>
+              <Button
+                mode="outlined"
+                compact
+                uppercase={false}
+                icon="undo"
+                onPress={() => onUndoTask(item.id)}
+              >
+                Undo
               </Button>
             </View>
           )}

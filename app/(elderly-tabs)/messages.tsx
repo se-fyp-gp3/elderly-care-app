@@ -28,10 +28,9 @@ import {
   ActivityIndicator,
   Avatar,
   Badge,
-  Divider,
   Searchbar,
   Text,
-  useTheme,
+  useTheme
 } from "react-native-paper";
 
 export default function ElderlyMessages() {
@@ -198,10 +197,29 @@ export default function ElderlyMessages() {
     });
   }, []);
 
+  const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+  const isOnline = (lastActive?: string): boolean => {
+    if (!lastActive) return false;
+    try {
+      return Date.now() - new Date(lastActive).getTime() < ONLINE_THRESHOLD_MS;
+    } catch {
+      return false;
+    }
+  };
+
+  const formatLastSeen = (lastActive?: string): string => {
+    if (!lastActive) return "";
+    if (isOnline(lastActive)) return "Online";
+    return `Last seen ${formatRelativeTime(lastActive)}`;
+  };
+
   const renderContactItem = ({ item }: { item: Contact }) => {
     const lastMsg = lastMessages[item.id];
     const lastMsgTime = lastMsg?.created_at || item.lastActive;
     const preview = lastMsg?.body;
+    const online = isOnline(item.lastActive);
+    const lastSeenText = formatLastSeen(item.lastActive);
 
     return (
       <TouchableOpacity
@@ -223,20 +241,37 @@ export default function ElderlyMessages() {
           <View
             style={[
               styles.onlineDot,
-              { backgroundColor: "#4CAF50", borderColor: theme.colors.surface },
+              {
+                backgroundColor: online ? "#4CAF50" : "#BDBDBD",
+                borderColor: theme.colors.surface,
+              },
             ]}
           />
         </View>
 
         <View style={styles.contactInfo}>
           <View style={styles.contactHeader}>
-            <Text
-              variant="titleMedium"
-              style={[styles.contactName, { color: theme.colors.onSurface }]}
-              numberOfLines={1}
-            >
-              {item.name}
-            </Text>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text
+                variant="titleMedium"
+                style={[styles.contactName, { color: theme.colors.onSurface }]}
+                numberOfLines={1}
+              >
+                {item.name}
+              </Text>
+              {lastSeenText ? (
+                <Text
+                  variant="bodySmall"
+                  style={{
+                    color: online ? "#4CAF50" : theme.colors.onSurfaceVariant,
+                    fontSize: 12,
+                    marginTop: 1,
+                  }}
+                >
+                  {lastSeenText}
+                </Text>
+              ) : null}
+            </View>
             <Text
               variant="bodySmall"
               style={[
@@ -249,17 +284,27 @@ export default function ElderlyMessages() {
           </View>
 
           {preview ? (
-            <Text
-              variant="bodySmall"
-              style={[
-                styles.previewText,
-                { color: theme.colors.onSurfaceVariant },
-              ]}
-              numberOfLines={1}
-            >
-              {lastMsg?.sender_id === elderlyProfileId ? "You: " : ""}
-              {preview}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {lastMsg?.sender_id === elderlyProfileId && (
+                <MaterialCommunityIcons
+                  name={lastMsg?.is_read ? "check-all" : "check"}
+                  size={14}
+                  color={lastMsg?.is_read ? "#4CAF50" : theme.colors.onSurfaceVariant}
+                  style={{ marginRight: 3 }}
+                />
+              )}
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.previewText,
+                  { color: theme.colors.onSurfaceVariant, flex: 1 },
+                ]}
+                numberOfLines={1}
+              >
+                {lastMsg?.sender_id === elderlyProfileId ? "You: " : ""}
+                {lastMsg?.message_type === "voice" ? "\ud83c\udfa4 Voice message" : preview}
+              </Text>
+            </View>
           ) : (
             <View style={styles.contactSubInfo}>
               <View
