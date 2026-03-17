@@ -1,12 +1,13 @@
-import { Caregiver, CaregiverElderly, Elderly, ElderlyConnection } from "@/types/appwrite";
+import { Caregiver, CaregiverConnection, CaregiverElderly, Elderly, ElderlyConnections } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
-    CAREGIVER_ELDERLY_TABLE_ID,
-    CAREGIVER_TABLE_ID,
-    DATABASE_ID,
-    ELDERLY_CONNECTIONS_TABLE_ID,
-    ELDERLY_TABLE_ID,
-    tablesDB,
+  CAREGIVER_CONNECTIONS_TABLE_ID,
+  CAREGIVER_ELDERLY_TABLE_ID,
+  CAREGIVER_TABLE_ID,
+  DATABASE_ID,
+  ELDERLY_CONNECTIONS_TABLE_ID,
+  ELDERLY_TABLE_ID,
+  tablesDB
 } from "./appwrite";
 
 export interface Contact {
@@ -20,9 +21,29 @@ export interface Contact {
 }
 
 /**
- * For a caregiver user: get all linked elderly as contacts
+ * For a caregiver user: get all linked elderly AND connected caregivers as contacts
  */
 export async function getContactsForCaregiver(
+  caregiverId: string,
+): Promise<Contact[]> {
+  try {
+    // Fetch elderly contacts and caregiver contacts in parallel
+    const [elderlyContacts, caregiverContacts] = await Promise.all([
+      getElderlyContactsForCaregiver(caregiverId),
+      getCaregiverContacts(caregiverId),
+    ]);
+
+    return [...elderlyContacts, ...caregiverContacts];
+  } catch (error) {
+    console.error("Error fetching contacts for caregiver:", error);
+    return [];
+  }
+}
+
+/**
+ * Get linked elderly contacts for a caregiver (from caregiver_elderly table)
+ */
+async function getElderlyContactsForCaregiver(
   caregiverId: string,
 ): Promise<Contact[]> {
   try {
@@ -71,7 +92,7 @@ export async function getContactsForCaregiver(
       lastActive: elderly.$updatedAt,
     }));
   } catch (error) {
-    console.error("Error fetching contacts for caregiver:", error);
+    console.error("Error fetching elderly contacts for caregiver:", error);
     return [];
   }
 }
@@ -236,6 +257,22 @@ export function formatRelativeTime(dateString?: string): string {
   }
 }
 
+/**
+ * Search for any user (elderly or caregiver) by phone number.
+ * Returns the matched profile with its role, or null if not found.
+ */
+export async function searchUserByPhone(
+  phone: string,
+): Promise<{ role: "elderly"; data: Elderly } | { role: "caregiver"; data: Caregiver } | null> {
+  const [elderly, caregiver] = await Promise.all([
+    searchElderlyByPhone(phone),
+    searchCaregiverByPhone(phone),
+  ]);
+  if (elderly) return { role: "elderly", data: elderly };
+  if (caregiver) return { role: "caregiver", data: caregiver };
+  return null;
+}
+
 // ────────────────────────────────────────────────────
 // Elderly-to-Elderly connection helpers
 // ────────────────────────────────────────────────────
@@ -275,7 +312,7 @@ export async function elderlyConnectionExists(
   try {
     // Check both directions: (id1, id2) and (id2, id1)
     const [fwd, rev] = await Promise.all([
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
@@ -284,7 +321,7 @@ export async function elderlyConnectionExists(
           Query.limit(1),
         ],
       }),
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
@@ -367,7 +404,7 @@ export async function getPendingConnectionRequests(
   elderlyId: string,
 ): Promise<{ connectionId: string; from: Elderly }[]> {
   try {
-    const response = await tablesDB.listRows<ElderlyConnection>({
+    const response = await tablesDB.listRows<ElderlyConnections>({
       databaseId: DATABASE_ID,
       tableId: ELDERLY_CONNECTIONS_TABLE_ID,
       queries: [
@@ -411,7 +448,7 @@ export async function getElderlyContacts(
   try {
     // Fetch connections where this elderly is on either side
     const [asId1, asId2] = await Promise.all([
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
@@ -420,7 +457,7 @@ export async function getElderlyContacts(
           Query.limit(100),
         ],
       }),
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
@@ -457,6 +494,131 @@ export async function getElderlyContacts(
     }));
   } catch (error) {
     console.error("Error fetching elderly contacts:", error);
+    return [];
+  }
+}
+
+// ────────────────────────────────────────────────────
+// Caregiver-to-Caregiver connection helpers
+// ────────────────────────────────────────────────────
+
+/**
+ * Check if a caregiver-to-caregiver connection already exists (in either direction).
+ */
+export async function caregiverConnectionExists(
+  caregiverId1: string,
+  caregiverId2: string,
+): Promise<boolean> {
+  try {
+    const [fwd, rev] = await Promise.all([
+      tablesDB.listRows<CaregiverConnection>({
+        databaseId: DATABASE_ID,
+        tableId: CAREGIVER_CONNECTIONS_TABLE_ID,
+        queries: [
+          Query.equal("caregiver_id_1", caregiverId1),
+          Query.equal("caregiver_id_2", caregiverId2),
+          Query.limit(1),
+        ],
+      }),
+      tablesDB.listRows<CaregiverConnection>({
+        databaseId: DATABASE_ID,
+        tableId: CAREGIVER_CONNECTIONS_TABLE_ID,
+        queries: [
+          Query.equal("caregiver_id_1", caregiverId2),
+          Query.equal("caregiver_id_2", caregiverId1),
+          Query.limit(1),
+        ],
+      }),
+    ]);
+    return fwd.total > 0 || rev.total > 0;
+  } catch (error) {
+    console.error("Error checking caregiver connection:", error);
+    return false;
+  }
+}
+
+/**
+ * Create a new caregiver-to-caregiver connection.
+ * Returns true on success, false if already exists.
+ */
+export async function addCaregiverConnection(
+  caregiverId1: string,
+  caregiverId2: string,
+): Promise<boolean> {
+  try {
+    const exists = await caregiverConnectionExists(caregiverId1, caregiverId2);
+    if (exists) return false;
+
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_CONNECTIONS_TABLE_ID,
+      rowId: ID.unique(),
+      data: {
+        caregiver_id_1: caregiverId1,
+        caregiver_id_2: caregiverId2,
+        status: "active",
+        created_at: new Date().toISOString(),
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error("Error adding caregiver connection:", error);
+    return false;
+  }
+}
+
+/**
+ * Get all caregiver contacts for a caregiver (from caregiver_connections table).
+ * Looks up connections in both directions.
+ */
+export async function getCaregiverContacts(
+  caregiverId: string,
+): Promise<Contact[]> {
+  try {
+    const [asId1, asId2] = await Promise.all([
+      tablesDB.listRows<CaregiverConnection>({
+        databaseId: DATABASE_ID,
+        tableId: CAREGIVER_CONNECTIONS_TABLE_ID,
+        queries: [
+          Query.equal("caregiver_id_1", caregiverId),
+          Query.equal("status", "active"),
+          Query.limit(100),
+        ],
+      }),
+      tablesDB.listRows<CaregiverConnection>({
+        databaseId: DATABASE_ID,
+        tableId: CAREGIVER_CONNECTIONS_TABLE_ID,
+        queries: [
+          Query.equal("caregiver_id_2", caregiverId),
+          Query.equal("status", "active"),
+          Query.limit(100),
+        ],
+      }),
+    ]);
+
+    const connectedIds = new Set<string>();
+    for (const row of asId1.rows) connectedIds.add(row.caregiver_id_2);
+    for (const row of asId2.rows) connectedIds.add(row.caregiver_id_1);
+
+    if (connectedIds.size === 0) return [];
+
+    const ids = [...connectedIds];
+    const detailsResponse = await tablesDB.listRows<Caregiver>({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_TABLE_ID,
+      queries: [Query.equal("$id", ids), Query.limit(100)],
+    });
+
+    return detailsResponse.rows.map((caregiver) => ({
+      id: caregiver.$id,
+      name: caregiver.name || "Unknown",
+      phone: caregiver.phone,
+      role: "caregiver" as const,
+      avatarLabel: (caregiver.name || "??").substring(0, 2).toUpperCase(),
+      lastActive: caregiver.$updatedAt,
+    }));
+  } catch (error) {
+    console.error("Error fetching caregiver contacts:", error);
     return [];
   }
 }

@@ -1478,6 +1478,86 @@
           "orders": []
         }
       ]
+    },
+    {
+      "$id": "caregiver_connections",
+      "$permissions": [
+        "create(\"users\")",
+        "read(\"users\")",
+        "update(\"users\")",
+        "delete(\"users\")"
+      ],
+      "databaseId": "elderly-care-app-db",
+      "name": "Caregiver Connections",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "caregiver_id_1",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 36,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "caregiver_id_2",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 36,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 20,
+          "default": "active",
+          "encrypt": false
+        },
+        {
+          "key": "created_at",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 30,
+          "default": null,
+          "encrypt": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ux_pair",
+          "type": "unique",
+          "status": "available",
+          "error": "",
+          "columns": ["caregiver_id_1", "caregiver_id_2"],
+          "lengths": [0, 0],
+          "orders": []
+        },
+        {
+          "key": "idx_caregiver_1",
+          "type": "key",
+          "status": "available",
+          "error": "",
+          "columns": ["caregiver_id_1"],
+          "lengths": [0],
+          "orders": []
+        },
+        {
+          "key": "idx_caregiver_2",
+          "type": "key",
+          "status": "available",
+          "error": "",
+          "columns": ["caregiver_id_2"],
+          "lengths": [0],
+          "orders": []
+        }
+      ]
     }
   ],
   "buckets": [
