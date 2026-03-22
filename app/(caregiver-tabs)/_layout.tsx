@@ -81,20 +81,6 @@ export default function TabsLayout() {
 
       {/* Hidden Screens */}
       <Tabs.Screen
-        name="more"
-        options={{
-          href: null,
-          title: "More",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="dots-horizontal-circle-outline"
-              size={size}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="emergency"
         options={{
           href: null,

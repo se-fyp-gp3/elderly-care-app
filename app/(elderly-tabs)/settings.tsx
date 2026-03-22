@@ -1,8 +1,9 @@
 import { useAuth } from "@/lib/auth-context";
+import { getCustomVoicesForElderly } from "@/lib/custom-voice";
 import { getElderlyByUserId, getLinkedCaregivers, updateElderlyEmergencyContact } from "@/lib/elderly";
-import { Caregiver, Elderly } from "@/types/appwrite";
+import { Caregiver, CustomVoice, Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Modal, ScrollView, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { ActivityIndicator, Avatar, Button, Card, List, Switch, Text, useTheme } from "react-native-paper";
 
@@ -19,6 +20,12 @@ export default function ElderlySettings() {
   const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [aiVoiceEnabled, setAiVoiceEnabled] = useState(
+    preferences.aiVoiceEnabled ?? false,
+  );
+  const [voicePickerVisible, setVoicePickerVisible] = useState(false);
+  const [voiceOptions, setVoiceOptions] = useState<CustomVoice[]>([]);
+  const [voiceSaving, setVoiceSaving] = useState(false);
 
   // Load elderly profile + linked caregivers
   const loadEmergencyData = useCallback(async () => {
@@ -30,6 +37,13 @@ export default function ElderlySettings() {
       setEmergencyContact(profile.emergency_contact ?? null);
       const caregivers = await getLinkedCaregivers(profile.$id);
       setLinkedCaregivers(caregivers);
+
+      const customVoices = await getCustomVoicesForElderly(profile.$id);
+      const caregiverIdSet = new Set(caregivers.map((c) => c.$id));
+      const filtered = customVoices.filter((voice) =>
+        caregiverIdSet.has(voice.caregiver_id),
+      );
+      setVoiceOptions(filtered);
     } catch (e) {
       console.error("Error loading emergency data:", e);
     }
@@ -39,10 +53,26 @@ export default function ElderlySettings() {
     loadEmergencyData();
   }, [loadEmergencyData]);
 
+  useEffect(() => {
+    setAiVoiceEnabled(preferences.aiVoiceEnabled ?? false);
+  }, [preferences.aiVoiceEnabled]);
+
   // Get the name of the currently‐selected emergency contact
   const selectedCaregiverName = linkedCaregivers.find(
     (c) => c.phone === emergencyContact,
   )?.name;
+
+  const dedupedVoiceOptions = useMemo(() => {
+    return Array.from(
+      new Map(voiceOptions.map((voice) => [voice.caregiver_id, voice])).values(),
+    );
+  }, [voiceOptions]);
+
+  const hasVoiceOptions = dedupedVoiceOptions.length > 0;
+
+  const selectedVoice = dedupedVoiceOptions.find(
+    (voice) => voice.voice_id === preferences.aiVoiceId,
+  );
 
   const handleSelectEmergencyContact = async (caregiver: Caregiver) => {
     if (!elderlyProfile) return;
@@ -77,6 +107,71 @@ export default function ElderlySettings() {
   const handleNotificationToggle = async (value: boolean) => {
     setNotifications(value);
     await updatePreferences({ ...preferences, notifications: value });
+  };
+
+  const handleAiVoiceToggle = async (value: boolean) => {
+    if (value && !hasVoiceOptions) {
+      Alert.alert(
+        "No available voice",
+        "No linked caregiver voice found. Please ask caregiver to create one first.",
+      );
+      return;
+    }
+
+    setAiVoiceEnabled(value);
+    await updatePreferences({
+      ...preferences,
+      aiVoiceEnabled: value,
+    });
+  };
+
+  useEffect(() => {
+    if (!hasVoiceOptions && aiVoiceEnabled) {
+      setAiVoiceEnabled(false);
+      void updatePreferences({
+        ...preferences,
+        aiVoiceEnabled: false,
+      });
+    }
+  }, [aiVoiceEnabled, hasVoiceOptions, preferences, updatePreferences]);
+
+  const handleSelectAiVoice = async (voice: CustomVoice) => {
+    setVoiceSaving(true);
+    try {
+      await updatePreferences({
+        ...preferences,
+        aiVoiceEnabled: true,
+        aiVoiceId: voice.voice_id,
+        aiVoiceCaregiverId: voice.caregiver_id,
+        aiVoiceCaregiverName: voice.caregiver_name,
+      });
+      setAiVoiceEnabled(true);
+      setVoicePickerVisible(false);
+      Alert.alert("Saved", `AI voice set to ${voice.caregiver_name}.`);
+    } catch (e) {
+      Alert.alert("Error", "Failed to save AI voice selection.");
+    } finally {
+      setVoiceSaving(false);
+    }
+  };
+
+  const handleClearAiVoice = async () => {
+    setVoiceSaving(true);
+    try {
+      await updatePreferences({
+        ...preferences,
+        aiVoiceEnabled: false,
+        aiVoiceId: undefined,
+        aiVoiceCaregiverId: undefined,
+        aiVoiceCaregiverName: undefined,
+      });
+      setAiVoiceEnabled(false);
+      Alert.alert("Cleared", "AI voice selection has been removed.");
+    } catch {
+      Alert.alert("Error", "Failed to clear AI voice selection.");
+    } finally {
+      setVoiceSaving(false);
+    }
   };
 
   return (
@@ -246,6 +341,93 @@ export default function ElderlySettings() {
           )}
           style={styles.listItem}
         />
+        <View
+          style={[
+            styles.divider,
+            { backgroundColor: theme.colors.outlineVariant },
+          ]}
+        />
+        <List.Item
+          title="AI Chat Voice Playback"
+          titleStyle={styles.listTitle}
+          description={aiVoiceEnabled ? "Enabled" : "Disabled"}
+          descriptionStyle={styles.listDescription}
+          left={() => (
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons
+                name={aiVoiceEnabled ? "volume-high" : "volume-off"}
+                size={26}
+                color={theme.colors.primary}
+              />
+            </View>
+          )}
+          right={() => (
+            <View style={styles.rightContainer}>
+              <Switch
+                value={aiVoiceEnabled}
+                onValueChange={handleAiVoiceToggle}
+                disabled={!hasVoiceOptions}
+              />
+            </View>
+          )}
+          style={styles.listItem}
+        />
+        <View
+          style={[
+            styles.divider,
+            { backgroundColor: theme.colors.outlineVariant },
+          ]}
+        />
+        <List.Item
+          title="Caregiver Voice"
+          titleStyle={styles.listTitle}
+          description={
+            selectedVoice
+              ? `${selectedVoice.caregiver_name} (${selectedVoice.voice_id})`
+              : "Not selected — tap to choose"
+          }
+          descriptionStyle={styles.listDescription}
+          left={() => (
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons
+                name="account-voice"
+                size={26}
+                color={theme.colors.primary}
+              />
+            </View>
+          )}
+          right={() => (
+            <View style={styles.rightContainer}>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={26}
+                color={theme.colors.onSurfaceVariant}
+              />
+            </View>
+          )}
+          onPress={() => setVoicePickerVisible(true)}
+          style={styles.listItem}
+        />
+        {selectedVoice && (
+          <View>
+            <View style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
+            <List.Item
+              title="Clear AI Voice"
+              titleStyle={[styles.listTitle, { color: theme.colors.error }]}
+              left={() => (
+                <View style={[styles.iconContainer, { backgroundColor: "#FFEBEE" }]}>
+                  <MaterialCommunityIcons
+                    name="delete"
+                    size={26}
+                    color={theme.colors.error}
+                  />
+                </View>
+              )}
+              onPress={handleClearAiVoice}
+              style={styles.listItem}
+            />
+          </View>
+        )}
       </Card>
 
       {/* Account */}
@@ -404,6 +586,84 @@ export default function ElderlySettings() {
                         <MaterialCommunityIcons name="check-circle" size={24} color={theme.colors.primary} />
                       )}
                       {saving && isSelected && (
+                        <ActivityIndicator size="small" style={{ marginLeft: 8 }} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+
+    <Modal
+      visible={voicePickerVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setVoicePickerVisible(false)}
+    >
+      <TouchableWithoutFeedback onPress={() => setVoicePickerVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.modalHeader}>
+                <Text variant="titleLarge" style={{ fontWeight: "700" }}>
+                  Select Caregiver Voice
+                </Text>
+                <TouchableOpacity onPress={() => setVoicePickerVisible(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color={theme.colors.onSurface} />
+                </TouchableOpacity>
+              </View>
+
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 16 }}>
+                Choose from voices created by your linked caregivers
+              </Text>
+
+              {dedupedVoiceOptions.length === 0 ? (
+                <View style={{ alignItems: "center", paddingVertical: 24 }}>
+                  <MaterialCommunityIcons name="account-voice-off" size={40} color={theme.colors.outlineVariant} />
+                  <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 10, textAlign: "center" }}>
+                    No caregiver voice found. Ask caregiver to create voice first.
+                  </Text>
+                </View>
+              ) : (
+                dedupedVoiceOptions.map((voice) => {
+                  const isSelected = voice.voice_id === preferences.aiVoiceId;
+                  return (
+                    <TouchableOpacity
+                      key={voice.$id}
+                      onPress={() => handleSelectAiVoice(voice)}
+                      disabled={voiceSaving}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.caregiverRow,
+                        {
+                          backgroundColor: isSelected
+                            ? theme.colors.primaryContainer
+                            : theme.colors.surfaceVariant,
+                        },
+                      ]}
+                    >
+                      <Avatar.Text
+                        size={42}
+                        label={(voice.caregiver_name ?? "CG").substring(0, 2).toUpperCase()}
+                        style={{ backgroundColor: theme.colors.tertiaryContainer }}
+                        labelStyle={{ color: theme.colors.onTertiaryContainer, fontWeight: "600" }}
+                      />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text variant="titleMedium" style={{ fontWeight: "600" }}>
+                          {voice.caregiver_name ?? "Caregiver"}
+                        </Text>
+                        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
+                          {voice.voice_id}
+                        </Text>
+                      </View>
+                      {isSelected && (
+                        <MaterialCommunityIcons name="check-circle" size={24} color={theme.colors.primary} />
+                      )}
+                      {voiceSaving && isSelected && (
                         <ActivityIndicator size="small" style={{ marginLeft: 8 }} />
                       )}
                     </TouchableOpacity>

@@ -1,4 +1,4 @@
-import { Caregiver, CaregiverElderly, Elderly, ElderlyConnection } from "@/types/appwrite";
+import { Caregiver, CaregiverElderly, Elderly, ElderlyConnections } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
     CAREGIVER_ELDERLY_TABLE_ID,
@@ -17,6 +17,15 @@ export interface Contact {
   avatarLabel: string;
   status?: string | null;
   lastActive?: string;
+}
+
+function isMissingElderlyConnectionsTableError(error: unknown): boolean {
+  const msg =
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message?: unknown }).message ?? "")
+      : String(error ?? "");
+
+  return msg.toLowerCase().includes("table with the requested id could not be found");
 }
 
 /**
@@ -275,7 +284,7 @@ export async function elderlyConnectionExists(
   try {
     // Check both directions: (id1, id2) and (id2, id1)
     const [fwd, rev] = await Promise.all([
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
@@ -284,7 +293,7 @@ export async function elderlyConnectionExists(
           Query.limit(1),
         ],
       }),
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
@@ -296,6 +305,9 @@ export async function elderlyConnectionExists(
     ]);
     return fwd.total > 0 || rev.total > 0;
   } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return false;
+    }
     console.error("Error checking elderly connection:", error);
     return false;
   }
@@ -326,6 +338,9 @@ export async function addElderlyConnection(
     });
     return true;
   } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return false;
+    }
     console.error("Error adding elderly connection:", error);
     return false;
   }
@@ -337,12 +352,19 @@ export async function addElderlyConnection(
 export async function acceptElderlyConnection(
   connectionDocId: string,
 ): Promise<void> {
-  await tablesDB.updateRow({
-    databaseId: DATABASE_ID,
-    tableId: ELDERLY_CONNECTIONS_TABLE_ID,
-    rowId: connectionDocId,
-    data: { status: "active" },
-  });
+  try {
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+      rowId: connectionDocId,
+      data: { status: "active" },
+    });
+  } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -351,12 +373,19 @@ export async function acceptElderlyConnection(
 export async function rejectElderlyConnection(
   connectionDocId: string,
 ): Promise<void> {
-  await tablesDB.updateRow({
-    databaseId: DATABASE_ID,
-    tableId: ELDERLY_CONNECTIONS_TABLE_ID,
-    rowId: connectionDocId,
-    data: { status: "rejected" },
-  });
+  try {
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+      rowId: connectionDocId,
+      data: { status: "rejected" },
+    });
+  } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -367,7 +396,7 @@ export async function getPendingConnectionRequests(
   elderlyId: string,
 ): Promise<{ connectionId: string; from: Elderly }[]> {
   try {
-    const response = await tablesDB.listRows<ElderlyConnection>({
+    const response = await tablesDB.listRows<ElderlyConnections>({
       databaseId: DATABASE_ID,
       tableId: ELDERLY_CONNECTIONS_TABLE_ID,
       queries: [
@@ -396,6 +425,9 @@ export async function getPendingConnectionRequests(
         from: elderlyMap.get(r.elderly_id_1)!,
       }));
   } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return [];
+    }
     console.error("Error fetching pending requests:", error);
     return [];
   }
@@ -411,7 +443,7 @@ export async function getElderlyContacts(
   try {
     // Fetch connections where this elderly is on either side
     const [asId1, asId2] = await Promise.all([
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
@@ -420,7 +452,7 @@ export async function getElderlyContacts(
           Query.limit(100),
         ],
       }),
-      tablesDB.listRows<ElderlyConnection>({
+      tablesDB.listRows<ElderlyConnections>({
         databaseId: DATABASE_ID,
         tableId: ELDERLY_CONNECTIONS_TABLE_ID,
         queries: [
@@ -456,6 +488,9 @@ export async function getElderlyContacts(
       lastActive: elderly.$updatedAt,
     }));
   } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return [];
+    }
     console.error("Error fetching elderly contacts:", error);
     return [];
   }

@@ -10,7 +10,14 @@ import {
   fetchElderlySchedulesForUser,
 } from "@/lib/elderly";
 import { getFormattedTodayMedicationSummary } from "@/lib/medication_tracking";
+import { synthesizePersonalVoice } from "@/lib/personal-voice";
 import type { ChatSession as AppwriteChatSession } from "@/types/appwrite";
+import {
+  createAudioPlayer,
+  setAudioModeAsync,
+  type AudioPlayer,
+} from "expo-audio";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -78,7 +85,7 @@ interface AIAPIResponse {
 
 export default function ElderlyChat() {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user, preferences, updatePreferences } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -91,8 +98,117 @@ export default function ElderlyChat() {
   const [isSuggestionsExpanded, setIsSuggestionsExpanded] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
+  const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
+  const [isVoiceSynthesizing, setIsVoiceSynthesizing] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const aiVoicePlayerRef = useRef<AudioPlayer | null>(null);
+
+  const aiVoiceEnabled = preferences.aiVoiceEnabled === true;
+  const selectedVoiceId =
+    typeof preferences.aiVoiceId === "string" ? preferences.aiVoiceId : "";
+
+  const stopAiVoicePlayback = useCallback(() => {
+    if (aiVoicePlayerRef.current) {
+      try {
+        aiVoicePlayerRef.current.pause();
+      } catch {}
+      aiVoicePlayerRef.current.remove();
+      aiVoicePlayerRef.current = null;
+    }
+    setIsVoiceSpeaking(false);
+  }, []);
+
+  const speakAiResponse = useCallback(
+    async (text: string) => {
+      if (!aiVoiceEnabled || !selectedVoiceId) return;
+      if (!text.trim()) return;
+
+      const plainText = text.replace(/\s+/g, " ").trim().slice(0, 300);
+      if (!plainText) return;
+
+      try {
+        stopAiVoicePlayback();
+        setIsVoiceSynthesizing(true);
+        setVoiceError(null);
+
+        const synthesized = await synthesizePersonalVoice(
+          plainText,
+          selectedVoiceId,
+        );
+
+        let audioSourceUri: string | null = null;
+
+        if (synthesized.audioUrl) {
+          audioSourceUri = synthesized.audioUrl;
+        } else if (synthesized.audioBase64) {
+          const tempUri = `${FileSystem.cacheDirectory}ai-voice-${Date.now()}.mp3`;
+          await FileSystem.writeAsStringAsync(tempUri, synthesized.audioBase64, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          audioSourceUri = tempUri;
+        }
+
+        if (!audioSourceUri) {
+          throw new Error("No playable audio source from TTS.");
+        }
+
+        await setAudioModeAsync({ playsInSilentMode: true });
+        const player = createAudioPlayer(audioSourceUri);
+        aiVoicePlayerRef.current = player;
+        player.addListener("playbackStatusUpdate", (status) => {
+          if (status.didJustFinish) {
+            setIsVoiceSpeaking(false);
+            player.remove();
+            if (aiVoicePlayerRef.current === player) {
+              aiVoicePlayerRef.current = null;
+            }
+          }
+        });
+        player.play();
+        setIsVoiceSpeaking(true);
+      } catch (error) {
+        console.warn("AI voice playback failed:", error);
+        const reason =
+          error instanceof Error && error.message
+            ? error.message
+            : "Voice playback failed.";
+        setVoiceError(reason);
+        setIsVoiceSpeaking(false);
+      } finally {
+        setIsVoiceSynthesizing(false);
+      }
+    },
+    [aiVoiceEnabled, selectedVoiceId, stopAiVoicePlayback],
+  );
+
+  const handleToggleAiVoice = useCallback(async () => {
+    if (!aiVoiceEnabled && !selectedVoiceId) {
+      Alert.alert(
+        "No voice selected",
+        "Please select a caregiver voice in Settings first.",
+      );
+      return;
+    }
+
+    const nextValue = !aiVoiceEnabled;
+    await updatePreferences({
+      ...preferences,
+      aiVoiceEnabled: nextValue,
+    });
+
+    if (!nextValue) {
+      stopAiVoicePlayback();
+      setVoiceError(null);
+    }
+  }, [aiVoiceEnabled, preferences, stopAiVoicePlayback, updatePreferences]);
+
+  useEffect(() => {
+    return () => {
+      stopAiVoicePlayback();
+    };
+  }, [stopAiVoicePlayback]);
 
   const serializeMessages = (msgs: Message[]): string =>
     JSON.stringify(
@@ -696,6 +812,7 @@ export default function ElderlyChat() {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+      void speakAiResponse(aiResponse);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         return;
@@ -843,6 +960,13 @@ export default function ElderlyChat() {
         />
         <View style={styles.topBarSpacer} />
         <IconButton
+          icon={aiVoiceEnabled ? "volume-high" : "volume-off"}
+          size={24}
+          onPress={handleToggleAiVoice}
+          style={styles.topBarButton}
+          iconColor={theme.colors.onSurface}
+        />
+        <IconButton
           icon="plus"
           size={28}
           onPress={startNewChat}
@@ -868,6 +992,30 @@ export default function ElderlyChat() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator animating={true} color={theme.colors.primary} />
             <Text style={styles.loadingText}>AI is thinking...</Text>
+          </View>
+        )}
+
+        {(isVoiceSynthesizing || isVoiceSpeaking) && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator animating={true} color={theme.colors.primary} />
+            <Text style={styles.loadingText}>
+              {isVoiceSynthesizing ? "Generating voice..." : "Playing voice..."}
+            </Text>
+          </View>
+        )}
+
+        {voiceError && (
+          <View style={styles.voiceErrorContainer}>
+            <Text style={styles.voiceErrorText} numberOfLines={3}>
+              Voice error: {voiceError}
+            </Text>
+            <IconButton
+              icon="close"
+              size={18}
+              onPress={() => setVoiceError(null)}
+              iconColor="#B71C1C"
+              style={styles.voiceErrorClose}
+            />
           </View>
         )}
       </View>
@@ -1188,6 +1336,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
     color: "#1565C0",
+  },
+  voiceErrorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: "#FFEBEE",
+    marginHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  voiceErrorText: {
+    flex: 1,
+    color: "#B71C1C",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  voiceErrorClose: {
+    margin: 0,
   },
   inputContainer: {
     padding: 14,
