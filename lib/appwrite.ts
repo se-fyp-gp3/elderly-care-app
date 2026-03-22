@@ -1,11 +1,11 @@
 import { Account, Client } from "appwrite";
 import {
-    Account as AccountReactNative,
-    Client as ClientReactNative,
-    Functions,
-    ID,
-    Storage,
-    TablesDB,
+  Account as AccountReactNative,
+  Client as ClientReactNative,
+  Functions,
+  ID,
+  Storage,
+  TablesDB,
 } from "react-native-appwrite";
 
 export const APPWRITE_ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!;

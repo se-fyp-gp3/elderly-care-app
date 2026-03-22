@@ -6,19 +6,19 @@ import {
   saveCustomVoiceRecord,
 } from "@/lib/custom-voice";
 import { createPersonalVoice, readAudioFileAsBase64 } from "@/lib/personal-voice";
-import * as DocumentPicker from "expo-document-picker";
 import { Caregiver, CustomVoice, CustomVoiceStatus, Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
+  createAudioPlayer,
   RecordingPresets,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
   useAudioRecorder,
-  createAudioPlayer,
   type AudioPlayer,
 } from "expo-audio";
+import * as DocumentPicker from "expo-document-picker";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
   Banner,
