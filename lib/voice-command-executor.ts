@@ -3,17 +3,17 @@
 // Bridges intent → action and generates Chinese response messages
 
 import { Linking } from "react-native";
-import type { VoiceLanguage, VoiceRecognitionResult } from "./voice-recognition";
 import { getContactsForElderly } from "./contacts";
+import { getCustomVoicesForElderly } from "./custom-voice";
 import { getElderlyByUserId } from "./elderly";
 import {
-  fetchActiveMedicationReminders,
-  fetchDailyMedicationLogs,
-  getFormattedTodayMedicationSummary,
-  logMedicationAction,
+    fetchActiveMedicationReminders,
+    fetchDailyMedicationLogs,
+    getFormattedTodayMedicationSummary,
+    logMedicationAction,
 } from "./medication_tracking";
-import { getCustomVoicesForElderly } from "./custom-voice";
-import { synthesizePersonalVoice, DEFAULT_VOICE } from "./personal-voice";
+import { DEFAULT_VOICE, synthesizePersonalVoice } from "./personal-voice";
+import type { VoiceLanguage, VoiceRecognitionResult } from "./voice-recognition";
 
 // ── Types ──
 

@@ -1,49 +1,49 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-  createChatSession,
-  deleteChatSession,
-  listChatSessionsForUser,
-  updateChatSession,
+    createChatSession,
+    deleteChatSession,
+    listChatSessionsForUser,
+    updateChatSession,
 } from "@/lib/chat";
 import {
-  buildScheduleSummary,
-  fetchElderlySchedulesForUser,
+    buildScheduleSummary,
+    fetchElderlySchedulesForUser,
 } from "@/lib/elderly";
 import { getFormattedTodayMedicationSummary } from "@/lib/medication_tracking";
 import { synthesizePersonalVoice } from "@/lib/personal-voice";
 import type { ChatSession as AppwriteChatSession } from "@/types/appwrite";
 import {
-  createAudioPlayer,
-  setAudioModeAsync,
-  type AudioPlayer,
+    createAudioPlayer,
+    setAudioModeAsync,
+    type AudioPlayer,
 } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Card,
-  Chip,
-  IconButton,
-  Menu,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Card,
+    Chip,
+    IconButton,
+    Menu,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 interface Message {

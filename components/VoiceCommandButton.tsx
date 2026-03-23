@@ -5,41 +5,40 @@
 import { useAuth } from "@/lib/auth-context";
 import { getElderlyByUserId } from "@/lib/elderly";
 import {
-  executeVoiceCommand,
-  synthesizeCommandResponse,
-  type CommandResult,
+    executeVoiceCommand,
+    synthesizeCommandResponse
 } from "@/lib/voice-command-executor";
 import {
-  recognizeVoiceCommand,
-  readAudioAsBase64,
-  type VoiceLanguage,
-  VOICE_LANGUAGE_LABELS,
+    readAudioAsBase64,
+    recognizeVoiceCommand,
+    VOICE_LANGUAGE_LABELS,
+    type VoiceLanguage,
 } from "@/lib/voice-recognition";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
 import {
-  createAudioPlayer,
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  useAudioRecorder,
+    createAudioPlayer,
+    RecordingPresets,
+    requestRecordingPermissionsAsync,
+    setAudioModeAsync,
+    useAudioRecorder,
 } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  Modal,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Animated,
+    Modal,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Button,
-  Chip,
-  Text,
-  useTheme,
+    ActivityIndicator,
+    Button,
+    Chip,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 type VoiceState =
