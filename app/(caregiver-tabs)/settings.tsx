@@ -782,6 +782,49 @@ export default function Settings() {
           </Card.Content>
         </Card>
 
+        {/* ───────── Voice Reply Language Section ───────── */}
+        <Card style={styles.card}>
+          <Card.Content>
+            <View style={styles.sectionHeaderRow}>
+              <MaterialCommunityIcons
+                name="translate"
+                size={22}
+                color={theme.colors.primary}
+              />
+              <Text variant="titleMedium" style={{ marginLeft: 8, fontWeight: "600" }}>
+                Voice Reply Language
+              </Text>
+            </View>
+            <Text variant="bodySmall" style={[styles.hintText, { marginBottom: 12 }]}>
+              Set the language for AI voice replies to elderly users.
+            </Text>
+            <View style={styles.langChipRow}>
+              {([
+                { key: "cantonese", label: "粵語" },
+                { key: "mandarin", label: "普通話" },
+                { key: "english", label: "English" },
+              ] as const).map((opt) => {
+                const currentLang = (preferences.voiceReplyLang as string) ?? "cantonese";
+                return (
+                  <Chip
+                    key={opt.key}
+                    selected={currentLang === opt.key}
+                    onPress={() => handleSetPreference("voiceReplyLang", opt.key)}
+                    style={[
+                      styles.langChip,
+                      currentLang === opt.key && { backgroundColor: theme.colors.primaryContainer },
+                    ]}
+                    textStyle={currentLang === opt.key ? { color: theme.colors.onPrimaryContainer, fontWeight: "600" } : undefined}
+                    showSelectedOverlay
+                  >
+                    {opt.label}
+                  </Chip>
+                );
+              })}
+            </View>
+          </Card.Content>
+        </Card>
+
         <Card style={styles.card}>
           <Card.Content>
             <View style={styles.switchRow}>
@@ -1042,5 +1085,18 @@ const styles = StyleSheet.create({
     color: "#666",
     fontStyle: "italic",
     marginVertical: 16,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  langChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  langChip: {
+    borderRadius: 20,
   },
 });

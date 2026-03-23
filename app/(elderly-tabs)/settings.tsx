@@ -5,7 +5,7 @@ import { Caregiver, CustomVoice, Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Modal, ScrollView, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
-import { ActivityIndicator, Avatar, Button, Card, List, Switch, Text, useTheme } from "react-native-paper";
+import { ActivityIndicator, Avatar, Button, Card, Chip, List, Switch, Text, useTheme } from "react-native-paper";
 
 export default function ElderlySettings() {
   const { user, preferences, updatePreferences, signOut } = useAuth();
@@ -26,6 +26,9 @@ export default function ElderlySettings() {
   const [voicePickerVisible, setVoicePickerVisible] = useState(false);
   const [voiceOptions, setVoiceOptions] = useState<CustomVoice[]>([]);
   const [voiceSaving, setVoiceSaving] = useState(false);
+  const [voiceReplyLang, setVoiceReplyLang] = useState<string>(
+    (preferences.voiceReplyLang as string) ?? "cantonese",
+  );
 
   // Load elderly profile + linked caregivers
   const loadEmergencyData = useCallback(async () => {
@@ -173,6 +176,20 @@ export default function ElderlySettings() {
       setVoiceSaving(false);
     }
   };
+
+  const handleVoiceReplyLangChange = async (lang: string) => {
+    setVoiceReplyLang(lang);
+    await updatePreferences({
+      ...preferences,
+      voiceReplyLang: lang,
+    });
+  };
+
+  const LANG_OPTIONS = [
+    { key: "cantonese", label: "粵語" },
+    { key: "mandarin", label: "普通話" },
+    { key: "english", label: "English" },
+  ] as const;
 
   return (
     <>
@@ -426,6 +443,44 @@ export default function ElderlySettings() {
               onPress={handleClearAiVoice}
               style={styles.listItem}
             />
+          </View>
+        )}
+        {aiVoiceEnabled && (
+          <View>
+            <View style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
+            <List.Item
+              title="Voice Reply Language"
+              titleStyle={styles.listTitle}
+              description="Language for AI voice replies"
+              descriptionStyle={styles.listDescription}
+              left={() => (
+                <View style={styles.iconContainer}>
+                  <MaterialCommunityIcons
+                    name="translate"
+                    size={26}
+                    color={theme.colors.primary}
+                  />
+                </View>
+              )}
+              style={styles.listItem}
+            />
+            <View style={styles.langChipRow}>
+              {LANG_OPTIONS.map((opt) => (
+                <Chip
+                  key={opt.key}
+                  selected={voiceReplyLang === opt.key}
+                  onPress={() => handleVoiceReplyLangChange(opt.key)}
+                  style={[
+                    styles.langChip,
+                    voiceReplyLang === opt.key && { backgroundColor: theme.colors.primaryContainer },
+                  ]}
+                  textStyle={voiceReplyLang === opt.key ? { color: theme.colors.onPrimaryContainer, fontWeight: "600" } : undefined}
+                  showSelectedOverlay
+                >
+                  {opt.label}
+                </Chip>
+              ))}
+            </View>
           </View>
         )}
       </Card>
@@ -784,5 +839,15 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     marginBottom: 10,
+  },
+  langChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  langChip: {
+    borderRadius: 20,
   },
 });

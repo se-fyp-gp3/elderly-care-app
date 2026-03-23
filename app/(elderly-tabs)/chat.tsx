@@ -38,7 +38,9 @@ import {
   ActivityIndicator,
   Avatar,
   Card,
+  Chip,
   IconButton,
+  Menu,
   Text,
   TextInput,
   useTheme,
@@ -101,6 +103,7 @@ export default function ElderlyChat() {
   const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
   const [isVoiceSynthesizing, setIsVoiceSynthesizing] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [langMenuVisible, setLangMenuVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const aiVoicePlayerRef = useRef<AudioPlayer | null>(null);
@@ -203,6 +206,26 @@ export default function ElderlyChat() {
       setVoiceError(null);
     }
   }, [aiVoiceEnabled, preferences, stopAiVoicePlayback, updatePreferences]);
+
+  const LANG_OPTIONS = [
+    { key: "cantonese", label: "粵語" },
+    { key: "mandarin", label: "普通話" },
+    { key: "english", label: "English" },
+  ] as const;
+
+  const voiceReplyLang =
+    (typeof preferences.voiceReplyLang === "string" ? preferences.voiceReplyLang : "cantonese") as string;
+
+  const currentLangLabel =
+    LANG_OPTIONS.find((o) => o.key === voiceReplyLang)?.label ?? "粵語";
+
+  const handleLangChange = useCallback(
+    async (lang: string) => {
+      setLangMenuVisible(false);
+      await updatePreferences({ ...preferences, voiceReplyLang: lang });
+    },
+    [preferences, updatePreferences],
+  );
 
   useEffect(() => {
     return () => {
@@ -324,11 +347,18 @@ export default function ElderlyChat() {
       content: msg.text,
     }));
 
+    const langInstruction =
+      voiceReplyLang === "cantonese"
+        ? "You MUST reply in 香港粵語 (Hong Kong Cantonese written Chinese). Use informal Cantonese written style."
+        : voiceReplyLang === "mandarin"
+          ? "You MUST reply in 普通話 (Mandarin Chinese, simplified or traditional)."
+          : "You MUST reply in English.";
+
     return [
       {
         role: "system",
         content:
-          "You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor. Respond in the same language the user uses (Chinese or English).",
+          `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\n${langInstruction}\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
       },
       ...history,
       {
@@ -966,6 +996,32 @@ export default function ElderlyChat() {
           style={styles.topBarButton}
           iconColor={theme.colors.onSurface}
         />
+        {aiVoiceEnabled && (
+          <Menu
+            visible={langMenuVisible}
+            onDismiss={() => setLangMenuVisible(false)}
+            anchor={
+              <Chip
+                icon="translate"
+                onPress={() => setLangMenuVisible(true)}
+                style={styles.langChip}
+                textStyle={styles.langChipText}
+                compact
+              >
+                {currentLangLabel}
+              </Chip>
+            }
+          >
+            {LANG_OPTIONS.map((opt) => (
+              <Menu.Item
+                key={opt.key}
+                title={opt.label}
+                onPress={() => handleLangChange(opt.key)}
+                leadingIcon={voiceReplyLang === opt.key ? "check" : undefined}
+              />
+            ))}
+          </Menu>
+        )}
         <IconButton
           icon="plus"
           size={28}
@@ -1242,6 +1298,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F4F6",
     width: 44,
     height: 44,
+  },
+  langChip: {
+    marginHorizontal: 4,
+    height: 36,
+  },
+  langChipText: {
+    fontSize: 13,
   },
   chatContainer: {
     flex: 1,
