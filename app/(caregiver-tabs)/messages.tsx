@@ -6,11 +6,14 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
+  acceptCaregiverConnection,
   addCaregiverConnection,
   Contact,
   formatRelativeTime,
   getContactsForCaregiver,
-  searchUserByPhone
+  getPendingCaregiverConnections,
+  rejectCaregiverConnection,
+  searchUserByPhone,
 } from "@/lib/contacts";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
 import { Caregiver, Elderly } from "@/types/appwrite";
@@ -65,6 +68,9 @@ export default function CaregiverMessages() {
   >(null);
   const [addingContact, setAddingContact] = useState(false);
   const [searchDone, setSearchDone] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<
+    { connectionId: string; from: Contact }[]
+  >([]);
 
   const fetchContacts = useCallback(async () => {
     if (!user) return;
@@ -75,7 +81,12 @@ export default function CaregiverMessages() {
         return;
       }
       setCaregiverProfileId(caregiver.$id);
-      const data = await getContactsForCaregiver(caregiver.$id);
+      
+      const [data, requests] = await Promise.all([
+        getContactsForCaregiver(caregiver.$id),
+        getPendingCaregiverConnections(caregiver.$id),
+      ]);
+      setPendingRequests(requests);
 
       // Fetch last messages for each contact
       const lastMsgs: Record<string, DirectMessage | null> = {};
@@ -105,6 +116,26 @@ export default function CaregiverMessages() {
       setLoading(false);
     }
   }, [user]);
+
+  const handleAcceptRequest = async (connectionId: string, name: string) => {
+    try {
+      await acceptCaregiverConnection(connectionId);
+      Alert.alert("Connected", `You are now connected with ${name}`);
+      fetchContacts();
+    } catch (error) {
+      Alert.alert("Error", "Failed to accept request.");
+    }
+  };
+
+  const handleRejectRequest = async (connectionId: string) => {
+    try {
+      await rejectCaregiverConnection(connectionId);
+      Alert.alert("Rejected", "Friend request rejected.");
+      fetchContacts();
+    } catch (error) {
+      Alert.alert("Error", "Failed to reject request.");
+    }
+  };
 
   const navigateToConversation = useCallback(
     (contact: Contact) => {
@@ -282,8 +313,9 @@ export default function CaregiverMessages() {
         return;
       }
 
-      // Always add to caregiver_connections (friend/chat list), 
+      // Always add to caregiver_connections (friend/chat list),
       // NOT caregiver_elderly (which implies caregiving responsibility)
+      // This will now create a PENDING request
       const success = await addCaregiverConnection(
         caregiverProfileId,
         foundUser.data.$id,
@@ -291,15 +323,15 @@ export default function CaregiverMessages() {
 
       if (success) {
         Alert.alert(
-          "Added!",
-          `${foundUser.data.name ?? "User"} has been added to your contacts.`,
+          "Invitation Sent",
+          `An invitation has been sent to ${foundUser.data.name ?? "User"}. You can chat once they accept.`,
         );
         closeAddDialog();
         await fetchContacts();
       } else {
         Alert.alert(
           "Already added",
-          `${foundUser.data.name ?? "This user"} is already in your contacts.`,
+          `${foundUser.data.name ?? "This user"} is already in your contacts or has a pending request.`,
         );
       }
     } catch (error) {
@@ -466,6 +498,78 @@ export default function CaregiverMessages() {
     );
   };
 
+  const renderPendingRequests = () => {
+    if (pendingRequests.length === 0) return null;
+
+    return (
+      <View style={{ marginBottom: 16 }}>
+        <Text
+          variant="titleSmall"
+          style={{
+            marginLeft: 16,
+            marginBottom: 8,
+            color: theme.colors.onSurfaceVariant,
+          }}
+        >
+          Pending Requests
+        </Text>
+        {pendingRequests.map((req) => (
+          <View
+            key={req.connectionId}
+            style={[
+              styles.contactItem,
+              { backgroundColor: theme.colors.surface, marginBottom: 1 },
+            ]}
+          >
+            <View style={styles.avatarContainer}>
+              <Avatar.Text
+                size={52}
+                label={req.from.avatarLabel}
+                style={{ backgroundColor: theme.colors.tertiaryContainer }}
+                labelStyle={{
+                  color: theme.colors.onTertiaryContainer,
+                  fontWeight: "600",
+                }}
+              />
+            </View>
+            <View style={[styles.contactInfo, { flexDirection: "row", alignItems: "center" }]}>
+              <View style={{ flex: 1 }}>
+                <Text
+                  variant="titleMedium"
+                  style={[styles.contactName, { color: theme.colors.onSurface }]}
+                >
+                  {req.from.name}
+                </Text>
+                <Text
+                  variant="bodySmall"
+                  style={{ color: theme.colors.onSurfaceVariant }}
+                >
+                  Wants to connect
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <Button
+                  mode="contained"
+                  compact
+                  onPress={() => handleAcceptRequest(req.connectionId, req.from.name)}
+                >
+                  Accept
+                </Button>
+                <Button
+                  mode="outlined"
+                  compact
+                  onPress={() => handleRejectRequest(req.connectionId)}
+                >
+                  Reject
+                </Button>
+              </View>
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <MaterialCommunityIcons
@@ -540,9 +644,10 @@ export default function CaregiverMessages() {
           data={filteredContacts}
           renderItem={renderContactItem}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={renderPendingRequests}
           contentContainerStyle={[
             styles.listContent,
-            filteredContacts.length === 0 && styles.emptyList,
+            filteredContacts.length === 0 && pendingRequests.length === 0 && styles.emptyList,
           ]}
           ItemSeparatorComponent={() => (
             <View
@@ -553,11 +658,11 @@ export default function CaregiverMessages() {
               }}
             />
           )}
-          ListEmptyComponent={renderEmptyState}
+          ListEmptyComponent={pendingRequests.length === 0 ? renderEmptyState : null}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
-          extraData={lastMessages}
+          extraData={[lastMessages, pendingRequests]}
           showsVerticalScrollIndicator={false}
         />
       )}

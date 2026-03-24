@@ -556,7 +556,7 @@ export async function addCaregiverConnection(
       data: {
         caregiver_id_1: caregiverId1,
         caregiver_id_2: caregiverId2,
-        status: "active",
+        status: "pending",
         created_at: new Date().toISOString(),
       },
     });
@@ -565,6 +565,108 @@ export async function addCaregiverConnection(
     console.error("Error adding caregiver connection:", error);
     return false;
   }
+}
+
+/**
+ * Get pending connection requests for a caregiver (or elderly using this system).
+ * Returns requests where the user is the receiver (caregiver_id_2) and status is "pending".
+ */
+export async function getPendingCaregiverConnections(
+  userId: string,
+): Promise<{ connectionId: string; from: Contact }[]> {
+  try {
+    const response = await tablesDB.listRows<CaregiverConnection>({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_CONNECTIONS_TABLE_ID,
+      queries: [
+        Query.equal("caregiver_id_2", userId),
+        Query.equal("status", "pending"),
+        Query.limit(50),
+      ],
+    });
+
+    if (response.rows.length === 0) return [];
+
+    const senderIds = response.rows.map((r) => r.caregiver_id_1);
+    const uniqueIds = [...new Set(senderIds)];
+
+    // Fetch sender profiles (could be Caregiver or Elderly)
+    const [caregiverResponse, elderlyResponse] = await Promise.all([
+      tablesDB.listRows<Caregiver>({
+        databaseId: DATABASE_ID,
+        tableId: CAREGIVER_TABLE_ID,
+        queries: [Query.equal("$id", uniqueIds), Query.limit(100)],
+      }),
+      tablesDB.listRows<Elderly>({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_TABLE_ID,
+        queries: [Query.equal("$id", uniqueIds), Query.limit(100)],
+      }),
+    ]);
+
+    const contactMap = new Map<string, Contact>();
+
+    caregiverResponse.rows.forEach((c) => {
+      contactMap.set(c.$id, {
+        id: c.$id,
+        name: c.name || "Unknown",
+        phone: c.phone,
+        role: "caregiver",
+        avatarLabel: (c.name || "??").substring(0, 2).toUpperCase(),
+        lastActive: c.$updatedAt,
+      });
+    });
+
+    elderlyResponse.rows.forEach((e) => {
+      contactMap.set(e.$id, {
+        id: e.$id,
+        name: e.name || "Unknown",
+        phone: e.phone,
+        role: "elderly",
+        avatarLabel: (e.name || "??").substring(0, 2).toUpperCase(),
+        status: e.status,
+        lastActive: e.$updatedAt,
+      });
+    });
+
+    return response.rows
+      .filter((r) => contactMap.has(r.caregiver_id_1))
+      .map((r) => ({
+        connectionId: r.$id,
+        from: contactMap.get(r.caregiver_id_1)!,
+      }));
+  } catch (error) {
+    console.error("Error fetching pending caregiver connections:", error);
+    return [];
+  }
+}
+
+/**
+ * Accept a pending caregiver connection request.
+ */
+export async function acceptCaregiverConnection(
+  connectionDocId: string,
+): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: CAREGIVER_CONNECTIONS_TABLE_ID,
+    rowId: connectionDocId,
+    data: { status: "active" },
+  });
+}
+
+/**
+ * Reject a pending caregiver connection request.
+ */
+export async function rejectCaregiverConnection(
+  connectionDocId: string,
+): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: CAREGIVER_CONNECTIONS_TABLE_ID,
+    rowId: connectionDocId,
+    data: { status: "rejected" },
+  });
 }
 
 /**
