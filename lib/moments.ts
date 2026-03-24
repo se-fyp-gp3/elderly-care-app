@@ -73,7 +73,7 @@ export async function createMoment(
         likes: [],
         comments_count: 0,
         ai_generated: false,
-        created_at: new Date().toISOString(), // Custom attribute if needed
+        // created_at: new Date().toISOString(), // Custom attribute if needed
       }
     );
     return response as unknown as Moment;
