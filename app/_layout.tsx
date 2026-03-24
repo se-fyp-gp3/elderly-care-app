@@ -1,13 +1,20 @@
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { Role } from "@/types/user";
 import { Stack, useRouter, useSegments } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, useColorScheme, View } from "react-native";
+import { useEffect, useState, useRef } from "react";
+import { ActivityIndicator, AppState, useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { MD3DarkTheme, MD3LightTheme, PaperProvider } from "react-native-paper";
 import { enGB, registerTranslation } from "react-native-paper-dates";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import PinterestSplash from "../components/PinterestSplash";
+import * as Notifications from "expo-notifications";
+import {
+  registerForPushNotificationsAsync,
+  sendImmediateNotification,
+} from "@/lib/notifications";
+import { clientReactNative, DATABASE_ID, DIRECT_MESSAGES_TABLE_ID } from "@/lib/appwrite";
+import { DirectMessage } from "@/types/messaging";
 
 registerTranslation("en", enGB);
 
@@ -54,6 +61,81 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   } = useAuth();
   const segments = useSegments();
   const [appReady, setAppReady] = useState(SKIP_SPLASH);
+  
+  // Ensure notifications show even when app is open
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+  const appState = useRef(AppState.currentState);
+
+  // Global Notification Listener for Direct Messages
+  useEffect(() => {
+    if (!user?.$id) return;
+
+    // Register for permissions on mount
+    registerForPushNotificationsAsync();
+
+    // Subscribe to ALL new messages in the collection
+    const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
+    const unsubscribe = clientReactNative.subscribe(channel, async (response) => {
+      // Only process creation events
+      if (!response.events.some((e) => e.endsWith(".create"))) return;
+
+      const payload = response.payload as DirectMessage;
+      
+      // We only care if:
+      // 1. The message is intended for the CURRENT logged-in user
+      // 2. The sender is NOT the current user (sanity check)
+      if (payload.receiver_id === user.$id && payload.sender_id !== user.$id) {
+        
+        // Show notification regardless of app state (Foreground/Background)
+        // because setNotificationHandler is configured to show alerts in foreground
+        await sendImmediateNotification(
+          payload.sender_name || "New Message",
+          payload.message_type === "voice" ? "Sent a voice message" : (payload.body || "Sent a message"),
+          {
+            type: "direct_message",
+            contactId: payload.sender_id,
+            contactName: payload.sender_name,
+            contactRole: payload.sender_role,
+          }
+        );
+      }
+    });
+
+    // Handle notification tap
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const rawData = response.notification.request.content.data;
+      
+      // Safe cast or property access
+      if (rawData && rawData.type === "direct_message") {
+        const contactId = rawData.contactId as string;
+        const contactName = rawData.contactName as string;
+        const contactRole = rawData.contactRole as string;
+
+        router.push({
+          pathname: "/conversation",
+          params: {
+            contactId,
+            contactName,
+            contactRole,
+          },
+        });
+      }
+    });
+
+    return () => {
+      // Cleanup subscription
+      unsubscribe();
+      subscription.remove();
+    };
+  }, [user?.$id, router]);
 
   useEffect(() => {
     const currentRoute = segments[0];
