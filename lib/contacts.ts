@@ -603,20 +603,50 @@ export async function getCaregiverContacts(
     if (connectedIds.size === 0) return [];
 
     const ids = [...connectedIds];
-    const detailsResponse = await tablesDB.listRows<Caregiver>({
+
+    // 1. Try to find them as Caregivers
+    const caregiverResponse = await tablesDB.listRows<Caregiver>({
       databaseId: DATABASE_ID,
       tableId: CAREGIVER_TABLE_ID,
       queries: [Query.equal("$id", ids), Query.limit(100)],
     });
+    
+    const caregivers = caregiverResponse.rows;
+    const foundIds = new Set(caregivers.map((c) => c.$id));
+    
+    // 2. Identify missing IDs and try to find them as Elderly
+    const missingIds = ids.filter((id) => !foundIds.has(id));
+    let elderlyList: Elderly[] = [];
+    
+    if (missingIds.length > 0) {
+      const elderlyResponse = await tablesDB.listRows<Elderly>({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_TABLE_ID,
+        queries: [Query.equal("$id", missingIds), Query.limit(100)],
+      });
+      elderlyList = elderlyResponse.rows;
+    }
 
-    return detailsResponse.rows.map((caregiver) => ({
-      id: caregiver.$id,
-      name: caregiver.name || "Unknown",
-      phone: caregiver.phone,
+    const contactsFromCaregivers: Contact[] = caregivers.map((c) => ({
+      id: c.$id,
+      name: c.name || "Unknown",
+      phone: c.phone,
       role: "caregiver" as const,
-      avatarLabel: (caregiver.name || "??").substring(0, 2).toUpperCase(),
-      lastActive: caregiver.$updatedAt,
+      avatarLabel: (c.name || "??").substring(0, 2).toUpperCase(),
+      lastActive: c.$updatedAt,
     }));
+
+    const contactsFromElderly: Contact[] = elderlyList.map((e) => ({
+      id: e.$id,
+      name: e.name || "Unknown",
+      phone: e.phone,
+      role: "elderly" as const,
+      avatarLabel: (e.name || "??").substring(0, 2).toUpperCase(),
+      status: e.status,
+      lastActive: e.$updatedAt,
+    }));
+
+    return [...contactsFromCaregivers, ...contactsFromElderly];
   } catch (error) {
     console.error("Error fetching caregiver contacts:", error);
     return [];

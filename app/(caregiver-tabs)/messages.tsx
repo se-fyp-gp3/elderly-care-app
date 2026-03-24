@@ -7,11 +7,10 @@ import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
   addCaregiverConnection,
-  addCaregiverContact,
   Contact,
   formatRelativeTime,
   getContactsForCaregiver,
-  searchUserByPhone,
+  searchUserByPhone
 } from "@/lib/contacts";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
 import { Caregiver, Elderly } from "@/types/appwrite";
@@ -272,62 +271,36 @@ export default function CaregiverMessages() {
     if (!foundUser || !caregiverProfileId) return;
     setAddingContact(true);
     try {
-      if (foundUser.role === "elderly") {
-        // Check if already in contacts
-        const alreadyExists = contacts.some((c) => c.id === foundUser.data.$id);
-        if (alreadyExists) {
-          Alert.alert(
-            "Already added",
-            `${foundUser.data.name ?? "This user"} is already in your contacts.`,
-          );
-          setAddingContact(false);
-          return;
-        }
-        const success = await addCaregiverContact(
-          caregiverProfileId,
-          foundUser.data.$id,
+      // Check if already in contacts
+      const alreadyExists = contacts.some((c) => c.id === foundUser.data.$id);
+      if (alreadyExists) {
+        Alert.alert(
+          "Already added",
+          `${foundUser.data.name ?? "This user"} is already in your contacts.`,
         );
-        if (success) {
-          Alert.alert(
-            "Added!",
-            `${foundUser.data.name ?? "User"} has been added to your contacts.`,
-          );
-          closeAddDialog();
-          await fetchContacts();
-        } else {
-          Alert.alert(
-            "Already added",
-            `${foundUser.data.name ?? "This user"} is already in your contacts.`,
-          );
-        }
+        setAddingContact(false);
+        return;
+      }
+
+      // Always add to caregiver_connections (friend/chat list), 
+      // NOT caregiver_elderly (which implies caregiving responsibility)
+      const success = await addCaregiverConnection(
+        caregiverProfileId,
+        foundUser.data.$id,
+      );
+
+      if (success) {
+        Alert.alert(
+          "Added!",
+          `${foundUser.data.name ?? "User"} has been added to your contacts.`,
+        );
+        closeAddDialog();
+        await fetchContacts();
       } else {
-        // Caregiver-to-caregiver: save connection then navigate to conversation
-        const alreadyExists = contacts.some((c) => c.id === foundUser.data.$id);
-        if (alreadyExists) {
-          Alert.alert(
-            "Already added",
-            `${foundUser.data.name ?? "This user"} is already in your contacts.`,
-          );
-          setAddingContact(false);
-          return;
-        }
-        const success = await addCaregiverConnection(
-          caregiverProfileId,
-          foundUser.data.$id,
+        Alert.alert(
+          "Already added",
+          `${foundUser.data.name ?? "This user"} is already in your contacts.`,
         );
-        if (success) {
-          Alert.alert(
-            "Added!",
-            `${foundUser.data.name ?? "User"} has been added to your contacts.`,
-          );
-          closeAddDialog();
-          await fetchContacts();
-        } else {
-          Alert.alert(
-            "Already added",
-            `${foundUser.data.name ?? "This user"} is already in your contacts.`,
-          );
-        }
       }
     } catch (error) {
       Alert.alert("Error", "Failed to add contact. Please try again.");
