@@ -1,5 +1,8 @@
 import MomentCard from "@/components/MomentCard";
 import { useAuth } from "@/lib/auth-context";
+import { getCaregiverByUserId } from "@/lib/caregiver";
+import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
+import { getElderlyByUserId } from "@/lib/elderly";
 import { addAIResponse, createMoment, getMoments, likeMoment } from "@/lib/moments";
 import { Moment, MomentComment } from "@/types/moments";
 import React, { useEffect, useState } from "react";
@@ -15,14 +18,41 @@ export default function MomentsView() {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
   const [posting, setPosting] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState("");
 
   useEffect(() => {
     loadMoments();
   }, []);
 
   const loadMoments = async () => {
+    if (!user) return;
     try {
-      const data = await getMoments();
+      setLoading(true);
+      
+      // 1. Get contacts based on role
+      let contacts: any[] = [];
+      if (preferences.role === "caregiver") {
+        const profile = await getCaregiverByUserId(user.$id);
+        if (profile) {
+            contacts = await getContactsForCaregiver(profile.$id);
+            setCurrentUserName(profile.name || user.name || "Anonymous");
+        }
+      } else if (preferences.role === "elderly") {
+        const profile = await getElderlyByUserId(user.$id);
+        if (profile) {
+            contacts = await getContactsForElderly(profile.$id);
+            setCurrentUserName(profile.name || user.name || "Anonymous");
+        }
+      }
+
+      // 2. Extract User IDs allowed to be seen (My friends + Me)
+      const allowedIds = [
+        user.$id, 
+        ...contacts.map((c) => c.userId).filter((id) => !!id)
+      ];
+
+      // 3. Fetch moments with filter
+      const data = await getMoments(1, allowedIds);
       setMoments(data);
     } catch (error) {
       console.error(error);
@@ -44,7 +74,7 @@ export default function MomentsView() {
       const newMoment = await createMoment(
         newPostContent,
         user?.$id || "anon",
-        user?.name || "Anonymous",
+        currentUserName || user?.name || "Anonymous",
         (preferences.role as "elderly" | "caregiver") || "caregiver"
       );
       setMoments([newMoment, ...moments]);

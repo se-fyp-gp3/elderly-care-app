@@ -12,6 +12,7 @@ import {
 
 export interface Contact {
   id: string;
+  userId?: string;
   name: string;
   phone: string | null;
   role: "elderly" | "caregiver";
@@ -84,6 +85,7 @@ async function getElderlyContactsForCaregiver(
 
     return uniqueElderly.map((elderly) => ({
       id: elderly.$id,
+      userId: elderly.user_id,
       name: elderly.name || "Unknown",
       phone: elderly.phone,
       role: "elderly" as const,
@@ -141,6 +143,7 @@ export async function getContactsForElderly(
 
     return uniqueCaregivers.map((caregiver) => ({
       id: caregiver.$id,
+      userId: caregiver.user_id,
       name: caregiver.name || "Unknown",
       phone: caregiver.phone,
       role: "caregiver" as const,
@@ -485,6 +488,7 @@ export async function getElderlyContacts(
 
     return detailsResponse.rows.map((elderly) => ({
       id: elderly.$id,
+      userId: elderly.user_id,
       name: elderly.name || "Unknown",
       phone: elderly.phone,
       role: "elderly" as const,
@@ -731,6 +735,7 @@ export async function getCaregiverContacts(
 
     const contactsFromCaregivers: Contact[] = caregivers.map((c) => ({
       id: c.$id,
+      userId: c.user_id,
       name: c.name || "Unknown",
       phone: c.phone,
       role: "caregiver" as const,
@@ -740,6 +745,7 @@ export async function getCaregiverContacts(
 
     const contactsFromElderly: Contact[] = elderlyList.map((e) => ({
       id: e.$id,
+      userId: e.user_id,
       name: e.name || "Unknown",
       phone: e.phone,
       role: "elderly" as const,

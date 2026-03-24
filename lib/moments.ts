@@ -10,12 +10,22 @@ import { Databases, ID, Query } from "react-native-appwrite";
 
 const databases = new Databases(clientReactNative);
 
-export async function getMoments(page = 1): Promise<Moment[]> {
+export async function getMoments(page = 1, allowedAuthorIds?: string[]): Promise<Moment[]> {
   try {
+    const queries = [
+      Query.orderDesc("$createdAt"),
+      Query.limit(20),
+      Query.offset((page - 1) * 20),
+    ];
+
+    if (allowedAuthorIds && allowedAuthorIds.length > 0) {
+      queries.push(Query.equal("author_id", allowedAuthorIds));
+    }
+
     const response = await databases.listDocuments(
       DATABASE_ID,
       MOMENTS_TABLE_ID,
-      [Query.orderDesc("$createdAt"), Query.limit(20), Query.offset((page - 1) * 20)]
+      queries
     );
     return response.documents as unknown as Moment[];
   } catch (error: any) {
@@ -35,6 +45,7 @@ export async function getMoments(page = 1): Promise<Moment[]> {
         $databaseId: DATABASE_ID,
         $permissions: [],
         $updatedAt: new Date().toISOString(),
+        $sequence: 0,
       },
       {
         $id: "mock2",
@@ -49,6 +60,7 @@ export async function getMoments(page = 1): Promise<Moment[]> {
         $databaseId: DATABASE_ID,
         $permissions: [],
         $updatedAt: new Date(Date.now() - 3600000).toISOString(),
+        $sequence: 0,
       },
     ];
   }
@@ -93,7 +105,8 @@ export async function createMoment(
       $databaseId: DATABASE_ID,
       $permissions: [],
       $updatedAt: new Date().toISOString(),
-    };
+      $sequence: 0,
+    } as unknown as Moment;
   }
 }
 
@@ -155,6 +168,7 @@ export async function addAIResponse(momentId: string, content: string): Promise<
         $databaseId: DATABASE_ID,
         $permissions: [],
         $updatedAt: new Date().toISOString(),
+        $sequence: 0,
      };
   } catch (error) {
       console.error("Error generating AI response:", error);
