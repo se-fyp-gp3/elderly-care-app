@@ -111,7 +111,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
     // Handle notification tap
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      const rawData = response.notification.request.content.data;
+      const rawData = response.notification.request.content.data as any;
       
       // Safe cast or property access
       if (rawData && rawData.type === "direct_message") {
@@ -119,8 +119,10 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
         const contactName = rawData.contactName as string;
         const contactRole = rawData.contactRole as string;
 
+        const targetPath = role === "elderly" ? "/(elderly-tabs)/conversation" : "/(caregiver-tabs)/conversation";
+
         router.push({
-          pathname: "/conversation",
+          pathname: targetPath,
           params: {
             contactId,
             contactName,
@@ -135,7 +137,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
       unsubscribe();
       subscription.remove();
     };
-  }, [user?.$id, router]);
+  }, [user?.$id, router, role]);
 
   useEffect(() => {
     const currentRoute = segments[0];
