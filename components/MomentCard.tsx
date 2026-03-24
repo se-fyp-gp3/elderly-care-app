@@ -110,7 +110,7 @@ export default function MomentCard({ moment, currentUserId, onLike, onAIRequest 
             onPress={handleAI}
             disabled={loadingAI || !!aiComment}
         >
-          <MaterialCommunityIcons name="sparkles" size={20} color={theme.colors.tertiary} />
+          <MaterialCommunityIcons name="creation" size={20} color={theme.colors.tertiary} />
           <Text variant="bodyMedium" style={{ marginLeft: 6, color: theme.colors.tertiary, fontWeight: '600' }}>
             AI Discuss
           </Text>
