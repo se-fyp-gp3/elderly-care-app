@@ -1,11 +1,11 @@
 import { Account, Client } from "appwrite";
 import {
-  Account as AccountReactNative,
-  Client as ClientReactNative,
-  Functions,
-  ID,
-  Storage,
-  TablesDB,
+    Account as AccountReactNative,
+    Client as ClientReactNative,
+    Functions,
+    ID,
+    Storage,
+    TablesDB,
 } from "react-native-appwrite";
 
 const APPWRITE_ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!;
@@ -64,6 +64,9 @@ export const ELDERLY_CONNECTIONS_TABLE_ID =
   process.env.EXPO_PUBLIC_ELDERLY_CONNECTIONS_TABLE_ID!;
 export const CAREGIVER_CONNECTIONS_TABLE_ID =
   process.env.EXPO_PUBLIC_CAREGIVER_CONNECTIONS_TABLE_ID || "caregiver_connections";
+
+export const MOMENTS_TABLE_ID = process.env.EXPO_PUBLIC_MOMENTS_TABLE_ID || "moments";
+export const MOMENTS_COMMENTS_TABLE_ID = process.env.EXPO_PUBLIC_MOMENTS_COMMENTS_TABLE_ID || "moments_comments";
 
 export const ROLE_MANAGEMENT_FUNCTION_ID =
   process.env.EXPO_PUBLIC_ROLE_MANAGEMENT_FUNCTION_ID!;

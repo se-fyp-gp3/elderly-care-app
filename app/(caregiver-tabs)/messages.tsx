@@ -46,6 +46,8 @@ import {
   useTheme
 } from "react-native-paper";
 
+import MomentsView from "@/components/MomentsView";
+
 export default function CaregiverMessages() {
   const theme = useTheme();
   const { user } = useAuth();
@@ -687,17 +689,8 @@ export default function CaregiverMessages() {
   );
 
   const renderMomentsPage = () => (
-    <View style={{ width, flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <MaterialCommunityIcons name="image-album" size={48} color={theme.colors.outlineVariant} />
-      <Text variant="titleMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 12 }}>
-        Moments
-      </Text>
-      <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}>
-        Share your life with friends
-      </Text>
-      <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4, opacity: 0.7 }}>
-        (Coming Soon)
-      </Text>
+    <View style={{ width, flex: 1 }}>
+      <MomentsView />
     </View>
   );
 
