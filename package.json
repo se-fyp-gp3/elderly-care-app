@@ -79,7 +79,7 @@
     "baseline-browser-mapping": "^2.10.0",
     "eslint": "^10.0.3",
     "eslint-config-expo": "~10.0.0",
-    "expo-module-scripts": "^55.0.2",
+    "expo-module-scripts": "^3.0.5",
     "typescript": "~5.9.3"
   },
   "overrides": {
