@@ -1,9 +1,9 @@
 import { generateAIResponse } from "@/lib/ai";
 import {
-  clientReactNative,
-  DATABASE_ID,
-  MOMENTS_COMMENTS_TABLE_ID,
-  MOMENTS_TABLE_ID,
+    clientReactNative,
+    DATABASE_ID,
+    MOMENTS_COMMENTS_TABLE_ID,
+    MOMENTS_TABLE_ID,
 } from "@/lib/appwrite";
 import { Moment, MomentComment } from "@/types/moments";
 import { Databases, ID, Query } from "react-native-appwrite";
