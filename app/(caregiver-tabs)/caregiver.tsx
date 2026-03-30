@@ -214,7 +214,7 @@ export default function CaregiverDashboard() {
             Caregiver Panel
           </Text>
           <Text variant="bodyMedium" style={styles.subtitle}>
-            Please switch to "Nursing Mode" in settings to use this feature
+            Please switch to &quot;Nursing Mode&quot; in settings to use this feature
           </Text>
           <Button mode="contained" onPress={() => {}} style={styles.button}>
             Go to Settings

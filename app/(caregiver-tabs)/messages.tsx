@@ -1,36 +1,52 @@
 import {
-    clientReactNative,
-    DATABASE_ID,
-    DIRECT_MESSAGES_TABLE_ID,
+  clientReactNative,
+  DATABASE_ID,
+  DIRECT_MESSAGES_TABLE_ID,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
-    Contact,
-    formatRelativeTime,
-    getContactsForCaregiver,
+  acceptCaregiverConnection,
+  addCaregiverConnection,
+  Contact,
+  formatRelativeTime,
+  getContactsForCaregiver,
+  getPendingCaregiverConnections,
+  rejectCaregiverConnection,
+  searchUserByPhone,
 } from "@/lib/contacts";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
+import { Caregiver, Elderly } from "@/types/appwrite";
 import { DirectMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Linking,
-    RefreshControl,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Keyboard,
+  Linking,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Searchbar,
-    Text,
-    useTheme
+  ActivityIndicator,
+  Avatar,
+  Button,
+  Searchbar,
+  Text,
+  TextInput,
+  useTheme
 } from "react-native-paper";
+
+import MomentsView from "@/components/MomentsView";
 
 export default function CaregiverMessages() {
   const theme = useTheme();
@@ -48,6 +64,23 @@ export default function CaregiverMessages() {
     Record<string, DirectMessage | null>
   >({});
 
+  const { width } = useWindowDimensions();
+  const [activeTab, setActiveTab] = useState(0);
+  const pagerRef = React.useRef<FlatList<number>>(null);
+
+  // ── Add friend dialog state ──
+  const [addDialogVisible, setAddDialogVisible] = useState(false);
+  const [phoneSearch, setPhoneSearch] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [foundUser, setFoundUser] = useState<
+    { role: "elderly"; data: Elderly } | { role: "caregiver"; data: Caregiver } | null
+  >(null);
+  const [addingContact, setAddingContact] = useState(false);
+  const [searchDone, setSearchDone] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<
+    { connectionId: string; from: Contact }[]
+  >([]);
+
   const fetchContacts = useCallback(async () => {
     if (!user) return;
     try {
@@ -57,7 +90,12 @@ export default function CaregiverMessages() {
         return;
       }
       setCaregiverProfileId(caregiver.$id);
-      const data = await getContactsForCaregiver(caregiver.$id);
+      
+      const [data, requests] = await Promise.all([
+        getContactsForCaregiver(caregiver.$id),
+        getPendingCaregiverConnections(caregiver.$id),
+      ]);
+      setPendingRequests(requests);
 
       // Fetch last messages for each contact
       const lastMsgs: Record<string, DirectMessage | null> = {};
@@ -87,6 +125,26 @@ export default function CaregiverMessages() {
       setLoading(false);
     }
   }, [user]);
+
+  const handleAcceptRequest = async (connectionId: string, name: string) => {
+    try {
+      await acceptCaregiverConnection(connectionId);
+      Alert.alert("Connected", `You are now connected with ${name}`);
+      fetchContacts();
+    } catch (error) {
+      Alert.alert("Error", "Failed to accept request.");
+    }
+  };
+
+  const handleRejectRequest = async (connectionId: string) => {
+    try {
+      await rejectCaregiverConnection(connectionId);
+      Alert.alert("Rejected", "Friend request rejected.");
+      fetchContacts();
+    } catch (error) {
+      Alert.alert("Error", "Failed to reject request.");
+    }
+  };
 
   const navigateToConversation = useCallback(
     (contact: Contact) => {
@@ -207,6 +265,91 @@ export default function CaregiverMessages() {
     });
   }, []);
 
+  // ── Add friend dialog handlers ──
+  const openAddDialog = useCallback(() => {
+    setPhoneSearch("");
+    setFoundUser(null);
+    setSearchDone(false);
+    setAddDialogVisible(true);
+  }, []);
+
+  const closeAddDialog = useCallback(() => {
+    setAddDialogVisible(false);
+    setPhoneSearch("");
+    setFoundUser(null);
+    setSearchDone(false);
+  }, []);
+
+  const handlePhoneSearch = useCallback(async () => {
+    const trimmed = phoneSearch.trim();
+    if (!trimmed) return;
+    Keyboard.dismiss();
+    setSearching(true);
+    setFoundUser(null);
+    setSearchDone(false);
+    try {
+      const result = await searchUserByPhone(trimmed);
+      // Don't show self in results
+      if (
+        result &&
+        result.role === "caregiver" &&
+        result.data.$id === caregiverProfileId
+      ) {
+        setFoundUser(null);
+      } else {
+        setFoundUser(result);
+      }
+      setSearchDone(true);
+    } catch (error) {
+      Alert.alert("Error", "Failed to search. Please try again.");
+    } finally {
+      setSearching(false);
+    }
+  }, [phoneSearch, caregiverProfileId]);
+
+  const handleAddFriend = useCallback(async () => {
+    if (!foundUser || !caregiverProfileId) return;
+    setAddingContact(true);
+    try {
+      // Check if already in contacts
+      const alreadyExists = contacts.some((c) => c.id === foundUser.data.$id);
+      if (alreadyExists) {
+        Alert.alert(
+          "Already added",
+          `${foundUser.data.name ?? "This user"} is already in your contacts.`,
+        );
+        setAddingContact(false);
+        return;
+      }
+
+      // Always add to caregiver_connections (friend/chat list),
+      // NOT caregiver_elderly (which implies caregiving responsibility)
+      // This will now create a PENDING request
+      const success = await addCaregiverConnection(
+        caregiverProfileId,
+        foundUser.data.$id,
+      );
+
+      if (success) {
+        Alert.alert(
+          "Invitation Sent",
+          `An invitation has been sent to ${foundUser.data.name ?? "User"}. You can chat once they accept.`,
+        );
+        closeAddDialog();
+        await fetchContacts();
+      } else {
+        Alert.alert(
+          "Already added",
+          `${foundUser.data.name ?? "This user"} is already in your contacts or has a pending request.`,
+        );
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to add contact. Please try again.");
+    } finally {
+      setAddingContact(false);
+    }
+  }, [foundUser, caregiverProfileId, contacts, closeAddDialog, fetchContacts]);
+
   const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
   const isOnline = (lastActive?: string): boolean => {
@@ -318,7 +461,7 @@ export default function CaregiverMessages() {
             <View style={styles.contactSubInfo}>
               <View style={styles.roleChip}>
                 <MaterialCommunityIcons
-                  name="account-heart"
+                  name={item.role === "elderly" ? "account-heart" : "shield-account"}
                   size={14}
                   color={theme.colors.primary}
                 />
@@ -329,7 +472,7 @@ export default function CaregiverMessages() {
                     { color: theme.colors.onSurfaceVariant },
                   ]}
                 >
-                  Elderly
+                  {item.role === "elderly" ? "Elderly" : "Caregiver"}
                 </Text>
               </View>
               <Text
@@ -364,6 +507,78 @@ export default function CaregiverMessages() {
     );
   };
 
+  const renderPendingRequests = () => {
+    if (pendingRequests.length === 0) return null;
+
+    return (
+      <View style={{ marginBottom: 16 }}>
+        <Text
+          variant="titleSmall"
+          style={{
+            marginLeft: 16,
+            marginBottom: 8,
+            color: theme.colors.onSurfaceVariant,
+          }}
+        >
+          Pending Requests
+        </Text>
+        {pendingRequests.map((req) => (
+          <View
+            key={req.connectionId}
+            style={[
+              styles.contactItem,
+              { backgroundColor: theme.colors.surface, marginBottom: 1 },
+            ]}
+          >
+            <View style={styles.avatarContainer}>
+              <Avatar.Text
+                size={52}
+                label={req.from.avatarLabel}
+                style={{ backgroundColor: theme.colors.tertiaryContainer }}
+                labelStyle={{
+                  color: theme.colors.onTertiaryContainer,
+                  fontWeight: "600",
+                }}
+              />
+            </View>
+            <View style={[styles.contactInfo, { flexDirection: "row", alignItems: "center" }]}>
+              <View style={{ flex: 1 }}>
+                <Text
+                  variant="titleMedium"
+                  style={[styles.contactName, { color: theme.colors.onSurface }]}
+                >
+                  {req.from.name}
+                </Text>
+                <Text
+                  variant="bodySmall"
+                  style={{ color: theme.colors.onSurfaceVariant }}
+                >
+                  Wants to connect
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <Button
+                  mode="contained"
+                  compact
+                  onPress={() => handleAcceptRequest(req.connectionId, req.from.name)}
+                >
+                  Accept
+                </Button>
+                <Button
+                  mode="outlined"
+                  compact
+                  onPress={() => handleRejectRequest(req.connectionId)}
+                >
+                  Reject
+                </Button>
+              </View>
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <MaterialCommunityIcons
@@ -381,29 +596,52 @@ export default function CaregiverMessages() {
         variant="bodyMedium"
         style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant }]}
       >
-        Your linked elderly will appear here.{"\n"}Add elderly from the Care
-        Panel to get started.
+        Your linked elderly will appear here.{"\n"}Tap the + button to add
+        friends by phone number.
       </Text>
     </View>
   );
 
-  return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
+  const onTabPress = (index: number) => {
+    setActiveTab(index);
+    pagerRef.current?.scrollToIndex({ index, animated: true });
+  };
+
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const slide = Math.round(e.nativeEvent.contentOffset.x / width);
+    if (slide !== activeTab) {
+      setActiveTab(slide);
+    }
+  };
+
+  const renderChatPage = () => (
+    <View style={{ width, flex: 1 }}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
-        <Searchbar
-          placeholder="Search contacts..."
-          onChangeText={setSearchQuery}
-          value={searchQuery}
-          style={[
-            styles.searchBar,
-            { backgroundColor: theme.colors.surfaceVariant },
-          ]}
-          inputStyle={styles.searchInput}
-          elevation={0}
-        />
+        <View style={styles.searchRow}>
+          <Searchbar
+            placeholder="Search contacts..."
+            onChangeText={setSearchQuery}
+            value={searchQuery}
+            style={[
+              styles.searchBar,
+              { backgroundColor: theme.colors.surfaceVariant, flex: 1 },
+            ]}
+            inputStyle={styles.searchInput}
+            elevation={0}
+          />
+          <TouchableOpacity
+            onPress={openAddDialog}
+            style={[styles.addBtn, { backgroundColor: theme.colors.primary }]}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons
+              name="account-plus"
+              size={22}
+              color={theme.colors.onPrimary}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Contact List */}
@@ -425,9 +663,10 @@ export default function CaregiverMessages() {
           data={filteredContacts}
           renderItem={renderContactItem}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={renderPendingRequests}
           contentContainerStyle={[
             styles.listContent,
-            filteredContacts.length === 0 && styles.emptyList,
+            filteredContacts.length === 0 && pendingRequests.length === 0 && styles.emptyList,
           ]}
           ItemSeparatorComponent={() => (
             <View
@@ -438,14 +677,284 @@ export default function CaregiverMessages() {
               }}
             />
           )}
-          ListEmptyComponent={renderEmptyState}
+          ListEmptyComponent={pendingRequests.length === 0 ? renderEmptyState : null}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
-          extraData={lastMessages}
+          extraData={[lastMessages, pendingRequests]}
           showsVerticalScrollIndicator={false}
         />
       )}
+    </View>
+  );
+
+  const renderMomentsPage = () => (
+    <View style={{ width, flex: 1 }}>
+      <MomentsView />
+    </View>
+  );
+
+  return (
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
+      {/* Top Tab Bar */}
+      <View style={{ flexDirection: 'row', backgroundColor: theme.colors.surface, elevation: 1 }}>
+        {['Chats', 'Moments'].map((tab, index) => {
+           const isActive = activeTab === index;
+           return (
+             <TouchableOpacity 
+               key={tab} 
+               style={{ 
+                 flex: 1, 
+                 paddingVertical: 14, 
+                 alignItems: 'center', 
+                 borderBottomWidth: 2, 
+                 borderBottomColor: isActive ? theme.colors.primary : 'transparent' 
+               }}
+               onPress={() => onTabPress(index)}
+               activeOpacity={0.7}
+             >
+               <Text 
+                 variant="labelLarge"
+                 style={{ 
+                   color: isActive ? theme.colors.primary : theme.colors.onSurfaceVariant, 
+                   fontWeight: isActive ? '700' : '500' 
+                 }}
+               >
+                 {tab}
+               </Text>
+             </TouchableOpacity>
+           );
+        })}
+      </View>
+
+      <FlatList
+        ref={pagerRef}
+        data={[0, 1]}
+        renderItem={({ item }) => item === 0 ? renderChatPage() : renderMomentsPage()}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        keyExtractor={(item) => item.toString()}
+        style={{ flex: 1 }}
+        getItemLayout={(data, index) => (
+          {length: width, offset: width * index, index}
+        )}
+      />
+
+      {/* ── Add Friend Modal ── */}
+      <Modal
+        visible={addDialogVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeAddDialog}
+      >
+        <TouchableWithoutFeedback onPress={closeAddDialog}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View
+                style={[
+                  styles.modalContent,
+                  { backgroundColor: theme.colors.surface },
+                ]}
+              >
+                {/* Header */}
+                <View style={styles.modalHeader}>
+                  <Text variant="titleLarge" style={{ fontWeight: "700" }}>
+                    Add Friend
+                  </Text>
+                  <TouchableOpacity onPress={closeAddDialog}>
+                    <MaterialCommunityIcons
+                      name="close"
+                      size={24}
+                      color={theme.colors.onSurface}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <Text
+                  variant="bodyMedium"
+                  style={{
+                    color: theme.colors.onSurfaceVariant,
+                    marginBottom: 16,
+                  }}
+                >
+                  Search for a friend by their phone number
+                </Text>
+
+                {/* Phone input + Search button */}
+                <View style={styles.phoneRow}>
+                  <TextInput
+                    mode="outlined"
+                    label="Phone number"
+                    value={phoneSearch}
+                    onChangeText={setPhoneSearch}
+                    keyboardType="phone-pad"
+                    style={{ flex: 1 }}
+                    dense
+                    left={<TextInput.Icon icon="phone" />}
+                    onSubmitEditing={handlePhoneSearch}
+                    returnKeyType="search"
+                  />
+                  <Button
+                    mode="contained"
+                    onPress={handlePhoneSearch}
+                    loading={searching}
+                    disabled={!phoneSearch.trim() || searching}
+                    style={styles.searchBtn}
+                    compact
+                  >
+                    Search
+                  </Button>
+                </View>
+
+                {/* Search result */}
+                {searching && (
+                  <View style={styles.resultArea}>
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.colors.primary}
+                    />
+                    <Text
+                      variant="bodySmall"
+                      style={{
+                        marginLeft: 8,
+                        color: theme.colors.onSurfaceVariant,
+                      }}
+                    >
+                      Searching...
+                    </Text>
+                  </View>
+                )}
+
+                {searchDone && !searching && foundUser && (
+                  <View
+                    style={[
+                      styles.resultCard,
+                      { backgroundColor: theme.colors.secondaryContainer },
+                    ]}
+                  >
+                    <Avatar.Text
+                      size={44}
+                      label={(foundUser.data.name ?? "??")
+                        .substring(0, 2)
+                        .toUpperCase()}
+                      style={{
+                        backgroundColor:
+                          foundUser.role === "elderly"
+                            ? theme.colors.primaryContainer
+                            : theme.colors.tertiaryContainer,
+                      }}
+                      labelStyle={{
+                        color:
+                          foundUser.role === "elderly"
+                            ? theme.colors.onPrimaryContainer
+                            : theme.colors.onTertiaryContainer,
+                        fontWeight: "600",
+                        fontSize: 16,
+                      }}
+                    />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text
+                        variant="titleMedium"
+                        style={{ fontWeight: "600" }}
+                      >
+                        {foundUser.data.name ?? "Unknown"}
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          marginTop: 2,
+                          gap: 8,
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                          }}
+                        >
+                          <MaterialCommunityIcons
+                            name="phone"
+                            size={13}
+                            color={theme.colors.onSecondaryContainer}
+                          />
+                          <Text
+                            variant="bodySmall"
+                            style={{
+                              marginLeft: 4,
+                              color: theme.colors.onSecondaryContainer,
+                            }}
+                          >
+                            {foundUser.data.phone ?? "N/A"}
+                          </Text>
+                        </View>
+                        <View
+                          style={{
+                            backgroundColor:
+                              foundUser.role === "elderly"
+                                ? theme.colors.primaryContainer
+                                : theme.colors.tertiaryContainer,
+                            paddingHorizontal: 6,
+                            paddingVertical: 1,
+                            borderRadius: 6,
+                          }}
+                        >
+                          <Text
+                            variant="labelSmall"
+                            style={{
+                              color:
+                                foundUser.role === "elderly"
+                                  ? theme.colors.primary
+                                  : theme.colors.tertiary,
+                              fontWeight: "600",
+                              textTransform: "capitalize",
+                            }}
+                          >
+                            {foundUser.role}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    <Button
+                      mode="contained"
+                      onPress={handleAddFriend}
+                      loading={addingContact}
+                      disabled={addingContact}
+                      compact
+                    >
+                      Add
+                    </Button>
+                  </View>
+                )}
+
+                {searchDone && !searching && !foundUser && (
+                  <View style={styles.resultArea}>
+                    <MaterialCommunityIcons
+                      name="account-search"
+                      size={28}
+                      color={theme.colors.outlineVariant}
+                    />
+                    <Text
+                      variant="bodyMedium"
+                      style={{
+                        marginLeft: 8,
+                        color: theme.colors.onSurfaceVariant,
+                      }}
+                    >
+                      No user found with that number
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
@@ -459,6 +968,11 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 12,
     borderBottomWidth: 0,
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   headerTop: {
     flexDirection: "row",
@@ -480,6 +994,14 @@ const styles = StyleSheet.create({
   searchInput: {
     fontSize: 14,
     minHeight: 44,
+  },
+  addBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 2,
   },
   loadingContainer: {
     flex: 1,
@@ -562,7 +1084,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
@@ -578,5 +1099,48 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
     lineHeight: 22,
+  },
+  // ── Add Friend Modal ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 24,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  phoneRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchBtn: {
+    marginTop: 6,
+    borderRadius: 8,
+  },
+  resultArea: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    justifyContent: "center",
+  },
+  resultCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    borderRadius: 14,
+    padding: 14,
   },
 });

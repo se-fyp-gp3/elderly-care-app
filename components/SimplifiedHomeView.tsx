@@ -47,7 +47,7 @@ export default function SimplifiedHomeView({
   const theme = useTheme();
   const router = useRouter();
   const [settingsVisible, setSettingsVisible] = useState(false);
-
+  
   const handleEmergencyCall = () => {
     const num = elderlyProfile?.emergency_contact;
     if (!num) {
@@ -79,17 +79,10 @@ export default function SimplifiedHomeView({
         {/* Top bar */}
         <View style={styles.topBar}>
           <View style={{ flex: 1 }}>
-            <Text
-              style={[styles.greeting, { color: theme.colors.onBackground }]}
-            >
+            <Text style={[styles.greeting, { color: theme.colors.onBackground }]}>
               Hello, {userName}!
             </Text>
-            <Text
-              style={[
-                styles.subtitle,
-                { color: theme.colors.onSurfaceVariant },
-              ]}
-            >
+            <Text style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
               How are you feeling today?
             </Text>
           </View>
@@ -101,43 +94,25 @@ export default function SimplifiedHomeView({
           activeOpacity={0.8}
           style={styles.emergencyButton}
         >
-          <MaterialCommunityIcons
-            name="phone-in-talk"
-            size={52}
-            color="#FFFFFF"
-          />
+          <MaterialCommunityIcons name="phone-in-talk" size={52} color="#FFFFFF" />
           <Text style={styles.emergencyText}>EMERGENCY CALL</Text>
-          <Text style={styles.emergencySubtext}>
-            Tap to call your emergency contact
-          </Text>
+          <Text style={styles.emergencySubtext}>Tap to call your emergency contact</Text>
         </TouchableOpacity>
 
         {/* Today's Medications */}
-        <Text
-          style={[styles.sectionTitle, { color: theme.colors.onBackground }]}
-        >
+        <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
           Today&apos;s Medications
         </Text>
 
         {todoList.length === 0 ? (
-          <Card
-            style={[
-              styles.emptyCard,
-              { backgroundColor: theme.colors.surface },
-            ]}
-          >
+          <Card style={[styles.emptyCard, { backgroundColor: theme.colors.surface }]}>
             <Card.Content style={styles.emptyCardContent}>
               <MaterialCommunityIcons
                 name="check-circle-outline"
                 size={40}
                 color={theme.colors.primary}
               />
-              <Text
-                style={[
-                  styles.emptyText,
-                  { color: theme.colors.onSurfaceVariant },
-                ]}
-              >
+              <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
                 No medications scheduled
               </Text>
             </Card.Content>
@@ -176,21 +151,19 @@ export default function SimplifiedHomeView({
                   color={iconColor}
                 />
                 <View style={styles.medInfo}>
-                  <Text
-                    style={[styles.medName, { color: theme.colors.onSurface }]}
-                  >
+                  <Text style={[styles.medName, { color: theme.colors.onSurface }]}>
                     {item.medicationName}
                   </Text>
-                  <Text
-                    style={[
-                      styles.medDetail,
-                      { color: theme.colors.onSurfaceVariant },
-                    ]}
-                  >
+                  <Text style={[styles.medDetail, { color: theme.colors.onSurfaceVariant }]}>
                     {item.time} — {item.dosage}
                   </Text>
                 </View>
-                <Text style={[styles.medStatus, { color: iconColor }]}>
+                <Text
+                  style={[
+                    styles.medStatus,
+                    { color: iconColor },
+                  ]}
+                >
                   {isTaken ? "Taken" : isMissing ? "Missed" : "Take"}
                 </Text>
               </TouchableOpacity>
@@ -199,31 +172,19 @@ export default function SimplifiedHomeView({
         )}
 
         {/* Message Shortcuts */}
-        <Text
-          style={[styles.sectionTitle, { color: theme.colors.onBackground }]}
-        >
+        <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
           Send a Message
         </Text>
 
         {contacts.length === 0 ? (
-          <Card
-            style={[
-              styles.emptyCard,
-              { backgroundColor: theme.colors.surface },
-            ]}
-          >
+          <Card style={[styles.emptyCard, { backgroundColor: theme.colors.surface }]}>
             <Card.Content style={styles.emptyCardContent}>
               <MaterialCommunityIcons
                 name="account-group-outline"
                 size={40}
                 color={theme.colors.outlineVariant}
               />
-              <Text
-                style={[
-                  styles.emptyText,
-                  { color: theme.colors.onSurfaceVariant },
-                ]}
-              >
+              <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
                 No contacts yet
               </Text>
             </Card.Content>
@@ -243,10 +204,7 @@ export default function SimplifiedHomeView({
                 })
               }
               activeOpacity={0.7}
-              style={[
-                styles.contactCard,
-                { backgroundColor: theme.colors.surface },
-              ]}
+              style={[styles.contactCard, { backgroundColor: theme.colors.surface }]}
             >
               <View
                 style={[
@@ -264,20 +222,10 @@ export default function SimplifiedHomeView({
                 </Text>
               </View>
               <View style={styles.contactInfo}>
-                <Text
-                  style={[
-                    styles.contactName,
-                    { color: theme.colors.onSurface },
-                  ]}
-                >
+                <Text style={[styles.contactName, { color: theme.colors.onSurface }]}>
                   {contact.name}
                 </Text>
-                <Text
-                  style={[
-                    styles.contactRole,
-                    { color: theme.colors.onSurfaceVariant },
-                  ]}
-                >
+                <Text style={[styles.contactRole, { color: theme.colors.onSurfaceVariant }]}>
                   {contact.role === "caregiver" ? "Caregiver" : "Friend"}
                 </Text>
               </View>

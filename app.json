@@ -76,7 +76,8 @@
       ],
       "./plugins/withHealthConnect",
       "expo-audio",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,
