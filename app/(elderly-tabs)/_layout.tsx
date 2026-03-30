@@ -152,6 +152,14 @@ export default function ElderlyTabsLayout() {
           headerShown: false,
         }}
       />
+      <Tabs.Screen
+        name="connect-caregiver"
+        options={{
+          href: null,
+          title: "Connect Caregiver",
+          headerShown: false,
+        }}
+      />
     </Tabs>
   );
 }
