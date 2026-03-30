@@ -1,3 +1,4 @@
+import CommentSheet from "@/components/CommentSheet";
 import MomentCard from "@/components/MomentCard";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
@@ -22,6 +23,7 @@ export default function MomentsView() {
   const [selectedMedia, setSelectedMedia] = useState<MomentMediaInput | null>(null);
   const [posting, setPosting] = useState(false);
   const [currentUserName, setCurrentUserName] = useState("");
+  const [commentMomentId, setCommentMomentId] = useState<string | null>(null);
 
   const loadMoments = useCallback(async () => {
     if (!user) return;
@@ -107,6 +109,21 @@ export default function MomentsView() {
      return await addAIResponse(momentId, content);
   };
 
+  const handleComment = (momentId: string) => {
+    setCommentMomentId(momentId);
+  };
+
+  const handleCommentAdded = () => {
+    // Increment local count optimistically
+    setMoments((prev) =>
+      prev.map((m) =>
+        m.$id === commentMomentId
+          ? { ...m, comments_count: (m.comments_count || 0) + 1 }
+          : m
+      )
+    );
+  };
+
   const closeCreateModal = () => {
     setCreateModalVisible(false);
     setNewPostContent("");
@@ -161,6 +178,7 @@ export default function MomentsView() {
               moment={item}
               currentUserId={user?.$id || ""}
               onLike={handleLike}
+              onComment={handleComment}
               onAIRequest={handleAIRequest}
             />
           )}
@@ -181,6 +199,16 @@ export default function MomentsView() {
         color={theme.colors.onPrimary}
         onPress={() => setCreateModalVisible(true)}
         label="Post"
+      />
+
+      <CommentSheet
+        visible={!!commentMomentId}
+        momentId={commentMomentId || ""}
+        onClose={() => setCommentMomentId(null)}
+        currentUserId={user?.$id || ""}
+        currentUserName={currentUserName || user?.name || "Anonymous"}
+        currentUserRole={(preferences.role as "elderly" | "caregiver") || "caregiver"}
+        onCommentAdded={handleCommentAdded}
       />
 
       <Modal

@@ -10,6 +10,7 @@ interface MomentCardProps {
   moment: Moment;
   currentUserId: string;
   onLike: (id: string) => void;
+  onComment: (id: string) => void;
   onAIRequest: (id: string, content: string) => Promise<MomentComment>;
 }
 
@@ -43,7 +44,7 @@ function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boo
   );
 }
 
-export default function MomentCard({ moment, currentUserId, onLike, onAIRequest }: MomentCardProps) {
+export default function MomentCard({ moment, currentUserId, onLike, onComment, onAIRequest }: MomentCardProps) {
   const theme = useTheme();
   const [liked, setLiked] = useState(moment.likes?.includes(currentUserId) || false);
   const [likesCount, setLikesCount] = useState(moment.likes?.length || 0);
@@ -156,10 +157,10 @@ export default function MomentCard({ moment, currentUserId, onLike, onAIRequest 
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionBtn}>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => onComment(moment.$id)}>
           <MaterialCommunityIcons name="comment-outline" size={20} color={theme.colors.onSurfaceVariant} />
           <Text variant="bodyMedium" style={{ marginLeft: 6, color: theme.colors.onSurfaceVariant }}>
-            Comment
+            {moment.comments_count > 0 ? moment.comments_count : "Comment"}
           </Text>
         </TouchableOpacity>
 

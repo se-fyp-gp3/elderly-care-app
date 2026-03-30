@@ -190,6 +190,57 @@ export async function likeMoment(momentId: string, userId: string, currentLikes:
   }
 }
 
+export async function getComments(momentId: string): Promise<MomentComment[]> {
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      MOMENTS_COMMENTS_TABLE_ID,
+      [
+        Query.equal("moment_id", momentId),
+        Query.orderDesc("$createdAt"),
+        Query.limit(100),
+      ]
+    );
+    return response.documents as unknown as MomentComment[];
+  } catch (error) {
+    console.error("Error fetching comments:", error);
+    return [];
+  }
+}
+
+export async function addComment(
+  momentId: string,
+  content: string,
+  userId: string,
+  userName: string,
+  userRole: "elderly" | "caregiver"
+): Promise<MomentComment> {
+  const comment = await databases.createDocument(
+    DATABASE_ID,
+    MOMENTS_COMMENTS_TABLE_ID,
+    ID.unique(),
+    {
+      moment_id: momentId,
+      content,
+      author_id: userId,
+      author_name: userName,
+      author_role: userRole,
+    }
+  );
+
+  // Increment comments_count on the moment
+  try {
+    const moment = await databases.getDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId);
+    await databases.updateDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId, {
+      comments_count: (moment.comments_count || 0) + 1,
+    });
+  } catch {
+    // Non-critical, count will be stale but functional
+  }
+
+  return comment as unknown as MomentComment;
+}
+
 export async function addAIResponse(momentId: string, content: string): Promise<MomentComment> {
   const aiContent = await generateAIResponse(content);
   
