@@ -28,10 +28,13 @@ import {
     Keyboard,
     Linking,
     Modal,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
     RefreshControl,
     StyleSheet,
     TouchableOpacity,
     TouchableWithoutFeedback,
+    useWindowDimensions,
     View,
 } from "react-native";
 import {
@@ -43,6 +46,8 @@ import {
     TextInput,
     useTheme,
 } from "react-native-paper";
+
+import MomentsView from "@/components/MomentsView";
 
 export default function ElderlyEmergency() {
   const theme = useTheme();
@@ -75,6 +80,10 @@ export default function ElderlyEmergency() {
     { connectionId: string; from: Elderly }[]
   >([]);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+
+  const { width } = useWindowDimensions();
+  const [activeTab, setActiveTab] = useState(0);
+  const pagerRef = React.useRef<FlatList<number>>(null);
 
   // ── Fetch contacts & last messages ──
   const fetchContacts = useCallback(async () => {
@@ -299,6 +308,19 @@ export default function ElderlyEmergency() {
     ]);
   }, []);
 
+  // ── Pager tab helpers ──
+  const onTabPress = (index: number) => {
+    setActiveTab(index);
+    pagerRef.current?.scrollToIndex({ index, animated: true });
+  };
+
+  const onPagerScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const slide = Math.round(e.nativeEvent.contentOffset.x / width);
+    if (slide !== activeTab) {
+      setActiveTab(slide);
+    }
+  };
+
   // ── Render conversation card ──
   const renderConversation = ({ item }: { item: Contact }) => {
     const lastMsg = lastMessages[item.id];
@@ -388,8 +410,9 @@ export default function ElderlyEmergency() {
     </View>
   );
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+  // ── Page renderers ──
+  const renderChatPage = () => (
+    <View style={{ width, flex: 1 }}>
       {/* Search bar + Add button */}
       <View style={styles.searchWrap}>
         <Searchbar
@@ -482,6 +505,63 @@ export default function ElderlyEmergency() {
           showsVerticalScrollIndicator={false}
         />
       )}
+    </View>
+  );
+
+  const renderMomentsPage = () => (
+    <View style={{ width, flex: 1 }}>
+      <MomentsView />
+    </View>
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Top Tab Bar */}
+      <View style={{ flexDirection: 'row', backgroundColor: theme.colors.surface, elevation: 1 }}>
+        {['Chats', 'Moments'].map((tab, index) => {
+          const isActive = activeTab === index;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={{
+                flex: 1,
+                paddingVertical: 14,
+                alignItems: 'center',
+                borderBottomWidth: 2,
+                borderBottomColor: isActive ? theme.colors.primary : 'transparent',
+              }}
+              onPress={() => onTabPress(index)}
+              activeOpacity={0.7}
+            >
+              <Text
+                variant="labelLarge"
+                style={{
+                  color: isActive ? theme.colors.primary : theme.colors.onSurfaceVariant,
+                  fontWeight: isActive ? '700' : '500',
+                }}
+              >
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <FlatList
+        ref={pagerRef}
+        data={[0, 1]}
+        renderItem={({ item }) => item === 0 ? renderChatPage() : renderMomentsPage()}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={onPagerScroll}
+        scrollEventThrottle={16}
+        keyExtractor={(item) => item.toString()}
+        style={{ flex: 1 }}
+        getItemLayout={(data, index) => (
+          { length: width, offset: width * index, index }
+        )}
+      />
 
       {/* ── Add Contact Modal ── */}
       <Modal
