@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
-import { addAIResponse, createMoment, getMoments, likeMoment } from "@/lib/moments";
+import { addAIResponse, createMoment, getMoments, getVisibleCommentCount, likeMoment } from "@/lib/moments";
 import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -24,6 +24,7 @@ export default function MomentsView() {
   const [posting, setPosting] = useState(false);
   const [currentUserName, setCurrentUserName] = useState("");
   const [commentMomentId, setCommentMomentId] = useState<string | null>(null);
+  const [allowedIds, setAllowedIds] = useState<string[]>([]);
 
   const loadMoments = useCallback(async () => {
     if (!user) return;
@@ -47,14 +48,24 @@ export default function MomentsView() {
       }
 
       // 2. Extract User IDs allowed to be seen (My friends + Me)
-      const allowedIds = [
+      const ids = [
         user.$id, 
         ...contacts.map((c) => c.userId).filter((id) => !!id)
       ];
+      setAllowedIds(ids);
 
       // 3. Fetch moments with filter
-      const data = await getMoments(1, allowedIds);
-      setMoments(data);
+      const data = await getMoments(1, ids);
+
+      // 4. Fetch visible comment counts for each moment
+      const countsArr = await Promise.all(
+        data.map((m) => getVisibleCommentCount(m.$id, ids))
+      );
+      const withCounts = data.map((m, i) => ({
+        ...m,
+        comments_count: countsArr[i],
+      }));
+      setMoments(withCounts);
     } catch (error) {
       console.error(error);
     } finally {
@@ -208,6 +219,7 @@ export default function MomentsView() {
         currentUserId={user?.$id || ""}
         currentUserName={currentUserName || user?.name || "Anonymous"}
         currentUserRole={(preferences.role as "elderly" | "caregiver") || "caregiver"}
+        allowedAuthorIds={allowedIds}
         onCommentAdded={handleCommentAdded}
       />
 

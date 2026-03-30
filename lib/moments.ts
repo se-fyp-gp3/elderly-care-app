@@ -190,21 +190,50 @@ export async function likeMoment(momentId: string, userId: string, currentLikes:
   }
 }
 
-export async function getComments(momentId: string): Promise<MomentComment[]> {
+export async function getComments(momentId: string, allowedAuthorIds?: string[]): Promise<MomentComment[]> {
   try {
+    const queries = [
+      Query.equal("moment_id", momentId),
+      Query.orderDesc("$createdAt"),
+      Query.limit(100),
+    ];
+
+    if (allowedAuthorIds && allowedAuthorIds.length > 0) {
+      queries.push(Query.equal("author_id", allowedAuthorIds));
+    }
+
     const response = await databases.listDocuments(
       DATABASE_ID,
       MOMENTS_COMMENTS_TABLE_ID,
-      [
-        Query.equal("moment_id", momentId),
-        Query.orderDesc("$createdAt"),
-        Query.limit(100),
-      ]
+      queries
     );
     return response.documents as unknown as MomentComment[];
   } catch (error) {
     console.error("Error fetching comments:", error);
     return [];
+  }
+}
+
+export async function getVisibleCommentCount(
+  momentId: string,
+  allowedAuthorIds?: string[]
+): Promise<number> {
+  try {
+    const queries = [
+      Query.equal("moment_id", momentId),
+      Query.limit(1),
+    ];
+    if (allowedAuthorIds && allowedAuthorIds.length > 0) {
+      queries.push(Query.equal("author_id", allowedAuthorIds));
+    }
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      MOMENTS_COMMENTS_TABLE_ID,
+      queries
+    );
+    return response.total;
+  } catch {
+    return 0;
   }
 }
 

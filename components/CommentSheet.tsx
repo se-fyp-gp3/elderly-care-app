@@ -28,6 +28,7 @@ interface CommentSheetProps {
   currentUserId: string;
   currentUserName: string;
   currentUserRole: "elderly" | "caregiver";
+  allowedAuthorIds?: string[];
   onCommentAdded?: () => void;
 }
 
@@ -81,6 +82,7 @@ export default function CommentSheet({
   currentUserId,
   currentUserName,
   currentUserRole,
+  allowedAuthorIds,
   onCommentAdded,
 }: CommentSheetProps) {
   const theme = useTheme();
@@ -95,14 +97,14 @@ export default function CommentSheet({
     if (!momentId) return;
     setLoading(true);
     try {
-      const data = await getComments(momentId);
+      const data = await getComments(momentId, allowedAuthorIds);
       setComments(data);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [momentId]);
+  }, [momentId, allowedAuthorIds]);
 
   useEffect(() => {
     if (visible) {
