@@ -515,7 +515,7 @@ export default function ElderlySettings() {
                       <MaterialCommunityIcons
                         name={option.icon as any}
                         size={26}
-                        color={isSelected ? "#FFFFFF" : theme.colors.onSurfaceVariant}
+                        color={isSelected ? theme.colors.onPrimary : theme.colors.onSurfaceVariant}
                       />
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
