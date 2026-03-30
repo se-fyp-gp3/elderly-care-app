@@ -32,6 +32,8 @@ export const storage = new Storage(clientReactNative);
 export { ID };
 
 export const VOICE_MESSAGES_BUCKET_ID = "voice-messages";
+export const MOMENTS_MEDIA_BUCKET_ID =
+  process.env.EXPO_PUBLIC_MOMENTS_MEDIA_BUCKET_ID || "moments-media";
 
 export const DATABASE_ID = process.env.EXPO_PUBLIC_DB_ID!;
 export const ELDERLY_TABLE_ID = process.env.EXPO_PUBLIC_ELDERLY_TABLE_ID!;

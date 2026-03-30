@@ -4,9 +4,11 @@ import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { addAIResponse, createMoment, getMoments, likeMoment } from "@/lib/moments";
-import { Moment, MomentComment } from "@/types/moments";
-import React, { useEffect, useState } from "react";
-import { Alert, FlatList, Keyboard, Modal, StyleSheet, TouchableWithoutFeedback, View } from "react-native";
+import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
+import * as ImagePicker from "expo-image-picker";
+import React, { useCallback, useEffect, useState } from "react";
+import { Alert, FlatList, Image, Keyboard, Modal, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ActivityIndicator, Button, FAB, Text, TextInput, useTheme } from "react-native-paper";
 
 export default function MomentsView() {
@@ -17,14 +19,11 @@ export default function MomentsView() {
   const [refreshing, setRefreshing] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
+  const [selectedMedia, setSelectedMedia] = useState<MomentMediaInput | null>(null);
   const [posting, setPosting] = useState(false);
   const [currentUserName, setCurrentUserName] = useState("");
 
-  useEffect(() => {
-    loadMoments();
-  }, []);
-
-  const loadMoments = async () => {
+  const loadMoments = useCallback(async () => {
     if (!user) return;
     try {
       setLoading(true);
@@ -60,7 +59,11 @@ export default function MomentsView() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [preferences.role, user]);
+
+  useEffect(() => {
+    loadMoments();
+  }, [loadMoments]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -68,19 +71,21 @@ export default function MomentsView() {
   };
 
   const handleCreatePost = async () => {
-    if (!newPostContent.trim()) return;
+    if (!newPostContent.trim() && !selectedMedia) return;
     setPosting(true);
     try {
       const newMoment = await createMoment(
-        newPostContent,
+        newPostContent.trim(),
         user?.$id || "anon",
         currentUserName || user?.name || "Anonymous",
-        (preferences.role as "elderly" | "caregiver") || "caregiver"
+        (preferences.role as "elderly" | "caregiver") || "caregiver",
+        selectedMedia
       );
       setMoments([newMoment, ...moments]);
       setNewPostContent("");
+      setSelectedMedia(null);
       setCreateModalVisible(false);
-    } catch (error) {
+    } catch {
         Alert.alert("Error", "Failed to post moment");
     } finally {
       setPosting(false);
@@ -99,6 +104,43 @@ export default function MomentsView() {
   const handleAIRequest = async (momentId: string, content: string): Promise<MomentComment> => {
      // This will return the AI comment to be displayed in the card
      return await addAIResponse(momentId, content);
+  };
+
+  const closeCreateModal = () => {
+    setCreateModalVisible(false);
+    setNewPostContent("");
+    setSelectedMedia(null);
+  };
+
+  const pickMedia = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow photo library access to upload media.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: false,
+      quality: 0.9,
+      videoMaxDuration: 60,
+      selectionLimit: 1,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    const mediaType = asset.type === "video" ? "video" : "image";
+    setSelectedMedia({
+      uri: asset.uri,
+      type: mediaType,
+      mimeType: asset.mimeType,
+      fileName: asset.fileName ?? undefined,
+      fileSize: asset.fileSize,
+      width: asset.width,
+      height: asset.height,
+      durationMs: asset.duration ?? undefined,
+    });
   };
 
   return (
@@ -142,9 +184,9 @@ export default function MomentsView() {
         visible={createModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setCreateModalVisible(false)}
+        onRequestClose={closeCreateModal}
       >
-        <TouchableWithoutFeedback onPress={() => setCreateModalVisible(false)}>
+        <TouchableWithoutFeedback onPress={closeCreateModal}>
             <View style={styles.modalOverlay}>
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
@@ -158,9 +200,39 @@ export default function MomentsView() {
                             onChangeText={setNewPostContent}
                             style={{ marginBottom: 16 }}
                         />
+                        <View style={styles.mediaRow}>
+                          <Button mode="outlined" icon="image-multiple" onPress={pickMedia}>
+                            Add photo/video
+                          </Button>
+                          {selectedMedia && (
+                            <Button onPress={() => setSelectedMedia(null)} textColor={theme.colors.error}>
+                              Remove
+                            </Button>
+                          )}
+                        </View>
+
+                        {selectedMedia && (
+                          <View style={styles.previewWrap}>
+                            {selectedMedia.type === "image" ? (
+                              <Image source={{ uri: selectedMedia.uri }} style={styles.previewImage} />
+                            ) : (
+                              <TouchableOpacity
+                                style={[styles.videoPlaceholder, { borderColor: theme.colors.outline }]}
+                                onPress={() => Alert.alert("Video selected", "Video will be uploaded with this post.")}
+                                activeOpacity={0.8}
+                              >
+                                <MaterialCommunityIcons name="video" size={28} color={theme.colors.primary} />
+                                <Text variant="bodyMedium" style={{ marginTop: 6 }}>
+                                  {selectedMedia.fileName || "Selected video"}
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )}
+
                         <View style={styles.modalActions}>
-                            <Button onPress={() => setCreateModalVisible(false)} style={{ marginRight: 8 }}>Cancel</Button>
-                            <Button mode="contained" onPress={handleCreatePost} loading={posting} disabled={posting || !newPostContent.trim()}>
+                            <Button onPress={closeCreateModal} style={{ marginRight: 8 }}>Cancel</Button>
+                            <Button mode="contained" onPress={handleCreatePost} loading={posting} disabled={posting || (!newPostContent.trim() && !selectedMedia)}>
                                 Post
                             </Button>
                         </View>
@@ -200,5 +272,27 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
+  },
+  mediaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  previewWrap: {
+    marginBottom: 14,
+  },
+  previewImage: {
+    width: "100%",
+    height: 220,
+    borderRadius: 10,
+  },
+  videoPlaceholder: {
+    borderWidth: 1,
+    borderRadius: 10,
+    minHeight: 120,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
   },
 });

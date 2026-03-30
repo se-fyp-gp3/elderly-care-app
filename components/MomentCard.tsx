@@ -2,7 +2,7 @@ import { formatRelativeTime } from "@/lib/contacts";
 import { Moment, MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
 
 interface MomentCardProps {
@@ -59,6 +59,19 @@ export default function MomentCard({ moment, currentUserId, onLike, onAIRequest 
       <Text variant="bodyLarge" style={styles.content}>
         {moment.content}
       </Text>
+
+      {moment.media_url && moment.media_type === "image" && (
+        <Image source={{ uri: moment.media_url }} style={styles.mediaImage} resizeMode="cover" />
+      )}
+
+      {moment.media_type === "video" && (
+        <View style={[styles.videoBox, { borderColor: theme.colors.outline }]}>
+          <MaterialCommunityIcons name="video" size={24} color={theme.colors.primary} />
+          <Text variant="bodyMedium" style={{ marginTop: 6 }}>
+            Video post
+          </Text>
+        </View>
+      )}
 
       {/* AI Response Section */}
       {loadingAI && (
@@ -160,5 +173,19 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     marginTop: 8,
+  },
+  mediaImage: {
+    width: "100%",
+    height: 240,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  videoBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    minHeight: 120,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
   },
 });

@@ -2,112 +2,131 @@ import { generateAIResponse } from "@/lib/ai";
 import {
     clientReactNative,
     DATABASE_ID,
+    MOMENTS_MEDIA_BUCKET_ID,
     MOMENTS_COMMENTS_TABLE_ID,
     MOMENTS_TABLE_ID,
+    storage,
 } from "@/lib/appwrite";
-import { Moment, MomentComment } from "@/types/moments";
+import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
+import * as FileSystem from "expo-file-system";
 import { Databases, ID, Query } from "react-native-appwrite";
 
 const databases = new Databases(clientReactNative);
 
 export async function getMoments(page = 1, allowedAuthorIds?: string[]): Promise<Moment[]> {
-  try {
-    const queries = [
-      Query.orderDesc("$createdAt"),
-      Query.limit(20),
-      Query.offset((page - 1) * 20),
-    ];
+  const queries = [
+    Query.orderDesc("$createdAt"),
+    Query.limit(20),
+    Query.offset((page - 1) * 20),
+  ];
 
-    if (allowedAuthorIds && allowedAuthorIds.length > 0) {
-      queries.push(Query.equal("author_id", allowedAuthorIds));
-    }
-
-    const response = await databases.listDocuments(
-      DATABASE_ID,
-      MOMENTS_TABLE_ID,
-      queries
-    );
-    return response.documents as unknown as Moment[];
-  } catch (error: any) {
-    console.warn("Failed to fetch moments, using mock data:", error);
-    // Return mock data for demo purposes if collection doesn't exist
-    return [
-      {
-        $id: "mock1",
-        $createdAt: new Date().toISOString(),
-        content: "Just finished a great walk in the park! Feeling refreshed.",
-        author_id: "user1",
-        author_name: "John Doe",
-        author_role: "caregiver",
-        likes: ["user2"],
-        comments_count: 1,
-        $collectionId: MOMENTS_TABLE_ID,
-        $databaseId: DATABASE_ID,
-        $permissions: [],
-        $updatedAt: new Date().toISOString(),
-        $sequence: 0,
-      },
-      {
-        $id: "mock2",
-        $createdAt: new Date(Date.now() - 3600000).toISOString(),
-        content: "Any tips for managing medication schedules efficiently?",
-        author_id: "user2",
-        author_name: "Jane Smith",
-        author_role: "elderly",
-        likes: [],
-        comments_count: 0,
-        $collectionId: MOMENTS_TABLE_ID,
-        $databaseId: DATABASE_ID,
-        $permissions: [],
-        $updatedAt: new Date(Date.now() - 3600000).toISOString(),
-        $sequence: 0,
-      },
-    ];
+  if (allowedAuthorIds && allowedAuthorIds.length > 0) {
+    queries.push(Query.equal("author_id", allowedAuthorIds));
   }
+
+  const response = await databases.listDocuments(
+    DATABASE_ID,
+    MOMENTS_TABLE_ID,
+    queries
+  );
+
+  const documents = response.documents as unknown as Moment[];
+  return documents.map((doc) => {
+    if (doc.media_bucket_id && doc.media_file_id) {
+      return {
+        ...doc,
+        media_url: storage
+          .getFileView(doc.media_bucket_id, doc.media_file_id)
+          .toString(),
+      };
+    }
+    return doc;
+  });
 }
 
 export async function createMoment(
   content: string,
   userId: string,
   userName: string,
-  userRole: "elderly" | "caregiver"
+  userRole: "elderly" | "caregiver",
+  media?: MomentMediaInput | null
 ): Promise<Moment> {
-  try {
-    const response = await databases.createDocument(
-      DATABASE_ID,
-      MOMENTS_TABLE_ID,
-      ID.unique(),
-      {
-        content,
-        author_id: userId,
-        author_name: userName,
-        author_role: userRole,
-        likes: [],
-        comments_count: 0,
-        ai_generated: false,
-        // created_at: new Date().toISOString(), // Custom attribute if needed
-      }
-    );
-    return response as unknown as Moment;
-  } catch (error) {
-    console.error("Error creating moment:", error);
-    // Return a mock moment so UI updates optimistically
-    return {
-      $id: ID.unique(),
-      $createdAt: new Date().toISOString(),
+  let mediaFields: Partial<Moment> = {};
+  if (media) {
+    mediaFields = await uploadMomentMedia(media);
+  }
+
+  const response = await databases.createDocument(
+    DATABASE_ID,
+    MOMENTS_TABLE_ID,
+    ID.unique(),
+    {
       content,
       author_id: userId,
       author_name: userName,
       author_role: userRole,
       likes: [],
       comments_count: 0,
-      $collectionId: MOMENTS_TABLE_ID,
-      $databaseId: DATABASE_ID,
-      $permissions: [],
-      $updatedAt: new Date().toISOString(),
-      $sequence: 0,
-    } as unknown as Moment;
+      ai_generated: false,
+      ...mediaFields,
+    }
+  );
+
+  const created = response as unknown as Moment;
+  if (created.media_bucket_id && created.media_file_id) {
+    created.media_url = storage
+      .getFileView(created.media_bucket_id, created.media_file_id)
+      .toString();
   }
+  return created;
+}
+
+async function uploadMomentMedia(media: MomentMediaInput): Promise<Partial<Moment>> {
+  const fileInfo = await FileSystem.getInfoAsync(media.uri);
+  if (!fileInfo.exists) {
+    throw new Error("Selected media file does not exist");
+  }
+
+  const guessedExtension = getFileExtension(media.fileName, media.mimeType, media.type);
+  const cleanFileName = media.fileName?.trim() || `${media.type}_${Date.now()}.${guessedExtension}`;
+  const mimeType = media.mimeType || (media.type === "video" ? "video/mp4" : "image/jpeg");
+
+  const uploadedFile = await storage.createFile({
+    bucketId: MOMENTS_MEDIA_BUCKET_ID,
+    fileId: ID.unique(),
+    file: {
+      name: cleanFileName,
+      type: mimeType,
+      size: media.fileSize ?? fileInfo.size ?? 0,
+      uri: media.uri,
+    },
+  });
+
+  const baseFields: Partial<Moment> = {
+    media_type: media.type,
+    media_bucket_id: MOMENTS_MEDIA_BUCKET_ID,
+    media_file_id: uploadedFile.$id,
+    media_mime_type: mimeType,
+    media_width: media.width,
+    media_height: media.height,
+    media_duration_ms: media.durationMs,
+  };
+
+  return baseFields;
+}
+
+function getFileExtension(
+  fileName?: string,
+  mimeType?: string,
+  mediaType?: "image" | "video"
+): string {
+  if (fileName && fileName.includes(".")) {
+    return fileName.split(".").pop() || "bin";
+  }
+  if (mimeType?.includes("/")) {
+    return mimeType.split("/")[1] || "bin";
+  }
+  return mediaType === "video" ? "mp4" : "jpg";
 }
 
 export async function likeMoment(momentId: string, userId: string, currentLikes: string[]): Promise<string[]> {

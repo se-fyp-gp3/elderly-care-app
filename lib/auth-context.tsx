@@ -179,9 +179,7 @@ export default function AuthProvider({
       await account.createEmailPasswordSession({ email, password });
       user = await account.get();
       // New login — overwrite stored elderly_user_id
-      if (Platform.OS !== "web") {
-        await SecureStore.deleteItemAsync("elderly_user_id");
-      }
+      await SecureStore.deleteItemAsync("elderly_user_id");
     }
     setUser(user);
     setNeedsReAuth(false);
