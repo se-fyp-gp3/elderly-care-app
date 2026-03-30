@@ -30,7 +30,6 @@ import {
 import {
   ActivityIndicator,
   Avatar,
-  Badge,
   Searchbar,
   Text,
   useTheme
