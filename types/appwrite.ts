@@ -200,3 +200,10 @@ export type ElderlyConnections = Models.Row & {
     status: string;
     created_at: string | null;
 }
+
+export type CaregiverConnection = Models.Row & {
+    caregiver_id_1: string;
+    caregiver_id_2: string;
+    status: string;
+    created_at: string | null;
+}
