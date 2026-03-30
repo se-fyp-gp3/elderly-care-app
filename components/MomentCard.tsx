@@ -1,8 +1,9 @@
 import { formatRelativeTime } from "@/lib/contacts";
 import { Moment, MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { Alert, Image, Linking, StyleSheet, TouchableOpacity, View } from "react-native";
+import { useVideoPlayer, VideoPlayer, VideoView } from "expo-video";
+import React, { useEffect, useState } from "react";
+import { Modal, Pressable, StyleSheet, TouchableOpacity, View, Image } from "react-native";
 import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
 
 interface MomentCardProps {
@@ -12,12 +13,43 @@ interface MomentCardProps {
   onAIRequest: (id: string, content: string) => Promise<MomentComment>;
 }
 
+function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boolean; onClose: () => void }) {
+  const player = useVideoPlayer(uri, (p: VideoPlayer) => {
+    p.loop = false;
+  });
+
+  useEffect(() => {
+    if (visible) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [visible, player]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.videoModalOverlay}>
+        <VideoView
+          player={player}
+          style={styles.videoPlayer}
+          allowsFullscreen
+          allowsPictureInPicture
+        />
+        <Pressable style={styles.videoCloseBtn} onPress={onClose}>
+          <MaterialCommunityIcons name="close-circle" size={36} color="#fff" />
+        </Pressable>
+      </View>
+    </Modal>
+  );
+}
+
 export default function MomentCard({ moment, currentUserId, onLike, onAIRequest }: MomentCardProps) {
   const theme = useTheme();
   const [liked, setLiked] = useState(moment.likes?.includes(currentUserId) || false);
   const [likesCount, setLikesCount] = useState(moment.likes?.length || 0);
   const [loadingAI, setLoadingAI] = useState(false);
   const [aiComment, setAIComment] = useState<MomentComment | null>(null);
+  const [videoVisible, setVideoVisible] = useState(false);
 
   const handleLike = () => {
     const newLiked = !liked;
@@ -39,21 +71,21 @@ export default function MomentCard({ moment, currentUserId, onLike, onAIRequest 
     }
   };
 
-  const handleOpenVideo = async () => {
-    if (!moment.media_url) {
-      Alert.alert("Unavailable", "Video URL is not available.");
-      return;
+  const handleOpenVideo = () => {
+    if (moment.media_url) {
+      setVideoVisible(true);
     }
-    const canOpen = await Linking.canOpenURL(moment.media_url);
-    if (!canOpen) {
-      Alert.alert("Cannot open video", "This device cannot open the video URL.");
-      return;
-    }
-    await Linking.openURL(moment.media_url);
   };
 
   return (
     <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+      {moment.media_url && moment.media_type === "video" && (
+        <VideoPlayerModal
+          uri={moment.media_url}
+          visible={videoVisible}
+          onClose={() => setVideoVisible(false)}
+        />
+      )}
       <View style={styles.header}>
         <Avatar.Text 
             size={40} 
@@ -200,5 +232,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
+  },
+  videoModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoPlayer: {
+    width: "100%",
+    height: 280,
+  },
+  videoCloseBtn: {
+    position: "absolute",
+    top: 48,
+    right: 16,
   },
 });
