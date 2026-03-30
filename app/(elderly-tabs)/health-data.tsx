@@ -117,7 +117,7 @@ export default function ElderlyHealthData() {
 
       {/* Step Tracking */}
       <Text variant="titleMedium" style={styles.sectionTitle}>
-        Today's Steps
+        Today&apos;s Steps
       </Text>
 
       <Card
