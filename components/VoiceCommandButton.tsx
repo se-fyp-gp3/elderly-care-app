@@ -11,8 +11,8 @@ import {
 import {
     readAudioAsBase64,
     recognizeVoiceCommand,
-    type VoiceLanguage,
     VOICE_LANGUAGE_LABELS,
+    type VoiceLanguage,
 } from "@/lib/voice-recognition";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
