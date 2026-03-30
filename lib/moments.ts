@@ -9,7 +9,7 @@ import {
 } from "@/lib/appwrite";
 import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
 import * as FileSystem from "expo-file-system";
-import { Databases, ID, Query } from "react-native-appwrite";
+import { Databases, ID, Permission, Query, Role } from "react-native-appwrite";
 
 const databases = new Databases(clientReactNative);
 
@@ -94,6 +94,7 @@ async function uploadMomentMedia(media: MomentMediaInput): Promise<Partial<Momen
         size: fileSize,
         uri: media.uri,
       },
+      permissions: [Permission.read(Role.users())],
     });
   } catch (error: any) {
     const reason = extractErrorMessage(error);
@@ -142,7 +143,7 @@ function extractErrorMessage(error: unknown): string {
 
 function buildMediaUrl(bucketId: string, fileId: string): string | undefined {
   try {
-    return storage.getFileDownloadURL(bucketId, fileId).toString();
+    return storage.getFileViewURL(bucketId, fileId).toString();
   } catch (error) {
     console.warn("Failed to build moment media URL:", error);
     return undefined;

@@ -32,7 +32,7 @@ function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boo
         <VideoView
           player={player}
           style={styles.videoPlayer}
-          allowsFullscreen
+          fullscreenOptions={{ enable: true }}
           allowsPictureInPicture
         />
         <Pressable style={styles.videoCloseBtn} onPress={onClose}>
