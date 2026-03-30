@@ -1,20 +1,20 @@
+import { clientReactNative, DATABASE_ID, DIRECT_MESSAGES_TABLE_ID } from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
+import {
+  registerForPushNotificationsAsync,
+  sendImmediateNotification,
+} from "@/lib/notifications";
+import { DirectMessage } from "@/types/messaging";
 import { Role } from "@/types/user";
+import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { MD3DarkTheme, MD3LightTheme, PaperProvider } from "react-native-paper";
 import { enGB, registerTranslation } from "react-native-paper-dates";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import PinterestSplash from "../components/PinterestSplash";
-import * as Notifications from "expo-notifications";
-import {
-  registerForPushNotificationsAsync,
-  sendImmediateNotification,
-} from "@/lib/notifications";
-import { clientReactNative, DATABASE_ID, DIRECT_MESSAGES_TABLE_ID } from "@/lib/appwrite";
-import { DirectMessage } from "@/types/messaging";
 
 registerTranslation("en", enGB);
 

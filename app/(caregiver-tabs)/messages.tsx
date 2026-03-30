@@ -27,14 +27,14 @@ import {
   Keyboard,
   Linking,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View,
   useWindowDimensions,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
+  View,
 } from "react-native";
 import {
   ActivityIndicator,
