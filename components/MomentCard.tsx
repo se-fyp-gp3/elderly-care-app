@@ -2,7 +2,7 @@ import { formatRelativeTime } from "@/lib/contacts";
 import { Moment, MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
-import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Image, Linking, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
 
 interface MomentCardProps {
@@ -39,6 +39,19 @@ export default function MomentCard({ moment, currentUserId, onLike, onAIRequest 
     }
   };
 
+  const handleOpenVideo = async () => {
+    if (!moment.media_url) {
+      Alert.alert("Unavailable", "Video URL is not available.");
+      return;
+    }
+    const canOpen = await Linking.canOpenURL(moment.media_url);
+    if (!canOpen) {
+      Alert.alert("Cannot open video", "This device cannot open the video URL.");
+      return;
+    }
+    await Linking.openURL(moment.media_url);
+  };
+
   return (
     <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
       <View style={styles.header}>
@@ -65,12 +78,12 @@ export default function MomentCard({ moment, currentUserId, onLike, onAIRequest 
       )}
 
       {moment.media_type === "video" && (
-        <View style={[styles.videoBox, { borderColor: theme.colors.outline }]}>
+        <TouchableOpacity style={[styles.videoBox, { borderColor: theme.colors.outline }]} onPress={handleOpenVideo}>
           <MaterialCommunityIcons name="video" size={24} color={theme.colors.primary} />
           <Text variant="bodyMedium" style={{ marginTop: 6 }}>
-            Video post
+            Tap to watch video
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
 
       {/* AI Response Section */}

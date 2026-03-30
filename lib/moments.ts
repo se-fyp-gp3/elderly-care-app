@@ -33,17 +33,9 @@ export async function getMoments(page = 1, allowedAuthorIds?: string[]): Promise
   const documents = response.documents as unknown as Moment[];
   return documents.map((doc) => {
     if (doc.media_bucket_id && doc.media_file_id) {
-      let mediaUrl: string | undefined;
-      try {
-        mediaUrl = storage
-          .getFileView(doc.media_bucket_id, doc.media_file_id)
-          .toString();
-      } catch (error) {
-        console.warn("Failed to build moment media URL:", error);
-      }
       return {
         ...doc,
-        media_url: mediaUrl,
+        media_url: buildMediaUrl(doc.media_bucket_id, doc.media_file_id),
       };
     }
     return doc;
@@ -80,13 +72,7 @@ export async function createMoment(
 
   const created = response as unknown as Moment;
   if (created.media_bucket_id && created.media_file_id) {
-    try {
-      created.media_url = storage
-        .getFileView(created.media_bucket_id, created.media_file_id)
-        .toString();
-    } catch (error) {
-      console.warn("Failed to build uploaded media URL:", error);
-    }
+    created.media_url = buildMediaUrl(created.media_bucket_id, created.media_file_id);
   }
   return created;
 }
@@ -152,6 +138,15 @@ function extractErrorMessage(error: unknown): string {
     return String((error as { message?: unknown }).message ?? "Unknown error");
   }
   return "Unknown error";
+}
+
+function buildMediaUrl(bucketId: string, fileId: string): string | undefined {
+  try {
+    return storage.getFileDownloadURL(bucketId, fileId).toString();
+  } catch (error) {
+    console.warn("Failed to build moment media URL:", error);
+    return undefined;
+  }
 }
 
 function getFileExtension(
