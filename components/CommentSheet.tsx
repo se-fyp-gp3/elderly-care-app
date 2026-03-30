@@ -4,17 +4,17 @@ import { MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput as RNTextInput,
-  View,
+    Animated,
+    Dimensions,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    TextInput as RNTextInput,
+    StyleSheet,
+    View,
 } from "react-native";
 import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
 

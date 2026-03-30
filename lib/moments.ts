@@ -2,8 +2,8 @@ import { generateAIResponse } from "@/lib/ai";
 import {
     clientReactNative,
     DATABASE_ID,
-    MOMENTS_MEDIA_BUCKET_ID,
     MOMENTS_COMMENTS_TABLE_ID,
+    MOMENTS_MEDIA_BUCKET_ID,
     MOMENTS_TABLE_ID,
     storage,
 } from "@/lib/appwrite";

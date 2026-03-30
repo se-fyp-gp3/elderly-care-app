@@ -6,10 +6,10 @@ import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { addAIResponse, createMoment, getMoments, likeMoment } from "@/lib/moments";
 import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, Image, Keyboard, Modal, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ActivityIndicator, Button, FAB, Text, TextInput, useTheme } from "react-native-paper";
 
 export default function MomentsView() {
