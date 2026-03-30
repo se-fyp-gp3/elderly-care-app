@@ -33,11 +33,17 @@ export async function getMoments(page = 1, allowedAuthorIds?: string[]): Promise
   const documents = response.documents as unknown as Moment[];
   return documents.map((doc) => {
     if (doc.media_bucket_id && doc.media_file_id) {
+      let mediaUrl: string | undefined;
+      try {
+        mediaUrl = storage
+          .getFileView(doc.media_bucket_id, doc.media_file_id)
+          .toString();
+      } catch (error) {
+        console.warn("Failed to build moment media URL:", error);
+      }
       return {
         ...doc,
-        media_url: storage
-          .getFileView(doc.media_bucket_id, doc.media_file_id)
-          .toString(),
+        media_url: mediaUrl,
       };
     }
     return doc;
@@ -74,33 +80,41 @@ export async function createMoment(
 
   const created = response as unknown as Moment;
   if (created.media_bucket_id && created.media_file_id) {
-    created.media_url = storage
-      .getFileView(created.media_bucket_id, created.media_file_id)
-      .toString();
+    try {
+      created.media_url = storage
+        .getFileView(created.media_bucket_id, created.media_file_id)
+        .toString();
+    } catch (error) {
+      console.warn("Failed to build uploaded media URL:", error);
+    }
   }
   return created;
 }
 
 async function uploadMomentMedia(media: MomentMediaInput): Promise<Partial<Moment>> {
-  const fileInfo = await FileSystem.getInfoAsync(media.uri);
-  if (!fileInfo.exists) {
-    throw new Error("Selected media file does not exist");
-  }
-
   const guessedExtension = getFileExtension(media.fileName, media.mimeType, media.type);
   const cleanFileName = media.fileName?.trim() || `${media.type}_${Date.now()}.${guessedExtension}`;
   const mimeType = media.mimeType || (media.type === "video" ? "video/mp4" : "image/jpeg");
+  const fileSize = await resolveFileSize(media);
 
-  const uploadedFile = await storage.createFile({
-    bucketId: MOMENTS_MEDIA_BUCKET_ID,
-    fileId: ID.unique(),
-    file: {
-      name: cleanFileName,
-      type: mimeType,
-      size: media.fileSize ?? fileInfo.size ?? 0,
-      uri: media.uri,
-    },
-  });
+  let uploadedFile;
+  try {
+    uploadedFile = await storage.createFile({
+      bucketId: MOMENTS_MEDIA_BUCKET_ID,
+      fileId: ID.unique(),
+      file: {
+        name: cleanFileName,
+        type: mimeType,
+        size: fileSize,
+        uri: media.uri,
+      },
+    });
+  } catch (error: any) {
+    const reason = extractErrorMessage(error);
+    throw new Error(
+      `Media upload failed: ${reason}. Please ensure bucket "${MOMENTS_MEDIA_BUCKET_ID}" exists and allows uploads.`
+    );
+  }
 
   const baseFields: Partial<Moment> = {
     media_type: media.type,
@@ -113,6 +127,31 @@ async function uploadMomentMedia(media: MomentMediaInput): Promise<Partial<Momen
   };
 
   return baseFields;
+}
+
+async function resolveFileSize(media: MomentMediaInput): Promise<number> {
+  if (typeof media.fileSize === "number" && media.fileSize > 0) {
+    return media.fileSize;
+  }
+
+  try {
+    const fileInfo = await FileSystem.getInfoAsync(media.uri);
+    if (fileInfo.exists && typeof fileInfo.size === "number" && fileInfo.size > 0) {
+      return fileInfo.size;
+    }
+  } catch {
+    // Ignore and fall back below.
+  }
+
+  return 1;
+}
+
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return String((error as { message?: unknown }).message ?? "Unknown error");
+  }
+  return "Unknown error";
 }
 
 function getFileExtension(

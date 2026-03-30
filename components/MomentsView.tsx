@@ -85,8 +85,9 @@ export default function MomentsView() {
       setNewPostContent("");
       setSelectedMedia(null);
       setCreateModalVisible(false);
-    } catch {
-        Alert.alert("Error", "Failed to post moment");
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to post moment";
+        Alert.alert("Post failed", message);
     } finally {
       setPosting(false);
     }
@@ -119,8 +120,10 @@ export default function MomentsView() {
       return;
     }
 
+    const mediaTypes = getSupportedPickerMediaTypes();
+
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes,
       allowsEditing: false,
       quality: 0.9,
       videoMaxDuration: 60,
@@ -243,6 +246,16 @@ export default function MomentsView() {
       </Modal>
     </View>
   );
+}
+
+function getSupportedPickerMediaTypes(): ImagePicker.MediaType | ImagePicker.MediaType[] {
+  const modernMediaType = (ImagePicker as unknown as {
+    MediaType?: { images?: ImagePicker.MediaType; videos?: ImagePicker.MediaType };
+  }).MediaType;
+  if (modernMediaType?.images && modernMediaType?.videos) {
+    return [modernMediaType.images, modernMediaType.videos];
+  }
+  return ["images", "videos"] as unknown as ImagePicker.MediaType[];
 }
 
 const styles = StyleSheet.create({
