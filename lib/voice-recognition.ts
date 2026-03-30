@@ -9,7 +9,7 @@ const DASHSCOPE_API_KEY =
 const DASHSCOPE_AUDIO_MODEL =
   process.env.EXPO_PUBLIC_DASHSCOPE_AUDIO_MODEL?.trim() || "qwen2.5-omni-7b";
 
-// Supported language codes
+// Language options for voice commands
 export type VoiceLanguage = "yue" | "zh" | "en";
 
 export const VOICE_LANGUAGE_LABELS: Record<VoiceLanguage, string> = {
@@ -18,37 +18,46 @@ export const VOICE_LANGUAGE_LABELS: Record<VoiceLanguage, string> = {
   en: "English",
 };
 
-// System prompts per language to guide Qwen3.5-audio understanding
+// Per-language system prompts (all understand mixed input, reply in selected language)
 const SYSTEM_PROMPTS: Record<VoiceLanguage, string> = {
-  yue: `你係一個長者護理助手。請用香港粵語回覆。
+  yue: `你係一個長者護理助手，支援中英粵混合口語。用戶可能會用廣東話、普通話、英文、或者混合嚟講嘢。
+請用廣東話回覆。
+
 仔細聽用戶嘅語音，識別佢哋嘅意圖。可能嘅意圖包括：
-1. 記錄食藥 (record_medication) - 例如「我食咗藥」「已經食藥」
-2. 新增藥物 (add_medication) - 例如「加一隻新藥」「我要食新藥」
-3. 打電話畀人 (call_contact) - 例如「打畀阿女」「打電話」
-4. 查詢藥物 (check_medication) - 例如「今日食咩藥」「有咩藥未食」
-5. 一般對話 (general_chat) - 其他所有對話
+1. 記錄食藥 (record_medication) - 例如「我食咗藥」「已經食藥」「medicine taken」「吃了药」
+2. 新增藥物 (add_medication) - 例如「加一隻新藥」「add a new medicine」「我要食新藥」
+3. 打電話畀人 (call_contact) - 例如「打畀阿女」「call my daughter」「打电话给XXX」，params要有name
+4. 查詢藥物 (check_medication) - 例如「今日食咩藥」「what medicine today」「有咩藥未食」
+5. 設定日程 (set_schedule) - 例如「下晝三點覆診」「明天要去做物理治療」「set appointment at 3pm」，params要有title, datetime(ISO格式), description
+6. 一般對話 (general_chat) - 其他所有對話
 
-請以JSON格式回覆：{"intent":"意圖名稱","params":{},"reply":"用粵語嘅回覆"}`,
+請以JSON格式回覆：{"intent":"意圖名稱","params":{},"reply":"回覆內容"}`,
 
-  zh: `你是一个长者护理助手。请用普通话回复。
+  zh: `你是一个长者护理助手，支持中英粤混合口语。用户可能会用粤语、普通话、英文、或者混合来说话。
+请用普通话回复。
+
 仔细听用户的语音，识别他们的意图。可能的意图包括：
-1. 记录服药 (record_medication) - 如"我吃了药""已经吃药了"
-2. 新增药物 (add_medication) - 如"加一种新药""我要吃新药"
-3. 打电话给人 (call_contact) - 如"打给女儿""打电话"
-4. 查询药物 (check_medication) - 如"今天吃什么药""有什么药没吃"
-5. 一般对话 (general_chat) - 其他所有对话
+1. 记录吃药 (record_medication) - 例如"我吃了药""已经吃药""medicine taken""我食咗藥"
+2. 新增药物 (add_medication) - 例如"加一种新药""add a new medicine""我要食新藥"
+3. 打电话给人 (call_contact) - 例如"打给女儿""call my daughter""打畀阿女"，params要有name
+4. 查询药物 (check_medication) - 例如"今天吃什么药""what medicine today""有咩藥未食"
+5. 设定日程 (set_schedule) - 例如"下午三点看医生""明天要去做物理治疗""set appointment at 3pm"，params要有title, datetime(ISO格式), description
+6. 一般对话 (general_chat) - 其他所有对话
 
-请以JSON格式回复：{"intent":"意图名称","params":{},"reply":"用普通话的回复"}`,
+请以JSON格式回复：{"intent":"意图名称","params":{},"reply":"回复内容"}`,
 
-  en: `You are an elderly care assistant. Reply in English.
-Listen carefully to the user's voice and identify their intent. Possible intents:
-1. Record medication taken (record_medication) - e.g. "I took my medicine", "medicine taken"
-2. Add new medication (add_medication) - e.g. "add a new medicine", "new prescription"
-3. Call a contact (call_contact) - e.g. "call my daughter", "make a phone call"
-4. Check medication schedule (check_medication) - e.g. "what medicine today", "any pills left"
-5. General conversation (general_chat) - everything else
+  en: `You are an elderly care assistant that understands Cantonese, Mandarin, and English (including mixed speech).
+Please reply in English.
 
-Reply in JSON: {"intent":"intent_name","params":{},"reply":"English reply"}`,
+Listen carefully to the user's voice and identify their intent. Possible intents include:
+1. Record medication taken (record_medication) - e.g. "I took my medicine", "已經食藥", "吃了药"
+2. Add new medication (add_medication) - e.g. "Add a new medicine", "加一隻新藥"
+3. Call a contact (call_contact) - e.g. "Call my daughter", "打畀阿女", params should include name
+4. Check medication (check_medication) - e.g. "What medicine today", "今日食咩藥"
+5. Set schedule (set_schedule) - e.g. "Doctor at 3pm", "明天要去做物理治療", params should include title, datetime (ISO format), description
+6. General chat (general_chat) - All other conversations
+
+Reply in JSON format: {"intent":"intent_name","params":{},"reply":"reply content"}`,
 };
 
 export interface VoiceRecognitionResult {
@@ -80,10 +89,10 @@ export async function recognizeVoiceCommand(
 ): Promise<VoiceRecognitionResult> {
   assertConfigured();
 
+  const systemPrompt = SYSTEM_PROMPTS[language];
+
   // Build the audio data URI
   const audioDataUri = `data:${mimeType};base64,${audioBase64}`;
-
-  const systemPrompt = SYSTEM_PROMPTS[language];
 
   // Use DashScope multimodal API (compatible mode) for Qwen audio model
   const apiUrl = `${process.env.EXPO_PUBLIC_DASHSCOPE_API_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1"}/chat/completions`;
@@ -111,12 +120,7 @@ export async function recognizeVoiceCommand(
           },
           {
             type: "text",
-            text:
-              language === "yue"
-                ? "請聽我講嘅嘢，識別意圖，用JSON回覆"
-                : language === "zh"
-                  ? "请听我说的话，识别意图，用JSON回复"
-                  : "Listen to what I said, identify intent, reply in JSON",
+            text: "請聽我講嘅嘢，識別意圖，用JSON回覆",
           },
         ],
       },
@@ -124,7 +128,7 @@ export async function recognizeVoiceCommand(
     max_tokens: 500,
     temperature: 0.3,
     modalities: ["text"],
-    audio: { voice: "Cherry", format: "wav" },
+    audio: { voice: "Chelsie", format: "wav" },
   };
 
   const response = await fetch(apiUrl, {
@@ -160,7 +164,7 @@ export async function recognizeVoiceCommand(
       .join("");
   }
 
-  return parseRecognitionResponse(textContent, language);
+  return parseRecognitionResponse(textContent);
 }
 
 /**
@@ -169,7 +173,6 @@ export async function recognizeVoiceCommand(
  */
 function parseRecognitionResponse(
   rawText: string,
-  language: VoiceLanguage,
 ): VoiceRecognitionResult {
   // Try to extract JSON from the response
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -189,17 +192,11 @@ function parseRecognitionResponse(
   }
 
   // Fallback: treat entire response as general chat
-  const fallbackReplies: Record<VoiceLanguage, string> = {
-    yue: "唔好意思，我聽唔太清楚。可以再講一次嗎？",
-    zh: "不好意思，我没听清楚。可以再说一次吗？",
-    en: "Sorry, I didn't catch that clearly. Could you say it again?",
-  };
-
   return {
     transcript: rawText,
     intent: "general_chat",
     params: {},
-    reply: rawText || fallbackReplies[language],
+    reply: rawText || "唔好意思，我聽唔太清楚。可以再講多次嗎？",
     raw: rawText,
   };
 }

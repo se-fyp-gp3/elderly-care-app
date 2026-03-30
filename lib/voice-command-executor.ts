@@ -13,6 +13,7 @@ import {
     logMedicationAction,
 } from "./medication_tracking";
 import { DEFAULT_VOICE, synthesizePersonalVoice } from "./personal-voice";
+import { createScheduleTask } from "./schedule";
 import type { VoiceLanguage, VoiceRecognitionResult } from "./voice-recognition";
 
 // ── Types ──
@@ -26,11 +27,11 @@ export interface CommandResult {
   audioBase64?: string;      // Pre-synthesized audio if available
 }
 
-// ── Language-specific messages ──
+// ── Per-language messages ──
 
 const MESSAGES: Record<VoiceLanguage, Record<string, string>> = {
   yue: {
-    medication_recorded: "好嘅，已經幫你記錄咗食藥。",
+    medication_recorded: "好嘅，已經幫你記錄咗食藥喇。",
     medication_all_taken: "你今日嘅藥已經全部食晒啦！做得好！",
     medication_none_pending: "你而家冇未食嘅藥。",
     medication_error: "記錄食藥嘅時候出咗啲問題，請稍後再試。",
@@ -41,36 +42,45 @@ const MESSAGES: Record<VoiceLanguage, Record<string, string>> = {
     call_not_found: "搵唔到呢個聯絡人。",
     call_no_phone: "呢個聯絡人冇電話號碼。",
     calling: "好嘅，而家幫你打畀",
+    schedule_created: "好嘅，已經幫你設定咗日程。",
+    schedule_error: "設定日程嘅時候出咗啲問題，請稍後再試。",
+    schedule_missing_info: "請講清楚幾時同埋做咩嘢。",
     general_response: "我聽到你講嘅嘢啦。有咩可以幫到你？",
     error: "唔好意思，出咗啲問題。請再試一次。",
   },
   zh: {
-    medication_recorded: "好的，已经帮你记录了服药。",
+    medication_recorded: "好的，已经帮你记录了吃药。",
     medication_all_taken: "你今天的药已经全部吃完了！做得好！",
-    medication_none_pending: "你现在没有没吃的药。",
-    medication_error: "记录服药时出了问题，请稍后再试。",
+    medication_none_pending: "你现在没有未吃的药。",
+    medication_error: "记录吃药的时候出了点问题，请稍后再试。",
     check_no_medication: "你今天没有药要吃。",
-    add_medication_prompt: "好的，请你说出药名和什么时候吃。",
+    add_medication_prompt: "好的，请说出药名和什么时候吃。",
     call_no_contacts: "你现在没有联系人。",
     call_which_contact: "你想打给谁？",
     call_not_found: "找不到这个联系人。",
     call_no_phone: "这个联系人没有电话号码。",
     calling: "好的，现在帮你打给",
-    general_response: "我听到你说的话了。有什么可以帮到你？",
-    error: "不好意思，出了一些问题。请再试一次。",
+    schedule_created: "好的，已经帮你设定了日程。",
+    schedule_error: "设定日程的时候出了点问题，请稍后再试。",
+    schedule_missing_info: "请说清楚什么时候和做什么。",
+    general_response: "我听到你说的了。有什么可以帮到你？",
+    error: "不好意思，出了点问题。请再试一次。",
   },
   en: {
-    medication_recorded: "Got it, I've recorded your medication as taken.",
-    medication_all_taken: "You've taken all your medications for today! Great job!",
-    medication_none_pending: "You have no pending medications right now.",
-    medication_error: "There was a problem recording your medication. Please try again.",
-    check_no_medication: "You have no medications scheduled for today.",
-    add_medication_prompt: "Sure, please tell me the medication name and when to take it.",
+    medication_recorded: "OK, I've recorded that you took your medication.",
+    medication_all_taken: "You've taken all your medication for today! Well done!",
+    medication_none_pending: "You have no pending medication right now.",
+    medication_error: "There was a problem recording your medication. Please try again later.",
+    check_no_medication: "You have no medication to take today.",
+    add_medication_prompt: "OK, please tell me the medicine name and when to take it.",
     call_no_contacts: "You don't have any contacts.",
     call_which_contact: "Who would you like to call?",
     call_not_found: "I couldn't find that contact.",
     call_no_phone: "This contact doesn't have a phone number.",
-    calling: "Okay, calling ",
+    calling: "OK, calling ",
+    schedule_created: "OK, I've set up the schedule for you.",
+    schedule_error: "There was a problem setting the schedule. Please try again later.",
+    schedule_missing_info: "Please tell me when and what you'd like to schedule.",
     general_response: "I heard you. How can I help?",
     error: "Sorry, something went wrong. Please try again.",
   },
@@ -86,23 +96,26 @@ const MESSAGES: Record<VoiceLanguage, Record<string, string>> = {
 export async function executeVoiceCommand(
   result: VoiceRecognitionResult,
   userId: string,
-  language: VoiceLanguage,
+  language: VoiceLanguage = "yue",
 ): Promise<CommandResult> {
-  const msg = MESSAGES[language];
+  const msg = MESSAGES[language] || MESSAGES.yue;
 
   try {
     switch (result.intent) {
       case "record_medication":
-        return await handleRecordMedication(userId, language, msg);
+        return await handleRecordMedication(userId, msg);
 
       case "check_medication":
-        return await handleCheckMedication(userId, language, msg);
+        return await handleCheckMedication(userId, msg);
 
       case "add_medication":
-        return handleAddMedication(language, msg, result.params);
+        return handleAddMedication(msg, result.params);
 
       case "call_contact":
-        return await handleCallContact(userId, language, msg, result.params);
+        return await handleCallContact(userId, msg, result.params);
+
+      case "set_schedule":
+        return await handleSetSchedule(userId, msg, result.params);
 
       case "general_chat":
       default:
@@ -126,7 +139,6 @@ export async function executeVoiceCommand(
 
 async function handleRecordMedication(
   userId: string,
-  language: VoiceLanguage,
   msg: Record<string, string>,
 ): Promise<CommandResult> {
   try {
@@ -176,12 +188,7 @@ async function handleRecordMedication(
           // @ts-ignore
           const medName = medications[0]?.name || "";
 
-          const takenMsg =
-            language === "yue"
-              ? `好嘅，已經幫你記錄咗${medName ? ` ${medName} ` : ""}食藥。`
-              : language === "zh"
-                ? `好的，已经帮你记录了${medName ? ` ${medName} ` : ""}服药。`
-                : `Got it, I've recorded ${medName || "your medication"} as taken.`;
+          const takenMsg = `好嘅，已經幫你記錄咗${medName ? ` ${medName} ` : ""}食藥。`;
 
           return {
             success: true,
@@ -219,7 +226,6 @@ async function handleRecordMedication(
 
 async function handleCheckMedication(
   userId: string,
-  language: VoiceLanguage,
   msg: Record<string, string>,
 ): Promise<CommandResult> {
   const summary = await getFormattedTodayMedicationSummary(userId);
@@ -234,7 +240,6 @@ async function handleCheckMedication(
 // ── Add Medication ──
 
 function handleAddMedication(
-  language: VoiceLanguage,
   msg: Record<string, string>,
   params: Record<string, any>,
 ): CommandResult {
@@ -255,7 +260,6 @@ function handleAddMedication(
 
 async function handleCallContact(
   userId: string,
-  language: VoiceLanguage,
   msg: Record<string, string>,
   params: Record<string, any>,
 ): Promise<CommandResult> {
@@ -274,12 +278,7 @@ async function handleCallContact(
   if (!targetName) {
     // List available contacts
     const names = contacts.map((c) => c.name).join("、");
-    const listMsg =
-      language === "yue"
-        ? `你有呢啲聯絡人：${names}。你想打畀邊個？`
-        : language === "zh"
-          ? `你有这些联系人：${names}。你想打给谁？`
-          : `You have these contacts: ${names}. Who would you like to call?`;
+    const listMsg = `你有呢啲聯絡人：${names}。你想打畀邊個？`;
 
     return {
       success: true,
@@ -320,16 +319,78 @@ async function handleCallContact(
   };
 }
 
+// ── Set Schedule ──
+
+async function handleSetSchedule(
+  userId: string,
+  msg: Record<string, string>,
+  params: Record<string, any>,
+): Promise<CommandResult> {
+  try {
+    const elderly = await getElderlyByUserId(userId);
+    if (!elderly) {
+      return { success: false, message: msg.schedule_error, action: "set_schedule" };
+    }
+
+    const title = params.title || params.event || "";
+    const datetimeStr = params.datetime || params.time || params.date || "";
+    const description = params.description || "";
+
+    if (!title || !datetimeStr) {
+      return {
+        success: true,
+        message: msg.schedule_missing_info,
+        action: "set_schedule",
+        needsConfirmation: true,
+      };
+    }
+
+    // Parse datetime — the AI model returns ISO format or natural language
+    let datetime: Date;
+    const parsed = Date.parse(datetimeStr);
+    if (!isNaN(parsed)) {
+      datetime = new Date(parsed);
+    } else {
+      // Fallback: use today with a default time
+      datetime = new Date();
+      datetime.setHours(datetime.getHours() + 1, 0, 0, 0);
+    }
+
+    await createScheduleTask({
+      title,
+      description,
+      datetime,
+      elderlyId: elderly.$id,
+      typeName: "appointment",
+    });
+
+    return {
+      success: true,
+      message: `${msg.schedule_created} ${title}`,
+      action: "set_schedule",
+    };
+  } catch (error) {
+    console.error("[voice-cmd] Set schedule error:", error);
+    return {
+      success: false,
+      message: msg.schedule_error,
+      action: "set_schedule",
+    };
+  }
+}
+
 /**
  * Synthesize a command result message using CosyVoice-v2 with family voice.
  *
  * @param message - Text to synthesize
  * @param elderlyId - Elderly profile ID (to look up custom voice)
+ * @param language - Language for TTS pronunciation
  * @returns base64 audio string
  */
 export async function synthesizeCommandResponse(
   message: string,
   elderlyId: string,
+  language: VoiceLanguage = "yue",
 ): Promise<string | null> {
   try {
     // Try to find a custom voice for this elderly
@@ -337,7 +398,7 @@ export async function synthesizeCommandResponse(
     const voiceId =
       customVoices.length > 0 ? customVoices[0].voice_id : DEFAULT_VOICE;
 
-    const result = await synthesizePersonalVoice(message, voiceId);
+    const result = await synthesizePersonalVoice(message, voiceId, undefined, language);
     return result.audioBase64 || null;
   } catch (error) {
     console.error("[voice-cmd] TTS synthesis error:", error);

@@ -298,6 +298,7 @@ export async function synthesizePersonalVoice(
   text: string,
   voice: string,
   model: string = TTS_MODEL,
+  language?: string,
 ): Promise<{ audioBase64?: string; audioUrl?: string }> {
   assertDashScopeConfigured();
 
@@ -306,11 +307,11 @@ export async function synthesizePersonalVoice(
   // ── Reference-based (zero-shot) cloning via Appwrite function ──
   if (resolvedVoice.startsWith("ref:")) {
     const storageFileId = resolvedVoice.slice(4);
-    return synthesizeWithReference(text, storageFileId, model);
+    return synthesizeWithReference(text, storageFileId, model, language);
   }
 
   // ── Direct synthesis with preset or registered voice ──
-  return synthesizeDirect(text, resolvedVoice, model);
+  return synthesizeDirect(text, resolvedVoice, model, language);
 }
 
 // ── Direct TTS (preset or DashScope-registered voice) via Appwrite function ──
@@ -318,19 +319,23 @@ async function synthesizeDirect(
   text: string,
   voice: string,
   model: string,
+  language?: string,
 ): Promise<{ audioBase64?: string; audioUrl?: string }> {
   // Route through Appwrite function which uses WebSocket to call CosyVoice
+  const requestBody: Record<string, any> = {
+    mode: "synthesize",
+    text,
+    model: model || TTS_MODEL,
+    voice: voice || DEFAULT_VOICE,
+    format: "mp3",
+    sampleRate: 22050,
+    rate: 0.9, // slightly slower for elderly users
+  };
+  if (language) requestBody.language = language;
+
   const fnResult = await functions.createExecution({
     functionId: VOICE_CLONE_FUNCTION_ID,
-    body: JSON.stringify({
-      mode: "synthesize",
-      text,
-      model: model || TTS_MODEL,
-      voice: voice || DEFAULT_VOICE,
-      format: "mp3",
-      sampleRate: 22050,
-      rate: 0.9, // slightly slower for elderly users
-    }),
+    body: JSON.stringify(requestBody),
     method: ExecutionMethod.POST,
   });
 
@@ -359,9 +364,10 @@ async function synthesizeWithReference(
   text: string,
   storageFileId: string,
   model: string,
+  language?: string,
 ): Promise<{ audioBase64?: string; audioUrl?: string }> {
   console.warn("[voice] Reference-based TTS not supported via WebSocket, using default voice");
-  return synthesizeDirect(text, DEFAULT_VOICE, model);
+  return synthesizeDirect(text, DEFAULT_VOICE, model, language);
 }
 
 // ── Utility ──

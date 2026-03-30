@@ -11,8 +11,8 @@ import {
 import {
     readAudioAsBase64,
     recognizeVoiceCommand,
-    VOICE_LANGUAGE_LABELS,
     type VoiceLanguage,
+    VOICE_LANGUAGE_LABELS,
 } from "@/lib/voice-recognition";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
@@ -48,28 +48,12 @@ type VoiceState =
   | "speaking"
   | "error";
 
-const STATE_LABELS: Record<VoiceLanguage, Record<VoiceState, string>> = {
-  yue: {
-    idle: "撳住講嘢",
-    recording: "聽緊...",
-    processing: "諗緊...",
-    speaking: "講緊...",
-    error: "出錯咗",
-  },
-  zh: {
-    idle: "按住说话",
-    recording: "正在听...",
-    processing: "正在想...",
-    speaking: "正在说...",
-    error: "出错了",
-  },
-  en: {
-    idle: "Hold to speak",
-    recording: "Listening...",
-    processing: "Thinking...",
-    speaking: "Speaking...",
-    error: "Error",
-  },
+const STATE_LABELS: Record<VoiceState, string> = {
+  idle: "撳住講嘢",
+  recording: "聽緊...",
+  processing: "諗緊...",
+  speaking: "講緊...",
+  error: "出錯咗",
 };
 
 export default function VoiceCommandButton() {
@@ -129,13 +113,7 @@ export default function VoiceCommandButton() {
 
       const { granted } = await requestRecordingPermissionsAsync();
       if (!granted) {
-        setErrorMessage(
-          language === "yue"
-            ? "需要錄音權限"
-            : language === "zh"
-              ? "需要录音权限"
-              : "Microphone permission required",
-        );
+        setErrorMessage("需要錄音權限");
         return;
       }
 
@@ -154,7 +132,7 @@ export default function VoiceCommandButton() {
       setVoiceState("error");
       setErrorMessage(String(err));
     }
-  }, [recorder, language]);
+  }, [recorder]);
 
   // Stop recording and process
   const stopRecording = useCallback(async () => {
@@ -214,16 +192,10 @@ export default function VoiceCommandButton() {
     } catch (err) {
       console.error("[voice-btn] Processing error:", err);
       setVoiceState("error");
-      setErrorMessage(
-        language === "yue"
-          ? "處理失敗，請再試一次"
-          : language === "zh"
-            ? "处理失败，请再试一次"
-            : "Processing failed, please try again",
-      );
+      setErrorMessage("處理失敗，請再試一次");
       setTimeout(() => setVoiceState("idle"), 3000);
     }
-  }, [voiceState, recorder, language, user, elderlyProfileId, router]);
+  }, [voiceState, recorder, user, elderlyProfileId, router]);
 
   // Play TTS response using CosyVoice-v2
   const playTTSResponse = useCallback(
@@ -234,6 +206,7 @@ export default function VoiceCommandButton() {
         const audioBase64 = await synthesizeCommandResponse(
           message,
           elderlyProfileId,
+          language,
         );
 
         if (audioBase64) {
@@ -274,7 +247,7 @@ export default function VoiceCommandButton() {
         console.warn("[voice-btn] TTS playback error:", err);
       }
     },
-    [elderlyProfileId],
+    [elderlyProfileId, language],
   );
 
   // Close modal
@@ -292,7 +265,7 @@ export default function VoiceCommandButton() {
     setErrorMessage("");
   }, [voiceState, recorder]);
 
-  const stateLabel = STATE_LABELS[language][voiceState];
+  const stateLabel = STATE_LABELS[voiceState];
 
   return (
     <>
@@ -327,28 +300,26 @@ export default function VoiceCommandButton() {
               { backgroundColor: theme.colors.surface },
             ]}
           >
+            {/* Title */}
+            <Text variant="titleLarge" style={{ textAlign: "center", marginBottom: 16, color: theme.colors.onSurface }}>
+              🎙️ 語音助手（中英粵）
+            </Text>
+
             {/* Language selector */}
             <View style={styles.languageRow}>
-              {(["yue", "zh", "en"] as VoiceLanguage[]).map((lang) => (
-                <Chip
-                  key={lang}
-                  selected={language === lang}
-                  onPress={() => setLanguage(lang)}
-                  style={[
-                    styles.langChip,
-                    language === lang && {
-                      backgroundColor: theme.colors.primaryContainer,
-                    },
-                  ]}
-                  textStyle={
-                    language === lang
-                      ? { color: theme.colors.onPrimaryContainer }
-                      : undefined
-                  }
-                >
-                  {VOICE_LANGUAGE_LABELS[lang]}
-                </Chip>
-              ))}
+              {(Object.keys(VOICE_LANGUAGE_LABELS) as VoiceLanguage[]).map(
+                (lang) => (
+                  <Chip
+                    key={lang}
+                    selected={language === lang}
+                    onPress={() => setLanguage(lang)}
+                    style={styles.langChip}
+                    showSelectedOverlay
+                  >
+                    {VOICE_LANGUAGE_LABELS[lang]}
+                  </Chip>
+                ),
+              )}
             </View>
 
             {/* Status indicator */}
@@ -477,11 +448,7 @@ export default function VoiceCommandButton() {
                   ]}
                   labelStyle={{ fontSize: 18 }}
                 >
-                  {language === "yue"
-                    ? "停止"
-                    : language === "zh"
-                      ? "停止"
-                      : "Stop"}
+                  停止
                 </Button>
               ) : voiceState === "idle" ? (
                 <>
@@ -495,11 +462,7 @@ export default function VoiceCommandButton() {
                     ]}
                     labelStyle={{ fontSize: 18 }}
                   >
-                    {language === "yue"
-                      ? "開始講"
-                      : language === "zh"
-                        ? "开始说"
-                        : "Start"}
+                    開始講
                   </Button>
                   <Button
                     mode="outlined"
@@ -507,11 +470,7 @@ export default function VoiceCommandButton() {
                     style={styles.closeButton}
                     labelStyle={{ fontSize: 16 }}
                   >
-                    {language === "yue"
-                      ? "關閉"
-                      : language === "zh"
-                        ? "关闭"
-                        : "Close"}
+                    關閉
                   </Button>
                 </>
               ) : (
@@ -521,11 +480,7 @@ export default function VoiceCommandButton() {
                   style={styles.closeButton}
                   labelStyle={{ fontSize: 16 }}
                 >
-                  {language === "yue"
-                    ? "關閉"
-                    : language === "zh"
-                      ? "关闭"
-                      : "Close"}
+                  關閉
                 </Button>
               )}
             </View>
