@@ -1478,6 +1478,307 @@
           "orders": []
         }
       ]
+    },
+    {
+      "$id": "caregiver_connections",
+      "$permissions": [
+        "create(\"users\")",
+        "read(\"users\")",
+        "update(\"users\")",
+        "delete(\"users\")"
+      ],
+      "databaseId": "elderly-care-app-db",
+      "name": "Caregiver Connections",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "caregiver_id_1",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 36,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "caregiver_id_2",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 36,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 20,
+          "default": "active",
+          "encrypt": false
+        },
+        {
+          "key": "created_at",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 30,
+          "default": null,
+          "encrypt": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ux_pair",
+          "type": "unique",
+          "status": "available",
+          "error": "",
+          "columns": ["caregiver_id_1", "caregiver_id_2"],
+          "lengths": [0, 0],
+          "orders": []
+        },
+        {
+          "key": "idx_caregiver_1",
+          "type": "key",
+          "status": "available",
+          "error": "",
+          "columns": ["caregiver_id_1"],
+          "lengths": [0],
+          "orders": []
+        },
+        {
+          "key": "idx_caregiver_2",
+          "type": "key",
+          "status": "available",
+          "error": "",
+          "columns": ["caregiver_id_2"],
+          "lengths": [0],
+          "orders": []
+        }
+      ]
+    },
+    {
+      "$id": "moments",
+      "$permissions": [
+        "create(\"users\")",
+        "read(\"users\")",
+        "update(\"users\")",
+        "delete(\"users\")"
+      ],
+      "databaseId": "elderly-care-app-db",
+      "name": "Moments",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "content",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 5000,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "author_id",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "author_name",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "author_role",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 20,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "likes",
+          "type": "string",
+          "required": false,
+          "array": true,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "comments_count",
+          "type": "integer",
+          "required": false,
+          "array": false,
+          "min": 0,
+          "max": 1000000,
+          "default": 0
+        },
+        {
+          "key": "ai_generated",
+          "type": "boolean",
+          "required": false,
+          "array": false,
+          "default": false
+        },
+        {
+          "key": "media_type",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": "enum",
+          "elements": ["image", "video"]
+        },
+        {
+          "key": "media_file_id",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "media_bucket_id",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "media_mime_type",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 80,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "media_width",
+          "type": "integer",
+          "required": false,
+          "array": false,
+          "min": 0,
+          "max": 10000,
+          "default": null
+        },
+        {
+          "key": "media_height",
+          "type": "integer",
+          "required": false,
+          "array": false,
+          "min": 0,
+          "max": 10000,
+          "default": null
+        },
+        {
+          "key": "media_duration_ms",
+          "type": "integer",
+          "required": false,
+          "array": false,
+          "min": 0,
+          "max": 7200000,
+          "default": null
+        }
+      ],
+      "indexes": [
+        {
+          "key": "idx_author_id",
+          "type": "key",
+          "status": "available",
+          "error": "",
+          "columns": ["author_id"],
+          "lengths": [0],
+          "orders": []
+        }
+      ]
+    },
+    {
+      "$id": "moments_comments",
+      "$permissions": [
+        "create(\"users\")",
+        "read(\"users\")",
+        "update(\"users\")",
+        "delete(\"users\")"
+      ],
+      "databaseId": "elderly-care-app-db",
+      "name": "Moments Comments",
+      "enabled": true,
+      "rowSecurity": false,
+      "columns": [
+        {
+          "key": "moment_id",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "content",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 5000,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "author_id",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "author_name",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "author_role",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 20,
+          "default": null,
+          "encrypt": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "idx_moment_id",
+          "type": "key",
+          "status": "available",
+          "error": "",
+          "columns": ["moment_id"],
+          "lengths": [0],
+          "orders": []
+        }
+      ]
     }
   ],
   "buckets": [
@@ -1489,6 +1790,18 @@
       "enabled": true,
       "maximumFileSize": 30000000,
       "allowedFileExtensions": ["jpg", "png"],
+      "compression": "none",
+      "encryption": true,
+      "antivirus": true
+    },
+    {
+      "$id": "moments-media",
+      "$permissions": [],
+      "fileSecurity": false,
+      "name": "moments-media",
+      "enabled": true,
+      "maximumFileSize": 52428800,
+      "allowedFileExtensions": ["jpg", "jpeg", "png", "webp", "mp4", "mov", "m4v"],
       "compression": "none",
       "encryption": true,
       "antivirus": true

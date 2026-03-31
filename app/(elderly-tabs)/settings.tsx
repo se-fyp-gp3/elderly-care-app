@@ -1,3 +1,4 @@
+import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 import { useAuth } from "@/lib/auth-context";
 import {
   getElderlyByUserId,
@@ -715,10 +716,55 @@ export default function ElderlySettings() {
                   );
                 })}
               </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 16 }}>
+                Select a layout that works best for you
+              </Text>
+
+              {VERSION_OPTIONS.map((option) => {
+                const isSelected = currentVersion === option.key;
+                return (
+                  <TouchableOpacity
+                    key={option.key}
+                    onPress={() => handleVersionChange(option.key)}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.caregiverRow,
+                      {
+                        backgroundColor: isSelected
+                          ? theme.colors.primaryContainer
+                          : theme.colors.surfaceVariant,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.iconContainer, {
+                      backgroundColor: isSelected ? theme.colors.primary : "#E8F0FE",
+                    }]}>
+                      <MaterialCommunityIcons
+                        name={option.icon as any}
+                        size={26}
+                        color={isSelected ? "#FFFFFF" : theme.colors.onSurfaceVariant}
+                      />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text variant="titleMedium" style={{ fontWeight: "600" }}>
+                        {option.label}
+                      </Text>
+                      <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                        {option.desc}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <MaterialCommunityIcons name="check-circle" size={24} color={theme.colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
     </>
   );
 }

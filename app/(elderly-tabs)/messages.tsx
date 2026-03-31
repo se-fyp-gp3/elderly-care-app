@@ -19,19 +19,23 @@ import {
   Alert,
   FlatList,
   Linking,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import {
   ActivityIndicator,
   Avatar,
-  Badge,
   Searchbar,
   Text,
   useTheme
 } from "react-native-paper";
+
+import MomentsView from "@/components/MomentsView";
 
 export default function ElderlyMessages() {
   const theme = useTheme();
@@ -46,6 +50,10 @@ export default function ElderlyMessages() {
   const [lastMessages, setLastMessages] = useState<
     Record<string, DirectMessage | null>
   >({});
+
+  const { width } = useWindowDimensions();
+  const [activeTab, setActiveTab] = useState(0);
+  const pagerRef = React.useRef<FlatList<number>>(null);
 
   const fetchContacts = useCallback(async () => {
     if (!user) return;
@@ -418,25 +426,22 @@ export default function ElderlyMessages() {
     </View>
   );
 
-  return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
+  const onTabPress = (index: number) => {
+    setActiveTab(index);
+    pagerRef.current?.scrollToIndex({ index, animated: true });
+  };
+
+  const onPagerScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const slide = Math.round(e.nativeEvent.contentOffset.x / width);
+    if (slide !== activeTab) {
+      setActiveTab(slide);
+    }
+  };
+
+  const renderChatPage = () => (
+    <View style={{ width, flex: 1 }}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
-        <View style={styles.headerTop}>
-          <Text
-            variant="headlineSmall"
-            style={[styles.headerTitle, { color: theme.colors.onSurface }]}
-          >
-            Messages
-          </Text>
-          <View style={styles.headerActions}>
-            <Badge size={22} style={{ backgroundColor: theme.colors.primary }}>
-              {contacts.length}
-            </Badge>
-          </View>
-        </View>
         <Searchbar
           placeholder="Search caregivers..."
           onChangeText={setSearchQuery}
@@ -493,6 +498,65 @@ export default function ElderlyMessages() {
           showsVerticalScrollIndicator={false}
         />
       )}
+    </View>
+  );
+
+  const renderMomentsPage = () => (
+    <View style={{ width, flex: 1 }}>
+      <MomentsView />
+    </View>
+  );
+
+  return (
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
+      {/* Top Tab Bar */}
+      <View style={{ flexDirection: 'row', backgroundColor: theme.colors.surface, elevation: 1 }}>
+        {['Chats', 'Moments'].map((tab, index) => {
+          const isActive = activeTab === index;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={{
+                flex: 1,
+                paddingVertical: 14,
+                alignItems: 'center',
+                borderBottomWidth: 2,
+                borderBottomColor: isActive ? theme.colors.primary : 'transparent',
+              }}
+              onPress={() => onTabPress(index)}
+              activeOpacity={0.7}
+            >
+              <Text
+                variant="labelLarge"
+                style={{
+                  color: isActive ? theme.colors.primary : theme.colors.onSurfaceVariant,
+                  fontWeight: isActive ? '700' : '500',
+                }}
+              >
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <FlatList
+        ref={pagerRef}
+        data={[0, 1]}
+        renderItem={({ item }) => item === 0 ? renderChatPage() : renderMomentsPage()}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={onPagerScroll}
+        scrollEventThrottle={16}
+        keyExtractor={(item) => item.toString()}
+        style={{ flex: 1 }}
+        getItemLayout={(data, index) => (
+          { length: width, offset: width * index, index }
+        )}
+      />
     </View>
   );
 }
