@@ -15,6 +15,12 @@ export enum VoiceTone {
   Professional = "professional",
 }
 
+export enum UIVersion {
+  Default = "default",
+  Accessible = "accessible",
+  Simplified = "simplified",
+}
+
 export type UserPreferences = {
   role?: Role;
   fontSize?: FontSize;
@@ -24,5 +30,6 @@ export type UserPreferences = {
   aiVoiceId?: string;
   aiVoiceCaregiverId?: string;
   aiVoiceCaregiverName?: string;
+  uiVersion?: UIVersion;
   [key: string]: any;
 };

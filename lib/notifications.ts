@@ -11,6 +11,19 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// Configure foreground notifications
+export function configureForegroundNotifications() {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
+
 export async function registerForPushNotificationsAsync() {
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
@@ -57,13 +70,17 @@ export async function scheduleMedicationNotification(
   });
 }
 
-export async function sendImmediateNotification(title: string, body: string) {
+export async function sendImmediateNotification(
+  title: string,
+  body: string,
+  data?: Record<string, any>,
+) {
   await Notifications.scheduleNotificationAsync({
     content: {
       title,
       body,
       sound: true,
-      data: { type: "medication_missed" },
+      data: data || { type: "medication_missed" },
     },
     trigger: null, // Immediate
   });
@@ -71,4 +88,15 @@ export async function sendImmediateNotification(title: string, body: string) {
 
 export async function cancelAllNotifications() {
   await Notifications.cancelAllScheduledNotificationsAsync();
+}
+
+/**
+ * Handle incoming background notifications
+ */
+export async function handleBackgroundNotification(
+  notification: Notifications.Notification,
+) {
+  // Process the notification if needed
+  // e.g., update badge count, sync data
+  return Promise.resolve();
 }

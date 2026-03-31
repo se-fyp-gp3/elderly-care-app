@@ -1,45 +1,47 @@
 import {
-  ID,
-  storage,
-  VOICE_MESSAGES_BUCKET_ID,
+    ID,
+    storage,
+    VOICE_MESSAGES_BUCKET_ID,
 } from "@/lib/appwrite";
+import { useAuth } from "@/lib/auth-context";
 import {
-  buildConversationId,
-  fetchConversationMessages,
-  markConversationAsRead,
-  sendDirectMessage,
-  subscribeToConversation,
+    buildConversationId,
+    fetchConversationMessages,
+    markConversationAsRead,
+    sendDirectMessage,
+    subscribeToConversation,
 } from "@/lib/messaging";
 import { DirectMessage } from "@/types/messaging";
+import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
 import {
-  createAudioPlayer,
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  useAudioRecorder,
+    createAudioPlayer,
+    RecordingPresets,
+    requestRecordingPermissionsAsync,
+    setAudioModeAsync,
+    useAudioRecorder,
 } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  IconButton,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    IconButton,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -177,6 +179,19 @@ export default function ConversationScreen({
 }: ConversationScreenProps) {
   const theme = useTheme();
   const router = useRouter();
+  const { preferences } = useAuth();
+  const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
+
+  const handleBack = () => {
+    if (myRole === "caregiver") {
+      router.replace("/(caregiver-tabs)/messages" as any);
+    } else if (uiVersion === UIVersion.Simplified) {
+      router.replace("/(elderly-tabs)/" as any);
+    } else {
+      router.replace("/(elderly-tabs)/emergency" as any);
+    }
+  };
+
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -507,13 +522,22 @@ export default function ConversationScreen({
               >
                 {formatMessageTime(item.created_at)}
               </Text>
-              {isMe && (
+              {isMe ? (
                 <MaterialCommunityIcons
                   name={item.is_read ? "check-all" : "check"}
                   size={14}
                   color={item.is_read ? "#64DD17" : theme.colors.onPrimary}
                   style={{ marginLeft: 4, opacity: 0.8 }}
                 />
+              ) : (
+                item.is_read && (
+                  <MaterialCommunityIcons
+                    name="check-all"
+                    size={14}
+                    color="#4CAF50"
+                    style={{ marginLeft: 4, opacity: 0.8 }}
+                  />
+                )
               )}
             </View>
           </View>
@@ -567,7 +591,7 @@ export default function ConversationScreen({
           <IconButton
             icon="arrow-left"
             size={24}
-            onPress={() => router.push("/emergency")}
+            onPress={handleBack}
             style={styles.backButton}
           />
           <Avatar.Text

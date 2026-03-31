@@ -34,6 +34,8 @@ export { ID };
 export const VOICE_MESSAGES_BUCKET_ID = "voice-messages";
 export const CUSTOM_VOICE_TABLE_ID =
   process.env.EXPO_PUBLIC_CUSTOM_VOICE_TABLE_ID || "custom_voice";
+export const MOMENTS_MEDIA_BUCKET_ID =
+  process.env.EXPO_PUBLIC_MOMENTS_MEDIA_BUCKET_ID || "moments-media";
 
 export const DATABASE_ID = process.env.EXPO_PUBLIC_DB_ID!;
 export const ELDERLY_TABLE_ID = process.env.EXPO_PUBLIC_ELDERLY_TABLE_ID!;
@@ -64,6 +66,11 @@ export const ELDERLY_DAILY_STEPS_TABLE_ID =
   process.env.EXPO_PUBLIC_ELDERLY_DAILY_STEPS_TABLE_ID!;
 export const ELDERLY_CONNECTIONS_TABLE_ID =
   process.env.EXPO_PUBLIC_ELDERLY_CONNECTIONS_TABLE_ID!;
+export const CAREGIVER_CONNECTIONS_TABLE_ID =
+  process.env.EXPO_PUBLIC_CAREGIVER_CONNECTIONS_TABLE_ID || "caregiver_connections";
+
+export const MOMENTS_TABLE_ID = process.env.EXPO_PUBLIC_MOMENTS_TABLE_ID || "moments";
+export const MOMENTS_COMMENTS_TABLE_ID = process.env.EXPO_PUBLIC_MOMENTS_COMMENTS_TABLE_ID || "moments_comments";
 
 export const ROLE_MANAGEMENT_FUNCTION_ID =
   process.env.EXPO_PUBLIC_ROLE_MANAGEMENT_FUNCTION_ID!;

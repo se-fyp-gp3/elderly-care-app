@@ -1,12 +1,12 @@
 import {
-    getRegistrationRequest,
-    markRegistrationScanned,
+  getRegistrationRequest,
+  markRegistrationScanned,
 } from "@/lib/registration";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Button, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,6 +19,15 @@ export default function ScanQRScreen() {
   const [scanned, setScanned] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const processingRef = useRef(false);
+
+  // Reset scan state when screen regains focus
+  useEffect(() => {
+    if (isFocused) {
+      setScanned(false);
+      setError(null);
+      processingRef.current = false;
+    }
+  }, [isFocused]);
 
   const handleGoBack = () => {
     router.navigate("/(caregiver-tabs)/caregiver");
@@ -46,8 +55,25 @@ export default function ScanQRScreen() {
         router.replace(
           `/(caregiver-tabs)/register-elderly?token=${payload.token}` as any,
         );
+      } else if (payload.type === "elderly-connect" && payload.token) {
+        // Handle connection QR from an already-registered elderly
+        const request = await getRegistrationRequest(payload.token);
+        if (!request) {
+          setError(
+            "This connection QR code is no longer valid. Please ask the elderly to generate a new one.",
+          );
+          processingRef.current = false;
+          setScanned(false);
+          return;
+        }
+        await markRegistrationScanned(request.$id);
+        router.replace(
+          `/(caregiver-tabs)/confirm-connect?token=${payload.token}` as any,
+        );
       } else {
-        setError("Invalid QR code. Please scan the elderly registration QR.");
+        setError(
+          "Invalid QR code. Please scan the elderly registration or connection QR code.",
+        );
         processingRef.current = false;
         setScanned(false);
       }
