@@ -1,14 +1,20 @@
-import { Caregiver, CaregiverConnection, CaregiverElderly, Elderly, ElderlyConnections } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
-    CAREGIVER_CONNECTIONS_TABLE_ID,
-    CAREGIVER_ELDERLY_TABLE_ID,
-    CAREGIVER_TABLE_ID,
-    DATABASE_ID,
-    ELDERLY_CONNECTIONS_TABLE_ID,
-    ELDERLY_TABLE_ID,
-    tablesDB
+  CAREGIVER_CONNECTIONS_TABLE_ID,
+  CAREGIVER_ELDERLY_TABLE_ID,
+  CAREGIVER_TABLE_ID,
+  DATABASE_ID,
+  ELDERLY_CONNECTIONS_TABLE_ID,
+  ELDERLY_TABLE_ID,
+  tablesDB,
 } from "./appwrite";
+import {
+  Caregiver,
+  CaregiverConnection,
+  CaregiverElderly,
+  Elderly,
+  ElderlyConnections,
+} from "@/types/appwrite";
 
 export interface Contact {
   id: string;
@@ -19,6 +25,17 @@ export interface Contact {
   avatarLabel: string;
   status?: string | null;
   lastActive?: string;
+}
+
+function isMissingElderlyConnectionsTableError(error: unknown): boolean {
+  const msg =
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message?: unknown }).message ?? "")
+      : String(error ?? "");
+
+  return msg
+    .toLowerCase()
+    .includes("table with the requested id could not be found");
 }
 
 /**
@@ -266,7 +283,11 @@ export function formatRelativeTime(dateString?: string): string {
  */
 export async function searchUserByPhone(
   phone: string,
-): Promise<{ role: "elderly"; data: Elderly } | { role: "caregiver"; data: Caregiver } | null> {
+): Promise<
+  | { role: "elderly"; data: Elderly }
+  | { role: "caregiver"; data: Caregiver }
+  | null
+> {
   const [elderly, caregiver] = await Promise.all([
     searchElderlyByPhone(phone),
     searchCaregiverByPhone(phone),
@@ -336,6 +357,9 @@ export async function elderlyConnectionExists(
     ]);
     return fwd.total > 0 || rev.total > 0;
   } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return false;
+    }
     console.error("Error checking elderly connection:", error);
     return false;
   }
@@ -366,6 +390,9 @@ export async function addElderlyConnection(
     });
     return true;
   } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return false;
+    }
     console.error("Error adding elderly connection:", error);
     return false;
   }
@@ -377,12 +404,19 @@ export async function addElderlyConnection(
 export async function acceptElderlyConnection(
   connectionDocId: string,
 ): Promise<void> {
-  await tablesDB.updateRow({
-    databaseId: DATABASE_ID,
-    tableId: ELDERLY_CONNECTIONS_TABLE_ID,
-    rowId: connectionDocId,
-    data: { status: "active" },
-  });
+  try {
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+      rowId: connectionDocId,
+      data: { status: "active" },
+    });
+  } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -391,12 +425,19 @@ export async function acceptElderlyConnection(
 export async function rejectElderlyConnection(
   connectionDocId: string,
 ): Promise<void> {
-  await tablesDB.updateRow({
-    databaseId: DATABASE_ID,
-    tableId: ELDERLY_CONNECTIONS_TABLE_ID,
-    rowId: connectionDocId,
-    data: { status: "rejected" },
-  });
+  try {
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+      rowId: connectionDocId,
+      data: { status: "rejected" },
+    });
+  } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -436,6 +477,9 @@ export async function getPendingConnectionRequests(
         from: elderlyMap.get(r.elderly_id_1)!,
       }));
   } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return [];
+    }
     console.error("Error fetching pending requests:", error);
     return [];
   }
@@ -497,6 +541,9 @@ export async function getElderlyContacts(
       lastActive: elderly.$updatedAt,
     }));
   } catch (error) {
+    if (isMissingElderlyConnectionsTableError(error)) {
+      return [];
+    }
     console.error("Error fetching elderly contacts:", error);
     return [];
   }
@@ -716,14 +763,14 @@ export async function getCaregiverContacts(
       tableId: CAREGIVER_TABLE_ID,
       queries: [Query.equal("$id", ids), Query.limit(100)],
     });
-    
+
     const caregivers = caregiverResponse.rows;
     const foundIds = new Set(caregivers.map((c) => c.$id));
-    
+
     // 2. Identify missing IDs and try to find them as Elderly
     const missingIds = ids.filter((id) => !foundIds.has(id));
     let elderlyList: Elderly[] = [];
-    
+
     if (missingIds.length > 0) {
       const elderlyResponse = await tablesDB.listRows<Elderly>({
         databaseId: DATABASE_ID,

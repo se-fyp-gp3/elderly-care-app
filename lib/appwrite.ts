@@ -1,15 +1,15 @@
 import { Account, Client } from "appwrite";
 import {
-    Account as AccountReactNative,
-    Client as ClientReactNative,
-    Functions,
-    ID,
-    Storage,
-    TablesDB,
+  Account as AccountReactNative,
+  Client as ClientReactNative,
+  Functions,
+  ID,
+  Storage,
+  TablesDB,
 } from "react-native-appwrite";
 
-const APPWRITE_ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!;
-const APPWRITE_PROJECT_ID = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!;
+export const APPWRITE_ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!;
+export const APPWRITE_PROJECT_ID = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!;
 const APPWRITE_PLATFORM = process.env.EXPO_PUBLIC_APPWRITE_PLATFORM!;
 const APPWRITE_DEV_KEY = process.env.EXPO_PRIVATE_APPWRITE_DEV_KEY!;
 
@@ -32,6 +32,8 @@ export const storage = new Storage(clientReactNative);
 export { ID };
 
 export const VOICE_MESSAGES_BUCKET_ID = "voice-messages";
+export const CUSTOM_VOICE_TABLE_ID =
+  process.env.EXPO_PUBLIC_CUSTOM_VOICE_TABLE_ID || "custom_voice";
 export const MOMENTS_MEDIA_BUCKET_ID =
   process.env.EXPO_PUBLIC_MOMENTS_MEDIA_BUCKET_ID || "moments-media";
 
@@ -72,6 +74,8 @@ export const MOMENTS_COMMENTS_TABLE_ID = process.env.EXPO_PUBLIC_MOMENTS_COMMENT
 
 export const ROLE_MANAGEMENT_FUNCTION_ID =
   process.env.EXPO_PUBLIC_ROLE_MANAGEMENT_FUNCTION_ID!;
+export const VOICE_CLONE_FUNCTION_ID =
+  process.env.EXPO_PUBLIC_VOICE_CLONE_FUNCTION_ID!;
 
 export interface RealtimeResponse {
   events: string[];

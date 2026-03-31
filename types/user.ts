@@ -26,6 +26,10 @@ export type UserPreferences = {
   fontSize?: FontSize;
   voiceTone?: VoiceTone;
   notifications?: boolean;
+  aiVoiceEnabled?: boolean;
+  aiVoiceId?: string;
+  aiVoiceCaregiverId?: string;
+  aiVoiceCaregiverName?: string;
   uiVersion?: UIVersion;
   [key: string]: any;
 };

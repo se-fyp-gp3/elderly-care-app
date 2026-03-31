@@ -1,3 +1,4 @@
+import VoiceCommandButton from "@/components/VoiceCommandButton";
 import SimplifiedHomeView from "@/components/SimplifiedHomeView";
 import { useAuth } from "@/lib/auth-context";
 import { Contact, getContactsForElderly } from "@/lib/contacts";
@@ -311,6 +312,7 @@ export default function ElderlyHome() {
     : null;
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       refreshControl={
@@ -544,6 +546,8 @@ export default function ElderlyHome() {
 
       <View style={styles.bottomSpacer} />
     </ScrollView>
+    <VoiceCommandButton />
+    </View>
   );
 }
 
