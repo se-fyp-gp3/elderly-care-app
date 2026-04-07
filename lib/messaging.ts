@@ -1,9 +1,9 @@
 import { DirectMessage } from "@/types/messaging";
 import { ID, Query } from "react-native-appwrite";
 import {
-    clientReactNative,
     DATABASE_ID,
     DIRECT_MESSAGES_TABLE_ID,
+    safeSubscribe,
     tablesDB,
 } from "./appwrite";
 
@@ -166,7 +166,7 @@ export function subscribeToConversation(
 ): () => void {
   try {
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+    const unsubscribe = safeSubscribe(channel, (response) => {
       const payload = response.payload as unknown as DirectMessage;
       if (payload?.conversation_id === conversationId) {
         onMessage(payload);

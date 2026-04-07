@@ -1,4 +1,4 @@
-import { clientReactNative, DATABASE_ID, DIRECT_MESSAGES_TABLE_ID } from "@/lib/appwrite";
+import { DATABASE_ID, DIRECT_MESSAGES_TABLE_ID, safeSubscribe } from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import {
   registerForPushNotificationsAsync,
@@ -83,7 +83,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
     // Subscribe to ALL new messages in the collection
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = clientReactNative.subscribe(channel, async (response) => {
+    const unsubscribe = safeSubscribe(channel, async (response) => {
       // Only process creation events
       if (!response.events.some((e) => e.endsWith(".create"))) return;
 

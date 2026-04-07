@@ -3,9 +3,9 @@
 // Bridges intent → action and generates Chinese response messages
 
 import { Linking } from "react-native";
-import { getContactsForElderly } from "./contacts";
+import { getContactsForElderly, getElderlyContacts } from "./contacts";
 import { getCustomVoicesForElderly } from "./custom-voice";
-import { getElderlyByUserId } from "./elderly";
+import { createElderlyMedicationWithReminder, getElderlyByUserId } from "./elderly";
 import {
   fetchActiveMedicationReminders,
   fetchDailyMedicationLogs,
@@ -47,6 +47,7 @@ const MESSAGES: Record<VoiceLanguage, Record<string, string>> = {
     schedule_missing_info: "請講清楚幾時同埋做咩嘢。",
     general_response: "我聽到你講嘅嘢啦。有咩可以幫到你？",
     error: "唔好意思，出咗啲問題。請再試一次。",
+    confirm_cancelled: "好嘅，取消咗。",
   },
   zh: {
     medication_recorded: "好的，已经帮你记录了吃药。",
@@ -65,6 +66,7 @@ const MESSAGES: Record<VoiceLanguage, Record<string, string>> = {
     schedule_missing_info: "请说清楚什么时候和做什么。",
     general_response: "我听到你说的了。有什么可以帮到你？",
     error: "不好意思，出了点问题。请再试一次。",
+    confirm_cancelled: "好的，已取消。",
   },
   en: {
     medication_recorded: "OK, I've recorded that you took your medication.",
@@ -83,6 +85,7 @@ const MESSAGES: Record<VoiceLanguage, Record<string, string>> = {
     schedule_missing_info: "Please tell me when and what you'd like to schedule.",
     general_response: "I heard you. How can I help?",
     error: "Sorry, something went wrong. Please try again.",
+    confirm_cancelled: "OK, cancelled.",
   },
 };
 
@@ -106,16 +109,16 @@ export async function executeVoiceCommand(
         return await handleRecordMedication(userId, msg);
 
       case "check_medication":
-        return await handleCheckMedication(userId, msg);
+        return await handleCheckMedication(userId, msg, language);
 
       case "add_medication":
-        return handleAddMedication(msg, result.params);
+        return await handleAddMedication(userId, msg, result.params, language);
 
       case "call_contact":
         return await handleCallContact(userId, msg, result.params);
 
       case "set_schedule":
-        return await handleSetSchedule(userId, msg, result.params);
+        return await handleSetSchedule(userId, msg, result.params, language);
 
       case "general_chat":
       default:
@@ -173,8 +176,6 @@ async function handleRecordMedication(
         });
 
         if (existingLog && existingLog.status === "pending") {
-          // Mark this one as taken
-          await logMedicationAction(userId, reminder.$id, scheduledAt, "taken");
           pendingFound = true;
 
           // Get medication name for response
@@ -188,12 +189,20 @@ async function handleRecordMedication(
           // @ts-ignore
           const medName = medications[0]?.name || "";
 
-          const takenMsg = `好嘅，已經幫你記錄咗${medName ? ` ${medName} ` : ""}食藥。`;
+          const confirmMsg = `確認記錄食咗${medName ? `「${medName}」` : "藥"}？講「確認」或者「取消」。`;
 
           return {
             success: true,
-            message: takenMsg,
+            message: confirmMsg,
             action: "record_medication",
+            needsConfirmation: true,
+            confirmationData: {
+              readyToExecute: true,
+              action: "record_medication",
+              reminderId: reminder.$id,
+              scheduledAt,
+              medName,
+            },
           };
         }
       }
@@ -227,8 +236,9 @@ async function handleRecordMedication(
 async function handleCheckMedication(
   userId: string,
   msg: Record<string, string>,
+  language: VoiceLanguage = "yue",
 ): Promise<CommandResult> {
-  const summary = await getFormattedTodayMedicationSummary(userId);
+  const summary = await getFormattedTodayMedicationSummary(userId, language);
 
   return {
     success: true,
@@ -239,19 +249,142 @@ async function handleCheckMedication(
 
 // ── Add Medication ──
 
-function handleAddMedication(
+const ADD_MED_MESSAGES: Record<VoiceLanguage, Record<string, string>> = {
+  yue: {
+    missing_name: "你想加咩藥呀？請講藥名。",
+    missing_times: "一日食幾次呀？",
+    missing_duration: "要食幾多日呀？",
+    invalid_times_per_day: "「每日幾次」要係一個整數，例如一日三次。請再講一次。",
+    invalid_duration: "「食幾日」要係一個整數，例如七日、十四日。請再講一次。",
+    success: "好嘅，已經幫你加咗",
+    error: "加藥嘅時候出咗啲問題，請稍後再試。",
+  },
+  zh: {
+    missing_name: "你想加什么药？请说药名。",
+    missing_times: "一天吃几次？",
+    missing_duration: "要吃几天？",
+    invalid_times_per_day: "「每天几次」必须是整数，例如一天三次。请再说一次。",
+    invalid_duration: "「吃几天」必须是整数，例如七天、十四天。请再说一次。",
+    success: "好的，已经帮你加了",
+    error: "加药时出了问题，请稍后再试。",
+  },
+  en: {
+    missing_name: "What medicine would you like to add? Please tell me the name.",
+    missing_times: "How many times a day?",
+    missing_duration: "How many days should you take it?",
+    invalid_times_per_day: "Times per day must be a whole number, like 3 times a day. Please say again.",
+    invalid_duration: "Duration must be a whole number of days, like 7 or 14 days. Please say again.",
+    success: "OK, I've added ",
+    error: "There was a problem adding the medication. Please try again later.",
+  },
+};
+
+async function handleAddMedication(
+  userId: string,
   msg: Record<string, string>,
   params: Record<string, any>,
-): CommandResult {
-  // This triggers UI navigation to the add medication screen
+  language: VoiceLanguage = "yue",
+): Promise<CommandResult> {
+  const addMsg = ADD_MED_MESSAGES[language] || ADD_MED_MESSAGES.yue;
+
+  const drugName = params.drug_name || params.name || params.medication_name || "";
+  const timesPerDay = params.times_per_day;
+  const durationDays = params.duration_days || params.duration;
+  const reminderTimes = params.reminder_times || [];
+  const afterMeal = params.after_meal ?? false;
+  const dosage = params.dosage ? Number(params.dosage) : 1;
+  const unit = params.unit || "dose";
+
+  // Validate required fields
+  if (!drugName) {
+    return {
+      success: true,
+      message: params.reply || addMsg.missing_name,
+      action: "add_medication",
+      needsConfirmation: true,
+      confirmationData: { step: "need_name" },
+    };
+  }
+
+  if (timesPerDay === undefined || timesPerDay === null) {
+    return {
+      success: true,
+      message: params.reply || addMsg.missing_times,
+      action: "add_medication",
+      needsConfirmation: true,
+      confirmationData: { step: "need_times", drug_name: drugName },
+    };
+  }
+
+  const timesInt = parseInt(String(timesPerDay), 10);
+  if (isNaN(timesInt) || timesInt < 1) {
+    return {
+      success: true,
+      message: addMsg.invalid_times_per_day,
+      action: "add_medication",
+      needsConfirmation: true,
+      confirmationData: { step: "need_times", drug_name: drugName },
+    };
+  }
+
+  if (durationDays === undefined || durationDays === null) {
+    return {
+      success: true,
+      message: params.reply || addMsg.missing_duration,
+      action: "add_medication",
+      needsConfirmation: true,
+      confirmationData: { step: "need_duration", drug_name: drugName, times_per_day: timesInt },
+    };
+  }
+
+  const durationInt = parseInt(String(durationDays), 10);
+  if (isNaN(durationInt) || durationInt < 1) {
+    return {
+      success: true,
+      message: addMsg.invalid_duration,
+      action: "add_medication",
+      needsConfirmation: true,
+      confirmationData: { step: "need_duration", drug_name: drugName, times_per_day: timesInt },
+    };
+  }
+
+  // Generate default reminder times if not provided
+  let times: string[] = Array.isArray(reminderTimes) ? reminderTimes : [];
+  if (times.length === 0) {
+    const defaultTimes: Record<number, string[]> = {
+      1: ["09:00"],
+      2: ["09:00", "21:00"],
+      3: ["08:00", "13:00", "19:00"],
+      4: ["08:00", "12:00", "17:00", "22:00"],
+    };
+    times = defaultTimes[timesInt] || Array.from({ length: timesInt }, (_, i) => {
+      const hour = Math.round(8 + (i * 14) / (timesInt - 1 || 1));
+      return `${String(hour).padStart(2, "0")}:00`;
+    });
+  }
+
+  // All params valid — ask for confirmation before creating
+  const confirmMsg = language === "yue"
+    ? `確認加「${drugName}」，一日${timesInt}次，食${durationInt}日？講「確認」或者「取消」。`
+    : language === "zh"
+      ? `确认添加「${drugName}」，一天${timesInt}次，吃${durationInt}天？说「确认」或「取消」。`
+      : `Add "${drugName}", ${timesInt} times a day for ${durationInt} days. Say "confirm" or "cancel".`;
+
   return {
     success: true,
-    message: msg.add_medication_prompt,
+    message: confirmMsg,
     action: "add_medication",
     needsConfirmation: true,
     confirmationData: {
-      medicationName: params.name || "",
-      time: params.time || "",
+      readyToExecute: true,
+      action: "add_medication",
+      drug_name: drugName,
+      unit,
+      dosage,
+      times_per_day: timesInt,
+      duration_days: durationInt,
+      after_meal: !!afterMeal,
+      reminder_times: times,
     },
   };
 }
@@ -268,7 +401,12 @@ async function handleCallContact(
     return { success: false, message: msg.call_no_contacts, action: "call_contact" };
   }
 
-  const contacts = await getContactsForElderly(elderly.$id);
+  // Get both caregiver contacts AND elderly contacts
+  const [caregiverContacts, elderlyContacts] = await Promise.all([
+    getContactsForElderly(elderly.$id),
+    getElderlyContacts(elderly.$id).catch(() => []),
+  ]);
+  const contacts = [...caregiverContacts, ...elderlyContacts];
   if (contacts.length === 0) {
     return { success: false, message: msg.call_no_contacts, action: "call_contact" };
   }
@@ -325,6 +463,7 @@ async function handleSetSchedule(
   userId: string,
   msg: Record<string, string>,
   params: Record<string, any>,
+  language: VoiceLanguage = "yue",
 ): Promise<CommandResult> {
   try {
     const elderly = await getElderlyByUserId(userId);
@@ -345,29 +484,26 @@ async function handleSetSchedule(
       };
     }
 
-    // Parse datetime — the AI model returns ISO format or natural language
-    let datetime: Date;
-    const parsed = Date.parse(datetimeStr);
-    if (!isNaN(parsed)) {
-      datetime = new Date(parsed);
-    } else {
-      // Fallback: use today with a default time
-      datetime = new Date();
-      datetime.setHours(datetime.getHours() + 1, 0, 0, 0);
-    }
-
-    await createScheduleTask({
-      title,
-      description,
-      datetime,
-      elderlyId: elderly.$id,
-      typeName: "appointment",
-    });
+    // All params valid — ask for confirmation before creating
+    const confirmMsg = language === "yue"
+      ? `確認設定日程「${title}」喺 ${datetimeStr}？講「確認」或者「取消」。`
+      : language === "zh"
+        ? `确认设定日程「${title}」在 ${datetimeStr}？说「确认」或「取消」。`
+        : `Set schedule "${title}" at ${datetimeStr}? Say "confirm" or "cancel".`;
 
     return {
       success: true,
-      message: `${msg.schedule_created} ${title}`,
+      message: confirmMsg,
       action: "set_schedule",
+      needsConfirmation: true,
+      confirmationData: {
+        readyToExecute: true,
+        action: "set_schedule",
+        title,
+        description,
+        datetime: datetimeStr,
+        elderlyId: elderly.$id,
+      },
     };
   } catch (error) {
     console.error("[voice-cmd] Set schedule error:", error);
@@ -376,6 +512,108 @@ async function handleSetSchedule(
       message: msg.schedule_error,
       action: "set_schedule",
     };
+  }
+}
+
+/**
+ * Execute a previously confirmed pending action.
+ */
+export async function executePendingAction(
+  pendingData: any,
+  userId: string,
+  language: VoiceLanguage = "yue",
+): Promise<CommandResult> {
+  const msg = MESSAGES[language] || MESSAGES.yue;
+  const addMsg = ADD_MED_MESSAGES[language] || ADD_MED_MESSAGES.yue;
+
+  try {
+    switch (pendingData.action) {
+      case "add_medication": {
+        const times: string[] = Array.isArray(pendingData.reminder_times) ? pendingData.reminder_times : [];
+        const timesInt = pendingData.times_per_day;
+        const durationInt = pendingData.duration_days;
+        const drugName = pendingData.drug_name;
+
+        // Generate default reminder times if empty
+        let finalTimes = times;
+        if (finalTimes.length === 0) {
+          const defaultTimes: Record<number, string[]> = {
+            1: ["09:00"],
+            2: ["09:00", "21:00"],
+            3: ["08:00", "13:00", "19:00"],
+            4: ["08:00", "12:00", "17:00", "22:00"],
+          };
+          finalTimes = defaultTimes[timesInt] || Array.from({ length: timesInt }, (_, i) => {
+            const hour = Math.round(8 + (i * 14) / (timesInt - 1 || 1));
+            return `${String(hour).padStart(2, "0")}:00`;
+          });
+        }
+
+        await createElderlyMedicationWithReminder(userId, {
+          name: drugName,
+          unit: pendingData.unit || "dose",
+          dosage: pendingData.dosage || 1,
+          timesPerDay: timesInt,
+          durationDays: durationInt,
+          afterMeal: !!pendingData.after_meal,
+          reminderTimes: finalTimes,
+          startDate: new Date().toISOString(),
+          active: true,
+        });
+
+        const successMsg = language === "yue"
+          ? `好嘅，已經幫你加咗「${drugName}」，一日${timesInt}次，食${durationInt}日。`
+          : language === "zh"
+            ? `好的，已经帮你加了「${drugName}」，一天${timesInt}次，吃${durationInt}天。`
+            : `OK, I've added "${drugName}", ${timesInt} times a day for ${durationInt} days.`;
+
+        return { success: true, message: successMsg, action: "add_medication" };
+      }
+
+      case "set_schedule": {
+        let datetime: Date;
+        const parsed = Date.parse(pendingData.datetime);
+        if (!isNaN(parsed)) {
+          datetime = new Date(parsed);
+        } else {
+          datetime = new Date();
+          datetime.setHours(datetime.getHours() + 1, 0, 0, 0);
+        }
+
+        await createScheduleTask({
+          title: pendingData.title,
+          description: pendingData.description || "",
+          datetime,
+          elderlyId: pendingData.elderlyId,
+          typeName: "appointment",
+        });
+
+        const schedMsg = language === "yue"
+          ? `好嘅，已經幫你設定咗日程「${pendingData.title}」。`
+          : language === "zh"
+            ? `好的，已经帮你设定了日程「${pendingData.title}」。`
+            : `OK, I've set the schedule "${pendingData.title}".`;
+
+        return { success: true, message: schedMsg, action: "set_schedule" };
+      }
+
+      case "record_medication": {
+        await logMedicationAction(userId, pendingData.reminderId, pendingData.scheduledAt, "taken");
+        const medName = pendingData.medName || "";
+        const takenMsg = language === "yue"
+          ? `好嘅，已經幫你記錄咗${medName ? `「${medName}」` : ""}食藥。`
+          : language === "zh"
+            ? `好的，已经帮你记录了${medName ? `「${medName}」` : ""}吃药。`
+            : `OK, I've recorded that you took ${medName || "your medication"}.`;
+        return { success: true, message: takenMsg, action: "record_medication" };
+      }
+
+      default:
+        return { success: false, message: msg.error, action: "error" };
+    }
+  } catch (error) {
+    console.error("[voice-cmd] Execute pending action error:", error);
+    return { success: false, message: msg.error, action: "error" };
   }
 }
 

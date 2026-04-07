@@ -5,6 +5,7 @@
 import { useAuth } from "@/lib/auth-context";
 import { getElderlyByUserId } from "@/lib/elderly";
 import {
+    executePendingAction,
     executeVoiceCommand,
     synthesizeCommandResponse
 } from "@/lib/voice-command-executor";
@@ -12,6 +13,7 @@ import {
     readAudioAsBase64,
     recognizeVoiceCommand,
     VOICE_LANGUAGE_LABELS,
+    type ConversationTurn,
     type VoiceLanguage,
 } from "@/lib/voice-recognition";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -56,6 +58,12 @@ const STATE_LABELS: Record<VoiceState, string> = {
   error: "出錯咗",
 };
 
+const MESSAGES_FOR_CANCEL: Record<string, string> = {
+  yue: "好嘅，取消咗。",
+  zh: "好的，已取消。",
+  en: "OK, cancelled.",
+};
+
 export default function VoiceCommandButton() {
   const theme = useTheme();
   const { user } = useAuth();
@@ -67,6 +75,12 @@ export default function VoiceCommandButton() {
   const [resultMessage, setResultMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [elderlyProfileId, setElderlyProfileId] = useState<string | null>(null);
+
+  // Multi-turn conversation history (kept while modal is open)
+  const conversationHistory = useRef<ConversationTurn[]>([]);
+
+  // Pending action awaiting user confirmation
+  const pendingAction = useRef<any>(null);
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const playerRef = useRef<AudioPlayer | null>(null);
@@ -159,6 +173,7 @@ export default function VoiceCommandButton() {
         audioBase64,
         language,
         "audio/m4a",
+        conversationHistory.current,
       );
 
       console.log("[voice-btn] Recognition:", JSON.stringify(recognitionResult));
@@ -167,17 +182,64 @@ export default function VoiceCommandButton() {
         throw new Error("Not authenticated");
       }
 
-      // Execute the command
-      const commandResult = await executeVoiceCommand(
-        recognitionResult,
-        user.$id,
-        language,
-      );
+      // Add user's transcript to conversation history
+      conversationHistory.current.push({
+        role: "user",
+        text: recognitionResult.transcript || recognitionResult.reply,
+      });
+
+      let commandResult;
+
+      // Check if there's a pending action waiting for confirmation
+      if (pendingAction.current) {
+        const transcript = (recognitionResult.transcript || recognitionResult.reply || "").toLowerCase();
+        const isConfirm = /^(好|確認|确认|係|是|yes|ok|okay|對|对|冇問題|没问题|confirm|得|sure)\b/.test(transcript.trim());
+        const isCancel = /^(唔好|不|取消|cancel|no|算|唔使|不用|唔要|不要)\b/.test(transcript.trim());
+
+        if (isConfirm) {
+          commandResult = await executePendingAction(
+            pendingAction.current,
+            user.$id,
+            language,
+          );
+          pendingAction.current = null;
+        } else if (isCancel) {
+          pendingAction.current = null;
+          const cancelMsg = (MESSAGES_FOR_CANCEL as any)[language] || "好嘅，取消咗。";
+          commandResult = { success: true, message: cancelMsg, action: "cancelled" };
+        } else {
+          // Not a clear confirm/cancel — treat as new command, discard pending
+          pendingAction.current = null;
+          commandResult = await executeVoiceCommand(
+            recognitionResult,
+            user.$id,
+            language,
+          );
+        }
+      } else {
+        // Execute the command normally
+        commandResult = await executeVoiceCommand(
+          recognitionResult,
+          user.$id,
+          language,
+        );
+      }
+
+      // If the result needs confirmation with ready data, store as pending
+      if (commandResult.needsConfirmation && commandResult.confirmationData?.readyToExecute) {
+        pendingAction.current = commandResult.confirmationData;
+      }
+
+      // Add AI response to conversation history
+      conversationHistory.current.push({
+        role: "assistant",
+        text: commandResult.message,
+      });
 
       setResultMessage(commandResult.message);
 
-      // Handle special actions that need navigation
-      if (commandResult.action === "add_medication") {
+      // Handle special actions that need navigation (only when creation is done)
+      if (commandResult.action === "add_medication" && !commandResult.needsConfirmation) {
         // Navigate to medication tab after TTS
         setTimeout(() => {
           setModalVisible(false);
@@ -192,7 +254,18 @@ export default function VoiceCommandButton() {
     } catch (err) {
       console.error("[voice-btn] Processing error:", err);
       setVoiceState("error");
-      setErrorMessage("處理失敗，請再試一次");
+      // Show friendly error in user's language
+      const friendlyError = language === "yue"
+        ? "對唔住，我聽唔清楚，請再講一次"
+        : language === "zh"
+          ? "对不起，我听不清楚，请再说一次"
+          : "Sorry, I didn't catch that. Please try again.";
+      setErrorMessage(friendlyError);
+      setResultMessage(friendlyError);
+      // Try to speak the error message too
+      try {
+        await playTTSResponse(friendlyError);
+      } catch {}
       setTimeout(() => setVoiceState("idle"), 3000);
     }
   }, [voiceState, recorder, user, elderlyProfileId, router]);
@@ -263,6 +336,9 @@ export default function VoiceCommandButton() {
     setModalVisible(false);
     setResultMessage("");
     setErrorMessage("");
+    // Clear conversation history and pending action on close
+    conversationHistory.current = [];
+    pendingAction.current = null;
   }, [voiceState, recorder]);
 
   const stateLabel = STATE_LABELS[voiceState];

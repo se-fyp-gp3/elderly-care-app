@@ -81,3 +81,43 @@ export interface RealtimeResponse {
   events: string[];
   payload: any;
 }
+
+/**
+ * Safe wrapper around `clientReactNative.subscribe` that catches
+ * INVALID_STATE_ERR thrown when the WebSocket is not yet open
+ * (e.g. during rapid page transitions). On failure it retries once
+ * after a short delay.
+ */
+export function safeSubscribe(
+  channel: string,
+  callback: (response: RealtimeResponse) => void,
+): () => void {
+  let unsubscribe: (() => void) | null = null;
+
+  const doSubscribe = () => {
+    try {
+      unsubscribe = clientReactNative.subscribe(channel, callback);
+    } catch (err: any) {
+      console.warn("[Realtime] subscribe failed, retrying in 1s:", err?.message);
+      const timer = setTimeout(() => {
+        try {
+          unsubscribe = clientReactNative.subscribe(channel, callback);
+        } catch (retryErr) {
+          console.warn("[Realtime] retry also failed:", retryErr);
+        }
+      }, 1000);
+      // If cleanup runs before retry fires, cancel it
+      unsubscribe = () => clearTimeout(timer);
+    }
+  };
+
+  doSubscribe();
+
+  return () => {
+    try {
+      unsubscribe?.();
+    } catch {
+      // Ignore errors during unsubscribe
+    }
+  };
+}

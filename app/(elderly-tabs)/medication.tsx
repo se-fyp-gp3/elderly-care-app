@@ -1,7 +1,7 @@
 import {
-  clientReactNative,
   DATABASE_ID,
   MEDICATION_LOGS_TABLE_ID,
+  safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -159,7 +159,7 @@ export default function ElderlyMedicationScreen() {
     }, 30000);
 
     // 3. Appwrite Realtime: Subscribe to medication logs changes
-    const realtimeUnsubscribe = clientReactNative.subscribe(
+    const realtimeUnsubscribe = safeSubscribe(
       `databases.${DATABASE_ID}.collections.${MEDICATION_LOGS_TABLE_ID}.documents`,
       (response) => {
         if (

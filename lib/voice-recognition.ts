@@ -18,46 +18,99 @@ export const VOICE_LANGUAGE_LABELS: Record<VoiceLanguage, string> = {
   en: "English",
 };
 
+// Database schema knowledge for the AI model
+const DB_SCHEMA_INFO = `
+【數據庫規則 — 新增藥物時必須遵守】
+- drug_name: 字串，藥物名稱（必填）
+- unit: 字串，單位（例如"粒"、"ml"、"dose"），預設"dose"
+- dosage: 數字(double)，每次劑量，預設1
+- times_per_day: 整數(integer)，每日幾次（必須係整數，例如1、2、3）
+- duration_days: 整數(integer)，食幾日（必須係整數，例如7、14、30）
+- reminder_times: 字串陣列，提醒時間（HH:MM格式，例如["08:00","12:00","18:00"]）
+- after_meal: 布林值，飯後食（true/false）
+- start_date: 日期字串（ISO格式），開始日期
+
+如果用戶講「一日三次」，times_per_day=3。
+如果用戶講「食兩個禮拜」，duration_days=14。
+如果用戶講「食一個月」，duration_days=30。
+如果用戶講「持續兩日」，duration_days=2。
+如果缺少必要資訊，用reply欄位友善咁問返用戶。
+`;
+
 // Per-language system prompts (all understand mixed input, reply in selected language)
 const SYSTEM_PROMPTS: Record<VoiceLanguage, string> = {
   yue: `你係一個長者護理助手，支援中英粵混合口語。用戶可能會用廣東話、普通話、英文、或者混合嚟講嘢。
-請用廣東話回覆。
+請用廣東話回覆，語氣要親切自然，好似同屋企人傾計咁。
 
-仔細聽用戶嘅語音，識別佢哋嘅意圖。可能嘅意圖包括：
-1. 記錄食藥 (record_medication) - 例如「我食咗藥」「已經食藥」「medicine taken」「吃了药」
-2. 新增藥物 (add_medication) - 例如「加一隻新藥」「add a new medicine」「我要食新藥」
-3. 打電話畀人 (call_contact) - 例如「打畀阿女」「call my daughter」「打电话给XXX」，params要有name
-4. 查詢藥物 (check_medication) - 例如「今日食咩藥」「what medicine today」「有咩藥未食」
-5. 設定日程 (set_schedule) - 例如「下晝三點覆診」「明天要去做物理治療」「set appointment at 3pm」，params要有title, datetime(ISO格式), description
-6. 一般對話 (general_chat) - 其他所有對話
+你支持多輪對話。如果之前嘅對話有提供上下文，請根據上下文嚟理解用戶嘅意圖。
+例如：用戶之前問「我今日食咗藥未？」→ 你話「你今日未食降血壓藥」→ 用戶話「幫我記錄」→ 你應該理解係要記錄食藥(record_medication)。
 
-請以JSON格式回覆：{"intent":"意圖名稱","params":{},"reply":"回覆內容"}`,
+仔細聽用戶嘅語音，識別佢哋嘅意圖。【intent欄位必須用英文名】：
+1. record_medication - 記錄食藥。例如「我食咗藥」「已經食藥」「幫我記錄」（如果上文提到藥物）
+2. add_medication - 新增藥物。例如「加一隻新藥」「我要食新藥」。params用以下欄位：
+   drug_name(藥名), unit(單位), dosage(劑量數字), times_per_day(整數), duration_days(整數), reminder_times(["HH:MM"]), after_meal(true/false)
+   如果用戶未講齊資訊，唔好自己填，用reply問返佢。
+3. call_contact - 打電話畀人。例如「打畀阿女」「打電話」。params要有name
+4. check_medication - 查詢藥物。例如「今日食咩藥」「有咩藥未食」
+5. set_schedule - 設定日程。例如「下晝三點覆診」。params要有title, datetime(ISO格式), description
+6. general_chat - 其他所有對話
+
+${DB_SCHEMA_INFO}
+
+重要規則：
+- intent 欄位必須用英文（record_medication/add_medication/call_contact/check_medication/set_schedule/general_chat）
+- reply 欄位必須係自然嘅廣東話回覆，唔好放JSON
+- 如果語音唔清楚，reply寫「對唔住，我聽唔清楚，可以再講一次嗎？」，intent設為general_chat
+
+請以JSON格式回覆：{"intent":"英文intent名","params":{},"reply":"廣東話回覆"}`,
 
   zh: `你是一个长者护理助手，支持中英粤混合口语。用户可能会用粤语、普通话、英文、或者混合来说话。
-请用普通话回复。
+请用普通话回复，语气要亲切自然，像跟家人聊天一样。
 
-仔细听用户的语音，识别他们的意图。可能的意图包括：
-1. 记录吃药 (record_medication) - 例如"我吃了药""已经吃药""medicine taken""我食咗藥"
-2. 新增药物 (add_medication) - 例如"加一种新药""add a new medicine""我要食新藥"
-3. 打电话给人 (call_contact) - 例如"打给女儿""call my daughter""打畀阿女"，params要有name
-4. 查询药物 (check_medication) - 例如"今天吃什么药""what medicine today""有咩藥未食"
-5. 设定日程 (set_schedule) - 例如"下午三点看医生""明天要去做物理治疗""set appointment at 3pm"，params要有title, datetime(ISO格式), description
-6. 一般对话 (general_chat) - 其他所有对话
+你支持多轮对话。如果之前的对话有提供上下文，请根据上下文来理解用户的意图。
 
-请以JSON格式回复：{"intent":"意图名称","params":{},"reply":"回复内容"}`,
+仔细听用户的语音，识别他们的意图。【intent字段必须用英文名】：
+1. record_medication - 记录吃药。例如"我吃了药""已经吃药""帮我记录"（如果上文提到药物）
+2. add_medication - 新增药物。例如"加一种新药""我要吃新药"。params用以下字段：
+   drug_name(药名), unit(单位), dosage(剂量数字), times_per_day(整数), duration_days(整数), reminder_times(["HH:MM"]), after_meal(true/false)
+   如果用户没说齐信息，不要自己填，用reply问用户。
+3. call_contact - 打电话给人。例如"打给女儿""打电话"。params要有name
+4. check_medication - 查询药物。例如"今天吃什么药""有什么药没吃"
+5. set_schedule - 设定日程。例如"下午三点看医生"。params要有title, datetime(ISO格式), description
+6. general_chat - 其他所有对话
+
+${DB_SCHEMA_INFO}
+
+重要规则：
+- intent 字段必须用英文（record_medication/add_medication/call_contact/check_medication/set_schedule/general_chat）
+- reply 字段必须是自然的普通话回复，不要放JSON
+- 如果语音不清楚，reply写"对不起，我听不清楚，请再说一次"，intent设为general_chat
+
+请以JSON格式回复：{"intent":"英文intent名","params":{},"reply":"普通话回复"}`,
 
   en: `You are an elderly care assistant that understands Cantonese, Mandarin, and English (including mixed speech).
-Please reply in English.
+Please reply in English. Be warm and natural, like talking to a family member.
 
-Listen carefully to the user's voice and identify their intent. Possible intents include:
-1. Record medication taken (record_medication) - e.g. "I took my medicine", "已經食藥", "吃了药"
-2. Add new medication (add_medication) - e.g. "Add a new medicine", "加一隻新藥"
-3. Call a contact (call_contact) - e.g. "Call my daughter", "打畀阿女", params should include name
-4. Check medication (check_medication) - e.g. "What medicine today", "今日食咩藥"
-5. Set schedule (set_schedule) - e.g. "Doctor at 3pm", "明天要去做物理治療", params should include title, datetime (ISO format), description
-6. General chat (general_chat) - All other conversations
+You support multi-turn conversation. If previous conversation context is provided, use it to understand the user's intent.
 
-Reply in JSON format: {"intent":"intent_name","params":{},"reply":"reply content"}`,
+Listen carefully to the user's voice and identify their intent. The intent field MUST be in English:
+1. record_medication - Record medication taken. e.g. "I took my medicine", "Mark it as taken"
+2. add_medication - Add new medication. e.g. "Add a new medicine". params should use:
+   drug_name(name), unit(unit), dosage(number), times_per_day(integer), duration_days(integer), reminder_times(["HH:MM"]), after_meal(true/false)
+   If the user hasn't provided all info, DON'T fill in defaults, ask in reply.
+3. call_contact - Call a contact. e.g. "Call my daughter". params should include name
+4. check_medication - Check medication. e.g. "What medicine today"
+5. set_schedule - Set schedule. e.g. "Doctor at 3pm". params should include title, datetime (ISO format), description
+6. general_chat - All other conversations
+
+${DB_SCHEMA_INFO}
+
+Important rules:
+- intent field MUST be English (record_medication/add_medication/call_contact/check_medication/set_schedule/general_chat)
+- reply field must be a natural English response, NOT JSON
+- If the speech is unclear, set reply to "Sorry, I didn't catch that. Could you say it again?" and intent to general_chat
+
+Reply in JSON format: {"intent":"english_intent_name","params":{},"reply":"natural reply"}`,
 };
 
 export interface VoiceRecognitionResult {
@@ -74,6 +127,11 @@ function assertConfigured() {
   }
 }
 
+export interface ConversationTurn {
+  role: "user" | "assistant";
+  text: string;
+}
+
 /**
  * Send audio to Qwen3.5-audio for end-to-end recognition + understanding.
  * The model transcribes the audio AND extracts intent in one pass.
@@ -81,11 +139,13 @@ function assertConfigured() {
  * @param audioBase64 - Base64-encoded audio data (WAV, M4A, MP3)
  * @param language - Target language for recognition
  * @param mimeType - MIME type of audio (default: audio/wav)
+ * @param conversationHistory - Previous conversation turns for multi-turn support
  */
 export async function recognizeVoiceCommand(
   audioBase64: string,
   language: VoiceLanguage = "yue",
   mimeType: string = "audio/wav",
+  conversationHistory: ConversationTurn[] = [],
 ): Promise<VoiceRecognitionResult> {
   assertConfigured();
 
@@ -97,34 +157,47 @@ export async function recognizeVoiceCommand(
   // Use DashScope multimodal API (compatible mode) for Qwen audio model
   const apiUrl = `${process.env.EXPO_PUBLIC_DASHSCOPE_API_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1"}/chat/completions`;
 
-  const requestBody = {
-    model: DASHSCOPE_AUDIO_MODEL,
-    messages: [
+  // Build messages with conversation history for multi-turn support
+  const messages: any[] = [
+    {
+      role: "system",
+      content: [{ type: "text", text: systemPrompt }],
+    },
+  ];
+
+  // Add conversation history (last 6 turns max)
+  for (const turn of conversationHistory.slice(-6)) {
+    messages.push({
+      role: turn.role,
+      content: [{ type: "text", text: turn.text }],
+    });
+  }
+
+  // Add current audio input
+  messages.push({
+    role: "user",
+    content: [
       {
-        role: "system",
-        content: [{ type: "text", text: systemPrompt }],
+        type: "input_audio",
+        input_audio: {
+          data: audioDataUri,
+          format: mimeType.includes("wav")
+            ? "wav"
+            : mimeType.includes("mp3")
+              ? "mp3"
+              : "m4a",
+        },
       },
       {
-        role: "user",
-        content: [
-          {
-            type: "input_audio",
-            input_audio: {
-              data: audioDataUri,
-              format: mimeType.includes("wav")
-                ? "wav"
-                : mimeType.includes("mp3")
-                  ? "mp3"
-                  : "m4a",
-            },
-          },
-          {
-            type: "text",
-            text: "請聽我講嘅嘢，識別意圖，用JSON回覆",
-          },
-        ],
+        type: "text",
+        text: "請聽我講嘅嘢，識別意圖，用JSON回覆",
       },
     ],
+  });
+
+  const requestBody = {
+    model: DASHSCOPE_AUDIO_MODEL,
+    messages,
     max_tokens: 500,
     temperature: 0.3,
     modalities: ["text"],
@@ -168,8 +241,36 @@ export async function recognizeVoiceCommand(
 }
 
 /**
+ * Map Chinese intent names to English intent names.
+ */
+const INTENT_MAP: Record<string, string> = {
+  "記錄食藥": "record_medication",
+  "记录吃药": "record_medication",
+  "記錄吃藥": "record_medication",
+  "新增藥物": "add_medication",
+  "新增药物": "add_medication",
+  "加藥": "add_medication",
+  "加药": "add_medication",
+  "打電話": "call_contact",
+  "打电话": "call_contact",
+  "打電話畀人": "call_contact",
+  "打电话给人": "call_contact",
+  "查詢藥物": "check_medication",
+  "查询药物": "check_medication",
+  "檢查藥物": "check_medication",
+  "检查药物": "check_medication",
+  "設定日程": "set_schedule",
+  "设定日程": "set_schedule",
+  "一般對話": "general_chat",
+  "一般对话": "general_chat",
+  "闲聊": "general_chat",
+  "閒聊": "general_chat",
+};
+
+/**
  * Parse the JSON response from Qwen3.5-audio.
  * Falls back gracefully if the model doesn't return valid JSON.
+ * Handles Chinese intent names and nested JSON in reply field.
  */
 function parseRecognitionResponse(
   rawText: string,
@@ -179,11 +280,49 @@ function parseRecognitionResponse(
   if (jsonMatch) {
     try {
       const parsed = JSON.parse(jsonMatch[0]);
+
+      // Map Chinese intent to English
+      let intent = parsed.intent || "general_chat";
+      if (INTENT_MAP[intent]) {
+        intent = INTENT_MAP[intent];
+      }
+
+      // Fix reply field: if it looks like JSON, extract the actual reply
+      let reply = parsed.reply || "";
+      if (typeof reply === "string" && reply.trim().startsWith("{")) {
+        try {
+          const nestedJson = JSON.parse(reply);
+          reply = nestedJson.reply || nestedJson.new_medicine || reply;
+          // If nested JSON has more useful params, merge them
+          if (nestedJson.params && typeof nestedJson.params === "object") {
+            parsed.params = { ...parsed.params, ...nestedJson.params };
+          }
+          if (nestedJson.intent && INTENT_MAP[nestedJson.intent]) {
+            intent = INTENT_MAP[nestedJson.intent];
+          }
+        } catch {
+          // Not valid JSON, use as-is
+        }
+      }
+
+      // Fix params: check if any param value looks like a reply instead of data
+      const params = parsed.params || {};
+      if (params.new_medicine && typeof params.new_medicine === "string" && params.new_medicine.length > 50) {
+        // This is likely a reply stuffed into params, not actual medication data
+        if (!reply) reply = params.new_medicine;
+        delete params.new_medicine;
+      }
+
+      // Ensure reply is not a JSON string
+      if (typeof reply === "string") {
+        reply = reply.trim();
+      }
+
       return {
         transcript: parsed.transcript || rawText,
-        intent: parsed.intent || "general_chat",
-        params: parsed.params || {},
-        reply: parsed.reply || rawText,
+        intent,
+        params,
+        reply: reply || rawText,
         raw: rawText,
       };
     } catch {

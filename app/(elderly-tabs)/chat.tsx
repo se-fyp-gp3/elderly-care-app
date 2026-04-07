@@ -1,49 +1,50 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-    createChatSession,
-    deleteChatSession,
-    listChatSessionsForUser,
-    updateChatSession,
+  createChatSession,
+  deleteChatSession,
+  listChatSessionsForUser,
+  updateChatSession,
 } from "@/lib/chat";
 import {
-    buildScheduleSummary,
-    fetchElderlySchedulesForUser,
+  buildScheduleSummary,
+  fetchElderlySchedulesForUser,
 } from "@/lib/elderly";
 import { getFormattedTodayMedicationSummary } from "@/lib/medication_tracking";
 import { synthesizePersonalVoice } from "@/lib/personal-voice";
+import { formatSearchResultsForContext, searchWeb } from "@/lib/search";
 import type { ChatSession as AppwriteChatSession } from "@/types/appwrite";
 import {
-    createAudioPlayer,
-    setAudioModeAsync,
-    type AudioPlayer,
+  createAudioPlayer,
+  setAudioModeAsync,
+  type AudioPlayer,
 } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Card,
-    Chip,
-    IconButton,
-    Menu,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  Card,
+  Chip,
+  IconButton,
+  Menu,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 interface Message {
@@ -98,6 +99,7 @@ export default function ElderlyChat() {
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [chatHistory, setChatHistory] = useState<AppwriteChatSession[]>([]);
   const [isSuggestionsExpanded, setIsSuggestionsExpanded] = useState(false);
+  const [searchEnabled, setSearchEnabled] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
   const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
@@ -324,7 +326,8 @@ export default function ElderlyChat() {
       lower.includes("pill")
     ) {
       if (!user?.$id) return "I can't access your medication data right now.";
-      return await getFormattedTodayMedicationSummary(user.$id);
+      const lang = voiceReplyLang === "cantonese" ? "yue" : voiceReplyLang === "mandarin" ? "zh" : "en";
+      return await getFormattedTodayMedicationSummary(user.$id, lang as "yue" | "zh" | "en");
     }
 
     if (
@@ -358,7 +361,7 @@ export default function ElderlyChat() {
       {
         role: "system",
         content:
-          `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\n${langInstruction}\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
+          `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\nIMPORTANT: Keep your response concise — no more than 80 words. Be brief and to the point.\n\n${langInstruction}\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
       },
       ...history,
       {
@@ -472,7 +475,7 @@ export default function ElderlyChat() {
     const payload = {
       model: resolvedModel,
       messages: messagesPayload,
-      max_tokens: 1000,
+      max_tokens: 200,
       temperature: 0.7,
     };
 
@@ -830,9 +833,24 @@ export default function ElderlyChat() {
       }
 
       const localResponse = await tryHandleLocalDataRequest(messageForAPI);
+
+      let searchContext = "";
+      if (searchEnabled && !localResponse && !selectedImage) {
+        try {
+          const searchResponse = await searchWeb(userMessage.text);
+          searchContext = formatSearchResultsForContext(searchResponse);
+        } catch (e) {
+          console.warn("Search failed, proceeding without:", e);
+        }
+      }
+
+      const finalMessage = searchContext
+        ? `${messageForAPI}\n\n[Web search results for context:\n${searchContext}\n]\nPlease use the above search results to provide a more informed answer.`
+        : messageForAPI;
+
       const aiResponse =
         localResponse ??
-        (await callAIAPI(messageForAPI, selectedImage));
+        (await callAIAPI(finalMessage, selectedImage));
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -1022,6 +1040,16 @@ export default function ElderlyChat() {
             ))}
           </Menu>
         )}
+        <IconButton
+          icon={searchEnabled ? "magnify" : "magnify-close"}
+          size={24}
+          onPress={() => setSearchEnabled((prev) => !prev)}
+          style={[
+            styles.topBarButton,
+            searchEnabled && { backgroundColor: "#E3F2FD" },
+          ]}
+          iconColor={searchEnabled ? "#1565C0" : theme.colors.onSurface}
+        />
         <IconButton
           icon="plus"
           size={28}

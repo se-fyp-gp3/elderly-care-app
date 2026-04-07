@@ -2,6 +2,7 @@ import { ElderlyStatus, HealthData } from "@/types/appwrite";
 import { Query } from "react-native-appwrite";
 import {
   DATABASE_ID,
+  ELDERLY_DAILY_STEPS_TABLE_ID,
   ELDERLY_MEDICATION_REMINDER_TABLE_ID,
   ELDERLY_MEDICATION_TABLE_ID,
   HEALTH_DATA_TABLE_ID,
@@ -17,6 +18,12 @@ export interface ElderlyStatusInfo {
   missedMedCount: number;
   nextAppointment: string | null;
   medicationSummary: string;
+  /** Today's step count, null if no record */
+  todaySteps: number | null;
+  /** ISO timestamp of the most recent step data update */
+  lastActiveTime: string | null;
+  /** Whether the elderly has shown recent activity (steps > 0 today or yesterday) */
+  isActive: boolean;
 }
 
 /**
@@ -53,6 +60,9 @@ export async function computeElderlyStatus(
   let missedMedCount = 0;
   let nextAppointment: string | null = null;
   let medicationSummary = "Up to date";
+  let todaySteps: number | null = null;
+  let lastActiveTime: string | null = null;
+  let isActive = false;
 
   try {
     // ── 1. Latest health data ───────────────────────────────────────────
@@ -281,6 +291,62 @@ export async function computeElderlyStatus(
     } catch {
       // Schedule query may fail; ignore
     }
+    // ── 4. Activity / liveness check (step data) ─────────────────────
+    try {
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10); // YYYY-MM-DD
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+      const stepsRes = await tablesDB.listRows<any>({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_DAILY_STEPS_TABLE_ID,
+        queries: [
+          Query.equal("elderlyId", elderlyId),
+          Query.orderDesc("date"),
+          Query.limit(3),
+        ],
+      });
+
+      const stepRecords = stepsRes.rows as any[];
+      const todayRecord = stepRecords.find((r: any) => r.date === todayStr);
+      const yesterdayRecord = stepRecords.find(
+        (r: any) => r.date === yesterdayStr,
+      );
+
+      if (todayRecord) {
+        todaySteps = todayRecord.steps ?? 0;
+        lastActiveTime = todayRecord.lastUpdated ?? null;
+        if (todaySteps !== null && todaySteps > 0) {
+          isActive = true;
+        }
+      }
+
+      if (!isActive && yesterdayRecord) {
+        const ySteps = yesterdayRecord.steps ?? 0;
+        if (ySteps > 0) {
+          isActive = true;
+          if (!lastActiveTime) {
+            lastActiveTime = yesterdayRecord.lastUpdated ?? null;
+          }
+        }
+      }
+
+      // Flag inactivity: no steps today AND no steps yesterday
+      if (!isActive && stepRecords.length > 0) {
+        // Has step tracking set up but no recent movement
+        if (status === ElderlyStatus.NORMAL) {
+          status = ElderlyStatus.WARNING;
+        }
+        reasons.push("No activity detected (0 steps)");
+      } else if (stepRecords.length === 0) {
+        // No step data at all — don't flag, tracking may not be enabled
+      }
+    } catch {
+      // Step query may fail; ignore
+    }
+
   } catch (err) {
     console.error("Error computing elderly status:", err);
   }
@@ -292,6 +358,9 @@ export async function computeElderlyStatus(
     missedMedCount,
     nextAppointment,
     medicationSummary,
+    todaySteps,
+    lastActiveTime,
+    isActive,
   };
 }
 
