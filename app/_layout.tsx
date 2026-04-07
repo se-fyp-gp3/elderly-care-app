@@ -1,8 +1,8 @@
 import { DATABASE_ID, DIRECT_MESSAGES_TABLE_ID, safeSubscribe } from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import {
-  registerForPushNotificationsAsync,
-  sendImmediateNotification,
+    registerForPushNotificationsAsync,
+    sendImmediateNotification,
 } from "@/lib/notifications";
 import { DirectMessage } from "@/types/messaging";
 import { Role } from "@/types/user";
