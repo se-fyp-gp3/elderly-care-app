@@ -48,14 +48,14 @@ export default function ElderlyHealthData() {
 
   // Format last sync time for display
   const formatLastSync = (isoString: string | null): string => {
-    if (!isoString) return "Not synced yet";
+    if (!isoString) return t('healthData.notSyncedYet');
     try {
       const date = new Date(isoString);
       const hours = String(date.getHours()).padStart(2, "0");
       const minutes = String(date.getMinutes()).padStart(2, "0");
-      return `Last updated: ${hours}:${minutes}`;
+      return t('healthData.lastUpdated', { time: `${hours}:${minutes}` });
     } catch {
-      return "Not synced yet";
+      return t('healthData.notSyncedYet');
     }
   };
 
@@ -77,13 +77,13 @@ export default function ElderlyHealthData() {
     if (!isAuthorized) {
       const granted = await authorize();
       if (granted) {
-        setSnackMessage("Health data permission granted. Syncing steps...");
+        setSnackMessage(t('healthData.permissionGrantedSyncing'));
         setSnackVisible(true);
       }
     }
     await manualSync();
     if (!stepError) {
-      setSnackMessage(`Steps updated: ${todaySteps.toLocaleString()} steps`);
+      setSnackMessage(t('healthData.stepsUpdated', { steps: todaySteps.toLocaleString() }));
       setSnackVisible(true);
     }
   };
@@ -306,7 +306,7 @@ export default function ElderlyHealthData() {
                     variant="labelSmall"
                     style={{ color: theme.colors.onSurfaceVariant }}
                   >
-                    steps
+                    {t('home.steps')}
                   </Text>
                 </View>
               </View>

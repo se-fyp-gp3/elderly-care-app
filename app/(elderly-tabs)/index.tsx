@@ -480,7 +480,9 @@ export default function ElderlyHome() {
                         : "#2196F320",
                   }}
                 >
-                  {schedule.status || t('home.upcoming')}
+                  {schedule.status
+                    ? { Completed: t('common.completed'), Missed: t('common.missed'), Pending: t('common.pending') }[schedule.status] ?? schedule.status
+                    : t('home.upcoming')}
                 </Chip>
               )}
             />
@@ -527,8 +529,8 @@ export default function ElderlyHome() {
               )}
               <Text variant="labelSmall" style={{ color: "#999", marginTop: 2 }}>
                 {lastSyncTime
-                  ? `Updated ${new Date(lastSyncTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                  : "Not synced yet"}
+                  ? t('home.updated', { time: new Date(lastSyncTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })
+                  : t('healthData.notSyncedYet')}
                 {stepSource === "health_connect" ? " · Health Connect" : stepSource === "apple_healthkit" ? " · Apple Health" : ""}
               </Text>
             </View>
