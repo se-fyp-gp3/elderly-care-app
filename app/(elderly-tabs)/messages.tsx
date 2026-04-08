@@ -12,7 +12,7 @@ import {
 } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
-import { formatPresence, isUserOnline } from "@/lib/presence";
+import { isUserOnline } from "@/lib/presence";
 import { DirectMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -252,7 +252,6 @@ export default function ElderlyMessages() {
     const lastMsgTime = lastMsg?.created_at || item.lastActive;
     const preview = lastMsg?.body;
     const online = isUserOnline(item.lastActive);
-    const lastSeenText = formatPresence(item.lastActive, t);
 
     return (
       <TouchableOpacity
@@ -292,18 +291,6 @@ export default function ElderlyMessages() {
               >
                 {item.name}
               </Text>
-              {lastSeenText ? (
-                <Text
-                  variant="bodySmall"
-                  style={{
-                    color: online ? "#4CAF50" : theme.colors.onSurfaceVariant,
-                    fontSize: 12,
-                    marginTop: 1,
-                  }}
-                >
-                  {lastSeenText}
-                </Text>
-              ) : null}
             </View>
             <Text
               variant="bodySmall"
@@ -318,11 +305,11 @@ export default function ElderlyMessages() {
 
           {preview ? (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              {lastMsg?.sender_id === elderlyProfileId && (
+              {lastMsg && (
                 <MaterialCommunityIcons
-                  name={lastMsg?.is_read ? "check-all" : "check"}
+                  name={lastMsg.is_read ? "check-all" : "check"}
                   size={14}
-                  color={lastMsg?.is_read ? "#4CAF50" : theme.colors.onSurfaceVariant}
+                  color={lastMsg.is_read ? "#4CAF50" : theme.colors.onSurfaceVariant}
                   style={{ marginRight: 3 }}
                 />
               )}
