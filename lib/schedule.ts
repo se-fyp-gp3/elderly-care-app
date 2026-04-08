@@ -6,6 +6,17 @@ import {
     ScheduleCategory,
     ScheduleStatus,
 } from "@/types/appwrite";
+import { ID, Query } from "react-native-appwrite";
+import {
+    DATABASE_ID,
+    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+    ELDERLY_MEDICATION_TABLE_ID,
+    MEDICATION_LOGS_TABLE_ID,
+    MEDICATION_TABLE_ID,
+    SCHEDULE_CATEGORY_TABLE_ID,
+    SCHEDULE_TABLE_ID,
+    tablesDB,
+} from "./appwrite";
 
 /** Translate a medication unit string (e.g. "tablet" → "片") using i18n. */
 export function translateUnit(unit: string): string {
@@ -31,17 +42,6 @@ export function translateFrequency(freq: string): string {
   if (m) return i18n.t('medication.timesDaily', { times: m[1] });
   return freq;
 }
-import { ID, Query } from "react-native-appwrite";
-import {
-    DATABASE_ID,
-    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-    ELDERLY_MEDICATION_TABLE_ID,
-    MEDICATION_LOGS_TABLE_ID,
-    MEDICATION_TABLE_ID,
-    SCHEDULE_CATEGORY_TABLE_ID,
-    SCHEDULE_TABLE_ID,
-    tablesDB,
-} from "./appwrite";
 
 /**
  * A unified event item shown on the schedule timeline,

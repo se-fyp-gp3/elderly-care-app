@@ -3,8 +3,8 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { getLocales } from "react-native-localize";
 import en from "./en.json";
-import zh from "./zh.json";
 import zhHant from "./zh-Hant.json";
+import zh from "./zh.json";
 
 const LANGUAGE_STORAGE_KEY = "@app_language";
 

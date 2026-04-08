@@ -9,8 +9,8 @@
     ScheduleSingleEventCard,
 } from "@/components/schedule";
 import { useAuth } from "@/lib/auth-context";
-import { getDateLocale } from "@/lib/i18n";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
+import { getDateLocale } from "@/lib/i18n";
 import {
     createScheduleTask,
     fetchDayMedicationEvents,
