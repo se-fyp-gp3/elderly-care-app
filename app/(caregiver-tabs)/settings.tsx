@@ -1,37 +1,38 @@
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
-    deleteCustomVoiceRecord,
-    getCustomVoicesForCaregiver,
-    saveCustomVoiceRecord,
+  deleteCustomVoiceRecord,
+  getCustomVoicesForCaregiver,
+  saveCustomVoiceRecord,
 } from "@/lib/custom-voice";
 import { createPersonalVoice, readAudioFileAsBase64 } from "@/lib/personal-voice";
 import { Caregiver, CustomVoice, CustomVoiceStatus, Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
-    createAudioPlayer,
-    RecordingPresets,
-    requestRecordingPermissionsAsync,
-    setAudioModeAsync,
-    useAudioRecorder,
-    type AudioPlayer,
+  createAudioPlayer,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+  type AudioPlayer,
 } from "expo-audio";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
-    ActivityIndicator,
-    Banner,
-    Button,
-    Card,
-    Chip,
-    Divider,
-    IconButton,
-    SegmentedButtons,
-    Switch,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Banner,
+  Button,
+  Card,
+  Chip,
+  Divider,
+  IconButton,
+  List,
+  SegmentedButtons,
+  Switch,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 type VoiceCreationStep = "idle" | "recording" | "converting" | "cloning" | "done" | "error";
@@ -384,451 +385,205 @@ export default function Settings() {
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      <View style={styles.content}>
-        <Text variant="headlineSmall" style={styles.title}>
-          User Settings
+      {/* Header */}
+      <View style={styles.header}>
+        <Text variant="headlineMedium" style={styles.title}>
+          Settings
         </Text>
-
-        {/* Trial status banner */}
-        <Banner
-          visible={!isTrial}
-          icon="lock"
-          actions={[]}
-          style={styles.trialBanner}
+        <Text
+          variant="bodyLarge"
+          style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}
         >
-          Some settings are locked. Contact support to upgrade your account.
-        </Banner>
+          Manage your caregiver preferences
+        </Text>
+      </View>
 
-        {/* User Labels Display */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium">Account Status</Text>
-            <View style={styles.labelsContainer}>
-              {userLabels.length > 0 ? (
-                userLabels.map((label, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.labelChip,
-                      { backgroundColor: theme.colors.primaryContainer },
-                    ]}
-                  >
-                    <Text
-                      variant="bodySmall"
-                      style={{ color: theme.colors.onPrimaryContainer }}
-                    >
-                      {label}
-                    </Text>
-                  </View>
-                ))
-              ) : (
-                <Text variant="bodySmall" style={styles.noLabels}>
-                  No labels assigned
-                </Text>
-              )}
+      {/* Trial status banner */}
+      <Banner
+        visible={!isTrial}
+        icon="lock"
+        actions={[]}
+        style={styles.trialBanner}
+      >
+        Some settings are locked. Contact support to upgrade your account.
+      </Banner>
+
+      {/* ── Account ── */}
+      <Text variant="titleLarge" style={styles.sectionTitle}>
+        Account
+      </Text>
+      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <List.Item
+          title="Account Status"
+          titleStyle={styles.listTitle}
+          description={
+            userLabels.length > 0
+              ? userLabels.join(", ")
+              : "No labels assigned"
+          }
+          descriptionStyle={styles.listDescription}
+          left={() => (
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons
+                name="shield-account"
+                size={26}
+                color={theme.colors.primary}
+              />
             </View>
-          </Card.Content>
-        </Card>
+          )}
+          style={styles.listItem}
+        />
+        {userLabels.length > 0 && (
+          <View style={styles.labelsContainer}>
+            {userLabels.map((label, index) => (
+              <Chip
+                key={index}
+                compact
+                style={{ backgroundColor: theme.colors.primaryContainer }}
+                textStyle={{ color: theme.colors.onPrimaryContainer }}
+              >
+                {label}
+              </Chip>
+            ))}
+          </View>
+        )}
+        <View
+          style={[
+            styles.divider,
+            { backgroundColor: theme.colors.outlineVariant },
+          ]}
+        />
+        <List.Item
+          title="User Role"
+          titleStyle={styles.listTitle}
+          left={() => (
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons
+                name="account-switch"
+                size={26}
+                color={theme.colors.primary}
+              />
+            </View>
+          )}
+          style={styles.listItem}
+        />
+        <View style={styles.segmentedContainer}>
+          <SegmentedButtons
+            value={preferences.role || "elderly"}
+            onValueChange={(value) => setPreference("role", value)}
+            buttons={[
+              { value: "elderly", label: "elderly" },
+              { value: "caregiver", label: "caregiver" },
+            ]}
+            style={styles.segmentedButtons}
+          />
+          <Text variant="bodySmall" style={styles.roleWarning}>
+            ⚠️ Changing role will reset your profile (testing only)
+          </Text>
+        </View>
+      </Card>
 
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium">User Roles</Text>
-            <SegmentedButtons
-              value={preferences.role || "elderly"}
-              onValueChange={(value) => setPreference("role", value)}
-              buttons={[
-                { value: "elderly", label: "elderly" },
-                { value: "caregiver", label: "caregiver" },
-              ]}
-              style={styles.segmentedButtons}
-            />
-            <Text variant="bodySmall" style={styles.roleWarning}>
-              ⚠️ Changing role will reset your profile (testing only)
-            </Text>
-          </Card.Content>
-        </Card>
-
-        <Card style={[styles.card, !isTrial && styles.disabledCard]}>
-          <Card.Content>
-            <Text variant="titleMedium">Font size {!isTrial && "🔒"}</Text>
-            <SegmentedButtons
-              value={preferences.fontSize || "medium"}
-              onValueChange={(value) =>
-                isTrial && setPreference("fontSize", value)
-              }
-              buttons={[
-                { value: "small", label: "small" },
-                { value: "medium", label: "medium" },
-                { value: "large", label: "large" },
-              ]}
-              style={styles.segmentedButtons}
-              density="regular"
-            />
-          </Card.Content>
-        </Card>
-
-        <Card style={[styles.card, !isTrial && styles.disabledCard]}>
-          <Card.Content>
-            <Text variant="titleMedium">
-              AI voice intonation {!isTrial && "🔒"}
-            </Text>
-            <SegmentedButtons
-              value={preferences.voiceTone || "gentle"}
-              onValueChange={(value) =>
-                isTrial && setPreference("voiceTone", value)
-              }
-              buttons={[
-                { value: "gentle", label: "gentle" },
-                { value: "friendly", label: "friendly" },
-                { value: "professional", label: "professional" },
-              ]}
-              style={styles.segmentedButtons}
-            />
-          </Card.Content>
-        </Card>
-
-        {/* ───────── Personal AI Voice Section ───────── */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.voiceSectionHeader}>
+      {/* ── Display ── */}
+      <Text variant="titleLarge" style={styles.sectionTitle}>
+        Display
+      </Text>
+      <Card
+        style={[
+          styles.card,
+          { backgroundColor: theme.colors.surface },
+          !isTrial && styles.disabledCard,
+        ]}
+      >
+        <List.Item
+          title={`Font Size${!isTrial ? " 🔒" : ""}`}
+          titleStyle={styles.listTitle}
+          description={preferences.fontSize || "medium"}
+          descriptionStyle={styles.listDescription}
+          left={() => (
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons
+                name="format-size"
+                size={26}
+                color={theme.colors.primary}
+              />
+            </View>
+          )}
+          style={styles.listItem}
+        />
+        <View style={styles.segmentedContainer}>
+          <SegmentedButtons
+            value={preferences.fontSize || "medium"}
+            onValueChange={(value) =>
+              isTrial && setPreference("fontSize", value)
+            }
+            buttons={[
+              { value: "small", label: "small" },
+              { value: "medium", label: "medium" },
+              { value: "large", label: "large" },
+            ]}
+            style={styles.segmentedButtons}
+            density="regular"
+          />
+        </View>
+        <View
+          style={[
+            styles.divider,
+            { backgroundColor: theme.colors.outlineVariant },
+          ]}
+        />
+        <List.Item
+          title={`AI Voice Intonation${!isTrial ? " 🔒" : ""}`}
+          titleStyle={styles.listTitle}
+          description={preferences.voiceTone || "gentle"}
+          descriptionStyle={styles.listDescription}
+          left={() => (
+            <View style={styles.iconContainer}>
               <MaterialCommunityIcons
                 name="account-voice"
-                size={24}
+                size={26}
                 color={theme.colors.primary}
               />
-              <Text variant="titleMedium" style={styles.voiceSectionTitle}>
-                Personal AI Voice
-              </Text>
             </View>
-            <Text variant="bodySmall" style={styles.hintText}>
-              Record your voice to create a personal voice clone for selected
-              elderly. The AI will speak in your voice when chatting with them.
-            </Text>
+          )}
+          style={styles.listItem}
+        />
+        <View style={styles.segmentedContainer}>
+          <SegmentedButtons
+            value={preferences.voiceTone || "gentle"}
+            onValueChange={(value) =>
+              isTrial && setPreference("voiceTone", value)
+            }
+            buttons={[
+              { value: "gentle", label: "gentle" },
+              { value: "friendly", label: "friendly" },
+              { value: "professional", label: "professional" },
+            ]}
+            style={styles.segmentedButtons}
+          />
+        </View>
+      </Card>
 
-            {/* Elderly selector */}
-            <Text variant="labelLarge" style={styles.voiceSectionLabel}>
-              Select Elderly
-            </Text>
-            {linkedElderly.length === 0 ? (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons
-                  name="account-off"
-                  size={32}
-                  color={theme.colors.outlineVariant}
-                />
-                <Text variant="bodySmall" style={styles.hintText}>
-                  No linked elderly found. Link an elderly first.
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.elderlyChipsWrap}>
-                {linkedElderly.map((elderly) => {
-                  const selected = selectedElderlyId === elderly.$id;
-                  const hasVoice = existingVoices.some(
-                    (v) =>
-                      v.elderly_id === elderly.$id &&
-                      v.status === CustomVoiceStatus.READY,
-                  );
-                  return (
-                    <Chip
-                      key={elderly.$id}
-                      selected={selected}
-                      onPress={() => setSelectedElderlyId(elderly.$id)}
-                      icon={hasVoice ? "check-circle" : undefined}
-                      style={[
-                        styles.elderlyChip,
-                        selected && {
-                          backgroundColor: theme.colors.primaryContainer,
-                        },
-                      ]}
-                    >
-                      {elderly.name || "Unnamed"}
-                    </Chip>
-                  );
-                })}
-              </View>
-            )}
-
-            <Divider style={styles.sectionDivider} />
-
-            {/* Recording section */}
-            <Text variant="labelLarge" style={styles.voiceSectionLabel}>
-              Voice Sample
-            </Text>
-            <Text variant="bodySmall" style={styles.hintText}>
-              Record at least 3 seconds of your voice, or pick an existing audio
-              file. Speak naturally in a quiet environment.
-            </Text>
-
-            {/* Recording indicator */}
-            {isRecordingSample && (
-              <View
-                style={[
-                  styles.recordingIndicator,
-                  { backgroundColor: theme.colors.errorContainer },
-                ]}
-              >
-                <View style={styles.recordingDot} />
-                <Text
-                  variant="bodyMedium"
-                  style={{ color: theme.colors.onErrorContainer, fontWeight: "600" }}
-                >
-                  Recording... {recordingSeconds}s
-                </Text>
-              </View>
-            )}
-
-            {recordingSampleUri && !isRecordingSample && (
-              <View
-                style={[
-                  styles.sampleReadyBanner,
-                  { backgroundColor: theme.colors.secondaryContainer },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="check-circle"
-                  size={20}
-                  color={theme.colors.onSecondaryContainer}
-                />
-                <Text
-                  variant="bodySmall"
-                  style={{
-                    color: theme.colors.onSecondaryContainer,
-                    marginLeft: 8,
-                    flex: 1,
-                  }}
-                >
-                  Sample ready ({recordingSeconds}s)
-                </Text>
-                <IconButton
-                  icon={isPlayingSample ? "stop" : "play"}
-                  size={22}
-                  onPress={handleTogglePlayback}
-                  iconColor={theme.colors.onSecondaryContainer}
-                  style={{ margin: 0 }}
-                />
-              </View>
-            )}
-
-            <View style={styles.voiceActionsRow}>
-              <Button
-                mode={isRecordingSample ? "contained" : "outlined"}
-                onPress={
-                  isRecordingSample
-                    ? handleStopVoiceRecording
-                    : handleStartVoiceRecording
-                }
-                disabled={isCreatingVoice}
-                icon={isRecordingSample ? "stop" : "microphone"}
-                buttonColor={isRecordingSample ? theme.colors.error : undefined}
-                textColor={isRecordingSample ? theme.colors.onError : undefined}
-                style={styles.actionButton}
-              >
-                {isRecordingSample ? "Stop" : "Record"}
-              </Button>
-              <Button
-                mode="outlined"
-                onPress={handlePickAudioFile}
-                disabled={isCreatingVoice || isRecordingSample}
-                icon="file-music"
-                style={styles.actionButton}
-              >
-                Pick File
-              </Button>
-            </View>
-            <View style={[styles.voiceActionsRow, { marginTop: 0 }]}>
-              <Button
-                mode="contained"
-                onPress={handleCreatePersonalVoice}
-                disabled={
-                  isCreatingVoice ||
-                  !recordingSampleUri ||
-                  !selectedElderlyId ||
-                  linkedElderly.length === 0
-                }
-                icon="creation"
-                style={styles.actionButton}
-              >
-                Create Voice
-              </Button>
-            </View>
-
-            {/* Voice creation progress */}
-            {voiceStep !== "idle" && (
-              <View
-                style={[
-                  styles.progressBanner,
-                  {
-                    backgroundColor:
-                      voiceStep === "error"
-                        ? theme.colors.errorContainer
-                        : voiceStep === "done"
-                          ? theme.colors.secondaryContainer
-                          : theme.colors.surfaceVariant,
-                  },
-                ]}
-              >
-                {isCreatingVoice && <ActivityIndicator size="small" />}
-                {voiceStep === "done" && (
-                  <MaterialCommunityIcons
-                    name="check-circle"
-                    size={20}
-                    color={theme.colors.onSecondaryContainer}
-                  />
-                )}
-                {voiceStep === "error" && (
-                  <MaterialCommunityIcons
-                    name="alert-circle"
-                    size={20}
-                    color={theme.colors.error}
-                  />
-                )}
-                <Text
-                  variant="bodySmall"
-                  style={[
-                    styles.progressText,
-                    voiceStep === "error" && { color: theme.colors.error },
-                  ]}
-                >
-                  {voiceStepMessage}
-                </Text>
-                {voiceStep === "error" && (
-                  <Button
-                    mode="text"
-                    compact
-                    onPress={() => setVoiceStep("idle")}
-                  >
-                    Dismiss
-                  </Button>
-                )}
-              </View>
-            )}
-
-            <Divider style={styles.sectionDivider} />
-
-            {/* Existing voices for selected elderly */}
-            <Text variant="labelLarge" style={styles.voiceSectionLabel}>
-              Existing Voices{" "}
-              {selectedElderlyId
-                ? `for ${getElderlyName(selectedElderlyId)}`
-                : ""}
-            </Text>
-
-            {loadingVoices ? (
-              <ActivityIndicator size="small" style={{ marginTop: 12 }} />
-            ) : voicesForSelected.length === 0 ? (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons
-                  name="volume-off"
-                  size={28}
-                  color={theme.colors.outlineVariant}
-                />
-                <Text variant="bodySmall" style={styles.hintText}>
-                  No voice clones yet. Record and create one above.
-                </Text>
-              </View>
-            ) : (
-              voicesForSelected.map((voice) => (
-                <View
-                  key={voice.$id}
-                  style={[
-                    styles.voiceRow,
-                    { backgroundColor: theme.colors.surfaceVariant },
-                  ]}
-                >
-                  <View style={styles.voiceRowInfo}>
-                    <MaterialCommunityIcons
-                      name="account-voice"
-                      size={20}
-                      color={theme.colors.primary}
-                    />
-                    <View style={{ marginLeft: 10, flex: 1 }}>
-                      <Text variant="bodyMedium" style={{ fontWeight: "600" }}>
-                        {voice.caregiver_name}
-                      </Text>
-                      <Text
-                        variant="bodySmall"
-                        style={{ color: theme.colors.onSurfaceVariant }}
-                        numberOfLines={1}
-                      >
-                        {voice.voice_id.startsWith("ref:")
-                          ? "Reference voice"
-                          : `ID: ${voice.voice_id}`}
-                      </Text>
-                      <Text
-                        variant="bodySmall"
-                        style={{ color: theme.colors.onSurfaceVariant }}
-                      >
-                        Status: {voice.status}
-                        {voice.created_at
-                          ? ` · ${new Date(voice.created_at).toLocaleDateString()}`
-                          : ""}
-                      </Text>
-                    </View>
-                  </View>
-                  <IconButton
-                    icon="delete"
-                    size={20}
-                    iconColor={theme.colors.error}
-                    onPress={() => handleDeleteVoice(voice)}
-                    disabled={deletingVoiceId === voice.$id}
-                  />
-                  {deletingVoiceId === voice.$id && (
-                    <ActivityIndicator size="small" />
-                  )}
-                </View>
-              ))
-            )}
-          </Card.Content>
-        </Card>
-
-        {/* ───────── Voice Reply Language Section ───────── */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.sectionHeaderRow}>
+      {/* ── Notifications ── */}
+      <Text variant="titleLarge" style={styles.sectionTitle}>
+        Notifications
+      </Text>
+      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <List.Item
+          title="Push Notifications"
+          titleStyle={styles.listTitle}
+          description="Receive medication and appointment reminders"
+          descriptionStyle={styles.listDescription}
+          left={() => (
+            <View style={styles.iconContainer}>
               <MaterialCommunityIcons
-                name="translate"
-                size={22}
+                name="bell"
+                size={26}
                 color={theme.colors.primary}
               />
-              <Text variant="titleMedium" style={{ marginLeft: 8, fontWeight: "600" }}>
-                Voice Reply Language
-              </Text>
             </View>
-            <Text variant="bodySmall" style={[styles.hintText, { marginBottom: 12 }]}>
-              Set the language for AI voice replies to elderly users.
-            </Text>
-            <View style={styles.langChipRow}>
-              {([
-                { key: "cantonese", label: "粵語" },
-                { key: "mandarin", label: "普通話" },
-                { key: "english", label: "English" },
-              ] as const).map((opt) => {
-                const currentLang = (preferences.voiceReplyLang as string) ?? "cantonese";
-                return (
-                  <Chip
-                    key={opt.key}
-                    selected={currentLang === opt.key}
-                    onPress={() => handleSetPreference("voiceReplyLang", opt.key)}
-                    style={[
-                      styles.langChip,
-                      currentLang === opt.key && { backgroundColor: theme.colors.primaryContainer },
-                    ]}
-                    textStyle={currentLang === opt.key ? { color: theme.colors.onPrimaryContainer, fontWeight: "600" } : undefined}
-                    showSelectedOverlay
-                  >
-                    {opt.label}
-                  </Chip>
-                );
-              })}
-            </View>
-          </Card.Content>
-        </Card>
-
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.switchRow}>
-              <Text variant="titleMedium">Push notifications</Text>
+          )}
+          right={() => (
+            <View style={styles.rightContainer}>
               <Switch
                 value={preferences.notifications !== false}
                 onValueChange={(value) =>
@@ -836,84 +591,511 @@ export default function Settings() {
                 }
               />
             </View>
-          </Card.Content>
-        </Card>
+          )}
+          style={styles.listItem}
+        />
+      </Card>
 
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium">Add custom settings</Text>
-            <TextInput
-              label="Setting item name"
-              value={newPreference.key}
-              onChangeText={(text) =>
-                setNewPreference((prev) => ({ ...prev, key: text }))
+      {/* ── Personal AI Voice ── */}
+      <Text variant="titleLarge" style={styles.sectionTitle}>
+        Personal AI Voice
+      </Text>
+      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <Card.Content style={{ paddingVertical: 20 }}>
+          <Text
+            variant="bodyMedium"
+            style={{ color: theme.colors.onSurfaceVariant, lineHeight: 22 }}
+          >
+            Record your voice to create a personal voice clone for selected
+            elderly. The AI will speak in your voice when chatting with them.
+          </Text>
+
+          {/* Elderly selector */}
+          <Text variant="titleSmall" style={styles.voiceSectionLabel}>
+            Select Elderly
+          </Text>
+          {linkedElderly.length === 0 ? (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons
+                name="account-off"
+                size={32}
+                color={theme.colors.outlineVariant}
+              />
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                No linked elderly found. Link an elderly first.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.elderlyChipsWrap}>
+              {linkedElderly.map((elderly) => {
+                const selected = selectedElderlyId === elderly.$id;
+                const hasVoice = existingVoices.some(
+                  (v) =>
+                    v.elderly_id === elderly.$id &&
+                    v.status === CustomVoiceStatus.READY,
+                );
+                return (
+                  <Chip
+                    key={elderly.$id}
+                    selected={selected}
+                    onPress={() => setSelectedElderlyId(elderly.$id)}
+                    icon={hasVoice ? "check-circle" : undefined}
+                    style={[
+                      styles.elderlyChip,
+                      selected && {
+                        backgroundColor: theme.colors.primaryContainer,
+                      },
+                    ]}
+                  >
+                    {elderly.name || "Unnamed"}
+                  </Chip>
+                );
+              })}
+            </View>
+          )}
+
+          <Divider style={styles.sectionDivider} />
+
+          {/* Recording section */}
+          <Text variant="titleSmall" style={styles.voiceSectionLabel}>
+            Voice Sample
+          </Text>
+          <Text
+            variant="bodySmall"
+            style={{ color: theme.colors.onSurfaceVariant, marginBottom: 8 }}
+          >
+            Record at least 3 seconds of your voice, or pick an existing audio
+            file. Speak naturally in a quiet environment.
+          </Text>
+
+          {/* Recording indicator */}
+          {isRecordingSample && (
+            <View
+              style={[
+                styles.recordingIndicator,
+                { backgroundColor: theme.colors.errorContainer },
+              ]}
+            >
+              <View style={styles.recordingDot} />
+              <Text
+                variant="bodyMedium"
+                style={{
+                  color: theme.colors.onErrorContainer,
+                  fontWeight: "600",
+                }}
+              >
+                Recording... {recordingSeconds}s
+              </Text>
+            </View>
+          )}
+
+          {recordingSampleUri && !isRecordingSample && (
+            <View
+              style={[
+                styles.sampleReadyBanner,
+                { backgroundColor: theme.colors.secondaryContainer },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="check-circle"
+                size={20}
+                color={theme.colors.onSecondaryContainer}
+              />
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: theme.colors.onSecondaryContainer,
+                  marginLeft: 8,
+                  flex: 1,
+                }}
+              >
+                Sample ready ({recordingSeconds}s)
+              </Text>
+              <IconButton
+                icon={isPlayingSample ? "stop" : "play"}
+                size={22}
+                onPress={handleTogglePlayback}
+                iconColor={theme.colors.onSecondaryContainer}
+                style={{ margin: 0 }}
+              />
+            </View>
+          )}
+
+          <View style={styles.voiceActionsRow}>
+            <Button
+              mode={isRecordingSample ? "contained" : "outlined"}
+              onPress={
+                isRecordingSample
+                  ? handleStopVoiceRecording
+                  : handleStartVoiceRecording
               }
+              disabled={isCreatingVoice}
+              icon={isRecordingSample ? "stop" : "microphone"}
+              buttonColor={isRecordingSample ? theme.colors.error : undefined}
+              textColor={isRecordingSample ? theme.colors.onError : undefined}
+              style={styles.actionButton}
+            >
+              {isRecordingSample ? "Stop" : "Record"}
+            </Button>
+            <Button
               mode="outlined"
-              style={styles.input}
-            />
-            <TextInput
-              label="Set value (JSON supported)"
-              value={newPreference.value}
-              onChangeText={(text) =>
-                setNewPreference((prev) => ({ ...prev, value: text }))
-              }
-              mode="outlined"
-              style={styles.input}
-              multiline
-            />
+              onPress={handlePickAudioFile}
+              disabled={isCreatingVoice || isRecordingSample}
+              icon="file-music"
+              style={styles.actionButton}
+            >
+              Pick File
+            </Button>
+          </View>
+          <View style={[styles.voiceActionsRow, { marginTop: 16 }]}>
             <Button
               mode="contained"
-              onPress={handleAddPreference}
-              disabled={!newPreference.key.trim()}
+              onPress={handleCreatePersonalVoice}
+              disabled={
+                isCreatingVoice ||
+                !recordingSampleUri ||
+                !selectedElderlyId ||
+                linkedElderly.length === 0
+              }
+              icon="creation"
+              style={styles.actionButton}
             >
-              Add Settings
+              Create Voice
             </Button>
-          </Card.Content>
-        </Card>
+          </View>
 
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="titleMedium">Current Settings</Text>
-            {Object.entries(preferences).map(([key, value]) => (
-              <View key={key} style={styles.preferenceItem}>
-                <View style={styles.preferenceText}>
-                  <Text variant="bodyMedium" style={styles.preferenceKey}>
-                    {key}:
-                  </Text>
-                  <Text variant="bodyMedium" style={styles.preferenceValue}>
-                    {typeof value === "object"
-                      ? JSON.stringify(value)
-                      : String(value)}
-                  </Text>
+          {/* Voice creation progress */}
+          {voiceStep !== "idle" && (
+            <View
+              style={[
+                styles.progressBanner,
+                {
+                  backgroundColor:
+                    voiceStep === "error"
+                      ? theme.colors.errorContainer
+                      : voiceStep === "done"
+                        ? theme.colors.secondaryContainer
+                        : theme.colors.surfaceVariant,
+                },
+              ]}
+            >
+              {isCreatingVoice && <ActivityIndicator size="small" />}
+              {voiceStep === "done" && (
+                <MaterialCommunityIcons
+                  name="check-circle"
+                  size={20}
+                  color={theme.colors.onSecondaryContainer}
+                />
+              )}
+              {voiceStep === "error" && (
+                <MaterialCommunityIcons
+                  name="alert-circle"
+                  size={20}
+                  color={theme.colors.error}
+                />
+              )}
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.progressText,
+                  voiceStep === "error" && { color: theme.colors.error },
+                ]}
+              >
+                {voiceStepMessage}
+              </Text>
+              {voiceStep === "error" && (
+                <Button
+                  mode="text"
+                  compact
+                  onPress={() => setVoiceStep("idle")}
+                >
+                  Dismiss
+                </Button>
+              )}
+            </View>
+          )}
+
+          <Divider style={styles.sectionDivider} />
+
+          {/* Existing voices for selected elderly */}
+          <Text variant="titleSmall" style={styles.voiceSectionLabel}>
+            Existing Voices{" "}
+            {selectedElderlyId
+              ? `for ${getElderlyName(selectedElderlyId)}`
+              : ""}
+          </Text>
+
+          {loadingVoices ? (
+            <ActivityIndicator size="small" style={{ marginTop: 12 }} />
+          ) : voicesForSelected.length === 0 ? (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons
+                name="volume-off"
+                size={28}
+                color={theme.colors.outlineVariant}
+              />
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                No voice clones yet. Record and create one above.
+              </Text>
+            </View>
+          ) : (
+            voicesForSelected.map((voice) => (
+              <View
+                key={voice.$id}
+                style={[
+                  styles.voiceRow,
+                  { backgroundColor: theme.colors.surfaceVariant },
+                ]}
+              >
+                <View style={styles.voiceRowInfo}>
+                  <MaterialCommunityIcons
+                    name="account-voice"
+                    size={20}
+                    color={theme.colors.primary}
+                  />
+                  <View style={{ marginLeft: 10, flex: 1 }}>
+                    <Text variant="bodyMedium" style={{ fontWeight: "600" }}>
+                      {voice.caregiver_name}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                      numberOfLines={1}
+                    >
+                      {voice.voice_id.startsWith("ref:")
+                        ? "Reference voice"
+                        : `ID: ${voice.voice_id}`}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      Status: {voice.status}
+                      {voice.created_at
+                        ? ` · ${new Date(voice.created_at).toLocaleDateString()}`
+                        : ""}
+                    </Text>
+                  </View>
                 </View>
-                {!["role", "fontSize", "voiceTone", "notifications"].includes(
-                  key,
-                ) && (
-                  <Button
-                    mode="outlined"
-                    compact
-                    onPress={() => handleRemovePreference(key)}
-                  >
-                    delete
-                  </Button>
+                <IconButton
+                  icon="delete"
+                  size={20}
+                  iconColor={theme.colors.error}
+                  onPress={() => handleDeleteVoice(voice)}
+                  disabled={deletingVoiceId === voice.$id}
+                />
+                {deletingVoiceId === voice.$id && (
+                  <ActivityIndicator size="small" />
                 )}
               </View>
-            ))}
-            {Object.keys(preferences).length === 0 && (
-              <Text style={styles.noPreferences}>No custom settings yet</Text>
-            )}
-          </Card.Content>
-        </Card>
+            ))
+          )}
+        </Card.Content>
+      </Card>
 
-        <Button
-          mode="contained"
-          buttonColor={theme.colors.error}
-          onPress={signOut}
-          style={styles.card}
-        >
-          Log Out
-        </Button>
-      </View>
+      {/* ── Voice Reply Language ── */}
+      <Text variant="titleLarge" style={styles.sectionTitle}>
+        Voice Reply Language
+      </Text>
+      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <List.Item
+          title="Reply Language"
+          titleStyle={styles.listTitle}
+          description="Set the language for AI voice replies to elderly users"
+          descriptionStyle={styles.listDescription}
+          left={() => (
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons
+                name="translate"
+                size={26}
+                color={theme.colors.primary}
+              />
+            </View>
+          )}
+          style={styles.listItem}
+        />
+        <View style={styles.langChipRow}>
+          {(
+            [
+              { key: "cantonese", label: "粵語" },
+              { key: "mandarin", label: "普通話" },
+              { key: "english", label: "English" },
+            ] as const
+          ).map((opt) => {
+            const currentLang =
+              (preferences.voiceReplyLang as string) ?? "cantonese";
+            return (
+              <Chip
+                key={opt.key}
+                selected={currentLang === opt.key}
+                onPress={() =>
+                  handleSetPreference("voiceReplyLang", opt.key)
+                }
+                style={[
+                  styles.langChip,
+                  currentLang === opt.key && {
+                    backgroundColor: theme.colors.primaryContainer,
+                  },
+                ]}
+                textStyle={
+                  currentLang === opt.key
+                    ? {
+                        color: theme.colors.onPrimaryContainer,
+                        fontWeight: "600",
+                      }
+                    : undefined
+                }
+                showSelectedOverlay
+              >
+                {opt.label}
+              </Chip>
+            );
+          })}
+        </View>
+      </Card>
+
+      {/* ── Custom Settings ── */}
+      <Text variant="titleLarge" style={styles.sectionTitle}>
+        Custom Settings
+      </Text>
+      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <Card.Content style={{ paddingVertical: 20 }}>
+          <View style={styles.sectionHeaderRow}>
+            <MaterialCommunityIcons
+              name="cog-outline"
+              size={22}
+              color={theme.colors.primary}
+            />
+            <Text
+              variant="titleMedium"
+              style={{ marginLeft: 8, fontWeight: "600" }}
+            >
+              Add Custom Setting
+            </Text>
+          </View>
+          <TextInput
+            label="Setting item name"
+            value={newPreference.key}
+            onChangeText={(text) =>
+              setNewPreference((prev) => ({ ...prev, key: text }))
+            }
+            mode="outlined"
+            style={styles.input}
+          />
+          <TextInput
+            label="Set value (JSON supported)"
+            value={newPreference.value}
+            onChangeText={(text) =>
+              setNewPreference((prev) => ({ ...prev, value: text }))
+            }
+            mode="outlined"
+            style={styles.input}
+            multiline
+          />
+          <Button
+            mode="contained"
+            onPress={handleAddPreference}
+            disabled={!newPreference.key.trim()}
+            icon="plus"
+            style={{ borderRadius: 12 }}
+          >
+            Add Setting
+          </Button>
+        </Card.Content>
+      </Card>
+
+      {/* ── Current Settings ── */}
+      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <Card.Content style={{ paddingVertical: 20 }}>
+          <View style={styles.sectionHeaderRow}>
+            <MaterialCommunityIcons
+              name="format-list-bulleted"
+              size={22}
+              color={theme.colors.primary}
+            />
+            <Text
+              variant="titleMedium"
+              style={{ marginLeft: 8, fontWeight: "600" }}
+            >
+              Current Settings
+            </Text>
+          </View>
+          {Object.entries(preferences).map(([key, value]) => (
+            <View key={key} style={styles.preferenceItem}>
+              <View style={styles.preferenceText}>
+                <Text variant="bodyMedium" style={styles.preferenceKey}>
+                  {key}:
+                </Text>
+                <Text variant="bodyMedium" style={styles.preferenceValue}>
+                  {typeof value === "object"
+                    ? JSON.stringify(value)
+                    : String(value)}
+                </Text>
+              </View>
+              {!["role", "fontSize", "voiceTone", "notifications"].includes(
+                key,
+              ) && (
+                <Button
+                  mode="outlined"
+                  compact
+                  onPress={() => handleRemovePreference(key)}
+                  icon="delete"
+                  style={{ borderRadius: 12 }}
+                >
+                  delete
+                </Button>
+              )}
+            </View>
+          ))}
+          {Object.keys(preferences).length === 0 && (
+            <Text style={styles.noPreferences}>No custom settings yet</Text>
+          )}
+        </Card.Content>
+      </Card>
+
+      {/* ── About ── */}
+      <Text variant="titleLarge" style={styles.sectionTitle}>
+        About
+      </Text>
+      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <List.Item
+          title="About App"
+          titleStyle={styles.listTitle}
+          description="Version 1.0.0"
+          descriptionStyle={styles.listDescription}
+          left={() => (
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons
+                name="information"
+                size={26}
+                color={theme.colors.primary}
+              />
+            </View>
+          )}
+          style={styles.listItem}
+        />
+      </Card>
+
+      {/* ── Sign Out ── */}
+      <Button
+        mode="contained"
+        onPress={signOut}
+        style={styles.logoutButton}
+        contentStyle={styles.logoutButtonContent}
+        labelStyle={styles.logoutButtonLabel}
+        icon="logout"
+        buttonColor={theme.colors.error}
+      >
+        Sign Out
+      </Button>
+
+      <View style={styles.bottomSpacer} />
     </ScrollView>
   );
 }
@@ -921,71 +1103,86 @@ export default function Settings() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 20,
   },
-  content: {
-    padding: 16,
+  header: {
+    marginBottom: 28,
   },
   title: {
     fontWeight: "bold",
-    marginBottom: 24,
-    textAlign: "center",
+  },
+  sectionTitle: {
+    fontWeight: "bold",
+    marginTop: 12,
+    marginBottom: 14,
+  },
+  trialBanner: {
+    marginBottom: 16,
+    borderRadius: 12,
   },
   card: {
-    marginBottom: 16,
+    marginBottom: 20,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+  },
+  listItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+  },
+  listTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  listDescription: {
+    fontSize: 14,
+    marginTop: 3,
+  },
+  iconContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#E8F0FE",
+    marginLeft: 8,
+  },
+  rightContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  divider: {
+    height: 1,
+    marginHorizontal: 20,
+  },
+  disabledCard: {
+    opacity: 0.6,
   },
   segmentedButtons: {
-    marginTop: 8,
+    marginTop: 4,
+  },
+  segmentedContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 14,
   },
   roleWarning: {
     marginTop: 8,
     color: "#f57c00",
     fontStyle: "italic",
   },
-  trialBanner: {
-    marginBottom: 16,
-  },
   labelsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginTop: 8,
-  },
-  labelChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  noLabels: {
-    color: "#666",
-    fontStyle: "italic",
-  },
-  disabledCard: {
-    opacity: 0.6,
-  },
-  switchRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  input: {
-    marginBottom: 12,
-  },
-  hintText: {
-    marginTop: 6,
-    color: "#666",
+    paddingHorizontal: 20,
+    paddingBottom: 14,
   },
   // ── Voice section styles ──
-  voiceSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  voiceSectionTitle: {
-    marginLeft: 8,
-    fontWeight: "bold",
-  },
   voiceSectionLabel: {
-    marginTop: 12,
+    marginTop: 16,
     marginBottom: 8,
     fontWeight: "600",
   },
@@ -998,7 +1195,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sectionDivider: {
-    marginVertical: 14,
+    marginVertical: 16,
   },
   emptyState: {
     alignItems: "center",
@@ -1009,7 +1206,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 14,
     marginTop: 8,
     marginBottom: 8,
     gap: 10,
@@ -1023,8 +1220,8 @@ const styles = StyleSheet.create({
   sampleReadyBanner: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 10,
-    borderRadius: 10,
+    padding: 12,
+    borderRadius: 14,
     marginTop: 8,
     marginBottom: 8,
   },
@@ -1037,12 +1234,13 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
     minWidth: 120,
+    borderRadius: 12,
   },
   progressBanner: {
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 14,
     marginTop: 10,
     gap: 10,
   },
@@ -1052,7 +1250,7 @@ const styles = StyleSheet.create({
   voiceRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
     marginBottom: 8,
   },
@@ -1061,11 +1259,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  // ── Language chips ──
+  langChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  langChip: {
+    borderRadius: 20,
+  },
+  // ── Input ──
+  input: {
+    marginBottom: 12,
+  },
+  // ── Preferences ──
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
   preferenceItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
   },
@@ -1086,17 +1305,20 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     marginVertical: 16,
   },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  langChipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  langChip: {
+  // ── Logout ──
+  logoutButton: {
+    marginTop: 28,
     borderRadius: 20,
+    elevation: 3,
+  },
+  logoutButtonContent: {
+    height: 56,
+  },
+  logoutButtonLabel: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  bottomSpacer: {
+    height: 40,
   },
 });
