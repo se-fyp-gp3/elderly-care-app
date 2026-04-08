@@ -434,8 +434,12 @@ export default function MedicationManagement() {
                 labelStyle={{ fontSize: 14 }}
               >
                 {statusFilter === "all"
-                  ? "Status"
-                  : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                  ? t('medication.filterStatus')
+                  : statusFilter === "pending"
+                    ? t('common.pending')
+                    : statusFilter === "completed"
+                      ? t('common.completed')
+                      : t('common.missed')}
               </Button>
               <Button
                 mode="text"

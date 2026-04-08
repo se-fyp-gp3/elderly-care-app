@@ -265,8 +265,7 @@ export default function TimeSlotCard({
                       ? t('common.taken')
                       : med.status === "pending"
                         ? t('common.pending')
-                        : med.status.charAt(0).toUpperCase() +
-                          med.status.slice(1)}
+                        : t('common.missed')}
                   </Text>
                 </View>
               </View>
