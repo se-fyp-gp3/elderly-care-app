@@ -41,7 +41,15 @@
     "active": "Active",
     "resolved": "Resolved",
     "welcomeToElderlyCare": "Welcome to the Elderly Care",
-    "provideServices": "Provide considerate services for the elderly and caregivers"
+    "provideServices": "Provide considerate services for the elderly and caregivers",
+    "never": "Never",
+    "justNow": "Just now",
+    "minutesAgo": "{{minutes}}m ago",
+    "hoursAgo": "{{hours}}h ago",
+    "daysAgo": "{{days}}d ago",
+    "noData": "No data",
+    "medicationCount_one": "{{count}} medication",
+    "medicationCount_other": "{{count}} medications"
   },
   "tabs": {
     "home": "Home",
@@ -351,7 +359,15 @@
     "allTakenToday": "All taken today",
     "nextMed": "Next: {{time}} {{name}}",
     "oneMissed": "1 missed · {{name}}",
-    "multipleMissed": "{{count}} missed"
+    "multipleMissed": "{{count}} missed",
+    "missedMedToday": "{{count}} missed medication(s) today",
+    "missedAndPending": "{{missed}} missed, {{pending}} pending",
+    "xMissed": "{{count}} missed",
+    "xPending": "{{count}} pending",
+    "noSchedule": "No schedule",
+    "upToDate": "Up to date",
+    "allTakenText": "All taken",
+    "unknownMedStatus": "Unknown"
   },
   "emergency": {
     "noEmergencyContact": "No Emergency Contact",
@@ -531,7 +547,15 @@
     "dateOfBirth": "Date of Birth",
     "bloodType": "Blood Type",
     "phone": "Phone",
-    "steps": "{{count}} steps"
+    "steps": "{{count}} steps",
+    "highBP": "High BP: {{sys}}/{{dia}} mmHg",
+    "lowBP": "Low BP: {{sys}}/{{dia}} mmHg",
+    "highHeartRate": "High heart rate: {{hr}} bpm",
+    "lowHeartRate": "Low heart rate: {{hr}} bpm",
+    "fever": "Fever: {{temp}}°C",
+    "lowTemperature": "Low temperature: {{temp}}°C",
+    "noCheckIn": "No check-in for {{days}} days",
+    "noHealthDataRecorded": "No health data recorded"
   },
   "messages": {
     "noCaregiversYet": "No Caregivers Yet",

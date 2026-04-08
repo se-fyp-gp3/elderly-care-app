@@ -351,7 +351,7 @@ export default function HealthDataPage() {
                   { color: theme.colors.onSurfaceVariant },
                 ]}
               >
-                {item.type || "Health Record"}
+                {item.type || t('healthData.healthRecord')}
               </Text>
               <Text
                 style={[
@@ -392,16 +392,16 @@ export default function HealthDataPage() {
 
   const bpSub = latestMetrics["Blood Pressure"]?.time
     ? formatTime(latestMetrics["Blood Pressure"].time).date
-    : "No data";
+    : t('common.noData');
   const hrSub = latestMetrics["Heart Rate"]?.time
     ? formatTime(latestMetrics["Heart Rate"].time).date
-    : "No data";
+    : t('common.noData');
   const tempSub = latestMetrics["Temperature"]?.time
     ? formatTime(latestMetrics["Temperature"].time).date
-    : "No data";
+    : t('common.noData');
   const weightSub = latestMetrics["Weight"]?.time
     ? formatTime(latestMetrics["Weight"].time).date
-    : "No data";
+    : t('common.noData');
 
   return (
     <View
@@ -510,15 +510,15 @@ export default function HealthDataPage() {
         <View style={[styles.filterSection, { paddingHorizontal: 16 }]}>
           {[
             [
-              { label: "All",            short: "All",   icon: "view-grid-outline", color: "" },
-              { label: "Blood Pressure", short: "BP",    icon: "heart-pulse",       color: "#2196F3" },
-              { label: "Heart Rate",     short: "HR",    icon: "heart-flash",       color: "#F44336" },
-              { label: "Temperature",    short: "Temp",  icon: "thermometer",       color: "#FF9800" },
+              { label: "All",            short: t('common.all'),   icon: "view-grid-outline", color: "" },
+              { label: "Blood Pressure", short: t('healthData.bp'),    icon: "heart-pulse",       color: "#2196F3" },
+              { label: "Heart Rate",     short: t('healthData.hr'),    icon: "heart-flash",       color: "#F44336" },
+              { label: "Temperature",    short: t('healthData.temp'),  icon: "thermometer",       color: "#FF9800" },
             ],
             [
-              { label: "Weight",            short: "Weight", icon: "scale-bathroom", color: "#4CAF50" },
-              { label: "Blood Sugar",       short: "Sugar",  icon: "water",           color: "#9C27B0" },
-              { label: "Oxygen Saturation", short: "SpO₂",  icon: "lungs",           color: "#00BCD4" },
+              { label: "Weight",            short: t('healthData.weight'), icon: "scale-bathroom", color: "#4CAF50" },
+              { label: "Blood Sugar",       short: t('healthData.sugar'),  icon: "water",           color: "#9C27B0" },
+              { label: "Oxygen Saturation", short: t('healthData.spo2'),  icon: "lungs",           color: "#00BCD4" },
             ],
           ].map((row, rowIdx) => (
             <View key={rowIdx} style={{ flexDirection: "row", gap: 8, marginBottom: rowIdx === 0 ? 8 : 0 }}>

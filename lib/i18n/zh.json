@@ -41,7 +41,15 @@
     "active": "进行中",
     "resolved": "已解决",
     "welcomeToElderlyCare": "欢迎来到长者照护",
-    "provideServices": "为长者和照顾者提供周到的服务"
+    "provideServices": "为长者和照顾者提供周到的服务",
+    "never": "从未",
+    "justNow": "刚刚",
+    "minutesAgo": "{{minutes}}分钟前",
+    "hoursAgo": "{{hours}}小时前",
+    "daysAgo": "{{days}}天前",
+    "noData": "无数据",
+    "medicationCount_one": "{{count}} 种药物",
+    "medicationCount_other": "{{count}} 种药物"
   },
   "tabs": {
     "home": "首页",
@@ -350,6 +358,14 @@
     "nextMed": "下一个：{{time}} {{name}}",
     "oneMissed": "1 漏服 · {{name}}",
     "multipleMissed": "{{count}} 漏服",
+    "missedMedToday": "今日 {{count}} 种药物漏服",
+    "missedAndPending": "{{missed}} 漏服，{{pending}} 待处理",
+    "xMissed": "{{count}} 漏服",
+    "xPending": "{{count}} 待处理",
+    "noSchedule": "无用药计划",
+    "upToDate": "已全部服用",
+    "allTakenText": "全部已服用",
+    "unknownMedStatus": "未知",
     "filterStatus": "筛选状态",
     "allStatus": "全部状态"
   },
@@ -529,7 +545,15 @@
     "dateOfBirth": "出生日期",
     "bloodType": "血型",
     "phone": "电话",
-    "steps": "{{count}} 步"
+    "steps": "{{count}} 步",
+    "highBP": "高血压：{{sys}}/{{dia}} mmHg",
+    "lowBP": "低血压：{{sys}}/{{dia}} mmHg",
+    "highHeartRate": "心率过快：{{hr}} bpm",
+    "lowHeartRate": "心率过慢：{{hr}} bpm",
+    "fever": "发烧：{{temp}}°C",
+    "lowTemperature": "低温：{{temp}}°C",
+    "noCheckIn": "已 {{days}} 天未检查",
+    "noHealthDataRecorded": "暂无健康数据"
   },
   "messages": {
     "noCaregiversYet": "暂无照顾者",

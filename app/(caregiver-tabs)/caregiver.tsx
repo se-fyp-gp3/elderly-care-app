@@ -71,9 +71,9 @@ export default function CaregiverDashboard() {
         (elderly) => ({
           ...elderly,
           age: calculateAge(elderly.birth),
-          lastCheck: "Loading...",
-          medication: "Loading...",
-          nextAppointment: "Loading...",
+          lastCheck: t('common.loading'),
+          medication: t('common.loading'),
+          nextAppointment: t('common.loading'),
         }),
       );
       setElderlyList(elderlyListWithPlaceholders);
@@ -92,7 +92,7 @@ export default function CaregiverDashboard() {
             status: statusInfo.status,
             lastCheck: formatLastCheck(statusInfo.lastCheckTime),
             medication: statusInfo.medicationSummary,
-            nextAppointment: statusInfo.nextAppointment || "None",
+            nextAppointment: statusInfo.nextAppointment || t('common.none'),
             statusInfo,
           };
         },
@@ -101,7 +101,7 @@ export default function CaregiverDashboard() {
       setElderlyList(elderlyListWithStatus);
     } catch (err: any) {
       console.error("Error fetching elderly data:", err);
-      setError(err.message || "Failed to load elderly data");
+      setError(err.message || t('caregiverPanel.failedToLoadElderly'));
       // Fallback to empty list on error
       setElderlyList([]);
     } finally {

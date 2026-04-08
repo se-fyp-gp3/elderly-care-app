@@ -2,6 +2,7 @@ import { ScheduleEvent } from "@/lib/schedule";
 import { ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import {
     Avatar,
@@ -31,6 +32,7 @@ export default function ScheduleMedGroupCard({
   onRemindMedication,
 }: ScheduleMedGroupCardProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const allCompleted = group.events.every(
     (e) =>
@@ -129,8 +131,7 @@ export default function ScheduleMedGroupCard({
               variant="titleMedium"
               style={{ fontWeight: "bold", fontSize: 16 }}
             >
-              {group.events.length} medication
-              {group.events.length > 1 ? "s" : ""}
+              {t('common.medicationCount', { count: group.events.length })}
             </Text>
             <View
               style={{
@@ -267,11 +268,11 @@ export default function ScheduleMedGroupCard({
                   >
                     {String(med.status).toLowerCase() ===
                     ScheduleStatus.COMPLETED.toLowerCase()
-                      ? "Taken"
+                      ? t('common.taken')
                       : String(med.status).toLowerCase() ===
                           ScheduleStatus.MISSED.toLowerCase()
-                        ? "Missed"
-                        : "Pending"}
+                        ? t('common.missed')
+                        : t('common.pending')}
                   </Text>
                 </View>
               </View>
@@ -293,7 +294,7 @@ export default function ScheduleMedGroupCard({
                       onPress={() => onTakeMedication(med)}
                       labelStyle={{ fontSize: 12 }}
                     >
-                      Take
+                      {t('medication.take')}
                     </Button>
                   </>
                 ) : (
@@ -304,7 +305,7 @@ export default function ScheduleMedGroupCard({
                     onPress={() => onUndoMedication(med)}
                     labelStyle={{ fontSize: 12 }}
                   >
-                    Undo
+                    {t('schedule.undo')}
                   </Button>
                 )}
               </View>

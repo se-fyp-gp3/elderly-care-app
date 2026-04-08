@@ -309,7 +309,7 @@ export default function MedicationManagement() {
               return {
                 ...m,
                 status: "pending",
-                lastTaken: "Never",
+                lastTaken: t('common.never'),
               };
             }
             return m;
