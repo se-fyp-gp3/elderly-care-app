@@ -1,9 +1,9 @@
 import { formatRelativeTime } from "@/lib/contacts";
 import { Moment, MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useTranslation } from "react-i18next";
 import { useVideoPlayer, VideoPlayer, VideoView } from "expo-video";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Image, Modal, Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
 

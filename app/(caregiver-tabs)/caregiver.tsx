@@ -1,36 +1,36 @@
 import AddElderlyDialog from "@/components/AddElderlyDialog";
 import ElderlyCard from "@/components/ElderlyCard";
 import { useAuth } from "@/lib/auth-context";
-import { useTranslation } from "react-i18next";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import { calculateAge } from "@/lib/elderly";
 import {
-  computeElderlyStatus,
-  ElderlyStatusInfo,
-  formatLastCheck,
+    computeElderlyStatus,
+    ElderlyStatusInfo,
+    formatLastCheck,
 } from "@/lib/elderly-status";
 import { Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  Linking,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
+    Alert,
+    Linking,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
 import {
-  Avatar,
-  Button,
-  Card,
-  Dialog,
-  FAB,
-  List,
-  Portal,
-  Text,
-  useTheme,
+    Avatar,
+    Button,
+    Card,
+    Dialog,
+    FAB,
+    List,
+    Portal,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];

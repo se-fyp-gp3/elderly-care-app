@@ -1,13 +1,13 @@
 import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 import { useAuth } from "@/lib/auth-context";
-import { useFontSize } from "@/lib/font-size-context";
-import { useLanguage } from "@/lib/language-context";
 import { getCustomVoicesForElderly } from "@/lib/custom-voice";
 import {
   getElderlyByUserId,
   getLinkedCaregivers,
   updateElderlyEmergencyContact,
 } from "@/lib/elderly";
+import { useFontSize } from "@/lib/font-size-context";
+import { useLanguage } from "@/lib/language-context";
 import { Caregiver, CustomVoice, Elderly } from "@/types/appwrite";
 import { FontSize, UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";

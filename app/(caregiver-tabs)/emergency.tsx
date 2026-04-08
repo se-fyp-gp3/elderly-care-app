@@ -3,25 +3,24 @@ import { useNavigation, useRouter } from "expo-router";
 import React, { useLayoutEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  FlatList,
-  Linking,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Linking,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  Avatar,
-  Button,
-  Card,
-  Chip,
-  Dialog,
-  Divider,
-  Portal,
-  Surface,
-  Text,
-  useTheme,
+    Button,
+    Card,
+    Chip,
+    Dialog,
+    Divider,
+    Portal,
+    Surface,
+    Text,
+    useTheme
 } from "react-native-paper";
 
 type EmergencyLog = {

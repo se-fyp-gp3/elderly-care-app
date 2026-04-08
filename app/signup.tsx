@@ -4,17 +4,17 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { AppwriteException } from "appwrite";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { OAuthProvider } from "react-native-appwrite";
 import {
-  Button,
-  Chip,
-  Snackbar,
-  Text,
-  TextInput,
-  useTheme,
+    Button,
+    Chip,
+    Snackbar,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
-import { useTranslation } from "react-i18next";
 
 export default function SignupScreen() {
   const { role } = useLocalSearchParams<{ role: Role }>();

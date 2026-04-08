@@ -5,16 +5,16 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { OAuthProvider } from "react-native-appwrite";
 import {
-  Button,
-  Snackbar,
-  Text,
-  TextInput,
-  useTheme,
+    Button,
+    Snackbar,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
-import { useTranslation } from "react-i18next";
 
 export default function AuthScreen() {
   const [email, setEmail] = useState<string>("");

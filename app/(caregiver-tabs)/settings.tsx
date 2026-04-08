@@ -1,12 +1,12 @@
 import { useAuth } from "@/lib/auth-context";
-import { useFontSize } from "@/lib/font-size-context";
-import { useLanguage } from "@/lib/language-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
   deleteCustomVoiceRecord,
   getCustomVoicesForCaregiver,
   saveCustomVoiceRecord,
 } from "@/lib/custom-voice";
+import { useFontSize } from "@/lib/font-size-context";
+import { useLanguage } from "@/lib/language-context";
 import { createPersonalVoice, readAudioFileAsBase64 } from "@/lib/personal-voice";
 import { Caregiver, CustomVoice, CustomVoiceStatus, Elderly } from "@/types/appwrite";
 import { FontSize } from "@/types/user";
@@ -21,8 +21,8 @@ import {
 } from "expo-audio";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
   Banner,

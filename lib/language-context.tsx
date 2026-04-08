@@ -1,8 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import i18n, {
-  loadPersistedLanguage,
-  persistLanguage,
-  SupportedLanguage,
+    loadPersistedLanguage,
+    persistLanguage,
+    SupportedLanguage,
 } from "./i18n/index";
 
 type LanguageContextType = {

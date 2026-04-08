@@ -2,26 +2,26 @@ import { useAuth } from "@/lib/auth-context";
 import { createCaregiverProfile } from "@/lib/caregiver";
 import { createElderlyProfile } from "@/lib/elderly";
 import { Caregiver, Elderly } from "@/types/appwrite";
+import { Role } from "@/types/user";
 import { useRouter } from "expo-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
 } from "react-native";
 import {
-  Button,
-  Card,
-  Snackbar,
-  Text,
-  TextInput,
-  useTheme,
+    Button,
+    Card,
+    Snackbar,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 import { DatePickerInput } from "react-native-paper-dates";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Role } from "@/types/user";
-import { useTranslation } from "react-i18next";
 
 export default function ProfileSetupScreen() {
   const { user, preferences, setPreference, refreshProfile } = useAuth();

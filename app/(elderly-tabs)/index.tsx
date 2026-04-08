@@ -1,5 +1,5 @@
-import VoiceCommandButton from "@/components/VoiceCommandButton";
 import SimplifiedHomeView from "@/components/SimplifiedHomeView";
+import VoiceCommandButton from "@/components/VoiceCommandButton";
 import { useAuth } from "@/lib/auth-context";
 import { Contact, getContactsForElderly } from "@/lib/contacts";
 import {

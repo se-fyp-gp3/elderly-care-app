@@ -1,19 +1,19 @@
 import {
-  clientReactNative,
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
+    clientReactNative,
+    DATABASE_ID,
+    DIRECT_MESSAGES_TABLE_ID,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
-  acceptCaregiverConnection,
-  addCaregiverConnection,
-  Contact,
-  formatRelativeTime,
-  getContactsForCaregiver,
-  getPendingCaregiverConnections,
-  rejectCaregiverConnection,
-  searchUserByPhone,
+    acceptCaregiverConnection,
+    addCaregiverConnection,
+    Contact,
+    formatRelativeTime,
+    getContactsForCaregiver,
+    getPendingCaregiverConnections,
+    rejectCaregiverConnection,
+    searchUserByPhone,
 } from "@/lib/contacts";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
 import { Caregiver, Elderly } from "@/types/appwrite";
@@ -22,28 +22,28 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Keyboard,
-  Linking,
-  Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  useWindowDimensions,
-  View,
+    Alert,
+    FlatList,
+    Keyboard,
+    Linking,
+    Modal,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Button,
-  Searchbar,
-  Text,
-  TextInput,
-  useTheme
+    ActivityIndicator,
+    Avatar,
+    Button,
+    Searchbar,
+    Text,
+    TextInput,
+    useTheme
 } from "react-native-paper";
 
 import MomentsView from "@/components/MomentsView";

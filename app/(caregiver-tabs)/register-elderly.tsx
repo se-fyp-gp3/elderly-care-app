@@ -1,29 +1,29 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-  cancelRegistrationRequest,
-  getRegistrationRequest,
-  registerElderlyForCaregiver,
+    cancelRegistrationRequest,
+    getRegistrationRequest,
+    registerElderlyForCaregiver,
 } from "@/lib/registration";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
 import {
-  Button,
-  HelperText,
-  Text,
-  TextInput,
-  useTheme,
+    Button,
+    HelperText,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 import { DatePickerInput } from "react-native-paper-dates";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTranslation } from "react-i18next";
 
 export default function RegisterElderlyScreen() {
   const theme = useTheme();

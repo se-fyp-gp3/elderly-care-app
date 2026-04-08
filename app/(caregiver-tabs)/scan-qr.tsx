@@ -1,16 +1,16 @@
 import {
-  getRegistrationRequest,
-  markRegistrationScanned,
+    getRegistrationRequest,
+    markRegistrationScanned,
 } from "@/lib/registration";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTranslation } from "react-i18next";
 
 export default function ScanQRScreen() {
   const theme = useTheme();

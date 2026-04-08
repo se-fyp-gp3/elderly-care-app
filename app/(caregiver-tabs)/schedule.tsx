@@ -1,25 +1,25 @@
 ﻿import {
-  DisplayItem,
-  NewTaskData,
-  NewTaskModal,
-  ScheduleCalendarStrip,
-  ScheduleFilterDialog,
-  ScheduleMedGroupCard,
-  ScheduleMonthPicker,
-  ScheduleSingleEventCard,
+    DisplayItem,
+    NewTaskData,
+    NewTaskModal,
+    ScheduleCalendarStrip,
+    ScheduleFilterDialog,
+    ScheduleMedGroupCard,
+    ScheduleMonthPicker,
+    ScheduleSingleEventCard,
 } from "@/components/schedule";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
-  createScheduleTask,
-  fetchDayMedicationEvents,
-  fetchDayScheduleEvents,
-  fetchScheduleCategories,
-  markScheduleTaskCompleted,
-  recordMedicationTaken,
-  ScheduleEvent,
-  undoMedicationTaken,
-  undoScheduleTaskCompleted,
+    createScheduleTask,
+    fetchDayMedicationEvents,
+    fetchDayScheduleEvents,
+    fetchScheduleCategories,
+    markScheduleTaskCompleted,
+    recordMedicationTaken,
+    ScheduleEvent,
+    undoMedicationTaken,
+    undoScheduleTaskCompleted,
 } from "@/lib/schedule";
 import { Elderly, ScheduleCategory, ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -27,30 +27,30 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Notifications from "expo-notifications";
 import { useNavigation, useRouter } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
-import {
-  Button,
-  Chip,
-  FAB,
-  Text,
-  useTheme,
-} from "react-native-paper";
 import { useTranslation } from "react-i18next";
+import {
+    Button,
+    Chip,
+    FAB,
+    Text,
+    useTheme,
+} from "react-native-paper";
 
 export default function SchedulePage() {
   const theme = useTheme();

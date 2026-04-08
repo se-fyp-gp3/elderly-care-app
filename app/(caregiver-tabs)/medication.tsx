@@ -1,45 +1,45 @@
 import { AddMedicationDialog, MedicationFormData } from "@/components/AddMedicationDialog";
 import ElderlyGroupSummary from "@/components/ElderlyGroupSummary";
 import {
-  ConfirmMedicationDialog,
-  ElderlyFilterDialog,
-  StatusFilterDialog,
+    ConfirmMedicationDialog,
+    ElderlyFilterDialog,
+    StatusFilterDialog,
 } from "@/components/MedFilterDialogs";
 import { MedicationItem } from "@/components/MedicationCard";
 import MedStatsCard from "@/components/MedStatsCard";
 import TimeSlotCard from "@/components/TimeSlotCard";
 import { useAuth } from "@/lib/auth-context";
 import {
-  addMedication,
-  confirmMedicationTaking,
-  ElderlyGroup,
-  fetchCaregiverMedicationData,
-  markMedicationProcessed,
-  undoMedicationTaking,
+    addMedication,
+    confirmMedicationTaking,
+    ElderlyGroup,
+    fetchCaregiverMedicationData,
+    markMedicationProcessed,
+    undoMedicationTaking,
 } from "@/lib/medication";
 import { Elderly } from "@/types/appwrite";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  AppState,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
+    Alert,
+    AppState,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
 import {
-  Button,
-  Divider,
-  FAB,
-  IconButton,
-  Portal,
-  Text,
-  useTheme,
+    Button,
+    Divider,
+    FAB,
+    IconButton,
+    Portal,
+    Text,
+    useTheme,
 } from "react-native-paper";
-import { useTranslation } from "react-i18next";
 
 // Start notification handler
 Notifications.setNotificationHandler({
