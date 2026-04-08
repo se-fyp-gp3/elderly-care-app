@@ -3,7 +3,7 @@ import { Moment, MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoPlayer, VideoView } from "expo-video";
 import React, { useEffect, useState } from "react";
-import { Image, Modal, Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Image, Modal, Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
 
 interface MomentCardProps {
@@ -11,7 +11,8 @@ interface MomentCardProps {
   currentUserId: string;
   onLike: (id: string) => void;
   onComment: (id: string) => void;
-  onAIRequest: (id: string, content: string) => Promise<MomentComment>;
+  onAIRequest: (id: string, content: string, imageUrl?: string) => Promise<MomentComment>;
+  onDelete?: (id: string) => void;
 }
 
 function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boolean; onClose: () => void }) {
@@ -44,7 +45,7 @@ function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boo
   );
 }
 
-export default function MomentCard({ moment, currentUserId, onLike, onComment, onAIRequest }: MomentCardProps) {
+export default function MomentCard({ moment, currentUserId, onLike, onComment, onAIRequest, onDelete }: MomentCardProps) {
   const theme = useTheme();
   const [liked, setLiked] = useState(moment.likes?.includes(currentUserId) || false);
   const [likesCount, setLikesCount] = useState(moment.likes?.length || 0);
@@ -63,7 +64,8 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
     if (loadingAI || aiComment) return;
     setLoadingAI(true);
     try {
-      const comment = await onAIRequest(moment.$id, moment.content);
+      const imageUrl = moment.media_type === "image" ? moment.media_url : undefined;
+      const comment = await onAIRequest(moment.$id, moment.content, imageUrl);
       setAIComment(comment);
     } catch (error) {
       console.error(error);
@@ -100,6 +102,19 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
             {moment.author_role} • {formatRelativeTime(moment.$createdAt)}
           </Text>
         </View>
+        {moment.author_id === currentUserId && onDelete && (
+          <TouchableOpacity
+            style={{ marginLeft: "auto", padding: 4 }}
+            onPress={() => {
+              Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
+                { text: "Cancel", style: "cancel" },
+                { text: "Delete", style: "destructive", onPress: () => onDelete(moment.$id) },
+              ]);
+            }}
+          >
+            <MaterialCommunityIcons name="delete-outline" size={22} color={theme.colors.error} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <Text variant="bodyLarge" style={styles.content}>

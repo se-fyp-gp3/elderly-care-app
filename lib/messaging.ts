@@ -178,3 +178,27 @@ export function subscribeToConversation(
     return () => {};
   }
 }
+
+/**
+ * Subscribe to ALL incoming messages for a specific user (by receiver_id).
+ * Used for global push notification triggering.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToUserMessages(
+  myProfileId: string,
+  onIncomingMessage: (message: DirectMessage) => void,
+): () => void {
+  try {
+    const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
+    const unsubscribe = safeSubscribe(channel, (response) => {
+      const payload = response.payload as unknown as DirectMessage;
+      if (payload?.receiver_id === myProfileId && payload?.sender_id !== myProfileId) {
+        onIncomingMessage(payload);
+      }
+    });
+    return unsubscribe;
+  } catch (error) {
+    console.error("Error subscribing to user messages:", error);
+    return () => {};
+  }
+}

@@ -270,13 +270,11 @@ export async function addComment(
   return comment as unknown as MomentComment;
 }
 
-export async function addAIResponse(momentId: string, content: string): Promise<MomentComment> {
-  const aiContent = await generateAIResponse(content);
+export async function addAIResponse(momentId: string, content: string, imageUrl?: string): Promise<MomentComment> {
+  const aiContent = await generateAIResponse(content, imageUrl);
   
   try {
-     // Create comment in comments collection if exists
-     /*
-     await databases.createDocument(
+     const doc = await databases.createDocument(
         DATABASE_ID,
         MOMENTS_COMMENTS_TABLE_ID,
         ID.unique(),
@@ -288,24 +286,49 @@ export async function addAIResponse(momentId: string, content: string): Promise<
             author_role: "ai"
         }
      );
-     */
-     // For simplicity in this demo, we'll just return the comment object
-     return {
-        $id: ID.unique(),
-        $createdAt: new Date().toISOString(),
-        content: aiContent,
-        author_id: "ai-assistant",
-        author_name: "AI Assistant",
-        author_role: "ai",
-        moment_id: momentId,
-        $collectionId: MOMENTS_COMMENTS_TABLE_ID,
-        $databaseId: DATABASE_ID,
-        $permissions: [],
-        $updatedAt: new Date().toISOString(),
-        $sequence: 0,
-     };
+
+     // Increment comments_count on the moment
+     try {
+       const moment = await databases.getDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId);
+       await databases.updateDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId, {
+         comments_count: (moment.comments_count || 0) + 1,
+       });
+     } catch {
+       // Non-critical
+     }
+
+     return doc as unknown as MomentComment;
   } catch (error) {
       console.error("Error generating AI response:", error);
       throw error;
+  }
+}
+
+export async function deleteMoment(momentId: string, mediaBucketId?: string | null, mediaFileId?: string | null): Promise<void> {
+  // Delete associated media file if exists
+  if (mediaBucketId && mediaFileId) {
+    try {
+      await storage.deleteFile(mediaBucketId, mediaFileId);
+    } catch (err) {
+      console.warn("Failed to delete media file:", err);
+    }
+  }
+
+  // Delete the moment document
+  await databases.deleteDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId);
+}
+
+export async function deleteComment(commentId: string, momentId: string): Promise<void> {
+  await databases.deleteDocument(DATABASE_ID, MOMENTS_COMMENTS_TABLE_ID, commentId);
+
+  // Decrement comments_count on the moment
+  try {
+    const moment = await databases.getDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId);
+    const currentCount = (moment as unknown as { comments_count?: number }).comments_count || 0;
+    await databases.updateDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId, {
+      comments_count: Math.max(0, currentCount - 1),
+    });
+  } catch (err) {
+    console.warn("Failed to decrement comments_count:", err);
   }
 }

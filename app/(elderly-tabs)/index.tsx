@@ -1,23 +1,23 @@
-import VoiceCommandButton from "@/components/VoiceCommandButton";
 import SimplifiedHomeView from "@/components/SimplifiedHomeView";
+import VoiceCommandButton from "@/components/VoiceCommandButton";
 import { useAuth } from "@/lib/auth-context";
 import { Contact, getContactsForElderly } from "@/lib/contacts";
 import {
-    fetchElderlySchedulesForUser,
-    getElderlyByUserId,
+  fetchElderlySchedulesForUser,
+  getElderlyByUserId,
 } from "@/lib/elderly";
 import { useStepSync } from "@/lib/hooks/useStepSync";
 import {
-    checkAndMarkSkippedMedications,
-    fetchActiveMedicationReminders,
-    fetchDailyMedicationLogs,
-    logMedicationAction,
+  checkAndMarkSkippedMedications,
+  fetchActiveMedicationReminders,
+  fetchDailyMedicationLogs,
+  logMedicationAction,
 } from "@/lib/medication_tracking";
 import {
-    Elderly,
-    ElderlyMedicationReminder,
-    MedicationLogs,
-    Schedule,
+  Elderly,
+  ElderlyMedicationReminder,
+  MedicationLogs,
+  Schedule,
 } from "@/types/appwrite";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -25,22 +25,21 @@ import { openURL } from "expo-linking";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    AppState,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    View,
+  ActivityIndicator,
+  Alert,
+  AppState,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
 import {
-    Button,
-    Card,
-    Chip,
-    List,
-    Text,
-    TouchableRipple,
-    useTheme
+  Button,
+  Card,
+  Chip,
+  Text,
+  TouchableRipple,
+  useTheme
 } from "react-native-paper";
 
 type TodoItem = {
@@ -101,10 +100,23 @@ export default function ElderlyHome() {
           console.error("Error fetching medication reminders/logs:", err);
         }
 
-        // Fetch schedules for this elderly
+        // Fetch schedules for this elderly (exclude medication type, today+tomorrow only)
         try {
           const schedResponse = await fetchElderlySchedulesForUser(user.$id);
-          setSchedules((schedResponse as Schedule[]).slice(0, 10));
+          const now = new Date();
+          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const tomorrowEnd = new Date(todayStart);
+          tomorrowEnd.setDate(tomorrowEnd.getDate() + 2); // end of tomorrow
+
+          const nonMedSchedules = (schedResponse as Schedule[]).filter((s) => {
+            if (s.type === "medication") return false;
+            if (!s.time) return false;
+            const t = new Date(s.time);
+            return t >= todayStart && t < tomorrowEnd;
+          });
+          // Sort by time ascending
+          nonMedSchedules.sort((a, b) => new Date(a.time!).getTime() - new Date(b.time!).getTime());
+          setSchedules(nonMedSchedules.slice(0, 10));
         } catch {
           console.log("No schedules found");
           setSchedules([]);
@@ -449,54 +461,129 @@ export default function ElderlyHome() {
         View All Medications
       </Button>
 
-      {/* Upcoming Schedule */}
+      {/* Upcoming Schedule (Today & Tomorrow) */}
       <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>
-        Upcoming Schedule
+        Today &amp; Tomorrow
       </Text>
-      <Card
-        style={[styles.listCard, { backgroundColor: theme.colors.surface }]}
-      >
-        {schedules.length > 0 ? (
-          schedules.slice(0, 3).map((schedule, index) => (
-            <List.Item
-              key={index}
-              title={schedule.title || "Appointment"}
-              description={
-                schedule.description || schedule.time || "No details"
-              }
-              left={(props) => (
-                <List.Icon {...props} icon="calendar-clock" color="#2196F3" />
-              )}
-              right={() => (
+      {schedules.length > 0 ? (
+        schedules.slice(0, 3).map((schedule, index) => {
+          const isCompleted = schedule.status === "Completed";
+          const isMissed = schedule.status === "Missed";
+          const accentColor = isCompleted
+            ? "#4CAF50"
+            : isMissed
+              ? "#F44336"
+              : "#2196F3";
+          const typeIcon = (() => {
+            switch (schedule.type) {
+              case "appointment": return "doctor";
+              case "meal": return "food-apple";
+              case "checkup": return "stethoscope";
+              case "activity": return "run";
+              default: return "calendar-clock";
+            }
+          })();
+          const scheduleTime = (() => {
+            if (!schedule.time) return "";
+            try {
+              const d = new Date(schedule.time);
+              return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            } catch {
+              return "";
+            }
+          })();
+          const scheduleDate = (() => {
+            if (!schedule.time) return "";
+            try {
+              const d = new Date(schedule.time);
+              return d.toLocaleDateString([], { month: "short", day: "numeric" });
+            } catch {
+              return "";
+            }
+          })();
+
+          return (
+            <View
+              key={`sched-${schedule.$id || index}`}
+              style={[styles.medCard, { borderLeftColor: accentColor }]}
+            >
+              <View style={styles.medCardTop}>
+                <View
+                  style={[
+                    styles.medCardIcon,
+                    { backgroundColor: isCompleted ? "#E8F5E9" : "#E3F2FD" },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={isCompleted ? "check-circle" : typeIcon}
+                    size={26}
+                    color={isCompleted ? "#4CAF50" : "#1976D2"}
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text variant="titleMedium" style={{ fontWeight: "700" }}>
+                    {schedule.title || "Appointment"}
+                  </Text>
+                  {schedule.description ? (
+                    <Text variant="bodyMedium" style={{ color: "#666", marginTop: 2 }} numberOfLines={1}>
+                      {schedule.description}
+                    </Text>
+                  ) : null}
+                </View>
+                {scheduleTime ? (
+                  <View style={{ alignItems: "flex-end" }}>
+                    <View style={styles.medCardTime}>
+                      <MaterialCommunityIcons name="clock-outline" size={15} color="#888" />
+                      <Text variant="bodyMedium" style={{ color: "#555", marginLeft: 4, fontWeight: "600" }}>
+                        {scheduleTime}
+                      </Text>
+                    </View>
+                    {scheduleDate ? (
+                      <Text variant="labelSmall" style={{ color: "#999", marginTop: 3 }}>
+                        {scheduleDate}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, gap: 8 }}>
                 <Chip
                   compact
-                  style={{
-                    backgroundColor:
-                      schedule.status === "Completed"
-                        ? "#4CAF5020"
-                        : "#2196F320",
-                  }}
+                  style={{ backgroundColor: `${accentColor}18` }}
+                  textStyle={{ color: accentColor, fontSize: 12 }}
                 >
-                  {schedule.status || "Upcoming"}
+                  {schedule.status || "Pending"}
                 </Chip>
-              )}
-            />
-          ))
-        ) : (
-          <List.Item
-            title="No upcoming events"
-            description="Your schedule is clear"
-            left={(props) => <List.Icon {...props} icon="calendar-blank" />}
-          />
-        )}
-        <Button
-          mode="text"
-          onPress={() => router.push("/schedule" as never)}
-          style={styles.viewAllButton}
-        >
-          View Full Schedule
-        </Button>
-      </Card>
+                {schedule.type ? (
+                  <Chip
+                    compact
+                    style={{ backgroundColor: "#F5F5F5" }}
+                    textStyle={{ fontSize: 12, color: "#666", textTransform: "capitalize" }}
+                  >
+                    {schedule.type}
+                  </Chip>
+                ) : null}
+              </View>
+            </View>
+          );
+        })
+      ) : (
+        <Card style={[styles.listCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={{ alignItems: "center", padding: 28 }}>
+            <MaterialCommunityIcons name="calendar-check" size={44} color="#A5D6A7" />
+            <Text variant="bodyLarge" style={{ marginTop: 8, color: "#666" }}>
+              No upcoming events
+            </Text>
+          </View>
+        </Card>
+      )}
+      <Button
+        mode="text"
+        onPress={() => router.push("/schedule" as never)}
+        style={styles.viewAllButton}
+      >
+        View Full Schedule
+      </Button>
 
       {/* Today's Steps */}
       <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>

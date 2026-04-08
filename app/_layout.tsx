@@ -1,5 +1,7 @@
 import { DATABASE_ID, DIRECT_MESSAGES_TABLE_ID, safeSubscribe } from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
+import { getCaregiverByUserId } from "@/lib/caregiver";
+import { getElderlyByUserId } from "@/lib/elderly";
 import {
     registerForPushNotificationsAsync,
     sendImmediateNotification,
@@ -81,33 +83,47 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     // Register for permissions on mount
     registerForPushNotificationsAsync();
 
-    // Subscribe to ALL new messages in the collection
-    const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = safeSubscribe(channel, async (response) => {
-      // Only process creation events
-      if (!response.events.some((e) => e.endsWith(".create"))) return;
+    let unsubscribeRealtime: (() => void) | null = null;
 
-      const payload = response.payload as DirectMessage;
-      
-      // We only care if:
-      // 1. The message is intended for the CURRENT logged-in user
-      // 2. The sender is NOT the current user (sanity check)
-      if (payload.receiver_id === user.$id && payload.sender_id !== user.$id) {
-        
-        // Show notification regardless of app state (Foreground/Background)
-        // because setNotificationHandler is configured to show alerts in foreground
-        await sendImmediateNotification(
-          payload.sender_name || "New Message",
-          payload.message_type === "voice" ? "Sent a voice message" : (payload.body || "Sent a message"),
-          {
-            type: "direct_message",
-            contactId: payload.sender_id,
-            contactName: payload.sender_name,
-            contactRole: payload.sender_role,
-          }
-        );
+    // Resolve profile ID first, then subscribe
+    const setup = async () => {
+      let myProfileId: string | null = null;
+      try {
+        if (role === "caregiver") {
+          const profile = await getCaregiverByUserId(user.$id);
+          if (profile) myProfileId = profile.$id;
+        } else {
+          const profile = await getElderlyByUserId(user.$id);
+          if (profile) myProfileId = profile.$id;
+        }
+      } catch {
+        // Profile not found yet
       }
-    });
+
+      if (!myProfileId) return;
+
+      const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
+      unsubscribeRealtime = safeSubscribe(channel, async (response) => {
+        if (!response.events.some((e) => e.endsWith(".create"))) return;
+
+        const payload = response.payload as DirectMessage;
+
+        if (payload.receiver_id === myProfileId && payload.sender_id !== myProfileId) {
+          await sendImmediateNotification(
+            payload.sender_name || "New Message",
+            payload.message_type === "voice" ? "Sent a voice message" : (payload.body || "Sent a message"),
+            {
+              type: "direct_message",
+              contactId: payload.sender_id,
+              contactName: payload.sender_name,
+              contactRole: payload.sender_role,
+            }
+          );
+        }
+      });
+    };
+
+    setup();
 
     // Handle notification tap
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
@@ -134,7 +150,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
     return () => {
       // Cleanup subscription
-      unsubscribe();
+      unsubscribeRealtime?.();
       subscription.remove();
     };
   }, [user?.$id, router, role]);

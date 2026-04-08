@@ -1,47 +1,47 @@
 import {
-    ID,
-    storage,
-    VOICE_MESSAGES_BUCKET_ID,
+  ID,
+  storage,
+  VOICE_MESSAGES_BUCKET_ID,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-    buildConversationId,
-    fetchConversationMessages,
-    markConversationAsRead,
-    sendDirectMessage,
-    subscribeToConversation,
+  buildConversationId,
+  fetchConversationMessages,
+  markConversationAsRead,
+  sendDirectMessage,
+  subscribeToConversation,
 } from "@/lib/messaging";
 import { DirectMessage } from "@/types/messaging";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
 import {
-    createAudioPlayer,
-    RecordingPresets,
-    requestRecordingPermissionsAsync,
-    setAudioModeAsync,
-    useAudioRecorder,
+  createAudioPlayer,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
 } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    IconButton,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  IconButton,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -103,12 +103,17 @@ function VoiceMessageBubble({
       await setAudioModeAsync({
         playsInSilentMode: true,
       });
-      // Download voice file from Appwrite Storage
+      // Download voice file to local cache for reliable playback (fixes Android)
       const downloadUrl = storage.getFileDownloadURL(
         VOICE_MESSAGES_BUCKET_ID,
         fileId,
       );
-      const player = createAudioPlayer(downloadUrl.toString());
+      const localUri = `${FileSystem.cacheDirectory}voice_${fileId}.m4a`;
+      const fileInfo = await FileSystem.getInfoAsync(localUri);
+      if (!fileInfo.exists) {
+        await FileSystem.downloadAsync(downloadUrl.toString(), localUri);
+      }
+      const player = createAudioPlayer(localUri);
       playerRef.current = player;
       player.addListener("playbackStatusUpdate", (status) => {
         if (status.didJustFinish) {
