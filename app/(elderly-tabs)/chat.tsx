@@ -11,7 +11,7 @@ import {
 } from "@/lib/elderly";
 import { getFormattedTodayMedicationSummary } from "@/lib/medication_tracking";
 import { synthesizePersonalVoice } from "@/lib/personal-voice";
-import { formatSearchResultsForContext, searchWeb } from "@/lib/search";
+import { formatSearchResultsForContext, searchWeb, shouldSearch } from "@/lib/search";
 import type { ChatSession as AppwriteChatSession } from "@/types/appwrite";
 import {
   createAudioPlayer,
@@ -361,7 +361,7 @@ export default function ElderlyChat() {
       {
         role: "system",
         content:
-          `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\nIMPORTANT: Keep your response concise — no more than 80 words. Be brief and to the point.\n\n${langInstruction}\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
+          `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\nIMPORTANT: Keep your response concise — no more than 80 words. Be brief and to the point.\n\n${langInstruction}\n\nWhen the user's message contains [SEARCH RESULTS], you MUST base your answer strictly on those results. Do NOT make up or guess information — only use facts from the provided search data. Summarize the key points for the elderly user in a caring tone.\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
       },
       ...history,
       {
@@ -419,6 +419,7 @@ export default function ElderlyChat() {
     userMessage: string,
     image?: SelectedImage | null,
     allowImageFallback = true,
+    hasSearchContext = false,
   ): Promise<string> => {
     const sleep = (ms: number) =>
       new Promise((resolve) => setTimeout(resolve, ms));
@@ -476,7 +477,7 @@ export default function ElderlyChat() {
       model: resolvedModel,
       messages: messagesPayload,
       max_tokens: 200,
-      temperature: 0.7,
+      temperature: hasSearchContext ? 0.2 : 0.7,
     };
 
     const maxAttempts = 3;
@@ -834,23 +835,52 @@ export default function ElderlyChat() {
 
       const localResponse = await tryHandleLocalDataRequest(messageForAPI);
 
+      // Selective search: only search when toggle is on AND query looks like it needs web info
       let searchContext = "";
-      if (searchEnabled && !localResponse && !selectedImage) {
+      let rawSearchResponse: Awaited<ReturnType<typeof searchWeb>> | null = null;
+      if (searchEnabled && !localResponse && !selectedImage && shouldSearch(userMessage.text)) {
         try {
-          const searchResponse = await searchWeb(userMessage.text);
-          searchContext = formatSearchResultsForContext(searchResponse);
+          rawSearchResponse = await searchWeb(userMessage.text);
+          searchContext = formatSearchResultsForContext(rawSearchResponse);
         } catch (e) {
           console.warn("Search failed, proceeding without:", e);
         }
       }
 
+      if (rawSearchResponse) {
+        console.log('[Search] Raw response:', JSON.stringify({
+          hasAiOverview: !!rawSearchResponse.aiOverview?.text,
+          aiOverviewText: rawSearchResponse.aiOverview?.text ?? '(none)',
+          aiOverviewRefs: rawSearchResponse.aiOverview?.references ?? [],
+          answerBoxType: rawSearchResponse.answerBox?.type ?? '(none)',
+          answerBox: rawSearchResponse.answerBox ?? '(none)',
+          hasKG: !!rawSearchResponse.knowledgeGraph?.description,
+          knowledgeGraph: rawSearchResponse.knowledgeGraph ?? '(none)',
+          resultsCount: rawSearchResponse.results?.length ?? 0,
+          results: rawSearchResponse.results?.map(r => ({ title: r.title, snippet: r.snippet })) ?? [],
+        }, null, 2));
+      }
+      if (searchContext) {
+        console.log('[Search] Formatted context for AI (full):\n', searchContext);
+      } else if (searchEnabled && shouldSearch(userMessage.text)) {
+        console.log('[Search] No search context produced — search may have returned empty results');
+      }
+
       const finalMessage = searchContext
-        ? `${messageForAPI}\n\n[Web search results for context:\n${searchContext}\n]\nPlease use the above search results to provide a more informed answer.`
+        ? `${messageForAPI}\n\n[SEARCH RESULTS — you MUST base your answer ONLY on these facts. Do NOT add, guess, or invent any information not found below:]\n${searchContext}\n[END SEARCH RESULTS]\n\nUsing ONLY the search results above, answer the user's question concisely.`
         : messageForAPI;
 
-      const aiResponse =
-        localResponse ??
-        (await callAIAPI(finalMessage, selectedImage));
+      console.log('[AI] Final message to model (full):\n', finalMessage);
+
+      // Start AI call; fire TTS in parallel once we get the response
+      const hasSearch = searchContext.length > 0;
+      const aiResponsePromise = localResponse
+        ? Promise.resolve(localResponse)
+        : callAIAPI(finalMessage, selectedImage, true, hasSearch);
+
+      const aiResponse = await aiResponsePromise;
+
+      console.log('[AI] Model reply (full):', aiResponse);
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -859,6 +889,7 @@ export default function ElderlyChat() {
         timestamp: new Date(),
       };
 
+      // Update UI and start TTS in parallel (don't await TTS)
       setMessages((prev) => [...prev, aiMessage]);
       void speakAiResponse(aiResponse);
     } catch (error) {
