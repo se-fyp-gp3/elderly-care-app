@@ -1,3 +1,4 @@
+import { usePresence } from "@/lib/hooks/usePresence";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -6,6 +7,7 @@ import { useTheme } from "react-native-paper";
 export default function TabsLayout() {
   const theme = useTheme();
   const { t } = useTranslation();
+  usePresence();
 
   return (
     <Tabs

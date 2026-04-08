@@ -1,7 +1,9 @@
 import {
+    CAREGIVER_TABLE_ID,
     clientReactNative,
     DATABASE_ID,
     DIRECT_MESSAGES_TABLE_ID,
+    ELDERLY_TABLE_ID,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
@@ -16,11 +18,12 @@ import {
     searchUserByPhone,
 } from "@/lib/contacts";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
+import { formatPresence, isUserOnline } from "@/lib/presence";
 import { Caregiver, Elderly } from "@/types/appwrite";
 import { DirectMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     Alert,
     FlatList,
@@ -194,20 +197,20 @@ export default function CaregiverMessages() {
             [otherUserId]: payload,
           }));
 
-          // Reorder contacts: move the contact to top
+          // The sender is clearly online — update their lastActive
+          const now = new Date().toISOString();
+
+          // Reorder contacts: move the contact to top & refresh lastActive
           setContacts((prevContacts) => {
             const index = prevContacts.findIndex((c) => c.id === otherUserId);
-            if (index === -1) {
-              // Optional: if new contact started chatting, we might need to fetch them
-              // For now, simpler handling:
-              return prevContacts;
-            }
+            if (index === -1) return prevContacts;
 
-            const updatedContact = prevContacts[index];
+            const updatedContact = {
+              ...prevContacts[index],
+              lastActive: now,
+            };
             const newContacts = [...prevContacts];
-            // Remove from old position
             newContacts.splice(index, 1);
-            // Add to top
             newContacts.unshift(updatedContact);
             return newContacts;
           });
@@ -217,6 +220,42 @@ export default function CaregiverMessages() {
 
     return () => {
       unsubscribe();
+    };
+  }, [caregiverProfileId]);
+
+  // ── Realtime presence subscription ─────────────────────────────
+  // Subscribe to elderly AND caregiver profile updates so the green/gray
+  // dot switches in realtime when a contact comes online or goes offline.
+  const contactIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    contactIdsRef.current = new Set(contacts.map((c) => c.id));
+  }, [contacts]);
+
+  useEffect(() => {
+    if (!caregiverProfileId) return;
+
+    const handlePresenceUpdate = (response: { events: string[]; payload: any }) => {
+      if (!response.events.some((e) => e.endsWith(".update"))) return;
+      const payload = response.payload as { $id: string; last_active?: string };
+      if (!payload?.$id || !contactIdsRef.current.has(payload.$id)) return;
+
+      setContacts((prev) =>
+        prev.map((c) =>
+          c.id === payload.$id
+            ? { ...c, lastActive: payload.last_active ?? c.lastActive }
+            : c,
+        ),
+      );
+    };
+
+    const elderlyChannel = `databases.${DATABASE_ID}.collections.${ELDERLY_TABLE_ID}.documents`;
+    const caregiverChannel = `databases.${DATABASE_ID}.collections.${CAREGIVER_TABLE_ID}.documents`;
+    const unsubElderly = clientReactNative.subscribe(elderlyChannel, handlePresenceUpdate);
+    const unsubCaregiver = clientReactNative.subscribe(caregiverChannel, handlePresenceUpdate);
+
+    return () => {
+      unsubElderly();
+      unsubCaregiver();
     };
   }, [caregiverProfileId]);
 
@@ -352,29 +391,12 @@ export default function CaregiverMessages() {
     }
   }, [foundUser, caregiverProfileId, contacts, closeAddDialog, fetchContacts]);
 
-  const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-
-  const isOnline = (lastActive?: string): boolean => {
-    if (!lastActive) return false;
-    try {
-      return Date.now() - new Date(lastActive).getTime() < ONLINE_THRESHOLD_MS;
-    } catch {
-      return false;
-    }
-  };
-
-  const formatLastSeen = (lastActive?: string): string => {
-    if (!lastActive) return "";
-    if (isOnline(lastActive)) return t('common.online');
-    return t('common.lastSeen', { time: formatRelativeTime(lastActive) });
-  };
-
   const renderContactItem = ({ item }: { item: Contact }) => {
     const lastMsg = lastMessages[item.id];
     const lastMsgTime = lastMsg?.created_at || item.lastActive;
     const preview = lastMsg?.body;
-    const online = isOnline(item.lastActive);
-    const lastSeenText = formatLastSeen(item.lastActive);
+    const online = isUserOnline(item.lastActive);
+    const lastSeenText = formatPresence(item.lastActive, t);
 
     return (
       <TouchableOpacity

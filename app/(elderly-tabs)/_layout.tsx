@@ -1,5 +1,6 @@
 import MiniSettingsGearButton from "@/components/MiniSettingsGearButton";
 import { useAuth } from "@/lib/auth-context";
+import { usePresence } from "@/lib/hooks/usePresence";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
@@ -30,6 +31,7 @@ export default function ElderlyTabsLayout() {
   const theme = useTheme();
   const { t } = useTranslation();
   const { preferences } = useAuth();
+  usePresence();
   const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
   const visible = getVisibleTabs(uiVersion);
 
