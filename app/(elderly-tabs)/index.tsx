@@ -24,6 +24,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { openURL } from "expo-linking";
 import { useRouter } from "expo-router";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
     ActivityIndicator,
     Alert,
@@ -57,6 +58,7 @@ export default function ElderlyHome() {
   const { user, preferences } = useAuth();
   const theme = useTheme();
   const router = useRouter();
+  const { t } = useTranslation();
   const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
   const isAccessible = uiVersion === UIVersion.Accessible;
   const {
@@ -250,7 +252,7 @@ export default function ElderlyHome() {
       );
       await fetchElderlyData();
     } catch (error) {
-      Alert.alert("Error", "Failed to update status");
+      Alert.alert("Error", t('common.failedUpdateStatus'));
     }
   };
 
@@ -267,19 +269,19 @@ export default function ElderlyHome() {
 
     if (!emergencyNumber) {
       Alert.alert(
-        "No Emergency Contact",
-        "You do not have an emergency contact set. Please ask a caregiver or administrator to configure one for you.",
+        t('home.noEmergencyContact'),
+        t('home.noEmergencyContactDesc'),
       );
       return;
     }
 
     Alert.alert(
-      "Emergency Call",
-      `Are you sure you want to call your emergency contact (${emergencyNumber})?`,
+      t('home.emergencyCall'),
+      t('home.emergencyCallConfirm', { number: emergencyNumber }),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t('common.cancel'), style: "cancel" },
         {
-          text: "Call Now",
+          text: t('home.callNow'),
           style: "destructive",
           onPress: () => openURL(`tel:${emergencyNumber}`),
         },
@@ -322,10 +324,10 @@ export default function ElderlyHome() {
       {/* Greeting */}
       <View style={styles.greetingSection}>
         <Text variant="headlineMedium" style={[styles.greetingName, accessibleStyles?.greetingName]}>
-          Hello, {elderlyProfile?.name || user?.name || "there"}!
+          Hello, {elderlyProfile?.name || user?.name || t('common.there')}!
         </Text>
         <Text variant="bodyLarge" style={[styles.greetingSubtitle, accessibleStyles?.greetingSubtitle]}>
-          How are you feeling today?
+          {t('home.howAreYou')}
         </Text>
       </View>
 
@@ -340,10 +342,10 @@ export default function ElderlyHome() {
           </View>
           <View style={{ flex: 1 }}>
             <Text variant="titleMedium" style={{ fontWeight: "700", color: "#C62828" }}>
-              Emergency Contact
+              {t('home.emergencyContact')}
             </Text>
             <Text variant="bodyMedium" style={{ color: "#999", marginTop: 2 }}>
-              Tap to call your emergency contact
+              {t('home.tapToCallEmergency')}
             </Text>
           </View>
           <MaterialCommunityIcons name="chevron-right" size={24} color="#E57373" />
@@ -352,7 +354,7 @@ export default function ElderlyHome() {
 
       {/* Today's Medications */}
       <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>
-        Today&apos;s Medications
+        {t('home.todaysMedications')}
       </Text>
       {todoList.length > 0 ? (
         todoList.slice(0, 3).map((item, index) => {
@@ -408,7 +410,7 @@ export default function ElderlyHome() {
                   <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
                     <MaterialCommunityIcons name="check-circle" size={18} color="#2E7D32" />
                     <Text style={{ color: "#2E7D32", fontSize: 14, fontWeight: "600" }}>
-                      Taken — tap to undo
+                      {t('home.takenTapToUndo')}
                     </Text>
                   </View>
                 </TouchableRipple>
@@ -423,7 +425,7 @@ export default function ElderlyHome() {
                   <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
                     <MaterialCommunityIcons name="check-bold" size={20} color="#FFF" />
                     <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "bold" }}>
-                      {isMissing ? "Take Now (Missed)" : "Mark as Taken"}
+                      {isMissing ? t('home.takeNowMissed') : t('home.markAsTaken')}
                     </Text>
                   </View>
                 </TouchableRipple>
@@ -436,7 +438,7 @@ export default function ElderlyHome() {
           <View style={{ alignItems: "center", padding: 28 }}>
             <MaterialCommunityIcons name="check-circle-outline" size={44} color="#A5D6A7" />
             <Text variant="bodyLarge" style={{ marginTop: 8, color: "#666" }}>
-              No medications scheduled for today.
+              {t('home.noMedsToday')}
             </Text>
           </View>
         </Card>
@@ -446,12 +448,12 @@ export default function ElderlyHome() {
         onPress={() => router.push("/medication" as never)}
         style={styles.viewAllButton}
       >
-        View All Medications
+        {t('home.viewAllMedications')}
       </Button>
 
       {/* Upcoming Schedule */}
       <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>
-        Upcoming Schedule
+        {t('home.upcomingSchedule')}
       </Text>
       <Card
         style={[styles.listCard, { backgroundColor: theme.colors.surface }]}
@@ -460,9 +462,9 @@ export default function ElderlyHome() {
           schedules.slice(0, 3).map((schedule, index) => (
             <List.Item
               key={index}
-              title={schedule.title || "Appointment"}
+              title={schedule.title || t('home.appointment')}
               description={
-                schedule.description || schedule.time || "No details"
+                schedule.description || schedule.time || t('home.noDetails')
               }
               left={(props) => (
                 <List.Icon {...props} icon="calendar-clock" color="#2196F3" />
@@ -477,15 +479,15 @@ export default function ElderlyHome() {
                         : "#2196F320",
                   }}
                 >
-                  {schedule.status || "Upcoming"}
+                  {schedule.status || t('home.upcoming')}
                 </Chip>
               )}
             />
           ))
         ) : (
           <List.Item
-            title="No upcoming events"
-            description="Your schedule is clear"
+            title={t('home.noUpcomingEvents')}
+            description={t('home.scheduleIsClear')}
             left={(props) => <List.Icon {...props} icon="calendar-blank" />}
           />
         )}
@@ -494,13 +496,13 @@ export default function ElderlyHome() {
           onPress={() => router.push("/schedule" as never)}
           style={styles.viewAllButton}
         >
-          View Full Schedule
+          {t('home.viewFullSchedule')}
         </Button>
       </Card>
 
       {/* Today's Steps */}
       <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>
-        Today&apos;s Steps
+        {t('home.todaysSteps')}
       </Text>
       <Card
         style={[styles.stepCard, { backgroundColor: theme.colors.surface }]}
@@ -519,7 +521,7 @@ export default function ElderlyHome() {
                   <Text variant="headlineMedium" style={{ fontWeight: "bold", color: "#9C27B0" }}>
                     {todaySteps.toLocaleString()}
                   </Text>
-                  <Text variant="bodyMedium" style={{ color: "#888" }}>steps</Text>
+                  <Text variant="bodyMedium" style={{ color: "#888" }}>{t('home.steps')}</Text>
                 </View>
               )}
               <Text variant="labelSmall" style={{ color: "#999", marginTop: 2 }}>

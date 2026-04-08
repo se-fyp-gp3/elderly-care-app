@@ -14,6 +14,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
+import { useTranslation } from "react-i18next";
 
 export default function AuthScreen() {
   const [email, setEmail] = useState<string>("");
@@ -28,6 +29,7 @@ export default function AuthScreen() {
 
   const { signIn, signInWithOAuth2, reAuthenticateElderly, preferences } =
     useAuth();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (Platform.OS !== "web") {
@@ -50,7 +52,7 @@ export default function AuthScreen() {
 
   const handleSignIn = async () => {
     if (!email || !password) {
-      setError("Email and password are required.");
+      setError(t('auth.emailRequired'));
       return;
     }
 
@@ -69,7 +71,7 @@ export default function AuthScreen() {
       } else if (error?.message) {
         setError(error.message);
       } else {
-        setError("An unexpected error occurred. Please try again.");
+        setError(t('auth.unexpectedError'));
       }
     } finally {
       setLoading(false);
@@ -97,7 +99,7 @@ export default function AuthScreen() {
       } else if (error?.message) {
         setError(error.message);
       } else {
-        setError("Authentication was cancelled or failed. Please try again.");
+        setError(t('auth.authCancelled'));
       }
     } finally {
       setLoading(false);
@@ -115,7 +117,7 @@ export default function AuthScreen() {
       if (error instanceof LoginError) {
         setError(error.message);
       } else {
-        setError("Biometric authentication failed. Please try again.");
+        setError(t('auth.biometricFailed'));
       }
     } finally {
       setLoading(false);
@@ -133,25 +135,25 @@ export default function AuthScreen() {
     >
       <View style={styles.content}>
         <Text style={styles.title} variant="headlineMedium">
-          Welcome Back
+          {t('auth.welcomeBack')}
         </Text>
         <Text style={styles.subtitle} variant="bodyMedium">
-          Sign in to continue
+          {t('auth.signInToContinue')}
         </Text>
 
         <TextInput
-          label="Email"
+          label={t('auth.email')}
           value={email}
           autoCapitalize="none"
           keyboardType="email-address"
-          placeholder="user@example.com"
+          placeholder={t('auth.emailPlaceholder')}
           mode="outlined"
           style={styles.input}
           onChangeText={setEmail}
           disabled={loading}
         />
         <TextInput
-          label="Password"
+          label={t('auth.password')}
           value={password}
           autoCapitalize="none"
           secureTextEntry
@@ -168,7 +170,7 @@ export default function AuthScreen() {
           loading={loading}
           disabled={loading}
         >
-          Sign In
+          {t('auth.signIn')}
         </Button>
 
         <View style={styles.divider}>
@@ -179,7 +181,7 @@ export default function AuthScreen() {
             ]}
           />
           <Text variant="bodySmall" style={styles.dividerText}>
-            OR
+            {t('common.or')}
           </Text>
           <View
             style={[
@@ -196,7 +198,7 @@ export default function AuthScreen() {
           icon="google"
           disabled={loading}
         >
-          Sign In with Google
+          {t('auth.signInWithGoogle')}
         </Button>
 
         {hasStoredElderly && Platform.OS !== "web" && (
@@ -213,7 +215,7 @@ export default function AuthScreen() {
             )}
             disabled={loading}
           >
-            Login with {biometricLabel}
+            {t('auth.loginWithBiometric', { label: biometricLabel })}
           </Button>
         )}
 
@@ -222,7 +224,7 @@ export default function AuthScreen() {
           onPress={handleGetStarted}
           style={styles.switchModeButton}
         >
-          New user? Get started
+          {t('auth.newUserGetStarted')}
         </Button>
       </View>
 
@@ -231,7 +233,7 @@ export default function AuthScreen() {
         onDismiss={() => setError(null)}
         duration={4000}
         action={{
-          label: "Dismiss",
+          label: t('common.dismiss'),
           onPress: () => setError(null),
         }}
       >

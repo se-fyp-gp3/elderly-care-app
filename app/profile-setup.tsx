@@ -21,6 +21,7 @@ import {
 import { DatePickerInput } from "react-native-paper-dates";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Role } from "@/types/user";
+import { useTranslation } from "react-i18next";
 
 export default function ProfileSetupScreen() {
   const { user, preferences, setPreference, refreshProfile } = useAuth();
@@ -32,17 +33,18 @@ export default function ProfileSetupScreen() {
 
   const theme = useTheme();
   const router = useRouter();
+  const { t } = useTranslation();
 
   const role: Role = preferences.role || Role.Elderly;
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      setError("Name is required");
+      setError(t('auth.nameRequired'));
       return;
     }
 
     if (!user) {
-      setError("User session not found. Please try signing in again.");
+      setError(t('auth.sessionNotFound'));
       return;
     }
 
@@ -71,7 +73,7 @@ export default function ProfileSetupScreen() {
       router.replace("/");
     } catch (err: any) {
       console.error("Profile creation error:", err);
-      setError(err.message || "Failed to create profile. Please try again.");
+      setError(err.message || t('auth.failedToCreateProfile'));
     } finally {
       setLoading(false);
     }
@@ -96,21 +98,16 @@ export default function ProfileSetupScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Text variant="headlineMedium" style={styles.title}>
-            Complete Your Profile
+            {t('auth.completeProfile')}
           </Text>
           <Text variant="bodyMedium" style={styles.subtitle}>
-            Tell us a bit about yourself
+            {t('auth.tellAboutYourself')}
           </Text>
 
           <Card style={styles.card}>
             <Card.Content>
               <Text variant="titleMedium" style={styles.sectionTitle}>
-                You are signing up as:{" "}
-                <Text
-                  style={{ fontWeight: "bold", textTransform: "capitalize" }}
-                >
-                  {role}
-                </Text>
+                {t('auth.signingUpAs', { role: t(`common.${role}`) })}
               </Text>
             </Card.Content>
           </Card>
@@ -118,29 +115,29 @@ export default function ProfileSetupScreen() {
           <Card style={styles.card}>
             <Card.Content>
               <TextInput
-                label="Full Name *"
+                label={t('auth.fullName')}
                 value={name}
                 onChangeText={setName}
                 mode="outlined"
                 style={styles.input}
                 disabled={loading}
-                placeholder="Enter your full name"
+                placeholder={t('auth.fullNamePlaceholder')}
               />
 
               <TextInput
-                label="Phone Number"
+                label={t('auth.phoneNumber')}
                 value={phone}
                 onChangeText={setPhone}
                 mode="outlined"
                 style={styles.input}
                 disabled={loading}
                 keyboardType="phone-pad"
-                placeholder="+1 234 567 8900"
+                placeholder={t('auth.phonePlaceholder')}
               />
 
               <DatePickerInput
                 locale="en"
-                label="Date of Birth"
+                label={t('auth.dateOfBirth')}
                 value={birthDate}
                 onChange={(d) => setBirthDate(d)}
                 inputMode="start"
@@ -158,7 +155,7 @@ export default function ProfileSetupScreen() {
             loading={loading}
             disabled={loading || !name.trim()}
           >
-            Complete Setup
+            {t('auth.completeSetup')}
           </Button>
 
           <Button
@@ -167,7 +164,7 @@ export default function ProfileSetupScreen() {
             style={styles.submitButton}
             disabled={loading}
           >
-            Switch Role to {role === Role.Elderly ? "Caregiver" : "Elderly"}
+            {t('auth.switchRole', { role: role === Role.Elderly ? t('common.caregiver') : t('common.elderly') })}
           </Button>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -177,7 +174,7 @@ export default function ProfileSetupScreen() {
         onDismiss={() => setError(null)}
         duration={4000}
         action={{
-          label: "Dismiss",
+          label: t('common.dismiss'),
           onPress: () => setError(null),
         }}
       >

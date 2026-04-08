@@ -26,6 +26,7 @@ import {
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     Animated,
     Modal,
@@ -49,17 +50,18 @@ type VoiceState =
   | "error";
 
 const STATE_LABELS: Record<VoiceState, string> = {
-  idle: "撳住講嘢",
-  recording: "聽緊...",
-  processing: "諗緊...",
-  speaking: "講緊...",
-  error: "出錯咗",
+  idle: "voiceCommand.holdToSpeak",
+  recording: "voiceCommand.listening",
+  processing: "voiceCommand.thinking",
+  speaking: "voiceCommand.speaking",
+  error: "voiceCommand.error",
 };
 
 export default function VoiceCommandButton() {
   const theme = useTheme();
   const { user } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [language, setLanguage] = useState<VoiceLanguage>("yue");
@@ -113,7 +115,7 @@ export default function VoiceCommandButton() {
 
       const { granted } = await requestRecordingPermissionsAsync();
       if (!granted) {
-        setErrorMessage("需要錄音權限");
+        setErrorMessage(t('voiceCommand.needRecordingPermission'));
         return;
       }
 
@@ -192,7 +194,7 @@ export default function VoiceCommandButton() {
     } catch (err) {
       console.error("[voice-btn] Processing error:", err);
       setVoiceState("error");
-      setErrorMessage("處理失敗，請再試一次");
+      setErrorMessage(t('voiceCommand.processingFailed'));
       setTimeout(() => setVoiceState("idle"), 3000);
     }
   }, [voiceState, recorder, user, elderlyProfileId, router]);
@@ -265,7 +267,7 @@ export default function VoiceCommandButton() {
     setErrorMessage("");
   }, [voiceState, recorder]);
 
-  const stateLabel = STATE_LABELS[voiceState];
+  const stateLabel = t(STATE_LABELS[voiceState]);
 
   return (
     <>
@@ -302,7 +304,7 @@ export default function VoiceCommandButton() {
           >
             {/* Title */}
             <Text variant="titleLarge" style={{ textAlign: "center", marginBottom: 16, color: theme.colors.onSurface }}>
-              🎙️ 語音助手（中英粵）
+              🎙️ {t('voiceCommand.voiceAssistant')}
             </Text>
 
             {/* Language selector */}
@@ -448,7 +450,7 @@ export default function VoiceCommandButton() {
                   ]}
                   labelStyle={{ fontSize: 18 }}
                 >
-                  停止
+                  {t('voiceCommand.stopButton')}
                 </Button>
               ) : voiceState === "idle" ? (
                 <>
@@ -462,7 +464,7 @@ export default function VoiceCommandButton() {
                     ]}
                     labelStyle={{ fontSize: 18 }}
                   >
-                    開始講
+                    {t('voiceCommand.startSpeaking')}
                   </Button>
                   <Button
                     mode="outlined"
@@ -470,7 +472,7 @@ export default function VoiceCommandButton() {
                     style={styles.closeButton}
                     labelStyle={{ fontSize: 16 }}
                   >
-                    關閉
+                    {t('voiceCommand.closeButton')}
                   </Button>
                 </>
               ) : (
@@ -480,7 +482,7 @@ export default function VoiceCommandButton() {
                   style={styles.closeButton}
                   labelStyle={{ fontSize: 16 }}
                 >
-                  關閉
+                  {t('voiceCommand.closeButton')}
                 </Button>
               )}
             </View>

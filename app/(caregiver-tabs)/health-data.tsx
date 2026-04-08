@@ -36,6 +36,7 @@ import {
   TextInput,
   useTheme
 } from "react-native-paper";
+import { useTranslation } from "react-i18next";
 
 export default function HealthDataPage() {
   const { elderlyId, elderlyName } = useLocalSearchParams<{
@@ -45,6 +46,7 @@ export default function HealthDataPage() {
   const theme = useTheme();
   const router = useRouter();
   const navigation = useNavigation();
+  const { t } = useTranslation();
 
   const [records, setRecords] = useState<HealthData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +85,7 @@ export default function HealthDataPage() {
             size={28}
             color={theme.colors.onSurface}
           />
-          <Text style={{ marginLeft: 5, fontSize: 16 }}>Back</Text>
+          <Text style={{ marginLeft: 5, fontSize: 16 }}>{t('common.back')}</Text>
         </TouchableOpacity>
       ),
     });
@@ -175,7 +177,7 @@ export default function HealthDataPage() {
   // ── Add record handler ────────────────────────────────────────────────
   const handleAddRecord = async () => {
     if (!elderlyId || !newRecord.value.trim()) {
-      Alert.alert("Error", "Please fill in the value.");
+      Alert.alert(t('common.error'), t('healthData.fillInValue'));
       return;
     }
     setSaving(true);
@@ -205,7 +207,7 @@ export default function HealthDataPage() {
       fetchData(); // Refresh list
     } catch (error) {
       console.error("Error adding health record:", error);
-      Alert.alert("Error", "Failed to add record.");
+      Alert.alert(t('common.error'), t('healthData.failedToAddRecord'));
     } finally {
       setSaving(false);
     }
@@ -414,7 +416,7 @@ export default function HealthDataPage() {
         {/* Header Title Area */}
         <View style={styles.pageHeader}>
           <Text variant="headlineMedium" style={{ fontWeight: "bold" }}>
-            Health Data
+            {t('tabs.healthData')}
           </Text>
           {elderlyName ? (
             <View
@@ -440,14 +442,14 @@ export default function HealthDataPage() {
         {/* Summary Statistics */}
         <View style={styles.statsRow}>
           {renderSummaryCard(
-            "Blood Pressure",
+            t('healthData.bloodPressure'),
             latestBP,
             bpSub,
             "heart-pulse",
             "#2196F3",
           )}
           {renderSummaryCard(
-            "Heart Rate",
+            t('healthData.heartRate'),
             latestHR,
             hrSub,
             "heart-flash",
@@ -456,14 +458,14 @@ export default function HealthDataPage() {
         </View>
         <View style={styles.statsRow}>
           {renderSummaryCard(
-            "Temperature",
+            t('healthData.temperature'),
             latestTemp,
             tempSub,
             "thermometer",
             "#FF9800",
           )}
           {renderSummaryCard(
-            "Weight",
+            t('healthData.weight'),
             latestWeight,
             weightSub,
             "scale-bathroom",
@@ -475,7 +477,7 @@ export default function HealthDataPage() {
         {chartData && (
           <Card style={styles.chartCard}>
             <Card.Title
-              title="BP Trends (Last 6)"
+              title={t('healthData.bpTrends')}
               left={(props) => (
                 <MaterialCommunityIcons {...props} name="chart-line" />
               )}
@@ -615,12 +617,12 @@ export default function HealthDataPage() {
             }}
           >
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              Activity Log ({filteredRecords.length})
+              {t('healthData.activityLog')} ({filteredRecords.length})
             </Text>
           </View>
           {loading ? (
             <View style={styles.emptyState}>
-              <Text variant="bodyLarge">Loading...</Text>
+              <Text variant="bodyLarge">{t('common.loading')}</Text>
             </View>
           ) : filteredRecords.length === 0 ? (
             <Surface
@@ -636,7 +638,7 @@ export default function HealthDataPage() {
                 color={theme.colors.onSurfaceVariant}
               />
               <Text variant="bodyLarge" style={{ marginTop: 12 }}>
-                No health records yet
+                {t('healthData.noHealthRecords')}
               </Text>
               <Text
                 variant="bodySmall"
@@ -645,7 +647,7 @@ export default function HealthDataPage() {
                   marginTop: 4,
                 }}
               >
-                Tap + to add a health record
+                {t('healthData.tapToAdd')}
               </Text>
             </Surface>
           ) : (
@@ -666,7 +668,7 @@ export default function HealthDataPage() {
           onDismiss={() => setAddDialogVisible(false)}
           style={{ backgroundColor: theme.colors.surface }}
         >
-          <Dialog.Title>Add Health Record</Dialog.Title>
+          <Dialog.Title>{t('healthData.addHealthRecord')}</Dialog.Title>
           <Dialog.ScrollArea style={{ paddingHorizontal: 0 }}>
             <ScrollView style={{ paddingHorizontal: 24 }}>
               {/* Type Selection – icon card grid */}
@@ -674,7 +676,7 @@ export default function HealthDataPage() {
                 variant="labelLarge"
                 style={{ marginBottom: 10, marginTop: 8 }}
               >
-                Type
+                {t('healthData.typeLabel')}
               </Text>
               <View
                 style={{
@@ -755,8 +757,8 @@ export default function HealthDataPage() {
                 mode="outlined"
                 label={
                   selectedTypeConfig?.hasSecond
-                    ? "Systolic (upper)"
-                    : `Value (${newRecord.unit})`
+                    ? t('healthData.systolic')
+                    : `${t('healthData.value')} (${newRecord.unit})`
                 }
                 value={newRecord.numericValue}
                 onChangeText={(text) => {
@@ -779,7 +781,7 @@ export default function HealthDataPage() {
               {selectedTypeConfig?.hasSecond && (
                 <TextInput
                   mode="outlined"
-                  label="Diastolic (lower)"
+                  label={t('healthData.diastolic')}
                   value={newRecord.secondValue}
                   onChangeText={(text) => {
                     const secondaryValue = text;
@@ -801,7 +803,7 @@ export default function HealthDataPage() {
               {/* Display Value (auto-generated or manual) */}
               <TextInput
                 mode="outlined"
-                label="Display Value"
+                label={t('healthData.displayValue')}
                 value={newRecord.value}
                 onChangeText={(text) =>
                   setNewRecord((prev) => ({ ...prev, value: text }))
@@ -812,7 +814,7 @@ export default function HealthDataPage() {
               {/* Note */}
               <TextInput
                 mode="outlined"
-                label="Note (optional)"
+                label={t('healthData.noteOptional')}
                 value={newRecord.note}
                 onChangeText={(text) =>
                   setNewRecord((prev) => ({ ...prev, note: text }))
@@ -824,14 +826,14 @@ export default function HealthDataPage() {
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
-            <Button onPress={() => setAddDialogVisible(false)}>Cancel</Button>
+            <Button onPress={() => setAddDialogVisible(false)}>{t('common.cancel')}</Button>
             <Button
               mode="contained"
               onPress={handleAddRecord}
               loading={saving}
               disabled={saving || !newRecord.value.trim()}
             >
-              Save
+              {t('common.save')}
             </Button>
           </Dialog.Actions>
         </Dialog>

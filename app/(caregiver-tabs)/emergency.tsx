@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation, useRouter } from "expo-router";
 import React, { useLayoutEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   FlatList,
@@ -81,6 +82,7 @@ export default function EmergencyPage() {
   const theme = useTheme();
   const router = useRouter();
   const navigation = useNavigation();
+  const { t } = useTranslation();
   const [selectedLog, setSelectedLog] = useState<EmergencyLog | null>(null);
 
   useLayoutEffect(() => {
@@ -96,7 +98,7 @@ export default function EmergencyPage() {
             size={28}
             color={theme.colors.onSurface}
           />
-          <Text style={{ marginLeft: 5, fontSize: 16 }}>Back</Text>
+          <Text style={{ marginLeft: 5, fontSize: 16 }}>{t('common.back')}</Text>
         </TouchableOpacity>
       ),
       headerRight: () => (
@@ -107,7 +109,7 @@ export default function EmergencyPage() {
             style={{ borderColor: theme.colors.error }}
             textStyle={{ color: theme.colors.error }}
           >
-            Live
+            {t('emergency.live')}
           </Chip>
         </View>
       ),
@@ -124,42 +126,42 @@ export default function EmergencyPage() {
         return {
           icon: "alert-decagram",
           color: "#D32F2F",
-          label: "Fall Detected",
+          label: t('emergency.fallDetected'),
         };
       case "sos":
-        return { icon: "bell-alert", color: "#C62828", label: "SOS Alert" };
+        return { icon: "bell-alert", color: "#C62828", label: t('emergency.sosAlert') };
       case "hr_warning":
         return {
           icon: "heart-broken",
           color: "#E64A19",
-          label: "Health Warning",
+          label: t('emergency.healthWarning'),
         };
       case "geo_fence":
         return {
           icon: "map-marker-alert",
           color: "#F57C00",
-          label: "Geo-Fence",
+          label: t('emergency.geoFence'),
         };
       default:
-        return { icon: "alert", color: "#757575", label: "Alert" };
+        return { icon: "alert", color: "#757575", label: t('emergency.alert') };
     }
   };
 
   const StatusBadge = ({ status }: { status: string }) => {
     let textColor = theme.colors.primary;
     let bgColor = theme.colors.primaryContainer;
-    let label = "Resolved";
+    let label = t('common.resolved');
     let icon = "check-circle";
 
     if (status === "active") {
       textColor = theme.colors.error;
       bgColor = theme.colors.errorContainer;
-      label = "Active";
+      label = t('common.active');
       icon = "alert-circle";
     } else if (status === "investigating") {
       textColor = "#FB8C00";
       bgColor = "#FFF3E0";
-      label = "In Progress";
+      label = t('emergency.inProgress');
       icon = "progress-clock";
     }
 
@@ -275,13 +277,13 @@ export default function EmergencyPage() {
                   fontWeight: "bold",
                 }}
               >
-                Alert System Active
+                {t('emergency.alertSystemActive')}
               </Text>
               <Text
                 variant="bodyMedium"
                 style={{ color: theme.colors.onErrorContainer }}
               >
-                2 unresolved alerts require attention.
+                {t('emergency.unresolvedAlerts', { count: 2 })}
               </Text>
             </View>
           </View>
@@ -292,14 +294,14 @@ export default function EmergencyPage() {
             style={{ marginTop: 12 }}
             onPress={() => setSelectedLog(EMERGENCY_LOGS[0])}
           >
-            View Latest Alert
+            {t('emergency.viewLatestAlert')}
           </Button>
         </Surface>
 
         {/* Quick Actions Grid */}
         <View style={styles.sectionHeader}>
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            Emergency Response
+            {t('emergency.emergencyResponse')}
           </Text>
         </View>
         <View style={styles.grid}>
@@ -314,7 +316,7 @@ export default function EmergencyPage() {
                 color="#D32F2F"
               />
               <Text style={[styles.gridLabel, { color: "#D32F2F" }]}>
-                Call 999
+                {t('emergency.call999')}
               </Text>
             </Card.Content>
           </Card>
@@ -329,14 +331,14 @@ export default function EmergencyPage() {
                 color="#1976D2"
               />
               <Text style={[styles.gridLabel, { color: "#1976D2" }]}>
-                Police
+                {t('emergency.police')}
               </Text>
             </Card.Content>
           </Card>
           <Card
             style={[styles.gridCard, { backgroundColor: "#fff" }]}
             onPress={() =>
-              Alert.alert("Broadcast", "Sending alert to all active staff...")
+              Alert.alert(t('emergency.broadcast'), t('emergency.broadcastDesc'))
             }
           >
             <Card.Content style={styles.gridContent}>
@@ -345,7 +347,7 @@ export default function EmergencyPage() {
                 size={32}
                 color={theme.colors.primary}
               />
-              <Text style={styles.gridLabel}>Broadcast</Text>
+              <Text style={styles.gridLabel}>{t('emergency.broadcast')}</Text>
             </Card.Content>
           </Card>
         </View>
@@ -353,10 +355,10 @@ export default function EmergencyPage() {
         {/* Log List */}
         <View style={[styles.sectionHeader, { marginTop: 10 }]}>
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            Recent Logs
+            {t('emergency.recentLogs')}
           </Text>
           <Button mode="text" compact>
-            Filter
+            {t('emergency.filter')}
           </Button>
         </View>
         <FlatList
@@ -377,32 +379,32 @@ export default function EmergencyPage() {
           <Dialog.Title
             style={{ color: theme.colors.error, fontWeight: "bold" }}
           >
-            <MaterialCommunityIcons name="alert" size={24} /> Incident Details
+            <MaterialCommunityIcons name="alert" size={24} /> {t('emergency.incidentDetails')}
           </Dialog.Title>
           <Dialog.Content>
             {selectedLog && (
               <View>
                 <Surface style={styles.detailBox} elevation={0}>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Type:</Text>
+                    <Text style={styles.detailLabel}>{t('emergency.type')}</Text>
                     <Text style={styles.detailValue}>
                       {selectedLog.type.toUpperCase().replace("_", " ")}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Elderly:</Text>
+                    <Text style={styles.detailLabel}>{t('emergency.elderlyLabel')}</Text>
                     <Text style={styles.detailValue}>
                       {selectedLog.elderlyName}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Location:</Text>
+                    <Text style={styles.detailLabel}>{t('emergency.location')}</Text>
                     <Text style={styles.detailValue}>
                       {selectedLog.location}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Time:</Text>
+                    <Text style={styles.detailLabel}>{t('emergency.timeLabel')}</Text>
                     <Text style={styles.detailValue}>
                       {selectedLog.time}, {selectedLog.date}
                     </Text>
@@ -413,7 +415,7 @@ export default function EmergencyPage() {
                   variant="titleMedium"
                   style={{ marginTop: 16, marginBottom: 4 }}
                 >
-                  Description
+                  {t('emergency.description')}
                 </Text>
                 <Text variant="bodyMedium" style={{ lineHeight: 20 }}>
                   {selectedLog.desc}
@@ -421,32 +423,32 @@ export default function EmergencyPage() {
 
                 <Divider style={{ marginVertical: 16 }} />
                 <Text variant="titleMedium" style={{ marginBottom: 12 }}>
-                  Suggested Actions
+                  {t('emergency.suggestedActions')}
                 </Text>
                 <View style={{ flexDirection: "row", gap: 10 }}>
                   <Chip
                     icon="phone"
                     onPress={() => handleCallEmergency("12345678")}
                   >
-                    Call Family
+                    {t('emergency.callFamily')}
                   </Chip>
                   <Chip icon="video" onPress={() => {}}>
-                    View Camera
+                    {t('emergency.viewCamera')}
                   </Chip>
                 </View>
               </View>
             )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setSelectedLog(null)}>Close</Button>
+            <Button onPress={() => setSelectedLog(null)}>{t('common.close')}</Button>
             <Button
               mode="contained"
               onPress={() => {
-                Alert.alert("Resolved", "Incident marked as resolved.");
+                Alert.alert(t('common.resolved'), t('emergency.markResolved'));
                 setSelectedLog(null);
               }}
             >
-              Mark Resolved
+              {t('emergency.markResolved')}
             </Button>
           </Dialog.Actions>
         </Dialog>

@@ -5,11 +5,13 @@ import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Button, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 export default function StartScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { user, signOut, setPreference } = useAuth();
+  const { t } = useTranslation();
 
   const handleRoleSelect = (role: Role) => {
     if (!user) {
@@ -34,10 +36,10 @@ export default function StartScreen() {
     >
       <View style={styles.content}>
         <Text variant="headlineLarge" style={styles.title}>
-          Welcome to{"\n"}Elderly Care
+          {t('auth.welcomeTo')}
         </Text>
         <Text variant="bodyLarge" style={styles.subtitle}>
-          Choose your role to get started
+          {t('auth.chooseRole')}
         </Text>
 
         <View style={styles.cardsContainer}>
@@ -50,10 +52,10 @@ export default function StartScreen() {
           >
             <MaterialCommunityIcons name="human-cane" size={64} color="white" />
             <Text variant="headlineSmall" style={styles.roleTitle}>
-              Elderly
+              {t('common.elderly')}
             </Text>
             <Text variant="bodyMedium" style={styles.roleDescription}>
-              I need care and assistance
+              {t('auth.elderlyDesc')}
             </Text>
           </Pressable>
 
@@ -66,10 +68,10 @@ export default function StartScreen() {
           >
             <MaterialCommunityIcons name="hand-heart" size={64} color="white" />
             <Text variant="headlineSmall" style={styles.roleTitle}>
-              Caregiver
+              {t('common.caregiver')}
             </Text>
             <Text variant="bodyMedium" style={styles.roleDescription}>
-              I provide care and support
+              {t('auth.caregiverDesc')}
             </Text>
           </Pressable>
         </View>
@@ -78,24 +80,24 @@ export default function StartScreen() {
           {user ? (
             <>
               <Text variant="bodyMedium" style={styles.footerText}>
-                Logged in as {user.email}
+                {t('auth.loggedInAs', { email: user.email })}
               </Text>
               <View style={styles.signOutRow}>
                 <Text variant="bodyMedium" style={styles.footerText}>
-                  Not you?
+                  {t('auth.notYou')}
                 </Text>
                 <Button mode="text" onPress={signOut}>
-                  Sign Out
+                  {t('common.signOut')}
                 </Button>
               </View>
             </>
           ) : (
             <>
               <Text variant="bodyMedium" style={styles.footerText}>
-                Already have an account?
+                {t('auth.alreadyHaveAccount')}
               </Text>
               <Button mode="text" onPress={handleSignIn}>
-                Sign In
+                {t('auth.signIn')}
               </Button>
             </>
           )}

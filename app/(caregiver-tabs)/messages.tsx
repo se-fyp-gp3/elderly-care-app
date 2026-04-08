@@ -47,11 +47,13 @@ import {
 } from "react-native-paper";
 
 import MomentsView from "@/components/MomentsView";
+import { useTranslation } from "react-i18next";
 
 export default function CaregiverMessages() {
   const theme = useTheme();
   const { user } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,20 +131,20 @@ export default function CaregiverMessages() {
   const handleAcceptRequest = async (connectionId: string, name: string) => {
     try {
       await acceptCaregiverConnection(connectionId);
-      Alert.alert("Connected", `You are now connected with ${name}`);
+      Alert.alert(t('emergency.connected'), t('emergency.connectedWith', { name }));
       fetchContacts();
     } catch (error) {
-      Alert.alert("Error", "Failed to accept request.");
+      Alert.alert(t('common.error'), t('emergency.failedToAccept'));
     }
   };
 
   const handleRejectRequest = async (connectionId: string) => {
     try {
       await rejectCaregiverConnection(connectionId);
-      Alert.alert("Rejected", "Friend request rejected.");
+      Alert.alert(t('emergency.rejected'), t('emergency.requestRejected'));
       fetchContacts();
     } catch (error) {
-      Alert.alert("Error", "Failed to reject request.");
+      Alert.alert(t('common.error'), t('emergency.failedToReject'));
     }
   };
 
@@ -242,26 +244,26 @@ export default function CaregiverMessages() {
   const handleCall = useCallback((phone?: string | null) => {
     if (!phone)
       return Alert.alert(
-        "No phone number",
-        "This contact has no phone number on file.",
+        t('common.noPhoneNumber'),
+        t('emergency.noPhoneOnFile'),
       );
     const url = `tel:${phone}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) Linking.openURL(url);
-      else Alert.alert("Cannot make a call from this device");
+      else Alert.alert(t('common.cannotCall'));
     });
   }, []);
 
   const handleSMS = useCallback((phone?: string | null) => {
     if (!phone)
       return Alert.alert(
-        "No phone number",
-        "This contact has no phone number on file.",
+        t('common.noPhoneNumber'),
+        t('emergency.noPhoneOnFile'),
       );
     const url = `sms:${phone}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) Linking.openURL(url);
-      else Alert.alert("Cannot send SMS from this device");
+      else Alert.alert(t('common.cannotSMS'));
     });
   }, []);
 
@@ -301,7 +303,7 @@ export default function CaregiverMessages() {
       }
       setSearchDone(true);
     } catch (error) {
-      Alert.alert("Error", "Failed to search. Please try again.");
+      Alert.alert(t('common.error'), t('emergency.failedToAdd'));
     } finally {
       setSearching(false);
     }
@@ -315,8 +317,8 @@ export default function CaregiverMessages() {
       const alreadyExists = contacts.some((c) => c.id === foundUser.data.$id);
       if (alreadyExists) {
         Alert.alert(
-          "Already added",
-          `${foundUser.data.name ?? "This user"} is already in your contacts.`,
+          t('emergency.alreadyAdded'),
+          t('emergency.alreadyInContacts', { name: foundUser.data.name ?? t('common.unknown') }),
         );
         setAddingContact(false);
         return;
@@ -332,19 +334,19 @@ export default function CaregiverMessages() {
 
       if (success) {
         Alert.alert(
-          "Invitation Sent",
-          `An invitation has been sent to ${foundUser.data.name ?? "User"}. You can chat once they accept.`,
+          t('emergency.invitationSent'),
+          t('emergency.invitationSentDesc', { name: foundUser.data.name ?? t('common.unknown') }) + ' ' + t('emergency.chatOnceAccepted'),
         );
         closeAddDialog();
         await fetchContacts();
       } else {
         Alert.alert(
-          "Already added",
-          `${foundUser.data.name ?? "This user"} is already in your contacts or has a pending request.`,
+          t('emergency.alreadyAdded'),
+          t('emergency.alreadyInContactsOrPending', { name: foundUser.data.name ?? t('common.unknown') }),
         );
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to add contact. Please try again.");
+      Alert.alert(t('common.error'), t('emergency.failedToAdd'));
     } finally {
       setAddingContact(false);
     }
@@ -363,8 +365,8 @@ export default function CaregiverMessages() {
 
   const formatLastSeen = (lastActive?: string): string => {
     if (!lastActive) return "";
-    if (isOnline(lastActive)) return "Online";
-    return `Last seen ${formatRelativeTime(lastActive)}`;
+    if (isOnline(lastActive)) return t('common.online');
+    return t('common.lastSeen', { time: formatRelativeTime(lastActive) });
   };
 
   const renderContactItem = ({ item }: { item: Contact }) => {
@@ -453,8 +455,8 @@ export default function CaregiverMessages() {
                 ]}
                 numberOfLines={1}
               >
-                {lastMsg?.sender_id === caregiverProfileId ? "You: " : ""}
-                {lastMsg?.message_type === "voice" ? "\ud83c\udfa4 Voice message" : preview}
+                {lastMsg?.sender_id === caregiverProfileId ? t('common.you') : ""}
+                {lastMsg?.message_type === "voice" ? t('common.voiceMessage') : preview}
               </Text>
             </View>
           ) : (
@@ -472,14 +474,14 @@ export default function CaregiverMessages() {
                     { color: theme.colors.onSurfaceVariant },
                   ]}
                 >
-                  {item.role === "elderly" ? "Elderly" : "Caregiver"}
+                  {item.role === "elderly" ? t('common.elderly') : t('common.caregiver')}
                 </Text>
               </View>
               <Text
                 variant="bodySmall"
                 style={{ color: theme.colors.onSurfaceVariant }}
               >
-                Tap to start chatting
+                {t('emergency.tapToChat')}
               </Text>
             </View>
           )}
@@ -520,7 +522,7 @@ export default function CaregiverMessages() {
             color: theme.colors.onSurfaceVariant,
           }}
         >
-          Pending Requests
+          {t('emergency.pendingRequests')}
         </Text>
         {pendingRequests.map((req) => (
           <View
@@ -553,7 +555,7 @@ export default function CaregiverMessages() {
                   variant="bodySmall"
                   style={{ color: theme.colors.onSurfaceVariant }}
                 >
-                  Wants to connect
+                  {t('emergency.wantsToConnect')}
                 </Text>
               </View>
               <View style={{ flexDirection: "row", gap: 8 }}>
@@ -562,14 +564,14 @@ export default function CaregiverMessages() {
                   compact
                   onPress={() => handleAcceptRequest(req.connectionId, req.from.name)}
                 >
-                  Accept
+                  {t('emergency.accept')}
                 </Button>
                 <Button
                   mode="outlined"
                   compact
                   onPress={() => handleRejectRequest(req.connectionId)}
                 >
-                  Reject
+                  {t('emergency.reject')}
                 </Button>
               </View>
             </View>
@@ -590,14 +592,13 @@ export default function CaregiverMessages() {
         variant="headlineSmall"
         style={[styles.emptyTitle, { color: theme.colors.onSurface }]}
       >
-        No Contacts Yet
+        {t('messages.noContactsYet')}
       </Text>
       <Text
         variant="bodyMedium"
         style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant }]}
       >
-        Your linked elderly will appear here.{"\n"}Tap the + button to add
-        friends by phone number.
+        {t('messages.contactsAppearHere')}
       </Text>
     </View>
   );
@@ -620,7 +621,7 @@ export default function CaregiverMessages() {
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.searchRow}>
           <Searchbar
-            placeholder="Search contacts..."
+            placeholder={t('messages.searchContacts')}
             onChangeText={setSearchQuery}
             value={searchQuery}
             style={[
@@ -655,7 +656,7 @@ export default function CaregiverMessages() {
               { color: theme.colors.onSurfaceVariant },
             ]}
           >
-            Loading contacts...
+            {t('messages.loadingContacts')}
           </Text>
         </View>
       ) : (
@@ -700,7 +701,7 @@ export default function CaregiverMessages() {
     >
       {/* Top Tab Bar */}
       <View style={{ flexDirection: 'row', backgroundColor: theme.colors.surface, elevation: 1 }}>
-        {['Chats', 'Moments'].map((tab, index) => {
+        {[t('emergency.chats'), t('emergency.moments')].map((tab, index) => {
            const isActive = activeTab === index;
            return (
              <TouchableOpacity 
@@ -764,7 +765,7 @@ export default function CaregiverMessages() {
                 {/* Header */}
                 <View style={styles.modalHeader}>
                   <Text variant="titleLarge" style={{ fontWeight: "700" }}>
-                    Add Friend
+                    {t('emergency.addFriend')}
                   </Text>
                   <TouchableOpacity onPress={closeAddDialog}>
                     <MaterialCommunityIcons
@@ -782,14 +783,14 @@ export default function CaregiverMessages() {
                     marginBottom: 16,
                   }}
                 >
-                  Search for a friend by their phone number
+                  {t('emergency.searchByPhone')}
                 </Text>
 
                 {/* Phone input + Search button */}
                 <View style={styles.phoneRow}>
                   <TextInput
                     mode="outlined"
-                    label="Phone number"
+                    label={t('emergency.phoneNumber')}
                     value={phoneSearch}
                     onChangeText={setPhoneSearch}
                     keyboardType="phone-pad"
@@ -807,7 +808,7 @@ export default function CaregiverMessages() {
                     style={styles.searchBtn}
                     compact
                   >
-                    Search
+                    {t('common.search')}
                   </Button>
                 </View>
 
@@ -825,7 +826,7 @@ export default function CaregiverMessages() {
                         color: theme.colors.onSurfaceVariant,
                       }}
                     >
-                      Searching...
+                      {t('emergency.searching')}
                     </Text>
                   </View>
                 )}
@@ -946,7 +947,7 @@ export default function CaregiverMessages() {
                         color: theme.colors.onSurfaceVariant,
                       }}
                     >
-                      No user found with that number
+                      {t('emergency.noUserFound')}
                     </Text>
                   </View>
                 )}

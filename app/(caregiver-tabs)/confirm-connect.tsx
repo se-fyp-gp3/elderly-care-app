@@ -9,6 +9,7 @@ import { Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
@@ -24,6 +25,7 @@ export default function ConfirmConnectScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { token } = useLocalSearchParams<{ token: string }>();
 
   const [elderly, setElderly] = useState<Elderly | null>(null);
@@ -40,19 +42,19 @@ export default function ConfirmConnectScreen() {
       try {
         const request = await getRegistrationRequest(token);
         if (!request || !request.elderly_user_id) {
-          setError("Connection request not found or expired.");
+          setError(t('confirmConnect.requestNotFound'));
           setLoading(false);
           return;
         }
 
         if (request.status === "completed") {
-          setError("This connection request has already been completed.");
+          setError(t('confirmConnect.requestCompleted'));
           setLoading(false);
           return;
         }
 
         if (request.status === "cancelled") {
-          setError("This connection request has been cancelled.");
+          setError(t('confirmConnect.requestCancelled'));
           setLoading(false);
           return;
         }
@@ -61,14 +63,14 @@ export default function ConfirmConnectScreen() {
 
         const profile = await getElderlyByUserId(request.elderly_user_id);
         if (!profile) {
-          setError("Elderly profile not found.");
+          setError(t('confirmConnect.elderlyNotFound'));
           setLoading(false);
           return;
         }
         setElderly(profile);
       } catch (err) {
         console.error("Error loading elderly info:", err);
-        setError("Failed to load elderly information.");
+        setError(t('confirmConnect.failedToLoad'));
       } finally {
         setLoading(false);
       }
@@ -101,7 +103,7 @@ export default function ConfirmConnectScreen() {
       }, 2000);
     } catch (err: any) {
       console.error("Connect error:", err);
-      setError(err?.message || "Failed to connect. Please try again.");
+      setError(err?.message || t('confirmConnect.failedToConnect'));
     } finally {
       setConnecting(false);
     }
@@ -126,14 +128,14 @@ export default function ConfirmConnectScreen() {
             color={theme.colors.error}
           />
           <Text variant="bodyLarge" style={{ marginTop: 16 }}>
-            No connection token found.
+            {t('confirmConnect.noConnectionToken')}
           </Text>
           <Button
             mode="contained"
             onPress={() => router.back()}
             style={{ marginTop: 16 }}
           >
-            Go Back
+            {t('confirmConnect.goBack')}
           </Button>
         </View>
       </SafeAreaView>
@@ -152,7 +154,7 @@ export default function ConfirmConnectScreen() {
             color="#4CAF50"
           />
           <Text variant="headlineSmall" style={styles.successTitle}>
-            Connected!
+            {t('confirmConnect.connected')}
           </Text>
           <Text
             variant="bodyMedium"
@@ -161,8 +163,8 @@ export default function ConfirmConnectScreen() {
               { color: theme.colors.onSurfaceVariant },
             ]}
           >
-            You are now linked to {elderly?.name ?? "this elderly"}.{"\n"}
-            Redirecting to your dashboard...
+            {t('confirmConnect.linkedTo', { name: elderly?.name ?? t('common.unknown') })}{"\n"}
+            {t('confirmConnect.redirecting')}
           </Text>
         </View>
       </SafeAreaView>
@@ -175,7 +177,7 @@ export default function ConfirmConnectScreen() {
     >
       <View style={styles.headerBar}>
         <Button icon="arrow-left" onPress={handleCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </View>
 
@@ -184,7 +186,7 @@ export default function ConfirmConnectScreen() {
           <>
             <ActivityIndicator size="large" />
             <Text variant="bodyLarge" style={{ marginTop: 16 }}>
-              Loading elderly information...
+              {t('confirmConnect.loadingElderlyInfo')}
             </Text>
           </>
         ) : error ? (
@@ -209,7 +211,7 @@ export default function ConfirmConnectScreen() {
               onPress={() => router.back()}
               style={{ marginTop: 16 }}
             >
-              Go Back
+              {t('confirmConnect.goBack')}
             </Button>
           </>
         ) : elderly ? (
@@ -220,7 +222,7 @@ export default function ConfirmConnectScreen() {
               color="#2196F3"
             />
             <Text variant="headlineSmall" style={styles.title}>
-              Connect to Elderly
+              {t('confirmConnect.connectToElderly')}
             </Text>
             <Text
               variant="bodyMedium"
@@ -229,7 +231,7 @@ export default function ConfirmConnectScreen() {
                 { color: theme.colors.onSurfaceVariant },
               ]}
             >
-              Do you want to link with this elderly?
+              {t('confirmConnect.wantToLink')}
             </Text>
 
             <Card
@@ -250,7 +252,7 @@ export default function ConfirmConnectScreen() {
                 />
                 <View style={{ marginLeft: 16, flex: 1 }}>
                   <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-                    {elderly.name ?? "Unknown"}
+                    {elderly.name ?? t('common.unknown')}
                   </Text>
                   {elderly.phone && (
                     <Text
@@ -276,7 +278,7 @@ export default function ConfirmConnectScreen() {
                 icon="check"
                 style={styles.confirmButton}
               >
-                Confirm
+                {t('common.confirm')}
               </Button>
               <Button
                 mode="outlined"
@@ -285,7 +287,7 @@ export default function ConfirmConnectScreen() {
                 icon="close"
                 style={styles.cancelButton}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
             </View>
           </>

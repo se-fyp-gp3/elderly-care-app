@@ -25,6 +25,7 @@ import {
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     Alert,
     FlatList,
@@ -180,6 +181,7 @@ export default function ConversationScreen({
   const theme = useTheme();
   const router = useRouter();
   const { preferences } = useAuth();
+  const { t } = useTranslation();
   const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
 
   const handleBack = () => {
@@ -286,7 +288,7 @@ export default function ConversationScreen({
     try {
       const { status } = await requestRecordingPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission needed", "Microphone access is required to send voice messages.");
+        Alert.alert(t('common.permissionNeeded'), t('chat.micPermission'));
         return;
       }
       await setAudioModeAsync({
@@ -302,7 +304,7 @@ export default function ConversationScreen({
       }, 1000);
     } catch (err) {
       console.error("Failed to start recording:", err);
-      Alert.alert("Error", "Could not start recording.");
+      Alert.alert(t('common.error'), t('chat.couldNotStartRecording'));
     }
   };
 
@@ -364,7 +366,7 @@ export default function ConversationScreen({
       setRecordingDuration(0);
     } catch (error) {
       console.error("Error sending voice message:", error);
-      Alert.alert("Error", "Failed to send voice message.");
+      Alert.alert(t('common.error'), t('chat.failedToSendVoice'));
     } finally {
       setSending(false);
     }
@@ -395,8 +397,8 @@ export default function ConversationScreen({
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
 
-      if (date.toDateString() === today.toDateString()) return "Today";
-      if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+      if (date.toDateString() === today.toDateString()) return t('common.today');
+      if (date.toDateString() === yesterday.toDateString()) return t('common.yesterday');
 
       return date.toLocaleDateString(undefined, {
         weekday: "short",
@@ -564,13 +566,13 @@ export default function ConversationScreen({
         variant="titleMedium"
         style={[styles.emptyTitle, { color: theme.colors.onSurface }]}
       >
-        Start a Conversation
+        {t('chat.startConversation')}
       </Text>
       <Text
         variant="bodyMedium"
         style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant }]}
       >
-        Send a message to {contactName}
+        {t('chat.sendMessageTo', { name: contactName })}
       </Text>
     </View>
   );
@@ -632,7 +634,7 @@ export default function ConversationScreen({
                 variant="bodySmall"
                 style={{ color: theme.colors.onSurfaceVariant }}
               >
-                {contactRole === "caregiver" ? "Caregiver" : "Elderly"}
+                {contactRole === "caregiver" ? t('common.caregiver') : t('common.elderly')}
               </Text>
             </View>
           </View>
@@ -692,7 +694,7 @@ export default function ConversationScreen({
           >
             <TextInput
               mode="outlined"
-              placeholder="Type a message..."
+              placeholder={t('chat.typeMessage')}
               value={inputText}
               onChangeText={setInputText}
               style={styles.textInput}

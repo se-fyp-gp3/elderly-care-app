@@ -1,6 +1,7 @@
 import AddElderlyDialog from "@/components/AddElderlyDialog";
 import ElderlyCard from "@/components/ElderlyCard";
 import { useAuth } from "@/lib/auth-context";
+import { useTranslation } from "react-i18next";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import { calculateAge } from "@/lib/elderly";
 import {
@@ -44,6 +45,7 @@ interface ElderlyListItem extends Elderly {
 export default function CaregiverDashboard() {
   const { preferences, user } = useAuth();
   const theme = useTheme();
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = React.useState(false);
   const [elderlyList, setElderlyList] = React.useState<ElderlyListItem[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -118,25 +120,25 @@ export default function CaregiverDashboard() {
   const quickActions = [
     {
       icon: "pill",
-      label: "Medication Management",
+      label: t('caregiverPanel.medicationManagement'),
       color: "#4CAF50",
       route: "medication",
     },
     {
       icon: "heart-pulse",
-      label: "Health Data",
+      label: t('caregiverPanel.healthData'),
       color: "#F44336",
       route: "health-data",
     },
     {
       icon: "calendar-clock",
-      label: "Schedule",
+      label: t('caregiverPanel.schedule'),
       color: "#2196F3",
       route: "schedule",
     },
     {
       icon: "chat-alert",
-      label: "Emergency Notification",
+      label: t('caregiverPanel.emergencyNotification'),
       color: "#FF9800",
       route: "emergency",
     },
@@ -149,11 +151,11 @@ export default function CaregiverDashboard() {
   }, [fetchElderlyData]);
 
   const handleCall = React.useCallback((phone?: string) => {
-    if (!phone) return Alert.alert("No phone number");
+    if (!phone) return Alert.alert(t('common.noPhoneNumber'));
     const url = `tel:${phone}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) Linking.openURL(url);
-      else Alert.alert("Cannot make a call from this device");
+      else Alert.alert(t('common.cannotCall'));
     });
   }, []);
 
@@ -211,13 +213,13 @@ export default function CaregiverDashboard() {
             color={theme.colors.primary}
           />
           <Text variant="headlineMedium" style={styles.title}>
-            Caregiver Panel
+            {t('caregiverPanel.title')}
           </Text>
           <Text variant="bodyMedium" style={styles.subtitle}>
-            Please switch to &quot;Nursing Mode&quot; in settings to use this feature
+            {t('caregiverPanel.switchToNursing')}
           </Text>
           <Button mode="contained" onPress={() => {}} style={styles.button}>
-            Go to Settings
+            {t('caregiverPanel.goToSettings')}
           </Button>
         </View>
       </View>
@@ -240,7 +242,7 @@ export default function CaregiverDashboard() {
                 <Text variant="headlineSmall" style={styles.statNumber}>
                   {elderlyList.length}
                 </Text>
-                <Text variant="bodyMedium">Elderly</Text>
+                <Text variant="bodyMedium">{t('caregiverPanel.elderlyLabel')}</Text>
               </View>
               <View style={styles.statItem}>
                 <Text variant="headlineSmall" style={styles.statNumber}>
@@ -250,7 +252,7 @@ export default function CaregiverDashboard() {
                     ).length
                   }
                 </Text>
-                <Text variant="bodyMedium">Needs Attention</Text>
+                <Text variant="bodyMedium">{t('caregiverPanel.needsAttention')}</Text>
               </View>
             </Card.Content>
           </Card>
@@ -258,7 +260,7 @@ export default function CaregiverDashboard() {
 
         <View style={styles.section}>
           <Text variant="titleLarge" style={styles.sectionTitle}>
-            Quick Actions
+            {t('caregiverPanel.quickActions')}
           </Text>
 
           {/* Temporary Demo Button - Removed as per request now that Info button works
@@ -306,7 +308,7 @@ export default function CaregiverDashboard() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text variant="titleLarge" style={styles.sectionTitle}>
-              Responsible elderly
+              {t('caregiverPanel.responsibleElderly')}
             </Text>
             {elderlyList.filter((e) => e.status === ElderlyStatus.WARNING)
               .length > 0 && (
@@ -327,7 +329,7 @@ export default function CaregiverDashboard() {
                       (e) => e.status === ElderlyStatus.WARNING,
                     ).length
                   }{" "}
-                  needs attention
+                  {t('caregiverPanel.needsAttention').toLowerCase()}
                 </Text>
               </View>
             )}
@@ -336,7 +338,7 @@ export default function CaregiverDashboard() {
           {loading && (
             <Card style={styles.elderlyCard}>
               <Card.Content>
-                <Text>Loading elderly data...</Text>
+                <Text>{t('caregiverPanel.loadingElderlyData')}</Text>
               </Card.Content>
             </Card>
           )}
@@ -350,7 +352,7 @@ export default function CaregiverDashboard() {
                   onPress={fetchElderlyData}
                   style={{ marginTop: 8 }}
                 >
-                  Retry
+                  {t('common.retry')}
                 </Button>
               </Card.Content>
             </Card>
@@ -360,7 +362,7 @@ export default function CaregiverDashboard() {
             <Card style={styles.elderlyCard}>
               <Card.Content>
                 <Text>
-                  No elderly records found. Add some using the + button below.
+                  {t('caregiverPanel.noElderlyRecords')}
                 </Text>
               </Card.Content>
             </Card>
@@ -385,7 +387,7 @@ export default function CaregiverDashboard() {
           visible={healthDataDialogVisible}
           onDismiss={() => setHealthDataDialogVisible(false)}
         >
-          <Dialog.Title>Select Health Data</Dialog.Title>
+          <Dialog.Title>{t('caregiverPanel.selectHealthData')}</Dialog.Title>
           <Dialog.ScrollArea>
             <ScrollView style={{ maxHeight: 300 }}>
               {elderlyList.length > 0 ? (
@@ -393,7 +395,7 @@ export default function CaregiverDashboard() {
                   <List.Item
                     key={item.$id}
                     title={item.name}
-                    description={`Age: ${item.age || "Unknown"}`}
+                    description={`${t('caregiverPanel.age')} ${item.age || t('common.unknown')}`}
                     left={(props) => (
                       <Avatar.Text
                         {...props}
@@ -418,20 +420,20 @@ export default function CaregiverDashboard() {
                 ))
               ) : (
                 <Text style={{ padding: 20, textAlign: "center" }}>
-                  No elderly records found.
+                  {t('caregiverPanel.noElderlyFound')}
                 </Text>
               )}
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button onPress={() => setHealthDataDialogVisible(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </Dialog.Actions>
         </Dialog>
 
         <Dialog visible={infoVisible} onDismiss={closeInfoDialog}>
-          <Dialog.Title>{selectedElderly?.name ?? "Details"}</Dialog.Title>
+          <Dialog.Title>{selectedElderly?.name ?? t('caregiverPanel.details')}</Dialog.Title>
           <Dialog.Content>
             <View
               style={{
@@ -450,21 +452,21 @@ export default function CaregiverDashboard() {
               </View>
             </View>
 
-            <Text variant="bodyMedium">Age: {selectedElderly?.age ?? "—"}</Text>
+            <Text variant="bodyMedium">{t('caregiverPanel.age')} {selectedElderly?.age ?? "—"}</Text>
             <Text variant="bodyMedium">
-              Phone: {selectedElderly?.phone ?? "—"}
+              {t('caregiverPanel.phone')} {selectedElderly?.phone ?? "—"}
             </Text>
             <Text variant="bodyMedium">
               Status: {selectedElderly?.status ?? "—"}
             </Text>
             <Text variant="bodyMedium">
-              Last Check: {selectedElderly?.lastCheck ?? "—"}
+              {t('caregiverPanel.lastCheck')} {selectedElderly?.lastCheck ?? "—"}
             </Text>
             <Text variant="bodyMedium">
-              Medication: {selectedElderly?.medication ?? "—"}
+              {t('tabs.medication')}: {selectedElderly?.medication ?? "—"}
             </Text>
             <Text variant="bodyMedium">
-              Next Appointment: {selectedElderly?.nextAppointment ?? "—"}
+              {t('caregiverPanel.nextAppointment')} {selectedElderly?.nextAppointment ?? "—"}
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
@@ -474,7 +476,7 @@ export default function CaregiverDashboard() {
                 closeInfoDialog();
               }}
             >
-              Call
+              {t('caregiverPanel.call')}
             </Button>
             <Button
               onPress={() => {
@@ -482,9 +484,9 @@ export default function CaregiverDashboard() {
                 closeInfoDialog();
               }}
             >
-              Health Data
+              {t('caregiverPanel.healthData')}
             </Button>
-            <Button onPress={closeInfoDialog}>Close</Button>
+            <Button onPress={closeInfoDialog}>{t('common.close')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

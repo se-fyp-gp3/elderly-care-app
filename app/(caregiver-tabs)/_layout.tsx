@@ -1,9 +1,11 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "react-native-paper";
 
 export default function TabsLayout() {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -24,7 +26,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "AI Chat Bot",
+          title: t('tabs.aiChatBot'),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="robot-happy-outline"
@@ -37,7 +39,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: "Messages",
+          title: t('tabs.messages'),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="chat" size={size} color={color} />
           ),
@@ -46,7 +48,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="caregiver"
         options={{
-          title: "Care panel",
+          title: t('tabs.carePanel'),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="account-supervisor"
@@ -59,7 +61,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="medication"
         options={{
-          title: "Medication",
+          title: t('tabs.medication'),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="pill" size={size} color={color} />
           ),
@@ -68,7 +70,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "settings",
+          title: t('tabs.settings'),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="cog-outline"
@@ -84,35 +86,35 @@ export default function TabsLayout() {
         name="emergency"
         options={{
           href: null,
-          title: "Emergency",
+          title: t('tabs.emergency'),
         }}
       />
       <Tabs.Screen
         name="health-data"
         options={{
           href: null,
-          title: "Health Data",
+          title: t('tabs.healthData'),
         }}
       />
       <Tabs.Screen
         name="schedule"
         options={{
           href: null,
-          title: "Schedule",
+          title: t('tabs.schedule'),
         }}
       />
       <Tabs.Screen
         name="elderly/[id]"
         options={{
           href: null,
-          title: "Elderly Detail",
+          title: t('tabs.elderlyDetail'),
         }}
       />
       <Tabs.Screen
         name="conversation"
         options={{
           href: null,
-          title: "Conversation",
+          title: t('tabs.conversation'),
           headerShown: false,
         }}
       />
@@ -120,7 +122,7 @@ export default function TabsLayout() {
         name="scan-qr"
         options={{
           href: null,
-          title: "Scan QR",
+          title: t('tabs.scanQR'),
           headerShown: false,
         }}
       />
@@ -128,7 +130,7 @@ export default function TabsLayout() {
         name="register-elderly"
         options={{
           href: null,
-          title: "Register Elderly",
+          title: t('tabs.registerElderly'),
           headerShown: false,
         }}
       />
@@ -136,7 +138,7 @@ export default function TabsLayout() {
         name="confirm-connect"
         options={{
           href: null,
-          title: "Confirm Connect",
+          title: t('tabs.confirmConnect'),
           headerShown: false,
         }}
       />

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Card, Text } from "react-native-paper";
 
@@ -15,6 +16,8 @@ export default function MedStatsCard({
   completedCount,
   missedCount,
 }: MedStatsCardProps) {
+  const { t } = useTranslation();
+
   return (
     <Card>
       <Card.Content>
@@ -23,7 +26,7 @@ export default function MedStatsCard({
             <Text variant="headlineSmall" style={styles.statNumber}>
               {totalCount}
             </Text>
-            <Text variant="bodyMedium">Total</Text>
+            <Text variant="bodyMedium">{t('medication.total')}</Text>
           </View>
           <View style={styles.stat}>
             <Text
@@ -32,7 +35,7 @@ export default function MedStatsCard({
             >
               {pendingCount}
             </Text>
-            <Text variant="bodyMedium">Pending</Text>
+            <Text variant="bodyMedium">{t('common.pending')}</Text>
           </View>
           <View style={styles.stat}>
             <Text
@@ -41,7 +44,7 @@ export default function MedStatsCard({
             >
               {completedCount}
             </Text>
-            <Text variant="bodyMedium">Done</Text>
+            <Text variant="bodyMedium">{t('medication.done')}</Text>
           </View>
           <View style={styles.stat}>
             <Text
@@ -50,7 +53,7 @@ export default function MedStatsCard({
             >
               {missedCount}
             </Text>
-            <Text variant="bodyMedium">Missed</Text>
+            <Text variant="bodyMedium">{t('common.missed')}</Text>
           </View>
         </View>
       </Card.Content>

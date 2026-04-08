@@ -2,6 +2,7 @@
 import { useAssets } from "expo-asset";
 import { Image } from "expo-image";
 import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Dimensions, StyleSheet, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import Animated, {
@@ -23,6 +24,7 @@ export default function SplashScreen({
   onAnimationComplete,
 }: SplashScreenProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const [assets] = useAssets([require("@/assets/images/logo.png")]);
 
   // 动画值
@@ -111,10 +113,10 @@ export default function SplashScreen({
       {/* 应用内容 - 初始时隐藏，动画时显示 */}
       <Animated.View style={[styles.content, contentAnimatedStyle]}>
         <Text style={styles.welcomeText} variant="titleLarge">
-          Welcome to the Elderly Care
+          {t('common.welcomeToElderlyCare')}
         </Text>
         <Text style={styles.subtitle} variant="bodyMedium">
-          Provide considerate services for the elderly and caregivers
+          {t('common.provideServices')}
         </Text>
       </Animated.View>
     </View>

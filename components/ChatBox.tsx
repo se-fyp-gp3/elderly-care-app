@@ -1,6 +1,7 @@
 // components/ChatBox.tsx
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   FlatList,
@@ -45,6 +46,7 @@ export default function ChatBox() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const DEEPSEEK_API_KEY = process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY?.trim();
   const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
@@ -53,7 +55,7 @@ export default function ChatBox() {
   useEffect(() => {
     const welcomeMessage: Message = {
       id: "1",
-      text: "Hello! I'm your AI Care Assistant. 👋\n\nI'm here to help you with health information, medication reminders, and general wellness advice. How can I assist you today?",
+      text: t('chat.welcomeMessage'),
       isUser: false,
       timestamp: new Date(),
     };
@@ -65,8 +67,8 @@ export default function ChatBox() {
           await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
           Alert.alert(
-            "Permission needed",
-            "We need camera roll permissions to upload photos.",
+            t('common.permissionNeeded'),
+            t('chat.cameraRollPermission'),
           );
         }
       }
@@ -154,19 +156,19 @@ export default function ChatBox() {
       }
     } else {
       Alert.alert(
-        "Add Photo",
-        "Choose an option",
+        t('chat.addPhoto'),
+        t('chat.chooseOption'),
         [
           {
-            text: "Take Photo",
+            text: t('chat.takePhoto'),
             onPress: () => takePhoto(),
           },
           {
-            text: "Choose from Gallery",
+            text: t('chat.chooseFromGallery'),
             onPress: () => pickImage(),
           },
           {
-            text: "Cancel",
+            text: t('common.cancel'),
             style: "cancel",
           },
         ],
@@ -192,7 +194,7 @@ export default function ChatBox() {
       if (Platform.OS === "web") {
         alert("Failed to pick image. Please try again.");
       } else {
-        Alert.alert("Error", "Failed to pick image. Please try again.");
+        Alert.alert(t('common.error'), t('chat.failedToPickImage'));
       }
     }
   };
@@ -206,8 +208,8 @@ export default function ChatBox() {
           alert("Camera permission is required to take photos.");
         } else {
           Alert.alert(
-            "Permission needed",
-            "Camera permission is required to take photos.",
+            t('common.permissionNeeded'),
+            t('chat.cameraPermissionRequired'),
           );
         }
         return;
@@ -227,7 +229,7 @@ export default function ChatBox() {
       if (Platform.OS === "web") {
         alert("Failed to take photo. Please try again.");
       } else {
-        Alert.alert("Error", "Failed to take photo. Please try again.");
+        Alert.alert(t('common.error'), t('chat.failedToTakePhoto'));
       }
     }
   };
@@ -380,7 +382,7 @@ export default function ChatBox() {
         {isLoading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator animating={true} color={theme.colors.primary} />
-            <Text style={styles.loadingText}>AI is thinking...</Text>
+            <Text style={styles.loadingText}>{t('chat.aiThinking')}</Text>
           </View>
         )}
       </View>
@@ -419,7 +421,7 @@ export default function ChatBox() {
           <TextInput
             value={inputText}
             onChangeText={setInputText}
-            placeholder="Type your message..."
+            placeholder={t('chat.typeMessage')}
             mode="outlined"
             style={styles.textInput}
             contentStyle={styles.textInputContent}

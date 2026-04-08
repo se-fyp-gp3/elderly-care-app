@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Alert, Linking, ScrollView, StyleSheet, View } from "react-native";
 import {
     Avatar,
@@ -42,19 +43,19 @@ export default function ElderlyDetailView({
   onHealthData,
 }: ElderlyDetailViewProps) {
   const theme = useTheme();
-
+  const { t } = useTranslation();
   const handleCall = (phone?: string) => {
     if (onCall && phone) {
       onCall(phone);
       return;
     }
     if (!phone) {
-      Alert.alert("No phone number");
+      Alert.alert(t('common.noPhoneNumber'));
       return;
     }
     const url = `tel:${phone}`;
     Linking.canOpenURL(url).then((s) =>
-      s ? Linking.openURL(url) : Alert.alert("Cannot call"),
+      s ? Linking.openURL(url) : Alert.alert(t('common.cannotCall')),
     );
   };
 
@@ -75,7 +76,7 @@ export default function ElderlyDetailView({
           />
           <View style={styles.headerInfo}>
             <Text variant="headlineSmall" style={{ fontWeight: "bold" }}>
-              {data.name || "Unknown"}
+              {data.name || t('common.unknown')}
             </Text>
             <View style={styles.badgeRow}>
               <Chip icon="identifier" style={styles.chip} compact>
@@ -87,7 +88,7 @@ export default function ElderlyDetailView({
                 textStyle={{ color: "#2E7D32" }}
                 compact
               >
-                {data.status || "Normal"}
+                {data.status || t('caregiverPanel.normal')}
               </Chip>
             </View>
           </View>
@@ -106,7 +107,7 @@ export default function ElderlyDetailView({
               size={28}
               color={theme.colors.primary}
             />
-            <Text style={styles.actionLabel}>Call</Text>
+            <Text style={styles.actionLabel}>{t('caregiverPanel.call')}</Text>
           </Card.Content>
         </Card>
         <Card
@@ -119,7 +120,7 @@ export default function ElderlyDetailView({
               size={28}
               color={theme.colors.error}
             />
-            <Text style={styles.actionLabel}>Health Data</Text>
+            <Text style={styles.actionLabel}>{t('caregiverPanel.healthData')}</Text>
           </Card.Content>
         </Card>
       </View>
@@ -127,7 +128,7 @@ export default function ElderlyDetailView({
       {/* Vitals Snapshot */}
       <Card style={styles.sectionCard}>
         <Card.Title
-          title="Latest Vitals"
+          title={t('healthData.latestVitals')}
           left={(props) => (
             <MaterialCommunityIcons
               {...props}
@@ -143,7 +144,7 @@ export default function ElderlyDetailView({
                 variant="labelMedium"
                 style={{ color: theme.colors.secondary }}
               >
-                Blood Pressure
+                {t('healthData.bloodPressure')}
               </Text>
               <Text variant="titleLarge">{data.lastVitals?.bp || "N/A"}</Text>
             </View>
@@ -153,7 +154,7 @@ export default function ElderlyDetailView({
                 variant="labelMedium"
                 style={{ color: theme.colors.secondary }}
               >
-                Heart Rate
+                {t('healthData.heartRate')}
               </Text>
               <Text variant="titleLarge">{data.lastVitals?.hr || "N/A"}</Text>
             </View>
@@ -163,7 +164,7 @@ export default function ElderlyDetailView({
                 variant="labelMedium"
                 style={{ color: theme.colors.secondary }}
               >
-                Temp
+                {t('healthData.temp')}
               </Text>
               <Text variant="titleLarge">
                 {data.lastVitals?.temp || "N/A"}
@@ -176,7 +177,7 @@ export default function ElderlyDetailView({
       {/* Basic Information */}
       <Card style={[styles.sectionCard, { marginBottom: 30 }]}>
         <Card.Title
-          title="Basic Information"
+          title={t('healthData.basicInfo')}
           left={(props) => (
             <MaterialCommunityIcons
               {...props}
@@ -187,21 +188,21 @@ export default function ElderlyDetailView({
         />
         <Card.Content style={{ padding: 0 }}>
           <List.Item
-            title="Age / Gender"
+            title={t('healthData.ageGender')}
             description={`${
               data.age !== undefined
-                ? `${data.age} years old`
+                ? t('healthData.yearsOld', { age: data.age })
                 : data.birth
                   ? new Date(data.birth).toLocaleDateString()
-                  : "Unknown"
-            } / ${data.gender || "Unknown"}`}
+                  : t('common.unknown')
+            } / ${data.gender || t('common.unknown')}`}
             left={(props) => <List.Icon {...props} icon="calendar-account" />}
           />
           <Divider />
           {data.birth && (
             <>
               <List.Item
-                title="Date of Birth"
+                title={t('healthData.dateOfBirth')}
                 description={new Date(data.birth).toLocaleDateString("en-GB", {
                   year: "numeric",
                   month: "long",
@@ -214,14 +215,14 @@ export default function ElderlyDetailView({
           )}
           <Divider />
           <List.Item
-            title="Blood Type"
-            description={data.bloodType || "Unknown"}
+            title={t('healthData.bloodType')}
+            description={data.bloodType || t('common.unknown')}
             left={(props) => <List.Icon {...props} icon="water" />}
           />
           <Divider />
           <List.Item
-            title="Phone"
-            description={data.phone || "Not set"}
+            title={t('healthData.phone')}
+            description={data.phone || t('common.notSet')}
             left={(props) => <List.Icon {...props} icon="phone" />}
             right={(props) =>
               data.phone ? (
@@ -235,8 +236,8 @@ export default function ElderlyDetailView({
           />
           <Divider />
           <List.Item
-            title="Emergency Contact"
-            description={data.emergencyContact || "Not set"}
+            title={t('home.emergencyContact')}
+            description={data.emergencyContact || t('common.notSet')}
             descriptionNumberOfLines={2}
             left={(props) => (
               <List.Icon {...props} icon="alert-circle-outline" />

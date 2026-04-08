@@ -14,6 +14,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
+import { useTranslation } from "react-i18next";
 
 export default function SignupScreen() {
   const { role } = useLocalSearchParams<{ role: Role }>();
@@ -27,23 +28,24 @@ export default function SignupScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { user, signUp, signInWithOAuth2 } = useAuth();
+  const { t } = useTranslation();
 
   const validateForm = (): string | null => {
     if (!email.trim()) {
-      return "Email is required";
+      return t('auth.emailIsRequired');
     }
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
-      return "Please enter a valid email address";
+      return t('auth.emailInvalid');
     }
     if (!password) {
-      return "Password is required";
+      return t('auth.passwordRequired');
     }
     if (password.length < 8) {
-      return "Password must be at least 8 characters long";
+      return t('auth.passwordMinLength');
     }
     if (password !== confirmPassword) {
-      return "Passwords do not match";
+      return t('auth.passwordMismatch');
     }
     return null;
   };
@@ -67,12 +69,12 @@ export default function SignupScreen() {
       if (err instanceof AppwriteException || (err && err.type)) {
         if (err.type === "user_already_exists") {
           setError(
-            "An account with this email already exists. Please sign in instead.",
+            t('auth.emailAlreadyExists'),
           );
         } else if (err.type === "general_argument_invalid") {
-          setError("Please enter a valid email address.");
+          setError(t('auth.invalidEmailAddress'));
         } else {
-          setError(err.message || "An unexpected error occurred.");
+          setError(err.message || t('auth.unexpectedError'));
         }
       } else if (err instanceof LoginError) {
         setError(err.message);
@@ -103,7 +105,7 @@ export default function SignupScreen() {
       } else if (err?.message) {
         setError(err.message);
       } else {
-        setError("Authentication was cancelled or failed. Please try again.");
+        setError(t('auth.authCancelled'));
       }
     } finally {
       setLoading(false);
@@ -134,7 +136,7 @@ export default function SignupScreen() {
     >
       <View style={styles.content}>
         <Text variant="headlineMedium" style={styles.title}>
-          Create Account
+          {t('auth.createAccount')}
         </Text>
 
         <View style={styles.roleChipContainer}>
@@ -149,24 +151,24 @@ export default function SignupScreen() {
             style={[styles.roleChip, { borderColor: getRoleColor() }]}
             textStyle={{ color: getRoleColor() }}
           >
-            {role === "caregiver" ? "Caregiver" : "Elderly"}
+            {role === "caregiver" ? t('common.caregiver') : t('common.elderly')}
           </Chip>
         </View>
 
         <TextInput
-          label="Email"
+          label={t('auth.email')}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
-          placeholder="user@example.com"
+          placeholder={t('auth.emailPlaceholder')}
           mode="outlined"
           style={styles.input}
           disabled={loading}
         />
 
         <TextInput
-          label="Password"
+          label={t('auth.password')}
           value={password}
           onChangeText={setPassword}
           autoCapitalize="none"
@@ -183,7 +185,7 @@ export default function SignupScreen() {
         />
 
         <TextInput
-          label="Confirm Password"
+          label={t('auth.confirmPassword')}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           autoCapitalize="none"
@@ -200,7 +202,7 @@ export default function SignupScreen() {
           loading={loading}
           disabled={loading}
         >
-          Sign Up
+          {t('auth.signUp')}
         </Button>
 
         <View style={styles.divider}>
@@ -211,7 +213,7 @@ export default function SignupScreen() {
             ]}
           />
           <Text variant="bodySmall" style={styles.dividerText}>
-            OR
+            {t('common.or')}
           </Text>
           <View
             style={[
@@ -228,11 +230,11 @@ export default function SignupScreen() {
           icon="google"
           disabled={loading}
         >
-          Continue with Google
+          {t('auth.continueWithGoogle')}
         </Button>
 
         <Button mode="text" onPress={handleGoBack} style={styles.backButton}>
-          ← Back to role selection
+          {t('auth.backToRoleSelection')}
         </Button>
       </View>
 
@@ -241,7 +243,7 @@ export default function SignupScreen() {
         onDismiss={() => setError(null)}
         duration={4000}
         action={{
-          label: "Dismiss",
+          label: t('common.dismiss'),
           onPress: () => setError(null),
         }}
       >

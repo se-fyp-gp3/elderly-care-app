@@ -3,6 +3,7 @@ import { addComment, getComments } from "@/lib/moments";
 import { MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     Animated,
     Dimensions,
@@ -92,6 +93,7 @@ export default function CommentSheet({
   const [posting, setPosting] = useState(false);
   const inputRef = useRef<RNTextInput>(null);
   const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+  const { t } = useTranslation();
 
   const loadComments = useCallback(async () => {
     if (!momentId) return;
@@ -180,7 +182,7 @@ export default function CommentSheet({
           {/* Header */}
           <View style={styles.headerRow}>
             <Text variant="titleMedium" style={{ fontWeight: "bold" }}>
-              Comments
+              {t('moments.comments')}
             </Text>
             <Pressable onPress={handleClose} hitSlop={12}>
               <MaterialCommunityIcons name="close" size={22} color={theme.colors.onSurface} />
@@ -212,7 +214,7 @@ export default function CommentSheet({
                     variant="bodyMedium"
                     style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}
                   >
-                    No comments yet. Be the first!
+                    {t('moments.noCommentsYet')}
                   </Text>
                 </View>
               }
@@ -237,7 +239,7 @@ export default function CommentSheet({
                   color: theme.colors.onSurface,
                 },
               ]}
-              placeholder="Add a comment..."
+              placeholder={t('moments.addComment')}
               placeholderTextColor={theme.colors.onSurfaceVariant}
               value={text}
               onChangeText={setText}

@@ -1,6 +1,7 @@
 import type { QRPairingStatus } from "@/lib/hooks/useQRPairing";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text, useTheme } from "react-native-paper";
 import QRCode from "react-native-qrcode-svg";
@@ -58,6 +59,7 @@ export default function QRPairingView({
   renderFooter,
 }: QRPairingViewProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   // Let the parent handle non-standard statuses (signing-in, done)
   const extraContent = renderExtra?.();
@@ -75,7 +77,7 @@ export default function QRPairingView({
     >
       <View style={styles.header}>
         <Button icon="arrow-left" onPress={onGoBack} style={styles.backButton}>
-          Back
+          {t('common.back')}
         </Button>
       </View>
 
@@ -84,7 +86,7 @@ export default function QRPairingView({
           <>
             <ActivityIndicator size="large" />
             <Text variant="bodyLarge" style={styles.statusText}>
-              Setting up...
+              {t('qrPairing.settingUp')}
             </Text>
           </>
         )}
@@ -167,7 +169,7 @@ export default function QRPairingView({
           <>
             <MaterialCommunityIcons name={icon} size={48} color="#FF9800" />
             <Text variant="headlineSmall" style={styles.title}>
-              {status === "expired" ? "Session Expired" : cancelledTitle}
+              {status === "expired" ? t('qrPairing.sessionExpired') : cancelledTitle}
             </Text>
             <Text
               variant="bodyMedium"
@@ -177,7 +179,7 @@ export default function QRPairingView({
               ]}
             >
               {status === "expired"
-                ? "The QR code has expired. Tap refresh to try again."
+                ? t('qrPairing.qrExpired')
                 : cancelledSubtitle}
             </Text>
 
@@ -214,7 +216,7 @@ export default function QRPairingView({
               icon="refresh"
               style={{ marginTop: 16 }}
             >
-              Refresh
+              {t('qrPairing.refresh')}
             </Button>
           </>
         )}
@@ -237,7 +239,7 @@ export default function QRPairingView({
               onPress={onGoBack}
               style={{ marginTop: 16 }}
             >
-              Go Back
+              {t('qrPairing.goBack')}
             </Button>
           </>
         )}

@@ -5,6 +5,7 @@ import { createConnectionRequest } from "@/lib/registration";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native";
 import { Button, Text, useTheme } from "react-native-paper";
 
@@ -12,6 +13,7 @@ export default function ConnectCaregiverScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   if (!user) {
     return (
@@ -23,7 +25,7 @@ export default function ConnectCaregiverScreen() {
 
   const { status, qrPayload, errorMsg, refresh, cleanupAndLeave } =
     useQRPairing({
-      createRequest: (t) => createConnectionRequest(t, user.$id),
+      createRequest: (tkn) => createConnectionRequest(tkn, user.$id),
       onCompleted: async (request, { setStatus, cleanup }) => {
         cleanup(request.$id);
         setStatus("done");
@@ -46,17 +48,17 @@ export default function ConnectCaregiverScreen() {
             color="#4CAF50"
           />
           <Text variant="headlineSmall" style={styles.title}>
-            Connected!
+            {t('connectCaregiver.connected')}
           </Text>
           <Text variant="bodyMedium" style={styles.statusText}>
-            Your caregiver has been linked to your account.
+            {t('connectCaregiver.connectedDesc')}
           </Text>
           <Button
             mode="contained"
             onPress={() => router.back()}
             style={{ marginTop: 24 }}
           >
-            Back to Settings
+            {t('connectCaregiver.backToSettings')}
           </Button>
         </>
       );
@@ -70,8 +72,7 @@ export default function ConnectCaregiverScreen() {
         variant="bodySmall"
         style={{ color: theme.colors.onSurfaceVariant, textAlign: "center" }}
       >
-        Your caregiver needs to open their app and scan this QR code from the
-        Care Panel.
+        {t('connectCaregiver.scanHint')}
       </Text>
     ),
     [theme.colors.onSurfaceVariant],
@@ -85,12 +86,12 @@ export default function ConnectCaregiverScreen() {
       onRefresh={refresh}
       onGoBack={handleGoBack}
       icon="account-plus"
-      title="Connect Caregiver"
-      subtitle={`Ask your caregiver to scan this QR code\nto connect with you`}
-      scannedHint="Scan successful! Caregiver is confirming the connection..."
-      waitingHint="Waiting for caregiver to scan..."
-      cancelledTitle="Connection Cancelled"
-      cancelledSubtitle="The caregiver cancelled the connection. Tap refresh to try again."
+      title={t('settings.connectCaregiver')}
+      subtitle={t('connectCaregiver.askToScan')}
+      scannedHint={t('connectCaregiver.scanSuccess')}
+      waitingHint={t('connectCaregiver.waitingForScan')}
+      cancelledTitle={t('connectCaregiver.connectionCancelled')}
+      cancelledSubtitle={t('connectCaregiver.cancelledDesc')}
       renderExtra={renderExtra}
       renderFooter={renderFooter}
     />

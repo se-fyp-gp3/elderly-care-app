@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { openURL } from "expo-linking";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   RefreshControl,
@@ -46,21 +47,22 @@ export default function SimplifiedHomeView({
 }: SimplifiedHomeViewProps) {
   const theme = useTheme();
   const router = useRouter();
+  const { t } = useTranslation();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   const handleEmergencyCall = () => {
     const num = elderlyProfile?.emergency_contact;
     if (!num) {
       Alert.alert(
-        "No Emergency Contact",
-        "Please ask a caregiver to set one for you.",
+        t('home.noEmergencyContact'),
+        t('home.askCaregiverToSet'),
       );
       return;
     }
-    Alert.alert("Emergency Call", `Call ${num}?`, [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t('emergency.emergencyCall'), t('home.callConfirm', { number: num }), [
+      { text: t('common.cancel'), style: "cancel" },
       {
-        text: "Call Now",
+        text: t('home.callNow'),
         style: "destructive",
         onPress: () => openURL(`tel:${num}`),
       },
@@ -82,7 +84,7 @@ export default function SimplifiedHomeView({
             <Text
               style={[styles.greeting, { color: theme.colors.onBackground }]}
             >
-              Hello, {userName}!
+              {t('home.hello', { name: userName })}
             </Text>
             <Text
               style={[
@@ -90,7 +92,7 @@ export default function SimplifiedHomeView({
                 { color: theme.colors.onSurfaceVariant },
               ]}
             >
-              How are you feeling today?
+              {t('home.howAreYou')}
             </Text>
           </View>
         </View>
@@ -106,9 +108,9 @@ export default function SimplifiedHomeView({
             size={52}
             color="#FFFFFF"
           />
-          <Text style={styles.emergencyText}>EMERGENCY CALL</Text>
+          <Text style={styles.emergencyText}>{t('home.emergencyCall')}</Text>
           <Text style={styles.emergencySubtext}>
-            Tap to call your emergency contact
+            {t('home.tapToCallEmergency')}
           </Text>
         </TouchableOpacity>
 
@@ -116,7 +118,7 @@ export default function SimplifiedHomeView({
         <Text
           style={[styles.sectionTitle, { color: theme.colors.onBackground }]}
         >
-          Today&apos;s Medications
+          {t('home.todaysMedications')}
         </Text>
 
         {todoList.length === 0 ? (
@@ -138,7 +140,7 @@ export default function SimplifiedHomeView({
                   { color: theme.colors.onSurfaceVariant },
                 ]}
               >
-                No medications scheduled
+                {t('home.noMedsToday')}
               </Text>
             </Card.Content>
           </Card>
@@ -191,7 +193,7 @@ export default function SimplifiedHomeView({
                   </Text>
                 </View>
                 <Text style={[styles.medStatus, { color: iconColor }]}>
-                  {isTaken ? "Taken" : isMissing ? "Missed" : "Take"}
+                  {isTaken ? t('common.taken') : isMissing ? t('common.missed') : t('medication.take')}
                 </Text>
               </TouchableOpacity>
             );
@@ -202,7 +204,7 @@ export default function SimplifiedHomeView({
         <Text
           style={[styles.sectionTitle, { color: theme.colors.onBackground }]}
         >
-          Send a Message
+          {t('home.sendMessage')}
         </Text>
 
         {contacts.length === 0 ? (
@@ -224,7 +226,7 @@ export default function SimplifiedHomeView({
                   { color: theme.colors.onSurfaceVariant },
                 ]}
               >
-                No contacts yet
+                {t('home.noContactsYet')}
               </Text>
             </Card.Content>
           </Card>
@@ -278,7 +280,7 @@ export default function SimplifiedHomeView({
                     { color: theme.colors.onSurfaceVariant },
                   ]}
                 >
-                  {contact.role === "caregiver" ? "Caregiver" : "Friend"}
+                  {contact.role === "caregiver" ? t('common.caregiver') : t('common.friend')}
                 </Text>
               </View>
               <MaterialCommunityIcons

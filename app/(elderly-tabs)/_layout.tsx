@@ -3,6 +3,7 @@ import { useAuth } from "@/lib/auth-context";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "react-native-paper";
 
 type TabVisibility = {
@@ -27,6 +28,7 @@ function getVisibleTabs(version: UIVersion): TabVisibility {
 
 export default function ElderlyTabsLayout() {
   const theme = useTheme();
+  const { t } = useTranslation();
   const { preferences } = useAuth();
   const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
   const visible = getVisibleTabs(uiVersion);
@@ -60,7 +62,7 @@ export default function ElderlyTabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t('tabs.home'),
           headerRight: isNonDefault ? () => <MiniSettingsGearButton /> : undefined,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
@@ -74,7 +76,7 @@ export default function ElderlyTabsLayout() {
       <Tabs.Screen
         name="chat"
         options={{
-          title: "AI Chat",
+          title: t('tabs.aiChat'),
           href: visible.chat ? undefined : null,
           headerRight: isAccessible ? () => <MiniSettingsGearButton /> : undefined,
           tabBarIcon: ({ color, size }) => (
@@ -90,13 +92,13 @@ export default function ElderlyTabsLayout() {
         name="messages"
         options={{
           href: null,
-          title: "Messages",
+          title: t('tabs.messages'),
         }}
       />
       <Tabs.Screen
         name="medication"
         options={{
-          title: "Medication",
+          title: t('tabs.medication'),
           href: visible.medication ? undefined : null,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="pill" size={iconSize ?? size} color={color} />
@@ -106,7 +108,7 @@ export default function ElderlyTabsLayout() {
       <Tabs.Screen
         name="emergency"
         options={{
-          title: "Community",
+          title: t('tabs.community'),
           href: visible.emergency ? undefined : null,
           headerRight: isAccessible ? () => <MiniSettingsGearButton /> : undefined,
           tabBarIcon: ({ color, size }) => (
@@ -121,7 +123,7 @@ export default function ElderlyTabsLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Settings",
+          title: t('tabs.settings'),
           href: visible.settings ? undefined : null,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="cog" size={iconSize ?? size} color={color} />
@@ -134,21 +136,21 @@ export default function ElderlyTabsLayout() {
         name="health-data"
         options={{
           href: null,
-          title: "Health Data",
+          title: t('tabs.healthData'),
         }}
       />
       <Tabs.Screen
         name="schedule"
         options={{
           href: null,
-          title: "Schedule",
+          title: t('tabs.schedule'),
         }}
       />
       <Tabs.Screen
         name="conversation"
         options={{
           href: null,
-          title: "Conversation",
+          title: t('tabs.conversation'),
           headerShown: false,
         }}
       />
@@ -156,7 +158,7 @@ export default function ElderlyTabsLayout() {
         name="connect-caregiver"
         options={{
           href: null,
-          title: "Connect Caregiver",
+          title: t('settings.connectCaregiver'),
           headerShown: false,
         }}
       />

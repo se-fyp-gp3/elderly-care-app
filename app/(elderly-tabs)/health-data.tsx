@@ -1,6 +1,7 @@
 import { useStepSync } from "@/lib/hooks/useStepSync";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Platform,
@@ -20,6 +21,7 @@ import {
 
 export default function ElderlyHealthData() {
   const theme = useTheme();
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = React.useState(false);
   const [snackVisible, setSnackVisible] = React.useState(false);
   const [snackMessage, setSnackMessage] = React.useState("");
@@ -105,19 +107,19 @@ export default function ElderlyHealthData() {
       {/* Header */}
       <View style={styles.header}>
         <Text variant="headlineSmall" style={styles.title}>
-          My Health Data
+          {t('healthData.myHealthData')}
         </Text>
         <Text
           variant="bodyMedium"
           style={{ color: theme.colors.onSurfaceVariant }}
         >
-          Track and monitor your health
+          {t('healthData.trackAndMonitor')}
         </Text>
       </View>
 
       {/* Step Tracking */}
       <Text variant="titleMedium" style={styles.sectionTitle}>
-        Today&apos;s Steps
+        {t('home.todaysSteps')}
       </Text>
 
       <Card
@@ -146,7 +148,7 @@ export default function ElderlyHealthData() {
                     variant="titleSmall"
                     style={{ color: theme.colors.onSurfaceVariant }}
                   >
-                    steps
+                    {t('home.steps')}
                   </Text>
                 </>
               )}
@@ -214,8 +216,8 @@ export default function ElderlyHealthData() {
               labelStyle={styles.authButtonLabel}
             >
               {Platform.OS === "android"
-                ? "Connect Health Connect"
-                : "Connect Apple Health"}
+                ? t('healthData.connectHealthConnect')
+                : t('healthData.connectAppleHealth')}
             </Button>
           )}
 
@@ -244,7 +246,7 @@ export default function ElderlyHealthData() {
                 />
               )}
               <Text variant="titleMedium" style={styles.syncButtonText}>
-                {isSyncing ? "Syncing..." : "Update Steps"}
+                {isSyncing ? t('healthData.syncing') : t('healthData.updateSteps')}
               </Text>
             </View>
           </TouchableRipple>
@@ -263,7 +265,7 @@ export default function ElderlyHealthData() {
                 marginLeft: 4,
               }}
             >
-              Auto sync: every 30 minutes
+              {t('healthData.autoSync')}
             </Text>
           </View>
         </Card.Content>
@@ -273,7 +275,7 @@ export default function ElderlyHealthData() {
       {stepHistory.length > 0 && (
         <>
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            Step History
+            {t('healthData.stepHistory')}
           </Text>
           <Card
             style={[

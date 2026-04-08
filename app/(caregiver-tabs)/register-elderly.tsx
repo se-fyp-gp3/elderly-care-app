@@ -23,11 +23,13 @@ import {
 } from "react-native-paper";
 import { DatePickerInput } from "react-native-paper-dates";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 export default function RegisterElderlyScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { token } = useLocalSearchParams<{ token: string }>();
 
   const [email, setEmail] = useState("");
@@ -40,11 +42,11 @@ export default function RegisterElderlyScreen() {
   const [success, setSuccess] = useState(false);
 
   const validateForm = (): string | null => {
-    if (!name.trim()) return "Full name is required";
-    if (!email.trim()) return "Email is required";
+    if (!name.trim()) return t('registerElderly.fullNameRequired');
+    if (!email.trim()) return t('registerElderly.emailRequired');
 
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!emailRegex.test(email)) return "Please enter a valid email address";
+    if (!emailRegex.test(email)) return t('registerElderly.invalidEmail');
 
     return null;
   };
@@ -57,7 +59,7 @@ export default function RegisterElderlyScreen() {
     }
 
     if (!user || !token) {
-      setError("Missing caregiver session or registration token.");
+      setError(t('registerElderly.missingSession'));
       return;
     }
 
@@ -84,11 +86,11 @@ export default function RegisterElderlyScreen() {
       console.error("Registration error:", err);
       if (err?.type === "user_already_exists") {
         setError(
-          "An account with this email already exists. Please use a different email.",
+          t('registerElderly.emailExists'),
         );
       } else {
         setError(
-          err?.message || "Failed to register elderly. Please try again.",
+          err?.message || t('registerElderly.failedToRegister'),
         );
       }
     } finally {
@@ -108,14 +110,14 @@ export default function RegisterElderlyScreen() {
             color={theme.colors.error}
           />
           <Text variant="bodyLarge" style={{ marginTop: 16 }}>
-            No registration token found.
+            {t('registerElderly.noRegistrationToken')}
           </Text>
           <Button
             mode="contained"
             onPress={() => router.back()}
             style={{ marginTop: 16 }}
           >
-            Go Back
+            {t('registerElderly.goBack')}
           </Button>
         </View>
       </SafeAreaView>
@@ -134,7 +136,7 @@ export default function RegisterElderlyScreen() {
             color="#4CAF50"
           />
           <Text variant="headlineSmall" style={styles.successTitle}>
-            Registration Complete!
+            {t('registerElderly.registrationComplete')}
           </Text>
           <Text
             variant="bodyMedium"
@@ -143,8 +145,8 @@ export default function RegisterElderlyScreen() {
               { color: theme.colors.onSurfaceVariant },
             ]}
           >
-            The elderly&apos;s account has been created and linked to you.{"\n"}
-            Their device will sign in automatically.
+            {t('registerElderly.accountCreatedLinked')}{"\n"}
+            {t('registerElderly.autoSignIn')}
           </Text>
         </View>
       </SafeAreaView>
@@ -168,7 +170,7 @@ export default function RegisterElderlyScreen() {
               color="#2196F3"
             />
             <Text variant="headlineSmall" style={styles.title}>
-              Register Elderly
+              {t('registerElderly.registerElderly')}
             </Text>
             <Text
               variant="bodyMedium"
@@ -177,14 +179,13 @@ export default function RegisterElderlyScreen() {
                 { color: theme.colors.onSurfaceVariant },
               ]}
             >
-              Fill in the details to create the elderly person&apos;s account.
-              They will be automatically signed in and linked to you.
+              {t('registerElderly.registerDesc')}
             </Text>
           </View>
 
           <View style={styles.form}>
             <TextInput
-              label="Full Name *"
+              label={t('registerElderly.fullName')}
               value={name}
               onChangeText={(text) => {
                 setName(text);
@@ -196,7 +197,7 @@ export default function RegisterElderlyScreen() {
             />
 
             <TextInput
-              label="Email *"
+              label={t('registerElderly.email')}
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
@@ -210,7 +211,7 @@ export default function RegisterElderlyScreen() {
             />
 
             <TextInput
-              label="Phone Number (Optional)"
+              label={t('registerElderly.phoneOptional')}
               value={phone}
               onChangeText={setPhone}
               mode="outlined"
@@ -221,7 +222,7 @@ export default function RegisterElderlyScreen() {
 
             <DatePickerInput
               locale="en"
-              label="Date of Birth (Optional)"
+              label={t('registerElderly.dobOptional')}
               value={birthDate}
               onChange={(d) => setBirthDate(d ?? undefined)}
               inputMode="start"
@@ -243,7 +244,7 @@ export default function RegisterElderlyScreen() {
               style={styles.submitButton}
               icon="account-plus"
             >
-              Create Elderly Account
+              {t('registerElderly.createAccount')}
             </Button>
 
             <Button
@@ -261,7 +262,7 @@ export default function RegisterElderlyScreen() {
               disabled={loading}
               style={styles.cancelButton}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
           </View>
         </ScrollView>

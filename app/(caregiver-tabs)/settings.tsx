@@ -1,4 +1,6 @@
 import { useAuth } from "@/lib/auth-context";
+import { useFontSize } from "@/lib/font-size-context";
+import { useLanguage } from "@/lib/language-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
   deleteCustomVoiceRecord,
@@ -7,6 +9,7 @@ import {
 } from "@/lib/custom-voice";
 import { createPersonalVoice, readAudioFileAsBase64 } from "@/lib/personal-voice";
 import { Caregiver, CustomVoice, CustomVoiceStatus, Elderly } from "@/types/appwrite";
+import { FontSize } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   createAudioPlayer,
@@ -19,6 +22,7 @@ import {
 import * as DocumentPicker from "expo-document-picker";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Banner,
@@ -48,6 +52,9 @@ export default function Settings() {
     signOut,
   } = useAuth();
   const theme = useTheme();
+  const { t } = useTranslation();
+  const { fontSize, setFontSize, scaledSize } = useFontSize();
+  const { language, setLanguage } = useLanguage();
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   const [newPreference, setNewPreference] = useState({
@@ -388,13 +395,13 @@ export default function Settings() {
       {/* Header */}
       <View style={styles.header}>
         <Text variant="headlineMedium" style={styles.title}>
-          Settings
+          {t('settings.title')}
         </Text>
         <Text
           variant="bodyLarge"
           style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}
         >
-          Manage your caregiver preferences
+          {t('settings.managePreferences')}
         </Text>
       </View>
 
@@ -405,21 +412,21 @@ export default function Settings() {
         actions={[]}
         style={styles.trialBanner}
       >
-        Some settings are locked. Contact support to upgrade your account.
+        {t('settings.lockedBanner')}
       </Banner>
 
       {/* ── Account ── */}
       <Text variant="titleLarge" style={styles.sectionTitle}>
-        Account
+        {t('settings.account')}
       </Text>
       <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         <List.Item
-          title="Account Status"
+          title={t('settings.accountStatus')}
           titleStyle={styles.listTitle}
           description={
             userLabels.length > 0
               ? userLabels.join(", ")
-              : "No labels assigned"
+              : t('settings.noLabels')
           }
           descriptionStyle={styles.listDescription}
           left={() => (
@@ -454,7 +461,7 @@ export default function Settings() {
           ]}
         />
         <List.Item
-          title="User Role"
+          title={t('settings.userRole')}
           titleStyle={styles.listTitle}
           left={() => (
             <View style={styles.iconContainer}>
@@ -472,20 +479,20 @@ export default function Settings() {
             value={preferences.role || "elderly"}
             onValueChange={(value) => setPreference("role", value)}
             buttons={[
-              { value: "elderly", label: "elderly" },
-              { value: "caregiver", label: "caregiver" },
+              { value: "elderly", label: t('common.elderly').toLowerCase() },
+              { value: "caregiver", label: t('common.caregiver').toLowerCase() },
             ]}
             style={styles.segmentedButtons}
           />
           <Text variant="bodySmall" style={styles.roleWarning}>
-            ⚠️ Changing role will reset your profile (testing only)
+            {t('settings.roleWarning')}
           </Text>
         </View>
       </Card>
 
       {/* ── Display ── */}
       <Text variant="titleLarge" style={styles.sectionTitle}>
-        Display
+        {t('settings.display')}
       </Text>
       <Card
         style={[
@@ -495,9 +502,9 @@ export default function Settings() {
         ]}
       >
         <List.Item
-          title={`Font Size${!isTrial ? " 🔒" : ""}`}
+          title={`${t('settings.fontSize')}${!isTrial ? " 🔒" : ""}`}
           titleStyle={styles.listTitle}
-          description={preferences.fontSize || "medium"}
+          description={fontSize}
           descriptionStyle={styles.listDescription}
           left={() => (
             <View style={styles.iconContainer}>
@@ -512,14 +519,17 @@ export default function Settings() {
         />
         <View style={styles.segmentedContainer}>
           <SegmentedButtons
-            value={preferences.fontSize || "medium"}
-            onValueChange={(value) =>
-              isTrial && setPreference("fontSize", value)
-            }
+            value={fontSize}
+            onValueChange={(value) => {
+              if (isTrial) {
+                setFontSize(value as FontSize);
+                setPreference("fontSize", value);
+              }
+            }}
             buttons={[
-              { value: "small", label: "small" },
-              { value: "medium", label: "medium" },
-              { value: "large", label: "large" },
+              { value: FontSize.Small, label: t('settings.fontSizeSmall') },
+              { value: FontSize.Medium, label: t('settings.fontSizeMedium') },
+              { value: FontSize.Large, label: t('settings.fontSizeLarge') },
             ]}
             style={styles.segmentedButtons}
             density="regular"
@@ -531,10 +541,59 @@ export default function Settings() {
             { backgroundColor: theme.colors.outlineVariant },
           ]}
         />
+        {/* ── Interface Language ── */}
         <List.Item
-          title={`AI Voice Intonation${!isTrial ? " 🔒" : ""}`}
+          title={t('settings.interfaceLanguage')}
           titleStyle={styles.listTitle}
-          description={preferences.voiceTone || "gentle"}
+          description={t('settings.interfaceLanguageDesc')}
+          descriptionStyle={styles.listDescription}
+          left={() => (
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons
+                name="translate"
+                size={26}
+                color={theme.colors.primary}
+              />
+            </View>
+          )}
+          style={styles.listItem}
+        />
+        <View style={styles.langChipRow}>
+          {([
+            { key: "zh" as const, label: t('settings.languageChinese') },
+            { key: "en" as const, label: t('settings.languageEnglish') },
+          ]).map((opt) => (
+            <Chip
+              key={opt.key}
+              selected={language === opt.key}
+              onPress={() => setLanguage(opt.key)}
+              style={[
+                styles.langChip,
+                language === opt.key && {
+                  backgroundColor: theme.colors.primaryContainer,
+                },
+              ]}
+              textStyle={
+                language === opt.key
+                  ? { color: theme.colors.onPrimaryContainer, fontWeight: "600" }
+                  : undefined
+              }
+              showSelectedOverlay
+            >
+              {opt.label}
+            </Chip>
+          ))}
+        </View>
+        <View
+          style={[
+            styles.divider,
+            { backgroundColor: theme.colors.outlineVariant },
+          ]}
+        />
+        <List.Item
+          title={`${t('settings.aiVoiceIntonation')}${!isTrial ? " 🔒" : ""}`}
+          titleStyle={styles.listTitle}
+          description={preferences.voiceTone || t('settings.gentle').toLowerCase()}
           descriptionStyle={styles.listDescription}
           left={() => (
             <View style={styles.iconContainer}>
@@ -554,9 +613,9 @@ export default function Settings() {
               isTrial && setPreference("voiceTone", value)
             }
             buttons={[
-              { value: "gentle", label: "gentle" },
-              { value: "friendly", label: "friendly" },
-              { value: "professional", label: "professional" },
+              { value: "gentle", label: t('settings.gentle').toLowerCase() },
+              { value: "friendly", label: t('settings.friendly').toLowerCase() },
+              { value: "professional", label: t('settings.professional').toLowerCase() },
             ]}
             style={styles.segmentedButtons}
           />
@@ -565,13 +624,13 @@ export default function Settings() {
 
       {/* ── Notifications ── */}
       <Text variant="titleLarge" style={styles.sectionTitle}>
-        Notifications
+        {t('settings.notifications')}
       </Text>
       <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         <List.Item
-          title="Push Notifications"
+          title={t('settings.pushNotifications')}
           titleStyle={styles.listTitle}
-          description="Receive medication and appointment reminders"
+          description={t('settings.pushNotificationsDesc')}
           descriptionStyle={styles.listDescription}
           left={() => (
             <View style={styles.iconContainer}>
@@ -598,7 +657,7 @@ export default function Settings() {
 
       {/* ── Personal AI Voice ── */}
       <Text variant="titleLarge" style={styles.sectionTitle}>
-        Personal AI Voice
+        {t('settings.personalAiVoice')}
       </Text>
       <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         <Card.Content style={{ paddingVertical: 20 }}>
@@ -606,13 +665,12 @@ export default function Settings() {
             variant="bodyMedium"
             style={{ color: theme.colors.onSurfaceVariant, lineHeight: 22 }}
           >
-            Record your voice to create a personal voice clone for selected
-            elderly. The AI will speak in your voice when chatting with them.
+            {t('settings.personalAiVoiceDesc')}
           </Text>
 
           {/* Elderly selector */}
           <Text variant="titleSmall" style={styles.voiceSectionLabel}>
-            Select Elderly
+            {t('settings.selectElderly')}
           </Text>
           {linkedElderly.length === 0 ? (
             <View style={styles.emptyState}>
@@ -625,7 +683,7 @@ export default function Settings() {
                 variant="bodySmall"
                 style={{ color: theme.colors.onSurfaceVariant }}
               >
-                No linked elderly found. Link an elderly first.
+                {t('settings.noLinkedElderly')}
               </Text>
             </View>
           ) : (
@@ -661,14 +719,13 @@ export default function Settings() {
 
           {/* Recording section */}
           <Text variant="titleSmall" style={styles.voiceSectionLabel}>
-            Voice Sample
+            {t('settings.voiceSample')}
           </Text>
           <Text
             variant="bodySmall"
             style={{ color: theme.colors.onSurfaceVariant, marginBottom: 8 }}
           >
-            Record at least 3 seconds of your voice, or pick an existing audio
-            file. Speak naturally in a quiet environment.
+            {t('settings.voiceSampleDesc')}
           </Text>
 
           {/* Recording indicator */}
@@ -687,7 +744,7 @@ export default function Settings() {
                   fontWeight: "600",
                 }}
               >
-                Recording... {recordingSeconds}s
+                {t('settings.recording')} {recordingSeconds}s
               </Text>
             </View>
           )}
@@ -712,7 +769,7 @@ export default function Settings() {
                   flex: 1,
                 }}
               >
-                Sample ready ({recordingSeconds}s)
+                {t('settings.sampleReady')} ({recordingSeconds}s)
               </Text>
               <IconButton
                 icon={isPlayingSample ? "stop" : "play"}
@@ -738,7 +795,7 @@ export default function Settings() {
               textColor={isRecordingSample ? theme.colors.onError : undefined}
               style={styles.actionButton}
             >
-              {isRecordingSample ? "Stop" : "Record"}
+              {isRecordingSample ? t('settings.stop') : t('settings.record')}
             </Button>
             <Button
               mode="outlined"
@@ -747,7 +804,7 @@ export default function Settings() {
               icon="file-music"
               style={styles.actionButton}
             >
-              Pick File
+              {t('settings.pickFile')}
             </Button>
           </View>
           <View style={[styles.voiceActionsRow, { marginTop: 16 }]}>
@@ -763,7 +820,7 @@ export default function Settings() {
               icon="creation"
               style={styles.actionButton}
             >
-              Create Voice
+              {t('settings.createVoice')}
             </Button>
           </View>
 
@@ -812,7 +869,7 @@ export default function Settings() {
                   compact
                   onPress={() => setVoiceStep("idle")}
                 >
-                  Dismiss
+                  {t('common.dismiss')}
                 </Button>
               )}
             </View>
@@ -822,9 +879,9 @@ export default function Settings() {
 
           {/* Existing voices for selected elderly */}
           <Text variant="titleSmall" style={styles.voiceSectionLabel}>
-            Existing Voices{" "}
+            {t('settings.existingVoices')}{" "}
             {selectedElderlyId
-              ? `for ${getElderlyName(selectedElderlyId)}`
+              ? `${t('settings.for')} ${getElderlyName(selectedElderlyId)}`
               : ""}
           </Text>
 
@@ -841,7 +898,7 @@ export default function Settings() {
                 variant="bodySmall"
                 style={{ color: theme.colors.onSurfaceVariant }}
               >
-                No voice clones yet. Record and create one above.
+                {t('settings.noVoiceClones')}
               </Text>
             </View>
           ) : (
@@ -869,14 +926,14 @@ export default function Settings() {
                       numberOfLines={1}
                     >
                       {voice.voice_id.startsWith("ref:")
-                        ? "Reference voice"
-                        : `ID: ${voice.voice_id}`}
+                        ? t('settings.referenceVoice')
+                        : `${t('settings.id')}${voice.voice_id}`}
                     </Text>
                     <Text
                       variant="bodySmall"
                       style={{ color: theme.colors.onSurfaceVariant }}
                     >
-                      Status: {voice.status}
+                      {t('settings.status')}{voice.status}
                       {voice.created_at
                         ? ` · ${new Date(voice.created_at).toLocaleDateString()}`
                         : ""}
@@ -901,13 +958,13 @@ export default function Settings() {
 
       {/* ── Voice Reply Language ── */}
       <Text variant="titleLarge" style={styles.sectionTitle}>
-        Voice Reply Language
+        {t('settings.voiceReplyLanguage')}
       </Text>
       <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         <List.Item
-          title="Reply Language"
+          title={t('settings.replyLanguage')}
           titleStyle={styles.listTitle}
-          description="Set the language for AI voice replies to elderly users"
+          description={t('settings.replyLanguageDesc')}
           descriptionStyle={styles.listDescription}
           left={() => (
             <View style={styles.iconContainer}>
@@ -923,9 +980,9 @@ export default function Settings() {
         <View style={styles.langChipRow}>
           {(
             [
-              { key: "cantonese", label: "粵語" },
-              { key: "mandarin", label: "普通話" },
-              { key: "english", label: "English" },
+              { key: "cantonese", label: t('settings.cantonese') },
+              { key: "mandarin", label: t('settings.mandarin') },
+              { key: "english", label: t('settings.english') },
             ] as const
           ).map((opt) => {
             const currentLang =
@@ -962,7 +1019,7 @@ export default function Settings() {
 
       {/* ── Custom Settings ── */}
       <Text variant="titleLarge" style={styles.sectionTitle}>
-        Custom Settings
+        {t('settings.customSettings')}
       </Text>
       <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         <Card.Content style={{ paddingVertical: 20 }}>
@@ -976,11 +1033,11 @@ export default function Settings() {
               variant="titleMedium"
               style={{ marginLeft: 8, fontWeight: "600" }}
             >
-              Add Custom Setting
+              {t('settings.addCustomSetting')}
             </Text>
           </View>
           <TextInput
-            label="Setting item name"
+            label={t('settings.settingItemName')}
             value={newPreference.key}
             onChangeText={(text) =>
               setNewPreference((prev) => ({ ...prev, key: text }))
@@ -989,7 +1046,7 @@ export default function Settings() {
             style={styles.input}
           />
           <TextInput
-            label="Set value (JSON supported)"
+            label={t('settings.setValueJson')}
             value={newPreference.value}
             onChangeText={(text) =>
               setNewPreference((prev) => ({ ...prev, value: text }))
@@ -1005,7 +1062,7 @@ export default function Settings() {
             icon="plus"
             style={{ borderRadius: 12 }}
           >
-            Add Setting
+            {t('settings.addSetting')}
           </Button>
         </Card.Content>
       </Card>
@@ -1023,7 +1080,7 @@ export default function Settings() {
               variant="titleMedium"
               style={{ marginLeft: 8, fontWeight: "600" }}
             >
-              Current Settings
+              {t('settings.currentSettings')}
             </Text>
           </View>
           {Object.entries(preferences).map(([key, value]) => (
@@ -1048,26 +1105,26 @@ export default function Settings() {
                   icon="delete"
                   style={{ borderRadius: 12 }}
                 >
-                  delete
+                  {t('common.delete')}
                 </Button>
               )}
             </View>
           ))}
           {Object.keys(preferences).length === 0 && (
-            <Text style={styles.noPreferences}>No custom settings yet</Text>
+            <Text style={styles.noPreferences}>{t('settings.noCustomSettings')}</Text>
           )}
         </Card.Content>
       </Card>
 
       {/* ── About ── */}
       <Text variant="titleLarge" style={styles.sectionTitle}>
-        About
+        {t('settings.about')}
       </Text>
       <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         <List.Item
-          title="About App"
+          title={t('settings.aboutApp')}
           titleStyle={styles.listTitle}
-          description="Version 1.0.0"
+          description={t('settings.version')}
           descriptionStyle={styles.listDescription}
           left={() => (
             <View style={styles.iconContainer}>
@@ -1092,7 +1149,7 @@ export default function Settings() {
         icon="logout"
         buttonColor={theme.colors.error}
       >
-        Sign Out
+        {t('common.signOut')}
       </Button>
 
       <View style={styles.bottomSpacer} />
