@@ -498,11 +498,10 @@ export default function Settings() {
         style={[
           styles.card,
           { backgroundColor: theme.colors.surface },
-          !isTrial && styles.disabledCard,
         ]}
       >
         <List.Item
-          title={`${t('settings.fontSize')}${!isTrial ? " 🔒" : ""}`}
+          title={t('settings.fontSize')}
           titleStyle={styles.listTitle}
           description={fontSize}
           descriptionStyle={styles.listDescription}
@@ -521,10 +520,8 @@ export default function Settings() {
           <SegmentedButtons
             value={fontSize}
             onValueChange={(value) => {
-              if (isTrial) {
-                setFontSize(value as FontSize);
-                setPreference("fontSize", value);
-              }
+              setFontSize(value as FontSize);
+              setPreference("fontSize", value);
             }}
             buttons={[
               { value: FontSize.Small, label: t('settings.fontSizeSmall') },
