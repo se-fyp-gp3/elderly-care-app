@@ -1,10 +1,10 @@
-import { formatRelativeTime } from "./contacts";
 import {
-  CAREGIVER_TABLE_ID,
-  DATABASE_ID,
-  ELDERLY_TABLE_ID,
-  tablesDB,
+    CAREGIVER_TABLE_ID,
+    DATABASE_ID,
+    ELDERLY_TABLE_ID,
+    tablesDB,
 } from "./appwrite";
+import { formatRelativeTime } from "./contacts";
 
 /** How often we ping the server while the app is in the foreground. */
 export const HEARTBEAT_INTERVAL_MS = 30_000; // 30 seconds
