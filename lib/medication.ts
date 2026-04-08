@@ -6,6 +6,7 @@
  */
 
 import { MedicationItem } from "@/components/MedicationCard";
+import { translateFrequency, translateUnit } from "@/lib/schedule";
 import { Elderly, ElderlyMedication, Medication } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
@@ -163,7 +164,7 @@ export async function fetchCaregiverMedicationData(
           ? medication.name || "Unknown Drug"
           : "Unknown Drug";
         const medicationUnit = medication ? medication.unit || "" : "";
-        const dosage = `${prescription.dosage || "?"} ${medicationUnit}`;
+        const dosage = `${prescription.dosage || "?"} ${translateUnit(medicationUnit)}`;
         const times = prescription.approx_times || [];
         const reminderId = prescriptionToReminderMap.get(prescription.$id);
 
@@ -174,7 +175,7 @@ export async function fetchCaregiverMedicationData(
             elderly: elderly.name,
             name: medicationName,
             dosage: dosage,
-            frequency: prescription.frequency || "",
+            frequency: translateFrequency(prescription.frequency || ""),
             time: "Anytime",
             status: "pending",
             lastTaken: prescription.last_taken
@@ -295,7 +296,7 @@ export async function fetchCaregiverMedicationData(
               elderly: elderly.name,
               name: medicationName,
               dosage: dosage,
-              frequency: prescription.frequency || "",
+              frequency: translateFrequency(prescription.frequency || ""),
               time: slot.displayTime,
               status: status,
               lastTaken: takenAt

@@ -170,9 +170,9 @@ export default function HealthDataPage() {
           strokeWidth: 2,
         },
       ],
-      legend: ["Systolic", "Diastolic"],
+      legend: [t('healthData.systolicShort'), t('healthData.diastolicShort')],
     };
-  }, [records]);
+  }, [records, t]);
 
   // ── Add record handler ────────────────────────────────────────────────
   const handleAddRecord = async () => {
@@ -254,6 +254,20 @@ export default function HealthDataPage() {
       default:
         return "chart-timeline-variant";
     }
+  };
+
+  /** Translate Appwrite health record type names to the current language */
+  const translateType = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      "Blood Pressure": t('healthData.bloodPressure'),
+      "Heart Rate": t('healthData.heartRate'),
+      "Temperature": t('healthData.temperature'),
+      "Weight": t('healthData.weight'),
+      "Blood Sugar": t('healthData.bloodSugar'),
+      "Oxygen Saturation": t('healthData.oxygenSaturation'),
+      "Steps": t('healthData.stepsLabel'),
+    };
+    return typeMap[type] || type;
   };
 
   const formatTime = (timeStr: string | null) => {
@@ -351,7 +365,7 @@ export default function HealthDataPage() {
                   { color: theme.colors.onSurfaceVariant },
                 ]}
               >
-                {item.type || t('healthData.healthRecord')}
+                {item.type ? translateType(item.type) : t('healthData.healthRecord')}
               </Text>
               <Text
                 style={[

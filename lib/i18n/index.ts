@@ -4,10 +4,11 @@ import { initReactI18next } from "react-i18next";
 import { getLocales } from "react-native-localize";
 import en from "./en.json";
 import zh from "./zh.json";
+import zhHant from "./zh-Hant.json";
 
 const LANGUAGE_STORAGE_KEY = "@app_language";
 
-export const SUPPORTED_LANGUAGES = ["en", "zh"] as const;
+export const SUPPORTED_LANGUAGES = ["en", "zh", "zh-Hant"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 /** Detect device language, falling back to English */
@@ -15,8 +16,19 @@ function getDeviceLanguage(): SupportedLanguage {
   try {
     const locales = getLocales();
     if (locales.length > 0) {
-      const tag = locales[0].languageCode;
-      if (tag === "zh") return "zh";
+      const loc = locales[0];
+      if (loc.languageCode === "zh") {
+        // Detect Traditional Chinese via script code or region
+        if (
+          loc.scriptCode === "Hant" ||
+          loc.languageTag?.includes("TW") ||
+          loc.languageTag?.includes("HK") ||
+          loc.languageTag?.includes("Hant")
+        ) {
+          return "zh-Hant";
+        }
+        return "zh";
+      }
     }
   } catch {
     // ignore
@@ -50,11 +62,22 @@ i18n.use(initReactI18next).init({
   resources: {
     en: { translation: en },
     zh: { translation: zh },
+    "zh-Hant": { translation: zhHant },
   },
   lng: "en", // overridden at runtime by LanguageProvider
   fallbackLng: "en",
   interpolation: { escapeValue: false },
   compatibilityJSON: "v4",
 });
+
+/** Map i18n language code to a BCP-47 locale for date formatting. */
+export function getDateLocale(lang?: string): string {
+  const l = lang || i18n.language;
+  switch (l) {
+    case "zh": return "zh-CN";
+    case "zh-Hant": return "zh-TW";
+    default: return "en-US";
+  }
+}
 
 export default i18n;

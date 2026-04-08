@@ -17,6 +17,7 @@ import {
     logMedicationAction,
     markPreviousDaysPendingAsMissing,
 } from "@/lib/medication_tracking";
+import { translateUnit } from "@/lib/schedule";
 import {
     cancelAllNotifications,
     registerForPushNotificationsAsync,
@@ -251,7 +252,7 @@ export default function ElderlyMedicationScreen() {
         // @ts-ignore
         const medUnit = medications[0]?.unit || "dose";
         // @ts-ignore
-        const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+        const medDosage = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
 
         list.push({
           reminder: r,
@@ -971,7 +972,7 @@ export default function ElderlyMedicationScreen() {
               const name = meds[0]?.name || "Medication";
               // @ts-ignore
               const medUnit = meds[0]?.unit || "dose";
-              const dosageStr = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+              const dosageStr = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
 
               const endDateStr = r.end_date
                 ? new Date(r.end_date).toLocaleDateString("en-GB", {
@@ -1009,7 +1010,7 @@ export default function ElderlyMedicationScreen() {
                       variant="bodySmall"
                       style={{ color: "#90A4AE", marginTop: 2 }}
                     >
-                      {dosageStr} · {r.reminder_times.length}x daily
+                      {dosageStr} · {t('medication.timesDaily', { times: r.reminder_times.length })}
                     </Text>
                     <Text
                       variant="bodySmall"

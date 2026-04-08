@@ -558,6 +558,7 @@ export default function Settings() {
         <View style={styles.langChipRow}>
           {([
             { key: "zh" as const, label: t('settings.languageChinese') },
+            { key: "zh-Hant" as const, label: t('settings.languageTraditionalChinese') },
             { key: "en" as const, label: t('settings.languageEnglish') },
           ]).map((opt) => (
             <Chip

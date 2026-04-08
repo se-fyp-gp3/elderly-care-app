@@ -9,6 +9,7 @@
     ScheduleSingleEventCard,
 } from "@/components/schedule";
 import { useAuth } from "@/lib/auth-context";
+import { getDateLocale } from "@/lib/i18n";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
     createScheduleTask,
@@ -57,7 +58,7 @@ export default function SchedulePage() {
   const router = useRouter();
   const navigation = useNavigation();
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // Data State
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
@@ -251,7 +252,7 @@ export default function SchedulePage() {
     const dateItem = new Date(referenceDate);
     dateItem.setDate(referenceDate.getDate() + i);
     return {
-      day: dateItem.toLocaleDateString("en-US", { weekday: "short" }),
+      day: dateItem.toLocaleDateString(getDateLocale(i18n.language), { weekday: "short" }),
       date: dateItem.getDate(),
       fullDate: dateItem,
       isToday: dateItem.toDateString() === new Date().toDateString(),

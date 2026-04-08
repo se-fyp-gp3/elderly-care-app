@@ -1,5 +1,7 @@
+import { getDateLocale } from "@/lib/i18n";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
     ScrollView,
     StyleSheet,
@@ -31,6 +33,8 @@ export default function ScheduleCalendarStrip({
   onOpenMonthPicker,
 }: ScheduleCalendarStripProps) {
   const theme = useTheme();
+  const { i18n } = useTranslation();
+  const locale = getDateLocale(i18n.language);
 
   return (
     <View
@@ -53,7 +57,7 @@ export default function ScheduleCalendarStrip({
             variant="headlineSmall"
             style={{ fontWeight: "bold", marginRight: 8 }}
           >
-            {referenceDate.toLocaleDateString("en-US", {
+            {referenceDate.toLocaleDateString(locale, {
               month: "long",
               year: "numeric",
             })}

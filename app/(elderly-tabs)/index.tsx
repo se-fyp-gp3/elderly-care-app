@@ -13,6 +13,7 @@ import {
     fetchDailyMedicationLogs,
     logMedicationAction,
 } from "@/lib/medication_tracking";
+import { translateUnit } from "@/lib/schedule";
 import {
     Elderly,
     ElderlyMedicationReminder,
@@ -223,7 +224,7 @@ export default function ElderlyHome() {
         // @ts-ignore
         const medUnit = medications[0]?.unit || "dose";
         // @ts-ignore
-        const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+        const medDosage = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
 
         list.push({
           reminder: r,

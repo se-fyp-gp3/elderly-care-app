@@ -1,4 +1,5 @@
 import { MedicationItem } from "@/components/MedicationCard";
+import { translateFrequency } from "@/lib/schedule";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -68,7 +69,7 @@ export default function TimeSlotCard({
       <Card.Title
         title={timeSlot}
         titleStyle={{ fontWeight: "bold", fontSize: 20 }}
-        subtitle={`${totalMeds} ${t('medication.medications', { count: totalMeds })}`}
+        subtitle={t('medication.medications', { count: totalMeds })}
         left={(props) => (
           <Avatar.Icon
             {...props}
@@ -231,7 +232,7 @@ export default function TimeSlotCard({
                     variant="bodySmall"
                     style={{ color: theme.colors.outline }}
                   >
-                    {med.dosage} • {med.frequency}
+                    {med.dosage} • {translateFrequency(med.frequency)}
                   </Text>
                 </View>
 

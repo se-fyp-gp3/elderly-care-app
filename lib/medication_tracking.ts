@@ -3,6 +3,7 @@ import {
     Medication,
     MedicationLogs,
 } from "@/types/appwrite";
+import { translateUnit } from "@/lib/schedule";
 import { ID, Query } from "react-native-appwrite";
 import {
     DATABASE_ID,
@@ -626,7 +627,7 @@ export async function getFormattedTodayMedicationSummary(
       // @ts-ignore
       const medUnit = medications[0]?.unit || "dose";
       // @ts-ignore
-      const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+      const medDosage = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
 
       todoList.push({
         time,
