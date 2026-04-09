@@ -14,9 +14,9 @@
 import { PermissionsAndroid, Platform } from "react-native";
 import { ID, Query } from "react-native-appwrite";
 import {
-    DATABASE_ID,
-    ELDERLY_DAILY_STEPS_TABLE_ID,
-    tablesDB,
+  DATABASE_ID,
+  ELDERLY_DAILY_STEPS_TABLE_ID,
+  tablesDB,
 } from "./appwrite";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -144,8 +144,7 @@ async function ensureActivityRecognitionPermission(): Promise<boolean> {
       PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION,
       {
         title: "Activity Recognition Permission",
-        message:
-          "This app needs activity recognition to read your step count.",
+        message: "This app needs activity recognition to read your step count.",
         buttonPositive: "Allow",
         buttonNegative: "Deny",
       },
@@ -193,9 +192,26 @@ async function fetchHealthConnectSteps(): Promise<{
 // ── Apple HealthKit (iOS) ──────────────────────────────────────────────
 
 function getAppleHealthKitModule() {
+  // react-native-health is an old bridge module that doesn't support
+  // TurboModules / New Architecture. Access the native module directly
+  // via NativeModules (with interop) or TurboModuleRegistry fallback.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mod = require("react-native-health");
-  return mod?.default ?? mod;
+  const { NativeModules, TurboModuleRegistry } = require("react-native");
+  const native =
+    NativeModules.AppleHealthKit ??
+    NativeModules.RCTAppleHealthKit ??
+    TurboModuleRegistry?.get?.("AppleHealthKit") ??
+    TurboModuleRegistry?.get?.("RCTAppleHealthKit");
+  if (!native) {
+    throw new Error(
+      "RNAppleHealthKit native module not found. Ensure react-native-health is linked.",
+    );
+  }
+  // Attach JS-side constants (Permissions, Units, etc.)
+  native.Constants = {
+    Permissions: { StepCount: "StepCount" },
+  };
+  return native;
 }
 
 async function requestHealthKitAuthorization(): Promise<boolean> {
@@ -450,8 +466,7 @@ export async function performStepSync(
     return {
       success: false,
       steps: 0,
-      source:
-        Platform.OS === "android" ? "health_connect" : "apple_healthkit",
+      source: Platform.OS === "android" ? "health_connect" : "apple_healthkit",
       error: error.message || "Unknown error during step sync",
     };
   }

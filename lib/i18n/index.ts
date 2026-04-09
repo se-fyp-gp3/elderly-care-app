@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getLocales } from "expo-localization";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { getLocales } from "react-native-localize";
 import en from "./en.json";
 import zhHant from "./zh-Hant.json";
 import zh from "./zh.json";
@@ -18,9 +18,8 @@ function getDeviceLanguage(): SupportedLanguage {
     if (locales.length > 0) {
       const loc = locales[0];
       if (loc.languageCode === "zh") {
-        // Detect Traditional Chinese via script code or region
+        // Detect Traditional Chinese via language tag or region
         if (
-          loc.scriptCode === "Hant" ||
           loc.languageTag?.includes("TW") ||
           loc.languageTag?.includes("HK") ||
           loc.languageTag?.includes("Hant")
@@ -74,9 +73,12 @@ i18n.use(initReactI18next).init({
 export function getDateLocale(lang?: string): string {
   const l = lang || i18n.language;
   switch (l) {
-    case "zh": return "zh-CN";
-    case "zh-Hant": return "zh-TW";
-    default: return "en-US";
+    case "zh":
+      return "zh-CN";
+    case "zh-Hant":
+      return "zh-TW";
+    default:
+      return "en-US";
   }
 }
 
