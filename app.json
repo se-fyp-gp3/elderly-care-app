@@ -17,9 +17,7 @@
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,
-        "com.apple.developer.healthkit.access": [
-          "health-records"
-        ]
+        "com.apple.developer.healthkit.access": ["health-records"]
       }
     },
     "android": {
@@ -62,10 +60,9 @@
         }
       ],
       "expo-web-browser",
-      "react-native-localize",
       "@react-native-community/datetimepicker",
       "react-native-health-connect",
-      "react-native-health",
+      "./plugins/withHealthKit",
       [
         "expo-build-properties",
         {
@@ -77,7 +74,8 @@
       "./plugins/withHealthConnect",
       "expo-audio",
       "expo-secure-store",
-      "expo-video"
+      "expo-video",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,
