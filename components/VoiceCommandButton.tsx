@@ -137,6 +137,9 @@ export default function VoiceCommandButton() {
         shouldRouteThroughEarpiece: false,
       });
 
+      // Reset any stale prepared/recording state before preparing again
+      try { await recorder.stop(); } catch {}
+
       await recorder.prepareToRecordAsync();
       recorder.record();
       setVoiceState("recording");
@@ -192,23 +195,36 @@ export default function VoiceCommandButton() {
 
       // Check if there's a pending action waiting for confirmation
       if (pendingAction.current) {
-        const transcript = (recognitionResult.transcript || recognitionResult.reply || "").toLowerCase();
-        const isConfirm = /^(好|確認|确认|係|是|yes|ok|okay|對|对|冇問題|没问题|confirm|得|sure)\b/.test(transcript.trim());
-        const isCancel = /^(唔好|不|取消|cancel|no|算|唔使|不用|唔要|不要)\b/.test(transcript.trim());
+        // Combine all text from AI response to detect confirm/cancel signals
+        const allText = [recognitionResult.transcript, recognitionResult.reply]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
 
-        if (isConfirm) {
+        const isCancel = /取消|cancel|唔好|不要|不用|唔使|算/.test(allText);
+
+        if (isCancel) {
+          pendingAction.current = null;
+          const cancelMsg = (MESSAGES_FOR_CANCEL as any)[language] || "好嘅，取消咗。";
+          commandResult = { success: true, message: cancelMsg, action: "cancelled" };
+        } else if (recognitionResult.intent === pendingAction.current.action) {
+          // AI understood the same intent as the pending action → treat as confirmation
           commandResult = await executePendingAction(
             pendingAction.current,
             user.$id,
             language,
           );
           pendingAction.current = null;
-        } else if (isCancel) {
+        } else if (/確認|确认|yes|ok|okay|confirm|sure|得/.test(allText)) {
+          // Explicit confirmation keywords found
+          commandResult = await executePendingAction(
+            pendingAction.current,
+            user.$id,
+            language,
+          );
           pendingAction.current = null;
-          const cancelMsg = (MESSAGES_FOR_CANCEL as any)[language] || "好嘅，取消咗。";
-          commandResult = { success: true, message: cancelMsg, action: "cancelled" };
         } else {
-          // Not a clear confirm/cancel — treat as new command, discard pending
+          // Truly different intent — discard pending and execute new command
           pendingAction.current = null;
           commandResult = await executeVoiceCommand(
             recognitionResult,

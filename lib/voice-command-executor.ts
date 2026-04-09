@@ -7,10 +7,10 @@ import { getContactsForElderly, getElderlyContacts } from "./contacts";
 import { getCustomVoicesForElderly } from "./custom-voice";
 import { createElderlyMedicationWithReminder, getElderlyByUserId } from "./elderly";
 import {
-  fetchActiveMedicationReminders,
-  fetchDailyMedicationLogs,
-  getFormattedTodayMedicationSummary,
-  logMedicationAction,
+    fetchActiveMedicationReminders,
+    fetchDailyMedicationLogs,
+    getFormattedTodayMedicationSummary,
+    logMedicationAction,
 } from "./medication_tracking";
 import { DEFAULT_VOICE, synthesizePersonalVoice } from "./personal-voice";
 import { createScheduleTask } from "./schedule";
@@ -348,8 +348,10 @@ async function handleAddMedication(
     };
   }
 
-  // Generate default reminder times if not provided
+  // Generate default reminder times if not provided or invalid
   let times: string[] = Array.isArray(reminderTimes) ? reminderTimes : [];
+  // Filter out non-HH:MM entries (e.g. "饭后", Chinese text)
+  times = times.filter((t: string) => /^\d{1,2}:\d{2}$/.test(t));
   if (times.length === 0) {
     const defaultTimes: Record<number, string[]> = {
       1: ["09:00"],
