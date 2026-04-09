@@ -2,6 +2,7 @@ import {
     clientReactNative,
     DATABASE_ID,
     DIRECT_MESSAGES_TABLE_ID,
+    safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -142,7 +143,7 @@ export default function ElderlyEmergency() {
   useEffect(() => {
     if (!elderlyProfile) return;
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+    const unsubscribe = safeSubscribe(channel, (response) => {
       if (response.events.some((event) => event.endsWith(".create"))) {
         const payload = response.payload as DirectMessage;
         if (

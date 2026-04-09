@@ -254,6 +254,24 @@ export default function CaregiverDashboard() {
                 </Text>
                 <Text variant="bodyMedium">{t('caregiverPanel.needsAttention')}</Text>
               </View>
+              <View style={styles.statItem}>
+                <Text
+                  variant="headlineSmall"
+                  style={[
+                    styles.statNumber,
+                    elderlyList.filter(
+                      (e) => e.statusInfo && !e.statusInfo.isActive && e.statusInfo.todaySteps !== null,
+                    ).length > 0 && { color: '#E65100' },
+                  ]}
+                >
+                  {
+                    elderlyList.filter(
+                      (e) => e.statusInfo && !e.statusInfo.isActive && e.statusInfo.todaySteps !== null,
+                    ).length
+                  }
+                </Text>
+                <Text variant="bodyMedium">Inactive</Text>
+              </View>
             </Card.Content>
           </Card>
         </View>

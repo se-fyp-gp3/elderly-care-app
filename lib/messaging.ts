@@ -1,9 +1,9 @@
 import { DirectMessage } from "@/types/messaging";
 import { ID, Query } from "react-native-appwrite";
 import {
-    clientReactNative,
     DATABASE_ID,
     DIRECT_MESSAGES_TABLE_ID,
+    safeSubscribe,
     tablesDB,
 } from "./appwrite";
 import { updatePresence } from "./presence";
@@ -171,7 +171,7 @@ export function subscribeToConversation(
 ): () => void {
   try {
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+    const unsubscribe = safeSubscribe(channel, (response) => {
       const payload = response.payload as unknown as DirectMessage;
       if (payload?.conversation_id === conversationId) {
         onMessage(payload);
@@ -180,6 +180,30 @@ export function subscribeToConversation(
     return unsubscribe;
   } catch (error) {
     console.error("Error subscribing to conversation:", error);
+    return () => {};
+  }
+}
+
+/**
+ * Subscribe to ALL incoming messages for a specific user (by receiver_id).
+ * Used for global push notification triggering.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToUserMessages(
+  myProfileId: string,
+  onIncomingMessage: (message: DirectMessage) => void,
+): () => void {
+  try {
+    const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
+    const unsubscribe = safeSubscribe(channel, (response) => {
+      const payload = response.payload as unknown as DirectMessage;
+      if (payload?.receiver_id === myProfileId && payload?.sender_id !== myProfileId) {
+        onIncomingMessage(payload);
+      }
+    });
+    return unsubscribe;
+  } catch (error) {
+    console.error("Error subscribing to user messages:", error);
     return () => {};
   }
 }

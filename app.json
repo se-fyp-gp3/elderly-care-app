@@ -32,7 +32,18 @@
       "package": "com.anonymous.elderlycareapp",
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.health.READ_STEPS"
+        "android.permission.health.READ_STEPS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.VIBRATE",
+        "android.permission.HIGH_SAMPLING_RATE_SENSORS",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
@@ -75,11 +86,26 @@
       "expo-audio",
       "expo-secure-store",
       "expo-video",
+      [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "expo-sensors",
+      "expo-task-manager",
       "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3d422aed-12f0-497f-99bb-3cba235c693f"
+      }
     }
   }
 }

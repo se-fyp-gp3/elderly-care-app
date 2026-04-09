@@ -1,14 +1,15 @@
 import {
-  CAREGIVER_TABLE_ID,
-  clientReactNative,
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
+    CAREGIVER_TABLE_ID,
+    clientReactNative,
+    DATABASE_ID,
+    DIRECT_MESSAGES_TABLE_ID,
+    safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-  Contact,
-  formatRelativeTime,
-  getContactsForElderly,
+    Contact,
+    formatRelativeTime,
+    getContactsForElderly,
 } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
@@ -19,23 +20,23 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  FlatList,
-  Linking,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    Alert,
+    FlatList,
+    Linking,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Searchbar,
-  Text,
-  useTheme
+    ActivityIndicator,
+    Avatar,
+    Searchbar,
+    Text,
+    useTheme
 } from "react-native-paper";
 
 import MomentsView from "@/components/MomentsView";
@@ -123,7 +124,7 @@ export default function ElderlyMessages() {
 
     // Subscribe to Direct Messages table for realtime updates
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+    const unsubscribe = safeSubscribe(channel, (response) => {
       if (response.events.some((event) => event.endsWith(".create"))) {
         const payload = response.payload as DirectMessage;
 

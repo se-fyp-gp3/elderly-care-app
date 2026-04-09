@@ -2,6 +2,7 @@ import {
     clientReactNative,
     DATABASE_ID,
     MEDICATION_LOGS_TABLE_ID,
+    safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -162,7 +163,7 @@ export default function ElderlyMedicationScreen() {
     }, 30000);
 
     // 3. Appwrite Realtime: Subscribe to medication logs changes
-    const realtimeUnsubscribe = clientReactNative.subscribe(
+    const realtimeUnsubscribe = safeSubscribe(
       `databases.${DATABASE_ID}.collections.${MEDICATION_LOGS_TABLE_ID}.documents`,
       (response) => {
         if (
@@ -221,6 +222,20 @@ export default function ElderlyMedicationScreen() {
         // Hide if scheduled_at is before start_date (e.g. created later in the day)
         if (r.start_date && new Date(scheduledAt) < new Date(r.start_date)) {
           return;
+        }
+
+        // Hide if scheduled_at is beyond duration_days
+        if (r.start_date && r.duration_days) {
+          const startDateMs = new Date(r.start_date).getTime();
+          const startHkDate = new Date(startDateMs + hkOffset).toISOString().slice(0, 10);
+          const firstCandBase = new Date(startHkDate);
+          firstCandBase.setUTCHours(hours, minutes, 0, 0);
+          const firstCandUtcMs = firstCandBase.getTime() - hkOffset;
+          const startDelay = firstCandUtcMs <= startDateMs ? 1 : 0;
+          const lastValidUtcMs = firstCandUtcMs + (startDelay + r.duration_days - 1) * 86400000;
+          if (scheduledDate.getTime() > lastValidUtcMs) {
+            return;
+          }
         }
 
         // Find if logged
@@ -961,86 +976,114 @@ export default function ElderlyMedicationScreen() {
         <Text variant="titleLarge" style={styles.sectionTitle}>
           {t('medication.finishedMedications')}
         </Text>
-        <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-          {finishedReminders.length > 0 ? (
-            finishedReminders.map((r) => {
-              // @ts-ignore
-              const meds = Array.isArray(r.elderly_medication?.medication)
-                ? r.elderly_medication.medication
-                : [];
-              // @ts-ignore
-              const name = meds[0]?.name || "Medication";
-              // @ts-ignore
-              const medUnit = meds[0]?.unit || "dose";
-              const dosageStr = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
-
-              const endDateStr = r.end_date
-                ? new Date(r.end_date).toLocaleDateString("en-GB", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                  })
-                : "—";
-
-              const startDateStr = r.start_date
-                ? new Date(r.start_date).toLocaleDateString("en-GB", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                  })
-                : "—";
-
-              return (
-                <View key={r.$id} style={styles.finishedItem}>
-                  <View style={styles.finishedIconContainer}>
-                    <MaterialCommunityIcons
-                      name="check-decagram"
-                      size={26}
-                      color="#78909C"
-                    />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 14 }}>
-                    <Text
-                      variant="titleMedium"
-                      style={{ fontWeight: "700", color: "#546E7A" }}
-                    >
-                      {name}
-                    </Text>
-                    <Text
-                      variant="bodySmall"
-                      style={{ color: "#90A4AE", marginTop: 2 }}
-                    >
-                      {dosageStr} · {t('medication.timesDaily', { times: r.reminder_times.length })}
-                    </Text>
-                    <Text
-                      variant="bodySmall"
-                      style={{ color: "#90A4AE", marginTop: 2 }}
-                    >
-                      {startDateStr} → {endDateStr}
-                    </Text>
-                  </View>
-                  <View style={styles.finishedBadge}>
-                    <Text style={styles.finishedBadgeText}>{t('common.completed')}</Text>
-                  </View>
+        {(() => {
+          if (finishedReminders.length === 0) {
+            return (
+              <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons name="history" size={48} color="#BDBDBD" />
+                  <Text variant="bodyLarge" style={{ marginTop: 8, color: "#666" }}>
+                    {t('medication.noFinishedMeds')}
+                  </Text>
                 </View>
-              );
-            })
-          ) : (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons
-                name="history"
-                size={48}
-                color="#BDBDBD"
-              />
-              <Text
-                variant="bodyLarge"
-                style={{ marginTop: 8, color: "#666" }}
-              >
-                {t('medication.noFinishedMeds')}
-              </Text>
+              </Card>
+            );
+          }
+
+          const now = new Date();
+          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const weekStart = new Date(todayStart);
+          weekStart.setDate(weekStart.getDate() - 7);
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+          const groups: { label: string; items: typeof finishedReminders }[] = [
+            { label: "Today", items: [] },
+            { label: "This Week", items: [] },
+            { label: "This Month", items: [] },
+            { label: "A Long Time Ago", items: [] },
+          ];
+
+          for (const r of finishedReminders) {
+            const d = r.end_date ? new Date(r.end_date) : (r.$updatedAt ? new Date(r.$updatedAt) : null);
+            if (!d) { groups[3].items.push(r); continue; }
+            if (d >= todayStart) groups[0].items.push(r);
+            else if (d >= weekStart) groups[1].items.push(r);
+            else if (d >= monthStart) groups[2].items.push(r);
+            else groups[3].items.push(r);
+          }
+
+          const nonEmptyGroups = groups.filter((g) => g.items.length > 0);
+
+          return nonEmptyGroups.map((group) => (
+            <View key={`fg-${group.label}`}>
+              <Text style={styles.finishedGroupLabel}>{group.label}</Text>
+              <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+                {group.items.map((r) => {
+                  // @ts-ignore
+                  const meds = Array.isArray(r.elderly_medication?.medication)
+                    ? r.elderly_medication.medication
+                    : [];
+                  // @ts-ignore
+                  const name = meds[0]?.name || "Medication";
+                  // @ts-ignore
+                  const medUnit = meds[0]?.unit || "dose";
+                  const dosageStr = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
+
+                  const endDateStr = r.end_date
+                    ? new Date(r.end_date).toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "—";
+
+                  const startDateStr = r.start_date
+                    ? new Date(r.start_date).toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "—";
+
+                  return (
+                    <View key={r.$id} style={styles.finishedItem}>
+                      <View style={styles.finishedIconContainer}>
+                        <MaterialCommunityIcons
+                          name="check-decagram"
+                          size={26}
+                          color="#78909C"
+                        />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 14 }}>
+                        <Text
+                          variant="titleMedium"
+                          style={{ fontWeight: "700", color: "#546E7A" }}
+                        >
+                          {name}
+                        </Text>
+                        <Text
+                          variant="bodySmall"
+                          style={{ color: "#90A4AE", marginTop: 2 }}
+                        >
+                          {dosageStr} · {t('medication.timesDaily', { times: r.reminder_times.length })}
+                        </Text>
+                        <Text
+                          variant="bodySmall"
+                          style={{ color: "#90A4AE", marginTop: 2 }}
+                        >
+                          {startDateStr} → {endDateStr}
+                        </Text>
+                      </View>
+                      <View style={styles.finishedBadge}>
+                        <Text style={styles.finishedBadgeText}>{t('common.completed')}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </Card>
             </View>
-          )}
-        </Card>
+          ));
+        })()}
 
         {/* Notes */}
         <Card
@@ -1508,6 +1551,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 10,
     backgroundColor: "#E8F5E9",
+  },
+  finishedGroupLabel: {
+    fontWeight: "600",
+    color: "#888",
+    fontSize: 13,
+    marginBottom: 8,
+    marginTop: 8,
+    marginLeft: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   finishedItem: {
     flexDirection: "row",

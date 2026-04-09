@@ -1,21 +1,22 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-    createChatSession,
-    deleteChatSession,
-    listChatSessionsForUser,
-    updateChatSession,
+  createChatSession,
+  deleteChatSession,
+  listChatSessionsForUser,
+  updateChatSession,
 } from "@/lib/chat";
 import {
-    buildScheduleSummary,
-    fetchElderlySchedulesForUser,
+  buildScheduleSummary,
+  fetchElderlySchedulesForUser,
 } from "@/lib/elderly";
 import { getFormattedTodayMedicationSummary } from "@/lib/medication_tracking";
 import { synthesizePersonalVoice } from "@/lib/personal-voice";
+import { formatSearchResultsForContext, searchWeb, shouldSearch } from "@/lib/search";
 import type { ChatSession as AppwriteChatSession } from "@/types/appwrite";
 import {
-    createAudioPlayer,
-    setAudioModeAsync,
-    type AudioPlayer,
+  createAudioPlayer,
+  setAudioModeAsync,
+  type AudioPlayer,
 } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -23,28 +24,28 @@ import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    FlatList,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Card,
-    Chip,
-    IconButton,
-    Menu,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  Card,
+  Chip,
+  IconButton,
+  Menu,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 interface Message {
@@ -99,6 +100,7 @@ export default function ElderlyChat() {
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [chatHistory, setChatHistory] = useState<AppwriteChatSession[]>([]);
   const [isSuggestionsExpanded, setIsSuggestionsExpanded] = useState(false);
+  const [searchEnabled, setSearchEnabled] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
   const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
@@ -327,7 +329,8 @@ export default function ElderlyChat() {
       lower.includes("pill")
     ) {
       if (!user?.$id) return "I can't access your medication data right now.";
-      return await getFormattedTodayMedicationSummary(user.$id);
+      const lang = voiceReplyLang === "cantonese" ? "yue" : voiceReplyLang === "mandarin" ? "zh" : "en";
+      return await getFormattedTodayMedicationSummary(user.$id, lang as "yue" | "zh" | "en");
     }
 
     if (
@@ -361,7 +364,7 @@ export default function ElderlyChat() {
       {
         role: "system",
         content:
-          `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\n${langInstruction}\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
+          `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\nIMPORTANT: Keep your response concise — no more than 80 words. Be brief and to the point.\n\n${langInstruction}\n\nWhen the user's message contains [SEARCH RESULTS], you MUST base your answer strictly on those results. Do NOT make up or guess information — only use facts from the provided search data. Summarize the key points for the elderly user in a caring tone.\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
       },
       ...history,
       {
@@ -419,6 +422,7 @@ export default function ElderlyChat() {
     userMessage: string,
     image?: SelectedImage | null,
     allowImageFallback = true,
+    hasSearchContext = false,
   ): Promise<string> => {
     const sleep = (ms: number) =>
       new Promise((resolve) => setTimeout(resolve, ms));
@@ -475,8 +479,8 @@ export default function ElderlyChat() {
     const payload = {
       model: resolvedModel,
       messages: messagesPayload,
-      max_tokens: 1000,
-      temperature: 0.7,
+      max_tokens: 200,
+      temperature: hasSearchContext ? 0.2 : 0.7,
     };
 
     const maxAttempts = 3;
@@ -833,9 +837,53 @@ export default function ElderlyChat() {
       }
 
       const localResponse = await tryHandleLocalDataRequest(messageForAPI);
-      const aiResponse =
-        localResponse ??
-        (await callAIAPI(messageForAPI, selectedImage));
+
+      // Selective search: only search when toggle is on AND query looks like it needs web info
+      let searchContext = "";
+      let rawSearchResponse: Awaited<ReturnType<typeof searchWeb>> | null = null;
+      if (searchEnabled && !localResponse && !selectedImage && shouldSearch(userMessage.text)) {
+        try {
+          rawSearchResponse = await searchWeb(userMessage.text);
+          searchContext = formatSearchResultsForContext(rawSearchResponse);
+        } catch (e) {
+          console.warn("Search failed, proceeding without:", e);
+        }
+      }
+
+      if (rawSearchResponse) {
+        console.log('[Search] Raw response:', JSON.stringify({
+          hasAiOverview: !!rawSearchResponse.aiOverview?.text,
+          aiOverviewText: rawSearchResponse.aiOverview?.text ?? '(none)',
+          aiOverviewRefs: rawSearchResponse.aiOverview?.references ?? [],
+          answerBoxType: rawSearchResponse.answerBox?.type ?? '(none)',
+          answerBox: rawSearchResponse.answerBox ?? '(none)',
+          hasKG: !!rawSearchResponse.knowledgeGraph?.description,
+          knowledgeGraph: rawSearchResponse.knowledgeGraph ?? '(none)',
+          resultsCount: rawSearchResponse.results?.length ?? 0,
+          results: rawSearchResponse.results?.map(r => ({ title: r.title, snippet: r.snippet })) ?? [],
+        }, null, 2));
+      }
+      if (searchContext) {
+        console.log('[Search] Formatted context for AI (full):\n', searchContext);
+      } else if (searchEnabled && shouldSearch(userMessage.text)) {
+        console.log('[Search] No search context produced — search may have returned empty results');
+      }
+
+      const finalMessage = searchContext
+        ? `${messageForAPI}\n\n[SEARCH RESULTS — you MUST base your answer ONLY on these facts. Do NOT add, guess, or invent any information not found below:]\n${searchContext}\n[END SEARCH RESULTS]\n\nUsing ONLY the search results above, answer the user's question concisely.`
+        : messageForAPI;
+
+      console.log('[AI] Final message to model (full):\n', finalMessage);
+
+      // Start AI call; fire TTS in parallel once we get the response
+      const hasSearch = searchContext.length > 0;
+      const aiResponsePromise = localResponse
+        ? Promise.resolve(localResponse)
+        : callAIAPI(finalMessage, selectedImage, true, hasSearch);
+
+      const aiResponse = await aiResponsePromise;
+
+      console.log('[AI] Model reply (full):', aiResponse);
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -844,6 +892,7 @@ export default function ElderlyChat() {
         timestamp: new Date(),
       };
 
+      // Update UI and start TTS in parallel (don't await TTS)
       setMessages((prev) => [...prev, aiMessage]);
       void speakAiResponse(aiResponse);
     } catch (error) {
@@ -1025,6 +1074,16 @@ export default function ElderlyChat() {
             ))}
           </Menu>
         )}
+        <IconButton
+          icon={searchEnabled ? "magnify" : "magnify-close"}
+          size={24}
+          onPress={() => setSearchEnabled((prev) => !prev)}
+          style={[
+            styles.topBarButton,
+            searchEnabled && { backgroundColor: "#E3F2FD" },
+          ]}
+          iconColor={searchEnabled ? "#1565C0" : theme.colors.onSurface}
+        />
         <IconButton
           icon="plus"
           size={28}

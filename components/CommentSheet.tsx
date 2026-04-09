@@ -1,10 +1,11 @@
 import { formatRelativeTime } from "@/lib/contacts";
-import { addComment, getComments } from "@/lib/moments";
+import { addComment, deleteComment, getComments } from "@/lib/moments";
 import { MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+    Alert,
     Animated,
     Dimensions,
     FlatList,
@@ -33,8 +34,30 @@ interface CommentSheetProps {
   onCommentAdded?: () => void;
 }
 
-function CommentItem({ comment }: { comment: MomentComment }) {
+function CommentItem({
+  comment,
+  currentUserId,
+  momentId,
+  onDelete,
+}: {
+  comment: MomentComment;
+  currentUserId: string;
+  momentId: string;
+  onDelete: (commentId: string) => void;
+}) {
   const theme = useTheme();
+  const isOwn = comment.author_id === currentUserId;
+
+  const handleDelete = () => {
+    Alert.alert("Delete Comment", "Are you sure you want to delete this comment?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => onDelete(comment.$id),
+      },
+    ]);
+  };
 
   return (
     <View style={styles.commentItem}>
@@ -55,12 +78,19 @@ function CommentItem({ comment }: { comment: MomentComment }) {
       />
       <View style={styles.commentBody}>
         <View style={styles.commentBubble}>
-          <Text variant="labelMedium" style={{ fontWeight: "bold" }}>
-            {comment.author_name}
-            {comment.author_role === "ai" && (
-              <Text style={{ color: theme.colors.tertiary, fontWeight: "normal" }}> • AI</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text variant="labelMedium" style={{ fontWeight: "bold", flex: 1 }}>
+              {comment.author_name}
+              {comment.author_role === "ai" && (
+                <Text style={{ color: theme.colors.tertiary, fontWeight: "normal" }}> • AI</Text>
+              )}
+            </Text>
+            {isOwn && (
+              <Pressable onPress={handleDelete} hitSlop={10}>
+                <MaterialCommunityIcons name="delete-outline" size={18} color={theme.colors.error} />
+              </Pressable>
             )}
-          </Text>
+          </View>
           <Text variant="bodyMedium" style={{ marginTop: 2, lineHeight: 20 }}>
             {comment.content}
           </Text>
@@ -153,6 +183,16 @@ export default function CommentSheet({
     }
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      await deleteComment(commentId, momentId);
+      setComments((prev) => prev.filter((c) => c.$id !== commentId));
+      onCommentAdded?.();
+    } catch (e) {
+      console.error("Error deleting comment:", e);
+    }
+  };
+
   if (!visible) return null;
 
   return (
@@ -200,7 +240,14 @@ export default function CommentSheet({
             <FlatList
               data={comments}
               keyExtractor={(item) => item.$id}
-              renderItem={({ item }) => <CommentItem comment={item} />}
+              renderItem={({ item }) => (
+                <CommentItem
+                  comment={item}
+                  currentUserId={currentUserId}
+                  momentId={momentId}
+                  onDelete={handleDeleteComment}
+                />
+              )}
               contentContainerStyle={styles.listContent}
               keyboardShouldPersistTaps="handled"
               ListEmptyComponent={

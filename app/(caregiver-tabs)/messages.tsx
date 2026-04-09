@@ -4,6 +4,7 @@ import {
     DATABASE_ID,
     DIRECT_MESSAGES_TABLE_ID,
     ELDERLY_TABLE_ID,
+    safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
@@ -174,7 +175,7 @@ export default function CaregiverMessages() {
 
     // Subscribe to Direct Messages table
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+    const unsubscribe = safeSubscribe(channel, (response) => {
       // Check if it's a create event
       if (
         response.events.some((event) => event.endsWith(".create"))

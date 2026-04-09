@@ -1,35 +1,66 @@
-// This is a simulated AI service.
-// In a real app, you would call OpenAI, Claude, or a custom backend here.
+const DASHSCOPE_API_KEY = process.env.EXPO_PUBLIC_DASHSCOPE_API_KEY?.trim();
+const DASHSCOPE_API_URL = process.env.EXPO_PUBLIC_DASHSCOPE_API_URL?.trim();
+const DASHSCOPE_TEXT_MODEL =
+  process.env.EXPO_PUBLIC_DASHSCOPE_MODEL?.trim() || "qwen3.5-flash";
+const DASHSCOPE_IMAGE_MODEL =
+  process.env.EXPO_PUBLIC_DASHSCOPE_IMAGE_MODEL?.trim() || "qwen3.5-vl";
 
-const TOPIC_STARTERS = [
-  "Have you considered how this affects daily routine?",
-  "That's an interesting point! Can you elaborate on the benefits?",
-  "Research suggests that engaging in this activity improves mental health.",
-  "Many caregivers find this approach helpful.",
-  "What are your thoughts on integrating this with existing care plans?",
-  "This reminds me of a similar case study.",
-];
+const SYSTEM_PROMPT =
+  "You are a helpful AI assistant in an elderly care community app. " +
+  "Provide a short, thoughtful, and caring response (2-3 sentences) to the community post. " +
+  "Be supportive, warm, and offer practical insights when relevant. " +
+  "Reply in the same language as the post content.";
 
-export async function generateAIResponse(content: string): Promise<string> {
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+export async function generateAIResponse(
+  content: string,
+  imageUrl?: string,
+): Promise<string> {
+  if (!DASHSCOPE_API_KEY || !DASHSCOPE_API_URL) {
+    return "AI service is not configured. Please set the DashScope API key.";
+  }
 
-  const lower = content.toLowerCase();
+  const hasImage = !!imageUrl;
+  const model = hasImage ? DASHSCOPE_IMAGE_MODEL : DASHSCOPE_TEXT_MODEL;
 
-  if (lower.includes("health") || lower.includes("medication")) {
-    return "It's crucial to monitor health metrics closely. Have you checked the latest vitals?";
+  const userContent = hasImage
+    ? [
+        { type: "text" as const, text: `Please comment on this community post:\n\n${content}` },
+        { type: "image_url" as const, image_url: { url: imageUrl } },
+      ]
+    : `Please comment on this community post:\n\n${content}`;
+
+  const payload = {
+    model,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userContent },
+    ],
+    max_tokens: 200,
+    temperature: 0.7,
+  };
+
+  try {
+    const response = await fetch(`${DASHSCOPE_API_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error("DashScope API error:", response.status, await response.text());
+      return "Sorry, the AI service is temporarily unavailable. Please try again later.";
+    }
+
+    const data = await response.json();
+    let text = data.choices?.[0]?.message?.content || "";
+    // Strip <think>...</think> tags if present
+    text = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    return text || "I appreciate this post! Thank you for sharing with our community.";
+  } catch (error) {
+    console.error("Error calling DashScope:", error);
+    return "Sorry, I couldn't generate a response right now. Please try again later.";
   }
-  if (lower.includes("food") || lower.includes("diet")) {
-    return "Nutrition plays a key role. What specific dietary needs are being addressed here?";
-  }
-  if (lower.includes("exercise") || lower.includes("walk")) {
-    return "Physical activity is great for well-being! Remember to ensure safety during exercises.";
-  }
-  if (lower.includes("lonely") || lower.includes("sad")) {
-    return "Social connection is vital. Have you tried scheduling a video call or a group activity?";
-  }
-  
-  // Random fallback
-  const random = TOPIC_STARTERS[Math.floor(Math.random() * TOPIC_STARTERS.length)];
-  return `AI Insight: ${random}`;
 }

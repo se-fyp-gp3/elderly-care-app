@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
-import { addAIResponse, createMoment, getMoments, getVisibleCommentCount, likeMoment } from "@/lib/moments";
+import { addAIResponse, createMoment, deleteMoment, getMoments, getVisibleCommentCount, likeMoment } from "@/lib/moments";
 import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -49,9 +49,10 @@ export default function MomentsView() {
         }
       }
 
-      // 2. Extract User IDs allowed to be seen (My friends + Me)
+      // 2. Extract User IDs allowed to be seen (My friends + Me + AI)
       const ids = [
         user.$id, 
+        "ai-assistant",
         ...contacts.map((c) => c.userId).filter((id) => !!id)
       ];
       setAllowedIds(ids);
@@ -117,9 +118,17 @@ export default function MomentsView() {
     }
   };
 
-  const handleAIRequest = async (momentId: string, content: string): Promise<MomentComment> => {
-     // This will return the AI comment to be displayed in the card
-     return await addAIResponse(momentId, content);
+  const handleAIRequest = async (momentId: string, content: string, imageUrl?: string): Promise<MomentComment> => {
+     const comment = await addAIResponse(momentId, content, imageUrl);
+     // Increment local comments_count
+     setMoments((prev) =>
+       prev.map((m) =>
+         m.$id === momentId
+           ? { ...m, comments_count: (m.comments_count || 0) + 1 }
+           : m
+       )
+     );
+     return comment;
   };
 
   const handleComment = (momentId: string) => {
@@ -176,6 +185,44 @@ export default function MomentsView() {
     });
   };
 
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow camera access to take photos.");
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      quality: 0.9,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    setSelectedMedia({
+      uri: asset.uri,
+      type: "image",
+      mimeType: asset.mimeType,
+      fileName: asset.fileName ?? undefined,
+      fileSize: asset.fileSize,
+      width: asset.width,
+      height: asset.height,
+    });
+  };
+
+  const handleDeleteMoment = async (momentId: string) => {
+    const moment = moments.find((m) => m.$id === momentId);
+    if (!moment) return;
+    try {
+      await deleteMoment(momentId, moment.media_bucket_id, moment.media_file_id);
+      setMoments((prev) => prev.filter((m) => m.$id !== momentId));
+    } catch (err) {
+      console.error("Error deleting moment:", err);
+      Alert.alert("Error", "Failed to delete the post.");
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       {loading ? (
@@ -193,6 +240,7 @@ export default function MomentsView() {
               onLike={handleLike}
               onComment={handleComment}
               onAIRequest={handleAIRequest}
+              onDelete={handleDeleteMoment}
             />
           )}
           refreshing={refreshing}
@@ -246,8 +294,11 @@ export default function MomentsView() {
                             style={{ marginBottom: 16 }}
                         />
                         <View style={styles.mediaRow}>
-                          <Button mode="outlined" icon="image-multiple" onPress={pickMedia}>
+                          <Button mode="outlined" icon="image-multiple" onPress={pickMedia} compact>
                             {t('moments.addPhotoVideo')}
+                          </Button>
+                          <Button mode="outlined" icon="camera" onPress={takePhoto} compact style={{ marginLeft: 8 }}>
+                            {t('moments.camera')}
                           </Button>
                           {selectedMedia && (
                             <Button onPress={() => setSelectedMedia(null)} textColor={theme.colors.error}>
