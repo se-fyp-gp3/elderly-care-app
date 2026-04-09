@@ -6,6 +6,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import {
     fetchGroupMessages,
+    markGroupMessagesAsRead,
     sendGroupMessage,
     subscribeToGroupMessages,
     updateGroupReadCursor,
@@ -13,6 +14,7 @@ import {
 import { getGroupMembers } from "@/lib/groups";
 import { GroupMember, GroupMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import type { AudioPlayer } from "expo-audio";
 import {
     createAudioPlayer,
@@ -31,13 +33,18 @@ import {
     Keyboard,
     KeyboardAvoidingView,
     Platform,
+    Pressable,
+    ScrollView,
     StyleSheet,
     TouchableOpacity,
     View,
 } from "react-native";
 import {
     ActivityIndicator,
+    Divider,
     IconButton,
+    Modal,
+    Portal,
     Text,
     TextInput,
     useTheme,
@@ -168,6 +175,13 @@ export default function GroupConversationScreen({
   const [sending, setSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  // Quote / reply
+  const [quotedMessage, setQuotedMessage] = useState<GroupMessage | null>(null);
+  // Long-press context menu
+  const [longPressMsg, setLongPressMsg] = useState<GroupMessage | null>(null);
+  // Read-by modal
+  const [readByMsg, setReadByMsg] = useState<GroupMessage | null>(null);
+
   // Voice recording
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
@@ -186,6 +200,8 @@ export default function GroupConversationScreen({
         setMessages(msgs);
         setMembers(mems);
         await updateGroupReadCursor(groupId, myProfileId);
+        // Mark all existing messages as read by me
+        markGroupMessagesAsRead(groupId, myProfileId).catch(() => {});
       } catch (error) {
         console.error("Error loading group messages:", error);
       } finally {
@@ -194,10 +210,20 @@ export default function GroupConversationScreen({
 
       unsub = subscribeToGroupMessages(groupId, (newMsg) => {
         setMessages((prev) => {
-          if (prev.some((m) => m.$id === newMsg.$id)) return prev;
+          const idx = prev.findIndex((m) => m.$id === newMsg.$id);
+          if (idx >= 0) {
+            // Update existing message (e.g. read_by changed)
+            const updated = [...prev];
+            updated[idx] = newMsg;
+            return updated;
+          }
           return [...prev, newMsg];
         });
         updateGroupReadCursor(groupId, myProfileId).catch(() => {});
+        // Mark incoming messages as read
+        if (newMsg.sender_id !== myProfileId) {
+          markGroupMessagesAsRead(groupId, myProfileId).catch(() => {});
+        }
       });
     })();
 
@@ -217,6 +243,8 @@ export default function GroupConversationScreen({
     Keyboard.dismiss();
     setSending(true);
     setInputText("");
+    const quoted = quotedMessage;
+    setQuotedMessage(null);
     try {
       await sendGroupMessage({
         groupId,
@@ -224,6 +252,11 @@ export default function GroupConversationScreen({
         senderName: myName,
         senderRole: myRole,
         body: text,
+        ...(quoted && {
+          quotedMessageId: quoted.$id,
+          quotedSenderName: quoted.sender_name,
+          quotedBody: quoted.body,
+        }),
       });
     } catch (error) {
       Alert.alert(t("common.error"), String(error));
@@ -231,7 +264,7 @@ export default function GroupConversationScreen({
     } finally {
       setSending(false);
     }
-  }, [inputText, groupId, myProfileId, myName, myRole]);
+  }, [inputText, groupId, myProfileId, myName, myRole, quotedMessage]);
 
   // Voice recording handlers
   const startRecording = useCallback(async () => {
@@ -320,52 +353,89 @@ export default function GroupConversationScreen({
 
     const isVoice = item.message_type === "voice";
 
+    // Read receipt logic for sent messages
+    const readBy = item.read_by ?? [];
+    const otherMembersCount = members.filter((m) => m.user_profile_id !== item.sender_id).length;
+    const allRead = otherMembersCount > 0 && readBy.length >= otherMembersCount;
+
+    const handleLongPress = () => {
+      if (isSystem) return;
+      setLongPressMsg(item);
+    };
+
     return (
-      <View style={[styles.msgRow, isMe ? styles.msgRowRight : styles.msgRowLeft]}>
-        {!isMe && (
-          <View style={styles.senderAvatar}>
-            <UserAvatar name={item.sender_name} size={28} role={item.sender_role} />
-          </View>
-        )}
-        <View style={{ maxWidth: "75%" }}>
+      <Pressable onLongPress={handleLongPress} delayLongPress={400}>
+        <View style={[styles.msgRow, isMe ? styles.msgRowRight : styles.msgRowLeft]}>
           {!isMe && (
-            <Text variant="labelSmall" style={[styles.senderLabel, { color: theme.colors.primary }]}>
-              {item.sender_name}
-            </Text>
+            <View style={styles.senderAvatar}>
+              <UserAvatar name={item.sender_name} size={28} role={item.sender_role} />
+            </View>
           )}
-          <View
-            style={[
-              styles.bubble,
-              isMe
-                ? { backgroundColor: theme.colors.primary, borderBottomRightRadius: 4 }
-                : { backgroundColor: theme.colors.surfaceVariant, borderBottomLeftRadius: 4 },
-            ]}
-          >
-            {isVoice ? (
-              <VoiceMessageBubble body={item.body} isMe={isMe} theme={theme} />
-            ) : (
-              <Text
-                style={[
-                  styles.msgText,
-                  { color: isMe ? theme.colors.onPrimary : theme.colors.onSurface },
-                ]}
-              >
-                {item.body}
+          <View style={{ maxWidth: "75%" }}>
+            {!isMe && (
+              <Text variant="labelSmall" style={[styles.senderLabel, { color: theme.colors.primary }]}>
+                {item.sender_name}
               </Text>
             )}
+            <View
+              style={[
+                styles.bubble,
+                isMe
+                  ? { backgroundColor: theme.colors.primary, borderBottomRightRadius: 4 }
+                  : { backgroundColor: theme.colors.surfaceVariant, borderBottomLeftRadius: 4 },
+              ]}
+            >
+              {/* Quoted message preview */}
+              {item.quoted_message_id ? (
+                <View style={[styles.quoteBubble, { borderLeftColor: isMe ? theme.colors.onPrimary : theme.colors.primary }]}>
+                  <Text
+                    variant="labelSmall"
+                    style={{ fontWeight: "700", color: isMe ? theme.colors.onPrimary : theme.colors.primary }}
+                    numberOfLines={1}
+                  >
+                    {item.quoted_sender_name}
+                  </Text>
+                  <Text
+                    variant="bodySmall"
+                    numberOfLines={2}
+                    style={{ color: isMe ? theme.colors.onPrimary : theme.colors.onSurfaceVariant, opacity: 0.8 }}
+                  >
+                    {item.quoted_body}
+                  </Text>
+                </View>
+              ) : null}
+              {isVoice ? (
+                <VoiceMessageBubble body={item.body} isMe={isMe} theme={theme} />
+              ) : (
+                <Text
+                  style={[
+                    styles.msgText,
+                    { color: isMe ? theme.colors.onPrimary : theme.colors.onSurface },
+                  ]}
+                >
+                  {item.body}
+                </Text>
+              )}
+            </View>
+            <View style={[styles.timeLabelRow, isMe && { flexDirection: "row-reverse" }]}>
+              <Text
+                variant="labelSmall"
+                style={[styles.timeLabel, { color: theme.colors.onSurfaceVariant }]}
+              >
+                {formatTime(item.created_at)}
+              </Text>
+              {isMe && (
+                <MaterialCommunityIcons
+                  name={allRead ? "check-all" : "check"}
+                  size={14}
+                  color={allRead ? "#4FC3F7" : theme.colors.onSurfaceVariant}
+                  style={{ marginHorizontal: 2 }}
+                />
+              )}
+            </View>
           </View>
-          <Text
-            variant="labelSmall"
-            style={[
-              styles.timeLabel,
-              { color: theme.colors.onSurfaceVariant },
-              isMe && { textAlign: "right" },
-            ]}
-          >
-            {formatTime(item.created_at)}
-          </Text>
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -423,6 +493,21 @@ export default function GroupConversationScreen({
           />
         )}
 
+        {/* Quote preview bar */}
+        {quotedMessage && (
+          <View style={[styles.quotePreviewBar, { backgroundColor: theme.colors.surfaceVariant }]}>
+            <View style={[styles.quotePreviewLeft, { borderLeftColor: theme.colors.primary }]}>
+              <Text variant="labelSmall" style={{ fontWeight: "700", color: theme.colors.primary }} numberOfLines={1}>
+                {quotedMessage.sender_name}
+              </Text>
+              <Text variant="bodySmall" numberOfLines={1} style={{ color: theme.colors.onSurfaceVariant }}>
+                {quotedMessage.message_type === "voice" ? `🎤 ${t("chat.voiceMessage")}` : quotedMessage.body}
+              </Text>
+            </View>
+            <IconButton icon="close" size={18} onPress={() => setQuotedMessage(null)} />
+          </View>
+        )}
+
         {/* Input bar */}
         <View style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}>
           {isRecording ? (
@@ -470,6 +555,76 @@ export default function GroupConversationScreen({
           )}
         </View>
       </KeyboardAvoidingView>
+
+      {/* Long-press context menu */}
+      <Portal>
+        <Modal visible={!!longPressMsg} onDismiss={() => setLongPressMsg(null)} contentContainerStyle={[styles.menuModal, { backgroundColor: theme.colors.surface }]}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              if (longPressMsg) setQuotedMessage(longPressMsg);
+              setLongPressMsg(null);
+            }}
+          >
+            <MaterialCommunityIcons name="reply" size={20} color={theme.colors.onSurface} />
+            <Text style={{ marginLeft: 12 }}>{t("chat.reply")}</Text>
+          </TouchableOpacity>
+          <Divider />
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={async () => {
+              if (longPressMsg && longPressMsg.message_type !== "voice") {
+                await Clipboard.setStringAsync(longPressMsg.body);
+              }
+              setLongPressMsg(null);
+            }}
+          >
+            <MaterialCommunityIcons name="content-copy" size={20} color={theme.colors.onSurface} />
+            <Text style={{ marginLeft: 12 }}>{t("chat.copy")}</Text>
+          </TouchableOpacity>
+          {longPressMsg?.sender_id === myProfileId && (
+            <>
+              <Divider />
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setReadByMsg(longPressMsg);
+                  setLongPressMsg(null);
+                }}
+              >
+                <MaterialCommunityIcons name="eye-outline" size={20} color={theme.colors.onSurface} />
+                <Text style={{ marginLeft: 12 }}>{t("chat.readBy")}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </Modal>
+
+        {/* Read-by modal */}
+        <Modal visible={!!readByMsg} onDismiss={() => setReadByMsg(null)} contentContainerStyle={[styles.readByModal, { backgroundColor: theme.colors.surface }]}>
+          <Text variant="titleMedium" style={{ fontWeight: "700", marginBottom: 12 }}>{t("chat.readBy")}</Text>
+          <ScrollView style={{ maxHeight: 300 }}>
+            {readByMsg && members
+              .filter((m) => m.user_profile_id !== readByMsg.sender_id)
+              .map((m) => {
+                const hasRead = (readByMsg.read_by ?? []).includes(m.user_profile_id);
+                return (
+                  <View key={m.$id} style={styles.readByRow}>
+                    <UserAvatar name={m.user_name} size={32} role={m.user_role} />
+                    <Text style={{ flex: 1, marginLeft: 10 }}>{m.user_name}</Text>
+                    <MaterialCommunityIcons
+                      name={hasRead ? "check-circle" : "clock-outline"}
+                      size={20}
+                      color={hasRead ? "#4FC3F7" : theme.colors.onSurfaceVariant}
+                    />
+                  </View>
+                );
+              })}
+          </ScrollView>
+          <TouchableOpacity onPress={() => setReadByMsg(null)} style={{ alignSelf: "center", marginTop: 12 }}>
+            <Text style={{ color: theme.colors.primary, fontWeight: "600" }}>{t("common.close")}</Text>
+          </TouchableOpacity>
+        </Modal>
+      </Portal>
     </SafeAreaView>
   );
 }
@@ -506,7 +661,49 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   msgText: { fontSize: 15, lineHeight: 21 },
-  timeLabel: { fontSize: 10, marginTop: 2, marginHorizontal: 4 },
+  timeLabel: { fontSize: 10, marginHorizontal: 4 },
+  timeLabelRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
+  quoteBubble: {
+    borderLeftWidth: 3,
+    paddingLeft: 8,
+    marginBottom: 6,
+    opacity: 0.85,
+  },
+  quotePreviewBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 12,
+    borderRadius: 8,
+    marginHorizontal: 8,
+    marginBottom: 2,
+  },
+  quotePreviewLeft: {
+    flex: 1,
+    borderLeftWidth: 3,
+    paddingLeft: 8,
+    paddingVertical: 4,
+  },
+  menuModal: {
+    marginHorizontal: 40,
+    borderRadius: 12,
+    paddingVertical: 8,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  readByModal: {
+    marginHorizontal: 32,
+    borderRadius: 16,
+    padding: 20,
+  },
+  readByRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
   inputBar: {
     flexDirection: "row",
     alignItems: "center",

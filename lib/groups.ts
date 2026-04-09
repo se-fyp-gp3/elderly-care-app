@@ -8,6 +8,7 @@ import {
     storage,
     tablesDB,
 } from "./appwrite";
+import { sendGroupMessage } from "./group-messaging";
 
 /**
  * Create a new group chat and add all members.
@@ -68,6 +69,16 @@ export async function createGroup(input: {
       }),
     ),
   );
+
+  // Send system message announcing group creation
+  await sendGroupMessage({
+    groupId: group.$id,
+    senderId: input.creatorId,
+    senderName: input.creatorName,
+    senderRole: input.creatorRole,
+    body: `${input.creatorName} created the group`,
+    messageType: "system",
+  });
 
   return group as unknown as Group;
 }

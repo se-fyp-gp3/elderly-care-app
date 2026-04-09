@@ -23,6 +23,10 @@ export type DirectMessage = Models.Row & {
   is_read: boolean;
   /** "text" | "voice" — defaults to "text" */
   message_type?: string;
+  /** Quote/reply fields */
+  quoted_message_id?: string;
+  quoted_sender_name?: string;
+  quoted_body?: string;
 };
 
 /**
@@ -37,6 +41,12 @@ export type GroupMessage = Models.Row & {
   body: string;
   created_at: string;
   message_type?: "text" | "voice" | "system";
+  /** Array of profile IDs who have read this message */
+  read_by?: string[];
+  /** Quote/reply fields */
+  quoted_message_id?: string;
+  quoted_sender_name?: string;
+  quoted_body?: string;
 };
 
 /**

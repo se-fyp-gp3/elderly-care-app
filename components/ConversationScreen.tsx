@@ -14,6 +14,7 @@ import {
 import { DirectMessage } from "@/types/messaging";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import type { AudioPlayer } from "expo-audio";
 import {
     createAudioPlayer,
@@ -32,6 +33,7 @@ import {
     Keyboard,
     KeyboardAvoidingView,
     Platform,
+    Pressable,
     StyleSheet,
     TouchableOpacity,
     View,
@@ -39,7 +41,10 @@ import {
 import {
     ActivityIndicator,
     Avatar,
+    Divider,
     IconButton,
+    Modal,
+    Portal,
     Text,
     TextInput,
     useTheme,
@@ -200,6 +205,11 @@ export default function ConversationScreen({
   const [sending, setSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  // Quote / reply
+  const [quotedMessage, setQuotedMessage] = useState<DirectMessage | null>(null);
+  // Long-press context menu
+  const [longPressMsg, setLongPressMsg] = useState<DirectMessage | null>(null);
+
   // ── Voice recording state ──
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
@@ -265,6 +275,8 @@ export default function ConversationScreen({
 
     setSending(true);
     Keyboard.dismiss();
+    const quoted = quotedMessage;
+    setQuotedMessage(null);
 
     try {
       const newMsg = await sendDirectMessage({
@@ -274,6 +286,11 @@ export default function ConversationScreen({
         senderRole: myRole,
         receiverId: contactId,
         body: text,
+        ...(quoted && {
+          quotedMessageId: quoted.$id,
+          quotedSenderName: quoted.sender_name,
+          quotedBody: quoted.body,
+        }),
       });
 
       setMessages((prev) => {
@@ -432,124 +449,147 @@ export default function ConversationScreen({
     const isMe = item.sender_id === myProfileId;
     const showDate = shouldShowDateSeparator(index);
 
+    const handleLongPress = () => setLongPressMsg(item);
+
     return (
-      <View>
-        {showDate && (
-          <View style={styles.dateSeparator}>
-            <View
-              style={[
-                styles.dateLine,
-                { backgroundColor: theme.colors.outlineVariant },
-              ]}
-            />
-            <Text
-              variant="labelSmall"
-              style={[
-                styles.dateText,
-                {
-                  color: theme.colors.onSurfaceVariant,
-                  backgroundColor: theme.colors.background,
-                },
-              ]}
-            >
-              {formatDateSeparator(item.created_at)}
-            </Text>
-            <View
-              style={[
-                styles.dateLine,
-                { backgroundColor: theme.colors.outlineVariant },
-              ]}
-            />
-          </View>
-        )}
-        <View
-          style={[
-            styles.messageRow,
-            isMe ? styles.messageRowRight : styles.messageRowLeft,
-          ]}
-        >
-          {!isMe && (
-            <Avatar.Text
-              size={32}
-              label={contactName.substring(0, 2).toUpperCase()}
-              style={[
-                styles.messageAvatar,
-                {
-                  backgroundColor:
-                    contactRole === "caregiver"
-                      ? theme.colors.tertiaryContainer
-                      : theme.colors.primaryContainer,
-                },
-              ]}
-              labelStyle={{
-                fontSize: 12,
-                color:
-                  contactRole === "caregiver"
-                    ? theme.colors.onTertiaryContainer
-                    : theme.colors.onPrimaryContainer,
-              }}
-            />
+      <Pressable onLongPress={handleLongPress} delayLongPress={400}>
+        <View>
+          {showDate && (
+            <View style={styles.dateSeparator}>
+              <View
+                style={[
+                  styles.dateLine,
+                  { backgroundColor: theme.colors.outlineVariant },
+                ]}
+              />
+              <Text
+                variant="labelSmall"
+                style={[
+                  styles.dateText,
+                  {
+                    color: theme.colors.onSurfaceVariant,
+                    backgroundColor: theme.colors.background,
+                  },
+                ]}
+              >
+                {formatDateSeparator(item.created_at)}
+              </Text>
+              <View
+                style={[
+                  styles.dateLine,
+                  { backgroundColor: theme.colors.outlineVariant },
+                ]}
+              />
+            </View>
           )}
           <View
             style={[
-              styles.messageBubble,
-              isMe
-                ? [styles.myBubble, { backgroundColor: theme.colors.primary }]
-                : [
-                    styles.theirBubble,
-                    { backgroundColor: theme.colors.surfaceVariant },
-                  ],
+              styles.messageRow,
+              isMe ? styles.messageRowRight : styles.messageRowLeft,
             ]}
           >
-            {item.message_type === "voice" ? (
-              <VoiceMessageBubble body={item.body} isMe={isMe} theme={theme} />
-            ) : (
-              <Text
+            {!isMe && (
+              <Avatar.Text
+                size={32}
+                label={contactName.substring(0, 2).toUpperCase()}
                 style={[
-                  styles.messageText,
+                  styles.messageAvatar,
                   {
-                    color: isMe ? theme.colors.onPrimary : theme.colors.onSurface,
+                    backgroundColor:
+                      contactRole === "caregiver"
+                        ? theme.colors.tertiaryContainer
+                        : theme.colors.primaryContainer,
                   },
                 ]}
-              >
-                {item.body}
-              </Text>
+                labelStyle={{
+                  fontSize: 12,
+                  color:
+                    contactRole === "caregiver"
+                      ? theme.colors.onTertiaryContainer
+                      : theme.colors.onPrimaryContainer,
+                }}
+              />
             )}
-            <View style={styles.messageFooter}>
-              <Text
-                style={[
-                  styles.messageTime,
-                  {
-                    color: isMe
-                      ? theme.colors.onPrimary
-                      : theme.colors.onSurfaceVariant,
-                    opacity: 0.7,
-                  },
-                ]}
-              >
-                {formatMessageTime(item.created_at)}
-              </Text>
-              {isMe ? (
-                <MaterialCommunityIcons
-                  name={item.is_read ? "check-all" : "check"}
-                  size={14}
-                  color={item.is_read ? "#64DD17" : theme.colors.onPrimary}
-                  style={{ marginLeft: 4, opacity: 0.8 }}
-                />
+            <View
+              style={[
+                styles.messageBubble,
+                isMe
+                  ? [styles.myBubble, { backgroundColor: theme.colors.primary }]
+                  : [
+                      styles.theirBubble,
+                      { backgroundColor: theme.colors.surfaceVariant },
+                    ],
+              ]}
+            >
+              {/* Quoted message preview */}
+              {item.quoted_message_id ? (
+                <View style={[styles.quoteBubble, { borderLeftColor: isMe ? theme.colors.onPrimary : theme.colors.primary }]}>
+                  <Text
+                    variant="labelSmall"
+                    style={{ fontWeight: "700", color: isMe ? theme.colors.onPrimary : theme.colors.primary }}
+                    numberOfLines={1}
+                  >
+                    {item.quoted_sender_name}
+                  </Text>
+                  <Text
+                    variant="bodySmall"
+                    numberOfLines={2}
+                    style={{ color: isMe ? theme.colors.onPrimary : theme.colors.onSurfaceVariant, opacity: 0.8 }}
+                  >
+                    {item.quoted_body}
+                  </Text>
+                </View>
+              ) : null}
+              {item.message_type === "voice" ? (
+                <VoiceMessageBubble body={item.body} isMe={isMe} theme={theme} />
               ) : (
-                item.is_read && (
+                <Text
+                  style={[
+                    styles.messageText,
+                    {
+                      color: isMe ? theme.colors.onPrimary : theme.colors.onSurface,
+                    },
+                  ]}
+                >
+                  {item.body}
+                </Text>
+              )}
+              <View style={styles.messageFooter}>
+                <Text
+                  style={[
+                    styles.messageTime,
+                    {
+                      color: isMe
+                        ? theme.colors.onPrimary
+                        : theme.colors.onSurfaceVariant,
+                      opacity: 0.7,
+                    },
+                  ]}
+                >
+                  {formatMessageTime(item.created_at)}
+                </Text>
+                {isMe ? (
                   <MaterialCommunityIcons
-                    name="check-all"
+                    name={item.is_read ? "check-all" : "check"}
                     size={14}
-                    color="#4CAF50"
+                    color={item.is_read ? "#64DD17" : theme.colors.onPrimary}
                     style={{ marginLeft: 4, opacity: 0.8 }}
                   />
-                )
-              )}
+                ) : (
+                  item.is_read && (
+                    <MaterialCommunityIcons
+                      name="check-all"
+                      size={14}
+                      color="#4CAF50"
+                      style={{ marginLeft: 4, opacity: 0.8 }}
+                    />
+                  )
+                )}
+              </View>
             </View>
           </View>
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -668,6 +708,21 @@ export default function ConversationScreen({
           />
         )}
 
+        {/* Quote preview bar */}
+        {quotedMessage && (
+          <View style={[styles.quotePreviewBar, { backgroundColor: theme.colors.surfaceVariant }]}>
+            <View style={[styles.quotePreviewLeft, { borderLeftColor: theme.colors.primary }]}>
+              <Text variant="labelSmall" style={{ fontWeight: "700", color: theme.colors.primary }} numberOfLines={1}>
+                {quotedMessage.sender_name}
+              </Text>
+              <Text variant="bodySmall" numberOfLines={1} style={{ color: theme.colors.onSurfaceVariant }}>
+                {quotedMessage.message_type === "voice" ? `🎤 ${t("chat.voiceMessage")}` : quotedMessage.body}
+              </Text>
+            </View>
+            <IconButton icon="close" size={18} onPress={() => setQuotedMessage(null)} />
+          </View>
+        )}
+
         {/* Input Bar */}
         {isRecording ? (
           <View style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}>
@@ -735,6 +790,35 @@ export default function ConversationScreen({
           </View>
         )}
       </KeyboardAvoidingView>
+
+      {/* Long-press context menu */}
+      <Portal>
+        <Modal visible={!!longPressMsg} onDismiss={() => setLongPressMsg(null)} contentContainerStyle={[styles.menuModal, { backgroundColor: theme.colors.surface }]}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              if (longPressMsg) setQuotedMessage(longPressMsg);
+              setLongPressMsg(null);
+            }}
+          >
+            <MaterialCommunityIcons name="reply" size={20} color={theme.colors.onSurface} />
+            <Text style={{ marginLeft: 12 }}>{t("chat.reply")}</Text>
+          </TouchableOpacity>
+          <Divider />
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={async () => {
+              if (longPressMsg && longPressMsg.message_type !== "voice") {
+                await Clipboard.setStringAsync(longPressMsg.body);
+              }
+              setLongPressMsg(null);
+            }}
+          >
+            <MaterialCommunityIcons name="content-copy" size={20} color={theme.colors.onSurface} />
+            <Text style={{ marginLeft: 12 }}>{t("chat.copy")}</Text>
+          </TouchableOpacity>
+        </Modal>
+      </Portal>
     </SafeAreaView>
   );
 }
@@ -940,5 +1024,36 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: "center" as const,
     alignItems: "center" as const,
+  },
+  quoteBubble: {
+    borderLeftWidth: 3,
+    paddingLeft: 8,
+    marginBottom: 6,
+    opacity: 0.85,
+  },
+  quotePreviewBar: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingLeft: 12,
+    borderRadius: 8,
+    marginHorizontal: 8,
+    marginBottom: 2,
+  },
+  quotePreviewLeft: {
+    flex: 1,
+    borderLeftWidth: 3,
+    paddingLeft: 8,
+    paddingVertical: 4,
+  },
+  menuModal: {
+    marginHorizontal: 40,
+    borderRadius: 12,
+    paddingVertical: 8,
+  },
+  menuItem: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
 });

@@ -5,13 +5,16 @@ import {
     clientReactNative,
     DATABASE_ID,
     DIRECT_MESSAGES_TABLE_ID,
+    GROUP_MEMBERS_TABLE_ID,
     GROUP_MESSAGES_TABLE_ID,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
+    addElderlyConnection,
     Contact,
     formatRelativeTime,
     getContactsForElderly,
+    searchUserByPhone,
 } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { getGroupUnreadCount, getLastGroupMessage } from "@/lib/group-messaging";
@@ -19,6 +22,7 @@ import { getGroupsForUser } from "@/lib/groups";
 import { buildConversationId, getLastMessage, getUnreadCountPerConversation } from "@/lib/messaging";
 import { isUserOnline } from "@/lib/presence";
 import { DirectMessage, Group, GroupMessage } from "@/types/messaging";
+import { Caregiver, Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -26,6 +30,7 @@ import { useTranslation } from "react-i18next";
 import {
     Alert,
     FlatList,
+    Keyboard,
     Linking,
     Modal,
     NativeScrollEvent,
@@ -41,9 +46,11 @@ import {
     ActivityIndicator,
     Avatar,
     Badge,
+    Button,
     Menu,
     Searchbar,
     Text,
+    TextInput,
     useTheme
 } from "react-native-paper";
 
@@ -95,6 +102,16 @@ export default function ElderlyMessages() {
   const { width } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState(0);
   const pagerRef = React.useRef<FlatList<number>>(null);
+
+  // ── Add friend dialog state ──
+  const [addDialogVisible, setAddDialogVisible] = useState(false);
+  const [phoneSearch, setPhoneSearch] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [foundUser, setFoundUser] = useState<
+    { role: "elderly"; data: Elderly } | { role: "caregiver"; data: Caregiver } | null
+  >(null);
+  const [addingContact, setAddingContact] = useState(false);
+  const [searchDone, setSearchDone] = useState(false);
 
   const fetchContacts = useCallback(async () => {
     if (!user) return;
@@ -206,6 +223,79 @@ export default function ElderlyMessages() {
     setShowLongPressMenu(true);
   }, []);
 
+  // ── Add friend dialog handlers ──
+  const openAddDialog = useCallback(() => {
+    setPhoneSearch("");
+    setFoundUser(null);
+    setSearchDone(false);
+    setAddDialogVisible(true);
+  }, []);
+
+  const closeAddDialog = useCallback(() => {
+    setAddDialogVisible(false);
+    setPhoneSearch("");
+    setFoundUser(null);
+    setSearchDone(false);
+  }, []);
+
+  const handlePhoneSearch = useCallback(async () => {
+    const trimmed = phoneSearch.trim();
+    if (!trimmed) return;
+    Keyboard.dismiss();
+    setSearching(true);
+    setFoundUser(null);
+    setSearchDone(false);
+    try {
+      const result = await searchUserByPhone(trimmed);
+      if (result && result.role === "elderly" && result.data.$id === elderlyProfileId) {
+        setFoundUser(null);
+      } else {
+        setFoundUser(result);
+      }
+      setSearchDone(true);
+    } catch {
+      Alert.alert(t("common.error"), t("emergency.failedToAdd"));
+    } finally {
+      setSearching(false);
+    }
+  }, [phoneSearch, elderlyProfileId]);
+
+  const handleAddFriend = useCallback(async () => {
+    if (!foundUser || !elderlyProfileId) return;
+    setAddingContact(true);
+    try {
+      const alreadyExists = contacts.some((c) => c.id === foundUser.data.$id);
+      if (alreadyExists) {
+        Alert.alert(
+          t("emergency.alreadyAdded"),
+          t("emergency.alreadyInContacts", { name: foundUser.data.name ?? t("common.unknown") }),
+        );
+        setAddingContact(false);
+        return;
+      }
+
+      const success = await addElderlyConnection(elderlyProfileId, foundUser.data.$id);
+
+      if (success) {
+        Alert.alert(
+          t("emergency.invitationSent"),
+          t("emergency.invitationSentDesc", { name: foundUser.data.name ?? t("common.unknown") }),
+        );
+        closeAddDialog();
+        await fetchContacts();
+      } else {
+        Alert.alert(
+          t("emergency.alreadyAdded"),
+          t("emergency.alreadyInContactsOrPending", { name: foundUser.data.name ?? t("common.unknown") }),
+        );
+      }
+    } catch {
+      Alert.alert(t("common.error"), t("emergency.failedToAdd"));
+    } finally {
+      setAddingContact(false);
+    }
+  }, [foundUser, elderlyProfileId, contacts, closeAddDialog, fetchContacts]);
+
   // ── Build unified chat list ──
   const chatList: ChatListItem[] = React.useMemo(() => {
     const items: ChatListItem[] = [];
@@ -284,23 +374,23 @@ export default function ElderlyMessages() {
             });
           }
 
-          // The sender is clearly online — update their lastActive
-          const now = new Date().toISOString();
+          // Only mark the other user as online if THEY sent the message
+          if (payload.sender_id !== elderlyProfileId) {
+            const now = new Date().toISOString();
+            setContacts((prevContacts) => {
+              const index = prevContacts.findIndex((c) => c.id === otherUserId);
+              if (index === -1) return prevContacts;
 
-          // Reorder contacts: move the contact to top & refresh lastActive
-          setContacts((prevContacts) => {
-            const index = prevContacts.findIndex((c) => c.id === otherUserId);
-            if (index === -1) return prevContacts;
-
-            const updatedContact = {
-              ...prevContacts[index],
-              lastActive: now,
-            };
-            const newContacts = [...prevContacts];
-            newContacts.splice(index, 1);
-            newContacts.unshift(updatedContact);
-            return newContacts;
-          });
+              const updatedContact = {
+                ...prevContacts[index],
+                lastActive: now,
+              };
+              const newContacts = [...prevContacts];
+              newContacts.splice(index, 1);
+              newContacts.unshift(updatedContact);
+              return newContacts;
+            });
+          }
         }
       }
     });
@@ -316,9 +406,20 @@ export default function ElderlyMessages() {
       }
     });
 
+    // Subscribe to group_members for realtime group discovery
+    const groupMembersChannel = `databases.${DATABASE_ID}.collections.${GROUP_MEMBERS_TABLE_ID}.documents`;
+    const unsubMembers = clientReactNative.subscribe(groupMembersChannel, (response) => {
+      if (!response.events.some((e) => e.endsWith(".create"))) return;
+      const payload = response.payload as { user_profile_id?: string };
+      if (payload?.user_profile_id === elderlyProfileId) {
+        fetchContacts();
+      }
+    });
+
     return () => {
       unsubscribe();
       unsubGroup();
+      unsubMembers();
     };
   }, [elderlyProfileId]);
 
@@ -668,6 +769,11 @@ export default function ElderlyMessages() {
             }
           >
             <Menu.Item
+              leadingIcon="account-plus"
+              title={t('chat.addNewFriend')}
+              onPress={() => { setShowAddMenu(false); openAddDialog(); }}
+            />
+            <Menu.Item
               leadingIcon="account-group"
               title={t('chat.createGroupChat')}
               onPress={() => { setShowAddMenu(false); setShowCreateGroup(true); }}
@@ -778,6 +884,137 @@ export default function ElderlyMessages() {
           { length: width, offset: width * index, index }
         )}
       />
+
+      {/* ── Add Friend Modal ── */}
+      <Modal
+        visible={addDialogVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeAddDialog}
+      >
+        <TouchableWithoutFeedback onPress={closeAddDialog}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+                <View style={styles.modalHeader}>
+                  <Text variant="titleLarge" style={{ fontWeight: "700" }}>
+                    {t("emergency.addFriend")}
+                  </Text>
+                  <TouchableOpacity onPress={closeAddDialog}>
+                    <MaterialCommunityIcons name="close" size={24} color={theme.colors.onSurface} />
+                  </TouchableOpacity>
+                </View>
+
+                <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 16 }}>
+                  {t("emergency.searchByPhone")}
+                </Text>
+
+                <View style={styles.phoneRow}>
+                  <TextInput
+                    mode="outlined"
+                    label={t("emergency.phoneNumber")}
+                    value={phoneSearch}
+                    onChangeText={setPhoneSearch}
+                    keyboardType="phone-pad"
+                    style={{ flex: 1 }}
+                    dense
+                    left={<TextInput.Icon icon="phone" />}
+                    onSubmitEditing={handlePhoneSearch}
+                    returnKeyType="search"
+                  />
+                  <Button
+                    mode="contained"
+                    onPress={handlePhoneSearch}
+                    loading={searching}
+                    disabled={!phoneSearch.trim() || searching}
+                    style={styles.searchBtn}
+                    compact
+                  >
+                    {t("common.search")}
+                  </Button>
+                </View>
+
+                {searching && (
+                  <View style={styles.resultArea}>
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                    <Text variant="bodySmall" style={{ marginLeft: 8, color: theme.colors.onSurfaceVariant }}>
+                      {t("emergency.searching")}
+                    </Text>
+                  </View>
+                )}
+
+                {searchDone && !searching && foundUser && (
+                  <View style={[styles.resultCard, { backgroundColor: theme.colors.secondaryContainer }]}>
+                    <Avatar.Text
+                      size={40}
+                      label={(foundUser.data.name ?? "?").substring(0, 2).toUpperCase()}
+                      style={{
+                        backgroundColor:
+                          foundUser.role === "elderly"
+                            ? theme.colors.primaryContainer
+                            : theme.colors.tertiaryContainer,
+                      }}
+                      labelStyle={{
+                        color:
+                          foundUser.role === "elderly"
+                            ? theme.colors.onPrimaryContainer
+                            : theme.colors.onTertiaryContainer,
+                        fontWeight: "600",
+                        fontSize: 16,
+                      }}
+                    />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text variant="titleMedium" style={{ fontWeight: "600" }}>
+                        {foundUser.data.name ?? "Unknown"}
+                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2, gap: 8 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <MaterialCommunityIcons name="phone" size={13} color={theme.colors.onSecondaryContainer} />
+                          <Text variant="bodySmall" style={{ marginLeft: 4, color: theme.colors.onSecondaryContainer }}>
+                            {foundUser.data.phone ?? "N/A"}
+                          </Text>
+                        </View>
+                        <View
+                          style={{
+                            backgroundColor:
+                              foundUser.role === "elderly" ? theme.colors.primaryContainer : theme.colors.tertiaryContainer,
+                            paddingHorizontal: 6,
+                            paddingVertical: 1,
+                            borderRadius: 6,
+                          }}
+                        >
+                          <Text
+                            variant="labelSmall"
+                            style={{
+                              color: foundUser.role === "elderly" ? theme.colors.primary : theme.colors.tertiary,
+                              fontWeight: "600",
+                              textTransform: "capitalize",
+                            }}
+                          >
+                            {foundUser.role}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    <Button mode="contained" onPress={handleAddFriend} loading={addingContact} disabled={addingContact} compact>
+                      {t("common.add")}
+                    </Button>
+                  </View>
+                )}
+
+                {searchDone && !searching && !foundUser && (
+                  <View style={styles.resultArea}>
+                    <MaterialCommunityIcons name="account-search" size={28} color={theme.colors.outlineVariant} />
+                    <Text variant="bodyMedium" style={{ marginLeft: 8, color: theme.colors.onSurfaceVariant }}>
+                      {t("emergency.noUserFound")}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       {/* ── Create Group Modal ── */}
       <CreateGroupModal
@@ -1023,5 +1260,33 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  phoneRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchBtn: {
+    marginTop: 6,
+    borderRadius: 8,
+  },
+  resultArea: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    justifyContent: "center",
+  },
+  resultCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    borderRadius: 14,
+    padding: 14,
   },
 });

@@ -292,7 +292,10 @@
     "admin": "Admin",
     "member": "Member",
     "notAdmin": "Only admin can do this",
-    "groupNameUpdated": "Group name updated"
+    "groupNameUpdated": "Group name updated",
+    "reply": "Reply",
+    "copy": "Copy",
+    "readBy": "Read by"
   },
   "medication": {
     "toTakeToday": "To Take Today",

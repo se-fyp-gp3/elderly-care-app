@@ -292,7 +292,10 @@
     "admin": "管理员",
     "member": "成员",
     "notAdmin": "仅管理员可操作",
-    "groupNameUpdated": "群组名称已更新"
+    "groupNameUpdated": "群组名称已更新",
+    "reply": "回复",
+    "copy": "复制",
+    "readBy": "已读"
   },
   "medication": {
     "toTakeToday": "今日待服用",

@@ -6,6 +6,7 @@ import {
   DATABASE_ID,
   DIRECT_MESSAGES_TABLE_ID,
   ELDERLY_TABLE_ID,
+  GROUP_MEMBERS_TABLE_ID,
   GROUP_MESSAGES_TABLE_ID,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
@@ -341,23 +342,23 @@ export default function CaregiverMessages() {
             });
           }
 
-          // The sender is clearly online — update their lastActive
-          const now = new Date().toISOString();
+          // Only mark the other user as online if THEY sent the message
+          if (payload.sender_id !== caregiverProfileId) {
+            const now = new Date().toISOString();
+            setContacts((prevContacts) => {
+              const index = prevContacts.findIndex((c) => c.id === otherUserId);
+              if (index === -1) return prevContacts;
 
-          // Reorder contacts: move the contact to top & refresh lastActive
-          setContacts((prevContacts) => {
-            const index = prevContacts.findIndex((c) => c.id === otherUserId);
-            if (index === -1) return prevContacts;
-
-            const updatedContact = {
-              ...prevContacts[index],
-              lastActive: now,
-            };
-            const newContacts = [...prevContacts];
-            newContacts.splice(index, 1);
-            newContacts.unshift(updatedContact);
-            return newContacts;
-          });
+              const updatedContact = {
+                ...prevContacts[index],
+                lastActive: now,
+              };
+              const newContacts = [...prevContacts];
+              newContacts.splice(index, 1);
+              newContacts.unshift(updatedContact);
+              return newContacts;
+            });
+          }
         }
       }
     });
@@ -375,9 +376,20 @@ export default function CaregiverMessages() {
       }
     });
 
+    // Subscribe to group_members for realtime group discovery
+    const groupMembersChannel = `databases.${DATABASE_ID}.collections.${GROUP_MEMBERS_TABLE_ID}.documents`;
+    const unsubMembers = clientReactNative.subscribe(groupMembersChannel, (response) => {
+      if (!response.events.some((e) => e.endsWith(".create"))) return;
+      const payload = response.payload as { user_profile_id?: string };
+      if (payload?.user_profile_id === caregiverProfileId) {
+        fetchContacts();
+      }
+    });
+
     return () => {
       unsubscribe();
       unsubGroup();
+      unsubMembers();
     };
   }, [caregiverProfileId]);
 

@@ -30,23 +30,32 @@ export async function sendDirectMessage(input: {
   receiverId: string;
   body: string;
   messageType?: "text" | "voice";
+  quotedMessageId?: string;
+  quotedSenderName?: string;
+  quotedBody?: string;
 }): Promise<DirectMessage> {
   const now = new Date().toISOString();
+  const data: Record<string, unknown> = {
+    conversation_id: input.conversationId,
+    sender_id: input.senderId,
+    sender_name: input.senderName,
+    sender_role: input.senderRole,
+    receiver_id: input.receiverId,
+    body: input.body,
+    created_at: now,
+    is_read: false,
+    message_type: input.messageType ?? "text",
+  };
+  if (input.quotedMessageId) {
+    data.quoted_message_id = input.quotedMessageId;
+    data.quoted_sender_name = input.quotedSenderName ?? "";
+    data.quoted_body = input.quotedBody ?? "";
+  }
   const doc = await tablesDB.createRow<DirectMessage>({
     databaseId: DATABASE_ID,
     tableId: DIRECT_MESSAGES_TABLE_ID,
     rowId: ID.unique(),
-    data: {
-      conversation_id: input.conversationId,
-      sender_id: input.senderId,
-      sender_name: input.senderName,
-      sender_role: input.senderRole,
-      receiver_id: input.receiverId,
-      body: input.body,
-      created_at: now,
-      is_read: false,
-      message_type: input.messageType ?? "text",
-    },
+    data,
   });
 
   // Update sender's presence so they appear online after sending a message

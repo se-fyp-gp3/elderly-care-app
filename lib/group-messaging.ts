@@ -18,21 +18,30 @@ export async function sendGroupMessage(input: {
   senderRole: "elderly" | "caregiver";
   body: string;
   messageType?: "text" | "voice" | "system";
+  quotedMessageId?: string;
+  quotedSenderName?: string;
+  quotedBody?: string;
 }): Promise<GroupMessage> {
   const now = new Date().toISOString();
+  const data: Record<string, unknown> = {
+    group_id: input.groupId,
+    sender_id: input.senderId,
+    sender_name: input.senderName,
+    sender_role: input.senderRole,
+    body: input.body,
+    created_at: now,
+    message_type: input.messageType ?? "text",
+  };
+  if (input.quotedMessageId) {
+    data.quoted_message_id = input.quotedMessageId;
+    data.quoted_sender_name = input.quotedSenderName ?? "";
+    data.quoted_body = input.quotedBody ?? "";
+  }
   const doc = await tablesDB.createRow<GroupMessage>({
     databaseId: DATABASE_ID,
     tableId: GROUP_MESSAGES_TABLE_ID,
     rowId: ID.unique(),
-    data: {
-      group_id: input.groupId,
-      sender_id: input.senderId,
-      sender_name: input.senderName,
-      sender_role: input.senderRole,
-      body: input.body,
-      created_at: now,
-      message_type: input.messageType ?? "text",
-    },
+    data,
   });
   return doc as unknown as GroupMessage;
 }
@@ -109,6 +118,42 @@ export function subscribeToGroupMessages(
   } catch (error) {
     console.error("Error subscribing to group messages:", error);
     return () => {};
+  }
+}
+
+/**
+ * Mark all group messages as read by this user.
+ * Appends profileId to read_by array for messages that don't already include it.
+ */
+export async function markGroupMessagesAsRead(
+  groupId: string,
+  profileId: string,
+): Promise<void> {
+  try {
+    const msgs = await tablesDB.listRows<GroupMessage>({
+      databaseId: DATABASE_ID,
+      tableId: GROUP_MESSAGES_TABLE_ID,
+      queries: [
+        Query.equal("group_id", groupId),
+        Query.orderDesc("created_at"),
+        Query.limit(100),
+      ],
+    });
+    const unread = (msgs.rows as unknown as GroupMessage[]).filter(
+      (m) => m.sender_id !== profileId && !(m.read_by ?? []).includes(profileId),
+    );
+    await Promise.all(
+      unread.map((m) =>
+        tablesDB.updateRow({
+          databaseId: DATABASE_ID,
+          tableId: GROUP_MESSAGES_TABLE_ID,
+          rowId: m.$id,
+          data: { read_by: [...(m.read_by ?? []), profileId] },
+        }),
+      ),
+    );
+  } catch (error) {
+    console.error("Error marking group messages as read:", error);
   }
 }
 
