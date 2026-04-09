@@ -6,6 +6,7 @@
  */
 
 import { MedicationItem } from "@/components/MedicationCard";
+import { translateFrequency, translateUnit } from "@/lib/schedule";
 import {
     Elderly,
     ElderlyMedication,
@@ -195,7 +196,7 @@ export async function fetchCaregiverMedicationData(
           ? medication.name || "Unknown Drug"
           : "Unknown Drug";
         const medicationUnit = medication ? medication.unit || "" : "";
-        const dosage = `${prescription.dosage || "?"} ${medicationUnit}`;
+        const dosage = `${prescription.dosage || "?"} ${translateUnit(medicationUnit)}`;
         const reminder = prescriptionToReminderMap.get(prescription.$id);
         const reminderId = reminder?.$id;
         const times: string[] = reminder?.reminder_times || prescription.approx_times || [];
@@ -207,7 +208,7 @@ export async function fetchCaregiverMedicationData(
             elderly: elderly.name,
             name: medicationName,
             dosage: dosage,
-            frequency: prescription.frequency || "",
+            frequency: translateFrequency(prescription.frequency || ""),
             time: "Anytime",
             status: "pending",
             lastTaken: prescription.last_taken
@@ -360,7 +361,7 @@ export async function fetchCaregiverMedicationData(
               elderly: elderly.name,
               name: medicationName,
               dosage: dosage,
-              frequency: prescription.frequency || "",
+              frequency: translateFrequency(prescription.frequency || ""),
               time: slot.displayTime,
               status: status,
               lastTaken: takenAt

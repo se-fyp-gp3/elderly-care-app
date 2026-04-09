@@ -1,4 +1,6 @@
 import {
+    CAREGIVER_TABLE_ID,
+    clientReactNative,
     DATABASE_ID,
     DIRECT_MESSAGES_TABLE_ID,
     safeSubscribe,
@@ -11,10 +13,12 @@ import {
 } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { buildConversationId, getLastMessage } from "@/lib/messaging";
+import { isUserOnline } from "@/lib/presence";
 import { DirectMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     Alert,
     FlatList,
@@ -41,6 +45,7 @@ export default function ElderlyMessages() {
   const theme = useTheme();
   const { user } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,12 +143,18 @@ export default function ElderlyMessages() {
             [otherUserId]: payload,
           }));
 
-          // Reorder contacts: move the contact to top
+          // The sender is clearly online — update their lastActive
+          const now = new Date().toISOString();
+
+          // Reorder contacts: move the contact to top & refresh lastActive
           setContacts((prevContacts) => {
             const index = prevContacts.findIndex((c) => c.id === otherUserId);
             if (index === -1) return prevContacts;
 
-            const updatedContact = prevContacts[index];
+            const updatedContact = {
+              ...prevContacts[index],
+              lastActive: now,
+            };
             const newContacts = [...prevContacts];
             newContacts.splice(index, 1);
             newContacts.unshift(updatedContact);
@@ -151,6 +162,38 @@ export default function ElderlyMessages() {
           });
         }
       }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [elderlyProfileId]);
+
+  // ── Realtime presence subscription ─────────────────────────────
+  // Subscribe to caregiver profile updates so the green/gray dot
+  // switches in realtime when a contact comes online or goes offline.
+  const contactIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    contactIdsRef.current = new Set(contacts.map((c) => c.id));
+  }, [contacts]);
+
+  useEffect(() => {
+    if (!elderlyProfileId) return;
+
+    const channel = `databases.${DATABASE_ID}.collections.${CAREGIVER_TABLE_ID}.documents`;
+    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+      if (!response.events.some((e) => e.endsWith(".update"))) return;
+      const payload = response.payload as { $id: string; last_active?: string };
+      if (!payload?.$id || !contactIdsRef.current.has(payload.$id)) return;
+
+      // Update the contact's lastActive in-place so the dot refreshes
+      setContacts((prev) =>
+        prev.map((c) =>
+          c.id === payload.$id
+            ? { ...c, lastActive: payload.last_active ?? c.lastActive }
+            : c,
+        ),
+      );
     });
 
     return () => {
@@ -182,52 +225,34 @@ export default function ElderlyMessages() {
   const handleCall = useCallback((phone?: string | null) => {
     if (!phone)
       return Alert.alert(
-        "No phone number",
-        "This contact has no phone number on file.",
+        t('common.noPhoneNumber'),
+        t('emergency.noPhoneOnFile'),
       );
     const url = `tel:${phone}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) Linking.openURL(url);
-      else Alert.alert("Cannot make a call from this device");
+      else Alert.alert(t('common.cannotCall'));
     });
-  }, []);
+  }, [t]);
 
   const handleSMS = useCallback((phone?: string | null) => {
     if (!phone)
       return Alert.alert(
-        "No phone number",
-        "This contact has no phone number on file.",
+        t('common.noPhoneNumber'),
+        t('emergency.noPhoneOnFile'),
       );
     const url = `sms:${phone}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) Linking.openURL(url);
-      else Alert.alert("Cannot send SMS from this device");
+      else Alert.alert(t('common.cannotSMS'));
     });
-  }, []);
-
-  const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-
-  const isOnline = (lastActive?: string): boolean => {
-    if (!lastActive) return false;
-    try {
-      return Date.now() - new Date(lastActive).getTime() < ONLINE_THRESHOLD_MS;
-    } catch {
-      return false;
-    }
-  };
-
-  const formatLastSeen = (lastActive?: string): string => {
-    if (!lastActive) return "";
-    if (isOnline(lastActive)) return "Online";
-    return `Last seen ${formatRelativeTime(lastActive)}`;
-  };
+  }, [t]);
 
   const renderContactItem = ({ item }: { item: Contact }) => {
     const lastMsg = lastMessages[item.id];
     const lastMsgTime = lastMsg?.created_at || item.lastActive;
     const preview = lastMsg?.body;
-    const online = isOnline(item.lastActive);
-    const lastSeenText = formatLastSeen(item.lastActive);
+    const online = isUserOnline(item.lastActive);
 
     return (
       <TouchableOpacity
@@ -267,18 +292,6 @@ export default function ElderlyMessages() {
               >
                 {item.name}
               </Text>
-              {lastSeenText ? (
-                <Text
-                  variant="bodySmall"
-                  style={{
-                    color: online ? "#4CAF50" : theme.colors.onSurfaceVariant,
-                    fontSize: 12,
-                    marginTop: 1,
-                  }}
-                >
-                  {lastSeenText}
-                </Text>
-              ) : null}
             </View>
             <Text
               variant="bodySmall"
@@ -293,11 +306,11 @@ export default function ElderlyMessages() {
 
           {preview ? (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              {lastMsg?.sender_id === elderlyProfileId && (
+              {lastMsg && (
                 <MaterialCommunityIcons
-                  name={lastMsg?.is_read ? "check-all" : "check"}
+                  name={lastMsg.is_read ? "check-all" : "check"}
                   size={14}
-                  color={lastMsg?.is_read ? "#4CAF50" : theme.colors.onSurfaceVariant}
+                  color={lastMsg.is_read ? "#4CAF50" : theme.colors.onSurfaceVariant}
                   style={{ marginRight: 3 }}
                 />
               )}
@@ -309,8 +322,8 @@ export default function ElderlyMessages() {
                 ]}
                 numberOfLines={1}
               >
-                {lastMsg?.sender_id === elderlyProfileId ? "You: " : ""}
-                {lastMsg?.message_type === "voice" ? "\ud83c\udfa4 Voice message" : preview}
+                {lastMsg?.sender_id === elderlyProfileId ? t('common.you') : ""}
+                {lastMsg?.message_type === "voice" ? t('common.voiceMessage') : preview}
               </Text>
             </View>
           ) : (
@@ -330,14 +343,14 @@ export default function ElderlyMessages() {
                   variant="labelSmall"
                   style={{ color: theme.colors.tertiary, fontWeight: "600" }}
                 >
-                  Caregiver
+                  {t('common.caregiver')}
                 </Text>
               </View>
               <Text
                 variant="bodySmall"
                 style={{ color: theme.colors.onSurfaceVariant }}
               >
-                Tap to start chatting
+                {t('messages.tapToChat')}
               </Text>
             </View>
           )}
@@ -383,14 +396,13 @@ export default function ElderlyMessages() {
         variant="headlineSmall"
         style={[styles.emptyTitle, { color: theme.colors.onSurface }]}
       >
-        No Caregivers Yet
+        {t('messages.noCaregiversYet')}
       </Text>
       <Text
         variant="bodyMedium"
         style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant }]}
       >
-        Your assigned caregivers will appear here.{"\n"}Ask your caregiver to
-        add you to their care list.
+        {t('messages.caregiverAppearHere')}
       </Text>
     </View>
   );
@@ -407,7 +419,7 @@ export default function ElderlyMessages() {
           variant="titleSmall"
           style={[styles.sectionLabel, { color: theme.colors.primary }]}
         >
-          My Caregivers
+          {t('messages.myCaregivers')}
         </Text>
         <View
           style={[
@@ -443,7 +455,7 @@ export default function ElderlyMessages() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <Searchbar
-          placeholder="Search caregivers..."
+          placeholder={t('messages.searchCaregivers')}
           onChangeText={setSearchQuery}
           value={searchQuery}
           style={[
@@ -466,7 +478,7 @@ export default function ElderlyMessages() {
               { color: theme.colors.onSurfaceVariant },
             ]}
           >
-            Loading caregivers...
+            {t('messages.loadingCaregivers')}
           </Text>
         </View>
       ) : (

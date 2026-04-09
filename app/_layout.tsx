@@ -2,6 +2,9 @@ import { DATABASE_ID, DIRECT_MESSAGES_TABLE_ID, safeSubscribe } from "@/lib/appw
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getElderlyByUserId } from "@/lib/elderly";
+import { FontSizeProvider, useFontSize } from "@/lib/font-size-context";
+import "@/lib/i18n"; // side-effect: initializes i18next
+import { LanguageProvider } from "@/lib/language-context";
 import {
     registerForPushNotificationsAsync,
     sendImmediateNotification,
@@ -13,7 +16,13 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { MD3DarkTheme, MD3LightTheme, PaperProvider } from "react-native-paper";
+import {
+  configureFonts,
+  MD3DarkTheme,
+  MD3LightTheme,
+  MD3Theme,
+  PaperProvider,
+} from "react-native-paper";
 import { enGB, registerTranslation } from "react-native-paper-dates";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import PinterestSplash from "../components/PinterestSplash";
@@ -236,9 +245,30 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function RootLayout() {
+/** Build a scaled MD3 theme by multiplying all font sizes by the given scale */
+function buildScaledTheme(base: MD3Theme, scale: number): MD3Theme {
+  if (scale === 1) return base;
+  const baseFonts = base.fonts;
+  const scaledFonts: Record<string, any> = {};
+  for (const variant of Object.keys(baseFonts)) {
+    const entry = (baseFonts as any)[variant];
+    scaledFonts[variant] = {
+      ...entry,
+      fontSize: Math.round((entry.fontSize ?? 14) * scale),
+      lineHeight: entry.lineHeight
+        ? Math.round(entry.lineHeight * scale)
+        : undefined,
+    };
+  }
+  return { ...base, fonts: configureFonts({ config: scaledFonts }) };
+}
+
+/** Inner component that consumes FontSizeContext to build the theme */
+function ThemedApp() {
   const colorScheme = useColorScheme();
-  const theme = colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme;
+  const { fontScale } = useFontSize();
+  const base = colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme;
+  const theme = buildScaledTheme(base, fontScale);
 
   return (
     <PaperProvider theme={theme}>
@@ -275,5 +305,15 @@ export default function RootLayout() {
         </AuthProvider>
       </GestureHandlerRootView>
     </PaperProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <FontSizeProvider>
+      <LanguageProvider>
+        <ThemedApp />
+      </LanguageProvider>
+    </FontSizeProvider>
   );
 }

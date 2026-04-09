@@ -22,6 +22,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   FlatList,
@@ -307,14 +308,16 @@ export default function ElderlyChat() {
     })();
   }, []);
 
+  const { t } = useTranslation();
+
   const quickSuggestions = useMemo(
     () => [
-      "What medicine do I need to take today?",
-      "What is my schedule today?",
-      "I feel unwell",
-      "📷 拍照識藥 (Photo Medication ID)",
+      t('chat.questionMedicine'),
+      t('chat.questionSchedule'),
+      t('chat.questionUnwell'),
+      t('chat.questionPhotoMedId'),
     ],
-    [],
+    [t],
   );
 
   const tryHandleLocalDataRequest = async (userMessage: string) => {
@@ -1147,7 +1150,7 @@ export default function ElderlyChat() {
             variant="labelMedium"
             style={{ color: theme.colors.onSurfaceVariant }}
           >
-            Quick questions:
+            {t('chat.quickQuestions')}
           </Text>
           <TouchableOpacity
             onPress={() => setIsSuggestionsExpanded((prev) => !prev)}
@@ -1159,7 +1162,7 @@ export default function ElderlyChat() {
                 { color: theme.colors.primary },
               ]}
             >
-              {isSuggestionsExpanded ? "Show less" : "Show more"}
+              {isSuggestionsExpanded ? t('chat.showLess') : t('chat.showMore')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1225,7 +1228,7 @@ export default function ElderlyChat() {
             <TextInput
               value={inputText}
               onChangeText={setInputText}
-              placeholder="Type your message..."
+              placeholder={t('chat.typeMessage')}
               mode="flat"
               style={styles.textInput}
               contentStyle={styles.textInputContent}

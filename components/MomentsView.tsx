@@ -9,12 +9,14 @@ import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Alert, FlatList, Image, Keyboard, Modal, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { ActivityIndicator, Button, FAB, Text, TextInput, useTheme } from "react-native-paper";
 
 export default function MomentsView() {
   const theme = useTheme();
   const { user, preferences } = useAuth();
+  const { t } = useTranslation();
   const [moments, setMoments] = useState<Moment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,7 +103,7 @@ export default function MomentsView() {
       setCreateModalVisible(false);
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to post moment";
-        Alert.alert("Post failed", message);
+        Alert.alert(t('moments.postFailed'), message);
     } finally {
       setPosting(false);
     }
@@ -153,7 +155,7 @@ export default function MomentsView() {
   const pickMedia = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Please allow photo library access to upload media.");
+      Alert.alert(t('common.permissionNeeded'), t('moments.photoLibraryPermission'));
       return;
     }
 
@@ -246,7 +248,7 @@ export default function MomentsView() {
           contentContainerStyle={{ padding: 8, paddingBottom: 80 }}
           ListEmptyComponent={
             <View style={styles.center}>
-                <Text>No moments yet. Be the first to share!</Text>
+                <Text>{t('moments.noMomentsYet')}</Text>
             </View>
           }
         />
@@ -257,7 +259,7 @@ export default function MomentsView() {
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         color={theme.colors.onPrimary}
         onPress={() => setCreateModalVisible(true)}
-        label="Post"
+        label={t('moments.post')}
       />
 
       <CommentSheet
@@ -281,26 +283,26 @@ export default function MomentsView() {
             <View style={styles.modalOverlay}>
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
-                        <Text variant="titleLarge" style={{ marginBottom: 16 }}>Create Post</Text>
+                        <Text variant="titleLarge" style={{ marginBottom: 16 }}>{t('moments.createPost')}</Text>
                         <TextInput
                             mode="outlined"
                             multiline
                             numberOfLines={4}
-                            placeholder="What's on your mind?"
+                            placeholder={t('moments.whatsOnYourMind')}
                             value={newPostContent}
                             onChangeText={setNewPostContent}
                             style={{ marginBottom: 16 }}
                         />
                         <View style={styles.mediaRow}>
                           <Button mode="outlined" icon="image-multiple" onPress={pickMedia} compact>
-                            Gallery
+                            {t('moments.addPhotoVideo')}
                           </Button>
                           <Button mode="outlined" icon="camera" onPress={takePhoto} compact style={{ marginLeft: 8 }}>
-                            Camera
+                            {t('moments.camera')}
                           </Button>
                           {selectedMedia && (
                             <Button onPress={() => setSelectedMedia(null)} textColor={theme.colors.error}>
-                              Remove
+                              {t('moments.removeMedia')}
                             </Button>
                           )}
                         </View>
@@ -312,7 +314,7 @@ export default function MomentsView() {
                             ) : (
                               <TouchableOpacity
                                 style={[styles.videoPlaceholder, { borderColor: theme.colors.outline }]}
-                                onPress={() => Alert.alert("Video selected", "Video will be uploaded with this post.")}
+                                onPress={() => Alert.alert(t('moments.videoSelected'), t('moments.videoWillBeUploaded'))}
                                 activeOpacity={0.8}
                               >
                                 <MaterialCommunityIcons name="video" size={28} color={theme.colors.primary} />
@@ -325,9 +327,9 @@ export default function MomentsView() {
                         )}
 
                         <View style={styles.modalActions}>
-                            <Button onPress={closeCreateModal} style={{ marginRight: 8 }}>Cancel</Button>
+                            <Button onPress={closeCreateModal} style={{ marginRight: 8 }}>{t('common.cancel')}</Button>
                             <Button mode="contained" onPress={handleCreatePost} loading={posting} disabled={posting || (!newPostContent.trim() && !selectedMedia)}>
-                                Post
+                                {t('moments.post')}
                             </Button>
                         </View>
                     </View>

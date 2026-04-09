@@ -1,12 +1,13 @@
 import {
-  getRegistrationRequest,
-  markRegistrationScanned,
+    getRegistrationRequest,
+    markRegistrationScanned,
 } from "@/lib/registration";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function ScanQRScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { t } = useTranslation();
   const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
@@ -45,7 +47,7 @@ export default function ScanQRScreen() {
         const request = await getRegistrationRequest(payload.token);
         if (!request) {
           setError(
-            "This registration QR code is no longer valid. Please generate a new QR code and try again.",
+            t('scanQR.registrationExpired'),
           );
           processingRef.current = false;
           setScanned(false);
@@ -60,7 +62,7 @@ export default function ScanQRScreen() {
         const request = await getRegistrationRequest(payload.token);
         if (!request) {
           setError(
-            "This connection QR code is no longer valid. Please ask the elderly to generate a new one.",
+            t('scanQR.connectionExpired'),
           );
           processingRef.current = false;
           setScanned(false);
@@ -72,13 +74,13 @@ export default function ScanQRScreen() {
         );
       } else {
         setError(
-          "Invalid QR code. Please scan the elderly registration or connection QR code.",
+          t('scanQR.invalidQRCode'),
         );
         processingRef.current = false;
         setScanned(false);
       }
     } catch {
-      setError("Invalid QR code format. Please try again.");
+      setError(t('scanQR.invalidQRFormat'));
       processingRef.current = false;
       setScanned(false);
     }
@@ -89,7 +91,7 @@ export default function ScanQRScreen() {
       <View
         style={[styles.container, { backgroundColor: theme.colors.background }]}
       >
-        <Text>Loading camera...</Text>
+        <Text>{t('scanQR.loadingCamera')}</Text>
       </View>
     );
   }
@@ -106,7 +108,7 @@ export default function ScanQRScreen() {
             color={theme.colors.onSurfaceVariant}
           />
           <Text variant="headlineSmall" style={styles.permissionTitle}>
-            Camera Permission Needed
+            {t('scanQR.cameraPermissionNeeded')}
           </Text>
           <Text
             variant="bodyMedium"
@@ -115,17 +117,17 @@ export default function ScanQRScreen() {
               { color: theme.colors.onSurfaceVariant },
             ]}
           >
-            To scan the elderly&apos;s QR code, please allow camera access.
+            {t('scanQR.cameraPermissionDesc')}
           </Text>
           <Button
             mode="contained"
             onPress={requestPermission}
             style={{ marginTop: 20 }}
           >
-            Grant Permission
+            {t('scanQR.grantPermission')}
           </Button>
           <Button mode="text" onPress={handleGoBack} style={{ marginTop: 8 }}>
-            Go Back
+            {t('scanQR.goBack')}
           </Button>
         </View>
       </SafeAreaView>
@@ -148,7 +150,7 @@ export default function ScanQRScreen() {
       <SafeAreaView style={styles.overlay}>
         <View style={styles.topBar}>
           <Button icon="arrow-left" textColor="#FFFFFF" onPress={handleGoBack}>
-            Back
+            {t('common.back')}
           </Button>
         </View>
 
@@ -163,10 +165,10 @@ export default function ScanQRScreen() {
 
         <View style={styles.instructions}>
           <Text variant="titleMedium" style={styles.instructionText}>
-            Scan Elderly Registration QR Code
+            {t('scanQR.scanTitle')}
           </Text>
           <Text variant="bodySmall" style={styles.instructionSubtext}>
-            Point your camera at the QR code shown on the elderly&apos;s device
+            {t('scanQR.scanDesc')}
           </Text>
           {error && (
             <Text

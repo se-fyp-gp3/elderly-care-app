@@ -1,25 +1,26 @@
 ﻿import {
-  DisplayItem,
-  NewTaskData,
-  NewTaskModal,
-  ScheduleCalendarStrip,
-  ScheduleFilterDialog,
-  ScheduleMedGroupCard,
-  ScheduleMonthPicker,
-  ScheduleSingleEventCard,
+    DisplayItem,
+    NewTaskData,
+    NewTaskModal,
+    ScheduleCalendarStrip,
+    ScheduleFilterDialog,
+    ScheduleMedGroupCard,
+    ScheduleMonthPicker,
+    ScheduleSingleEventCard,
 } from "@/components/schedule";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
+import { getDateLocale } from "@/lib/i18n";
 import {
-  createScheduleTask,
-  fetchDayMedicationEvents,
-  fetchDayScheduleEvents,
-  fetchScheduleCategories,
-  markScheduleTaskCompleted,
-  recordMedicationTaken,
-  ScheduleEvent,
-  undoMedicationTaken,
-  undoScheduleTaskCompleted,
+    createScheduleTask,
+    fetchDayMedicationEvents,
+    fetchDayScheduleEvents,
+    fetchScheduleCategories,
+    markScheduleTaskCompleted,
+    recordMedicationTaken,
+    ScheduleEvent,
+    undoMedicationTaken,
+    undoScheduleTaskCompleted,
 } from "@/lib/schedule";
 import { Elderly, ScheduleCategory, ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -27,28 +28,29 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect, useNavigation, useRouter } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
+import { useTranslation } from "react-i18next";
 import {
-  Button,
-  Chip,
-  FAB,
-  Text,
-  useTheme,
+    Button,
+    Chip,
+    FAB,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 export default function SchedulePage() {
@@ -56,6 +58,7 @@ export default function SchedulePage() {
   const router = useRouter();
   const navigation = useNavigation();
   const { user } = useAuth();
+  const { t, i18n } = useTranslation();
 
   // Data State
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
@@ -255,7 +258,7 @@ export default function SchedulePage() {
     const dateItem = new Date(referenceDate);
     dateItem.setDate(referenceDate.getDate() + i);
     return {
-      day: dateItem.toLocaleDateString("en-US", { weekday: "short" }),
+      day: dateItem.toLocaleDateString(getDateLocale(i18n.language), { weekday: "short" }),
       date: dateItem.getDate(),
       fullDate: dateItem,
       isToday: dateItem.toDateString() === new Date().toDateString(),
@@ -307,7 +310,7 @@ export default function SchedulePage() {
             size={28}
             color={theme.colors.onSurface}
           />
-          <Text style={{ marginLeft: 5, fontSize: 16 }}>Back</Text>
+          <Text style={{ marginLeft: 5, fontSize: 16 }}>{t('common.back')}</Text>
         </TouchableOpacity>
       ),
       headerRight: () => (
@@ -316,7 +319,7 @@ export default function SchedulePage() {
             icon="calendar-month"
             onPress={() => setDatePickerVisible(true)}
           >
-            Calendar
+            {t('schedule.calendar')}
           </Chip>
         </View>
       ),
@@ -337,7 +340,7 @@ export default function SchedulePage() {
       );
     } catch (err) {
       console.error("Error updating task status", err);
-      Alert.alert("Error", "Could not mark task as completed.");
+      Alert.alert(t('common.error'), t('schedule.couldNotMarkDone'));
     }
   };
 
@@ -353,7 +356,7 @@ export default function SchedulePage() {
       );
     } catch (err) {
       console.error("Error undoing task", err);
-      Alert.alert("Error", "Could not undo task.");
+      Alert.alert(t('common.error'), t('schedule.couldNotUndo'));
     }
   };
 
@@ -384,7 +387,7 @@ export default function SchedulePage() {
       );
     } catch (err) {
       console.error("Failed to take med", err);
-      Alert.alert("Error", "Failed to update medication status.");
+      Alert.alert(t('common.error'), t('schedule.failedToUpdateMedStatus'));
     }
   };
 
@@ -405,7 +408,7 @@ export default function SchedulePage() {
 
       await fetchData();
     } catch (err) {
-      Alert.alert("Error", "Failed to undo.");
+      Alert.alert(t('common.error'), t('schedule.failedToUndo'));
     }
   };
 
@@ -413,21 +416,21 @@ export default function SchedulePage() {
     try {
       const { status } = await Notifications.getPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission required", "Please enable notifications.");
+        Alert.alert(t('schedule.permissionRequired'), t('schedule.enableNotifications'));
         return;
       }
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "Task Reminder",
-          body: `Reminder: ${event.title} (${event.elderlyName})`,
+          title: t('schedule.taskReminder'),
+          body: `${t('schedule.reminderPrefix')}${event.title} (${event.elderlyName})`,
           data: { eventId: event.id },
         },
         trigger: { type: "timeInterval", seconds: 5, repeats: false } as any,
       });
-      Alert.alert("Reminder set", "Notification in 5 seconds.");
+      Alert.alert(t('schedule.reminderSet'), t('schedule.notifIn5Sec'));
     } catch (e) {
       console.warn(e);
-      Alert.alert("Error", "Could not schedule reminder.");
+      Alert.alert(t('common.error'), t('schedule.couldNotSchedule'));
     }
   };
 
@@ -435,29 +438,29 @@ export default function SchedulePage() {
     try {
       const { status } = await Notifications.getPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission required", "Please enable notifications.");
+        Alert.alert(t('schedule.permissionRequired'), t('schedule.enableNotifications'));
         return;
       }
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "Medication Reminder",
-          body: `Time to take ${event.title} (${event.elderlyName})`,
+          title: t('schedule.medReminder'),
+          body: `${t('schedule.timeToTake', { med: event.title })} (${event.elderlyName})`,
           data: { eventId: event.id },
         },
         trigger: { type: "timeInterval", seconds: 5, repeats: false } as any,
       });
-      Alert.alert("Reminder set", "Notification in 5 seconds.");
+      Alert.alert(t('schedule.reminderSet'), t('schedule.notifIn5Sec'));
     } catch (e) {
       console.warn(e);
-      Alert.alert("Error", "Could not schedule reminder.");
+      Alert.alert(t('common.error'), t('schedule.couldNotSchedule'));
     }
   };
 
   const handleSaveTask = async () => {
     if (!newTask.title || !newTask.elderlyId || !newTask.time) {
       Alert.alert(
-        "Missing Information",
-        "Please enter a title, select a time, and choose an elderly person.",
+        t('schedule.missingInfo'),
+        t('schedule.enterTitleTimeElderly'),
       );
       return;
     }
@@ -545,7 +548,7 @@ export default function SchedulePage() {
               variant="titleMedium"
               style={{ fontWeight: "bold", marginRight: 8 }}
             >
-              Tasks for
+              {t('schedule.tasksFor')}
             </Text>
             <Button
               mode="text"
@@ -556,9 +559,9 @@ export default function SchedulePage() {
               labelStyle={{ fontSize: 16, fontWeight: "bold" }}
             >
               {selectedElderlyId === "All"
-                ? "Everyone"
+                ? t('schedule.everyone')
                 : linkedElderly.find((e) => e.$id === selectedElderlyId)
-                    ?.name || "Unknown"}
+                    ?.name || t('common.unknown')}
             </Button>
             <ScheduleFilterDialog
               visible={filterVisible}
@@ -581,9 +584,9 @@ export default function SchedulePage() {
               onPress={scrollToPriorityTask}
               style={{ marginRight: 8 }}
             >
-              Focus
+              {t('schedule.focus')}
             </Button>
-            <Chip compact>{filteredEvents.length} Tasks</Chip>
+            <Chip compact>{filteredEvents.length} {t('schedule.tasks')}</Chip>
           </View>
         </View>
         <FlatList
@@ -612,7 +615,7 @@ export default function SchedulePage() {
             !loading ? (
               <View style={{ alignItems: "center", marginTop: 50 }}>
                 <Text style={{ color: theme.colors.outline }}>
-                  No tasks found for this day.
+                  {t('schedule.noTasksForDay')}
                 </Text>
               </View>
             ) : null
@@ -625,7 +628,7 @@ export default function SchedulePage() {
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         color={theme.colors.onPrimary}
         onPress={() => setNewTaskVisible(true)}
-        label="New Task"
+        label={t('schedule.newTask')}
       />
 
       {/* Native Date Picker */}

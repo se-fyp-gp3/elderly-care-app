@@ -2,6 +2,7 @@ import { ElderlyStatusInfo } from "@/lib/elderly-status";
 import { Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Avatar, Button, Card, Chip, Text, useTheme } from "react-native-paper";
 
@@ -46,6 +47,7 @@ export default function ElderlyCard({
 }: ElderlyCardProps) {
   const displayAge = elderly.age ?? calculateAge(elderly.birth);
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const isWarning = elderly.status === ElderlyStatus.WARNING;
   const isDanger = elderly.status === ElderlyStatus.DANGER;
@@ -53,10 +55,10 @@ export default function ElderlyCard({
   const reasons = elderly.statusInfo?.reasons ?? [];
 
   const chipLabel = isDanger
-    ? "Danger"
+    ? t('caregiverPanel.danger')
     : isWarning
-      ? "Need attention"
-      : "Normal";
+      ? t('medication.needAttention')
+      : t('caregiverPanel.normal');
 
   const chipStyle = isDanger
     ? styles.dangerChip
@@ -82,7 +84,7 @@ export default function ElderlyCard({
             />
             <View style={styles.elderlyDetails}>
               <Text variant="titleMedium">{elderly.name}</Text>
-              <Text variant="bodyMedium">{displayAge} years old</Text>
+              <Text variant="bodyMedium">{displayAge} {t('healthData.yearsOld', { age: '' }).replace(/^\d*\s*/, '')}</Text>
             </View>
           </View>
           <Chip mode="outlined" style={[styles.statusChip, chipStyle]}>
@@ -117,7 +119,7 @@ export default function ElderlyCard({
         <View style={styles.elderlyStats}>
           <View style={styles.statRow}>
             <MaterialCommunityIcons name="clock-outline" size={16} />
-            <Text variant="bodySmall"> Final Check: {elderly.lastCheck}</Text>
+            <Text variant="bodySmall"> {t('caregiverPanel.lastCheck')} {elderly.lastCheck}</Text>
           </View>
           <View style={styles.statRow}>
             <MaterialCommunityIcons
@@ -137,7 +139,7 @@ export default function ElderlyCard({
                   : undefined
               }
             >
-              {' '}Medication: {elderly.medication}
+              {' '}{t('home.todaysMedications').split(' ').pop()}: {elderly.medication}
             </Text>
           </View>
           <View style={styles.statRow}>
@@ -175,7 +177,7 @@ export default function ElderlyCard({
             <MaterialCommunityIcons name="calendar" size={16} />
             <Text variant="bodySmall">
               {" "}
-              Next appointment: {elderly.nextAppointment}
+              {t('caregiverPanel.nextAppointment')} {elderly.nextAppointment}
             </Text>
           </View>
         </View>
@@ -188,7 +190,7 @@ export default function ElderlyCard({
             style={styles.smallButton}
             onPress={() => onCall(elderly.phone || undefined)}
           >
-            Call
+            {t('caregiverPanel.call')}
           </Button>
           <Button
             mode="outlined"
@@ -197,7 +199,7 @@ export default function ElderlyCard({
             style={styles.smallButton}
             onPress={() => onViewInfo(elderly)}
           >
-            Info
+            {t('caregiverPanel.info')}
           </Button>
           <Button
             mode="contained"
@@ -206,7 +208,7 @@ export default function ElderlyCard({
             style={styles.smallButton}
             onPress={() => onViewHealth(elderly.$id)} // Ensure we use the correct ID field
           >
-            Health
+            {t('caregiverPanel.health')}
           </Button>
         </View>
       </Card.Content>

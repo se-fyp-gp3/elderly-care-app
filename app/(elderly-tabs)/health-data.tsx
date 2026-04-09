@@ -2,25 +2,27 @@ import { useStepSync } from "@/lib/hooks/useStepSync";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
 import {
-  Button,
-  Card,
-  Snackbar,
-  Text,
-  TouchableRipple,
-  useTheme,
+    Button,
+    Card,
+    Snackbar,
+    Text,
+    TouchableRipple,
+    useTheme,
 } from "react-native-paper";
 
 export default function ElderlyHealthData() {
   const theme = useTheme();
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = React.useState(false);
   const [snackVisible, setSnackVisible] = React.useState(false);
   const [snackMessage, setSnackMessage] = React.useState("");
@@ -53,14 +55,14 @@ export default function ElderlyHealthData() {
 
   // Format last sync time for display
   const formatLastSync = (isoString: string | null): string => {
-    if (!isoString) return "Not synced yet";
+    if (!isoString) return t('healthData.notSyncedYet');
     try {
       const date = new Date(isoString);
       const hours = String(date.getHours()).padStart(2, "0");
       const minutes = String(date.getMinutes()).padStart(2, "0");
-      return `Last updated: ${hours}:${minutes}`;
+      return t('healthData.lastUpdated', { time: `${hours}:${minutes}` });
     } catch {
-      return "Not synced yet";
+      return t('healthData.notSyncedYet');
     }
   };
 
@@ -82,13 +84,13 @@ export default function ElderlyHealthData() {
     if (!isAuthorized) {
       const granted = await authorize();
       if (granted) {
-        setSnackMessage("Health data permission granted. Syncing steps...");
+        setSnackMessage(t('healthData.permissionGrantedSyncing'));
         setSnackVisible(true);
       }
     }
     await manualSync();
     if (!stepError) {
-      setSnackMessage(`Steps updated: ${todaySteps.toLocaleString()} steps`);
+      setSnackMessage(t('healthData.stepsUpdated', { steps: todaySteps.toLocaleString() }));
       setSnackVisible(true);
     }
   };
@@ -112,19 +114,19 @@ export default function ElderlyHealthData() {
       {/* Header */}
       <View style={styles.header}>
         <Text variant="headlineSmall" style={styles.title}>
-          My Health Data
+          {t('healthData.myHealthData')}
         </Text>
         <Text
           variant="bodyMedium"
           style={{ color: theme.colors.onSurfaceVariant }}
         >
-          Track and monitor your health
+          {t('healthData.trackAndMonitor')}
         </Text>
       </View>
 
       {/* Step Tracking */}
       <Text variant="titleMedium" style={styles.sectionTitle}>
-        Today&apos;s Steps
+        {t('home.todaysSteps')}
       </Text>
 
       <Card
@@ -153,7 +155,7 @@ export default function ElderlyHealthData() {
                     variant="titleSmall"
                     style={{ color: theme.colors.onSurfaceVariant }}
                   >
-                    steps
+                    {t('home.steps')}
                   </Text>
                 </>
               )}
@@ -221,8 +223,8 @@ export default function ElderlyHealthData() {
               labelStyle={styles.authButtonLabel}
             >
               {Platform.OS === "android"
-                ? "Connect Health Connect"
-                : "Connect Apple Health"}
+                ? t('healthData.connectHealthConnect')
+                : t('healthData.connectAppleHealth')}
             </Button>
           )}
 
@@ -251,7 +253,7 @@ export default function ElderlyHealthData() {
                 />
               )}
               <Text variant="titleMedium" style={styles.syncButtonText}>
-                {isSyncing ? "Syncing..." : "Update Steps"}
+                {isSyncing ? t('healthData.syncing') : t('healthData.updateSteps')}
               </Text>
             </View>
           </TouchableRipple>
@@ -270,7 +272,7 @@ export default function ElderlyHealthData() {
                 marginLeft: 4,
               }}
             >
-              Auto sync: every 30 minutes
+              {t('healthData.autoSync')}
             </Text>
           </View>
         </Card.Content>
@@ -280,7 +282,7 @@ export default function ElderlyHealthData() {
       {stepHistory.length > 0 && (
         <>
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            Step History
+            {t('healthData.stepHistory')}
           </Text>
           <Card
             style={[
@@ -311,7 +313,7 @@ export default function ElderlyHealthData() {
                     variant="labelSmall"
                     style={{ color: theme.colors.onSurfaceVariant }}
                   >
-                    steps
+                    {t('home.steps')}
                   </Text>
                 </View>
               </View>

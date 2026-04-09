@@ -4,6 +4,7 @@ import DateTimePicker, {
     DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import {
     Avatar,
@@ -62,7 +63,7 @@ export function AddMedicationDialog({
   onEditingTimeIndexChange,
 }: AddMedicationDialogProps) {
   const theme = useTheme();
-
+  const { t } = useTranslation();
   const handleTimePickerChange = (
     _event: DateTimePickerEvent,
     selectedDate?: Date,
@@ -94,12 +95,12 @@ export function AddMedicationDialog({
       >
         {step === "form" ? (
           <View>
-            <Dialog.Title>Add New Medication</Dialog.Title>
+            <Dialog.Title>{t('medication.addNewMedication')}</Dialog.Title>
             <Dialog.ScrollArea>
               <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
                 <TouchableOpacity onPress={() => onStepChange("elderly")}>
                   <TextInput
-                    label="Select Elderly"
+                    label={t('medication.selectElderly')}
                     value={
                       formData.elderlyName ||
                       linkedElderly.find((e) => e.$id === formData.elderlyId)
@@ -119,7 +120,7 @@ export function AddMedicationDialog({
                 </TouchableOpacity>
 
                 <TextInput
-                  label="Medication Name"
+                  label={t('medication.medicationName')}
                   value={formData.name}
                   onChangeText={(val) =>
                     onFormDataChange((prev) => ({ ...prev, name: val }))
@@ -131,7 +132,7 @@ export function AddMedicationDialog({
                   style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}
                 >
                   <TextInput
-                    label="Dosage"
+                    label={t('medication.dosage')}
                     value={formData.dosage}
                     keyboardType="numeric"
                     onChangeText={(val) =>
@@ -141,7 +142,7 @@ export function AddMedicationDialog({
                     mode="outlined"
                   />
                   <TextInput
-                    label="Unit"
+                    label={t('medication.unit')}
                     value={formData.unit}
                     onChangeText={(val) =>
                       onFormDataChange((prev) => ({ ...prev, unit: val }))
@@ -153,7 +154,7 @@ export function AddMedicationDialog({
 
                 <TouchableOpacity onPress={() => onStepChange("frequency")}>
                   <TextInput
-                    label="Frequency"
+                    label={t('medication.frequency')}
                     value={formData.frequency}
                     editable={false}
                     right={
@@ -167,7 +168,7 @@ export function AddMedicationDialog({
                   />
                 </TouchableOpacity>
 
-                <Text style={{ marginBottom: 5 }}>Reminder Times:</Text>
+                <Text style={{ marginBottom: 5 }}>{t('medication.reminderTimesLabel')}</Text>
                 <View
                   style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
                 >
@@ -199,14 +200,14 @@ export function AddMedicationDialog({
                       onShowTimePicker(true);
                     }}
                   >
-                    Add Time
+                    {t('medication.addTime')}
                   </Chip>
                 </View>
               </ScrollView>
             </Dialog.ScrollArea>
             <Dialog.Actions>
-              <Button onPress={onDismiss}>Cancel</Button>
-              <Button onPress={onSave}>Save</Button>
+              <Button onPress={onDismiss}>{t('common.cancel')}</Button>
+              <Button onPress={onSave}>{t('common.save')}</Button>
             </Dialog.Actions>
           </View>
         ) : (
@@ -223,14 +224,14 @@ export function AddMedicationDialog({
                 onPress={() => onStepChange("form")}
               />
               <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-                {step === "elderly" ? "Select Elderly" : "Select Frequency"}
+                {step === "elderly" ? t('medication.selectElderly') : t('medication.selectFrequency')}
               </Text>
             </View>
             <Divider />
             {step === "elderly" && (
               <View style={{ padding: 10 }}>
                 <Searchbar
-                  placeholder="Search"
+                  placeholder={t('common.search')}
                   onChangeText={onElderlySearchChange}
                   value={elderlySearch}
                   style={{
@@ -290,7 +291,7 @@ export function AddMedicationDialog({
                           )}
                         </TouchableOpacity>
                       ))
-                  : ["Daily", "Twice a day", "3 times/day", "Weekly"].map(
+                  : [t('medication.daily'), t('medication.twiceADay'), t('medication.threeTimesDay'), t('medication.weekly')].map(
                       (f) => (
                         <TouchableOpacity
                           key={f}
@@ -326,7 +327,7 @@ export function AddMedicationDialog({
               </ScrollView>
             </Dialog.ScrollArea>
             <Dialog.Actions>
-              <Button onPress={() => onStepChange("form")}>Back</Button>
+              <Button onPress={() => onStepChange("form")}>{t('common.back')}</Button>
             </Dialog.Actions>
           </View>
         )}

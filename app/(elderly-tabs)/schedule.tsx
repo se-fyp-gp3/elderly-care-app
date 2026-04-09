@@ -6,6 +6,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "expo-router";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Keyboard,
@@ -21,6 +22,7 @@ import {
   Card,
   Chip,
   FAB,
+  List,
   Modal,
   Portal,
   Text,
@@ -31,6 +33,7 @@ import {
 export default function ElderlySchedule() {
   const { user } = useAuth();
   const theme = useTheme();
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = React.useState(false);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
   const [elderlyProfileId, setElderlyProfileId] = React.useState<string>("");
@@ -325,19 +328,19 @@ export default function ElderlySchedule() {
       {/* Header */}
       <View style={styles.header}>
         <Text variant="headlineSmall" style={styles.title}>
-          My Schedule
+          {t('schedule.mySchedule')}
         </Text>
         <Text
           variant="bodyMedium"
           style={{ color: theme.colors.onSurfaceVariant }}
         >
-          View and manage your appointments
+          {t('schedule.viewAppointments')}
         </Text>
       </View>
 
       {/* Upcoming Schedule */}
       <Text variant="titleMedium" style={styles.sectionTitle}>
-        Upcoming
+        {t('home.upcoming')}
       </Text>
       {upcomingGroups.length > 0 ? (
         upcomingGroups.map((group) => (
@@ -420,10 +423,10 @@ export default function ElderlySchedule() {
         <View style={styles.emptyState}>
           <MaterialCommunityIcons name="calendar-check" size={48} color="#4CAF50" />
           <Text variant="bodyLarge" style={{ marginTop: 8 }}>
-            No upcoming events
+            {t('home.noUpcomingEvents')}
           </Text>
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-            Tap + to add a new event
+            {t('home.scheduleIsClear')}
           </Text>
         </View>
       )}
@@ -432,7 +435,7 @@ export default function ElderlySchedule() {
       {pastGroups.length > 0 && (
         <>
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            Past Events
+            {t('schedule.pastEvents')}
           </Text>
           {pastGroups.map((group) => (
             <View key={`pg-${group.label}`}>
@@ -530,15 +533,14 @@ export default function ElderlySchedule() {
               variant="titleSmall"
               style={{ marginLeft: 8, color: theme.colors.onPrimaryContainer }}
             >
-              Reminders
+              {t('schedule.reminders')}
             </Text>
           </View>
           <Text
             variant="bodyMedium"
             style={{ color: theme.colors.onPrimaryContainer, marginTop: 8 }}
           >
-            You will receive notifications before your scheduled appointments.
-            Make sure notifications are enabled.
+            {t('schedule.remindersDesc')}
           </Text>
         </Card.Content>
       </Card>

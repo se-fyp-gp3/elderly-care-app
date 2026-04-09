@@ -1,20 +1,20 @@
+import {
+    Caregiver,
+    CaregiverConnection,
+    CaregiverElderly,
+    Elderly,
+    ElderlyConnections,
+} from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
-  CAREGIVER_CONNECTIONS_TABLE_ID,
-  CAREGIVER_ELDERLY_TABLE_ID,
-  CAREGIVER_TABLE_ID,
-  DATABASE_ID,
-  ELDERLY_CONNECTIONS_TABLE_ID,
-  ELDERLY_TABLE_ID,
-  tablesDB,
+    CAREGIVER_CONNECTIONS_TABLE_ID,
+    CAREGIVER_ELDERLY_TABLE_ID,
+    CAREGIVER_TABLE_ID,
+    DATABASE_ID,
+    ELDERLY_CONNECTIONS_TABLE_ID,
+    ELDERLY_TABLE_ID,
+    tablesDB,
 } from "./appwrite";
-import {
-  Caregiver,
-  CaregiverConnection,
-  CaregiverElderly,
-  Elderly,
-  ElderlyConnections,
-} from "@/types/appwrite";
 
 export interface Contact {
   id: string;
@@ -108,7 +108,7 @@ async function getElderlyContactsForCaregiver(
       role: "elderly" as const,
       avatarLabel: (elderly.name || "??").substring(0, 2).toUpperCase(),
       status: elderly.status,
-      lastActive: elderly.$updatedAt,
+      lastActive: elderly.last_active ?? elderly.$updatedAt,
     }));
   } catch (error) {
     console.error("Error fetching elderly contacts for caregiver:", error);
@@ -165,7 +165,7 @@ export async function getContactsForElderly(
       phone: caregiver.phone,
       role: "caregiver" as const,
       avatarLabel: (caregiver.name || "??").substring(0, 2).toUpperCase(),
-      lastActive: caregiver.$updatedAt,
+      lastActive: caregiver.last_active ?? caregiver.$updatedAt,
     }));
   } catch (error) {
     console.error("Error fetching contacts for elderly:", error);

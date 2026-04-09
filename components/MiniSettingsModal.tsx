@@ -3,12 +3,13 @@ import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
-  Modal,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    Modal,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import { Button, Text, useTheme } from "react-native-paper";
 
@@ -19,26 +20,26 @@ interface MiniSettingsModalProps {
 
 export const VERSION_OPTIONS: {
   key: UIVersion;
-  label: string;
-  desc: string;
+  labelKey: string;
+  descKey: string;
   icon: string;
 }[] = [
   {
     key: UIVersion.Default,
-    label: "Default",
-    desc: "5 tabs - Full features",
+    labelKey: "miniSettings.default",
+    descKey: "miniSettings.defaultDesc",
     icon: "view-dashboard",
   },
   {
     key: UIVersion.Accessible,
-    label: "Accessible",
-    desc: "3 pages - Larger text & buttons",
+    labelKey: "miniSettings.accessible",
+    descKey: "miniSettings.accessibleDesc",
     icon: "text-box-outline",
   },
   {
     key: UIVersion.Simplified,
-    label: "Super Simplified",
-    desc: "1 page - Emergency, Meds & Messages",
+    labelKey: "miniSettings.superSimplified",
+    descKey: "miniSettings.superSimplifiedDesc",
     icon: "cellphone",
   },
 ];
@@ -50,6 +51,7 @@ export default function MiniSettingsModal({
   const theme = useTheme();
   const router = useRouter();
   const { preferences, setPreference, signOut } = useAuth();
+  const { t } = useTranslation();
   const currentVersion =
     (preferences.uiVersion as UIVersion) || UIVersion.Default;
 
@@ -77,7 +79,7 @@ export default function MiniSettingsModal({
             >
               <View style={styles.header}>
                 <Text variant="titleLarge" style={{ fontWeight: "700" }}>
-                  Settings
+                  {t('miniSettings.title')}
                 </Text>
                 <TouchableOpacity onPress={onDismiss}>
                   <MaterialCommunityIcons
@@ -96,7 +98,7 @@ export default function MiniSettingsModal({
                   color: theme.colors.onSurface,
                 }}
               >
-                Interface Style
+                {t('miniSettings.interfaceStyle')}
               </Text>
 
               {VERSION_OPTIONS.map((opt) => {
@@ -128,13 +130,13 @@ export default function MiniSettingsModal({
                         variant="bodyLarge"
                         style={{ fontWeight: selected ? "700" : "400" }}
                       >
-                        {opt.label}
+                        {t(opt.labelKey)}
                       </Text>
                       <Text
                         variant="bodySmall"
                         style={{ color: theme.colors.onSurfaceVariant }}
                       >
-                        {opt.desc}
+                        {t(opt.descKey)}
                       </Text>
                     </View>
                     {selected && (
@@ -156,7 +158,7 @@ export default function MiniSettingsModal({
                 textColor={theme.colors.onError}
                 icon="logout"
               >
-                Sign Out
+                {t('common.signOut')}
               </Button>
             </View>
           </TouchableWithoutFeedback>

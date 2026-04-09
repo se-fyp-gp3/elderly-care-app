@@ -1,3 +1,4 @@
+import { translateUnit } from "@/lib/schedule";
 import {
     ElderlyMedicationReminder,
     Medication,
@@ -642,7 +643,7 @@ export async function getFormattedTodayMedicationSummary(
       // @ts-ignore
       const medUnit = medications[0]?.unit || "dose";
       // @ts-ignore
-      const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+      const medDosage = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
 
       todoList.push({
         time,

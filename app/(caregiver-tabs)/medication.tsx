@@ -24,6 +24,7 @@ import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     Alert,
     AppState,
@@ -56,6 +57,7 @@ export default function MedicationManagement() {
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [confirmingMedItem, setConfirmingMedItem] = useState<MedicationItem | null>(
@@ -187,7 +189,7 @@ export default function MedicationManagement() {
 
   const handleAddMedication = async () => {
     if (!medicationFormData.elderlyId || !medicationFormData.name) {
-      Alert.alert("Error", "Please fill in Elderly and Medication Name.");
+      Alert.alert(t('common.error'), t('medication.fillElderlyAndName'));
       return;
     }
 
@@ -201,12 +203,12 @@ export default function MedicationManagement() {
         frequency: medicationFormData.frequency,
         times: medicationFormData.times,
       });
-      Alert.alert("Success", "Medication added successfully.");
+      Alert.alert(t('common.success'), t('medication.medAddedSuccess'));
       setAddMedDialogVisible(false);
       fetchData();
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Failed to add medication.");
+      Alert.alert(t('common.error'), t('medication.failedToAddMed'));
     } finally {
       setLoading(false);
     }
@@ -292,16 +294,16 @@ export default function MedicationManagement() {
     } catch (err: any) {
       console.error("Error updating medication", err);
       if (err?.message?.includes("auto-repair")) {
-        Alert.alert("Configuration Error", err.message);
+        Alert.alert(t('medication.configError'), err.message);
       } else {
-        Alert.alert("Error", "Failed to update status.");
+        Alert.alert(t('common.error'), t('medication.failedToUpdateStatus'));
       }
     }
   };
 
   const onUndoTaking = async (medItem: MedicationItem) => {
     if (!medItem.logId) {
-      Alert.alert("Cannot Undo", "History record not found.");
+      Alert.alert(t('medication.undo'), t('medication.failedToUndo'));
       return;
     }
 
@@ -316,7 +318,7 @@ export default function MedicationManagement() {
               return {
                 ...m,
                 status: "pending",
-                lastTaken: "Never",
+                lastTaken: t('common.never'),
               };
             }
             return m;
@@ -326,7 +328,7 @@ export default function MedicationManagement() {
 
       await fetchData();
     } catch (err) {
-      Alert.alert("Error", "Failed to undo.");
+      Alert.alert(t('common.error'), t('medication.failedToUndo'));
     }
   };
 
@@ -337,36 +339,36 @@ export default function MedicationManagement() {
         const { status } = await Notifications.getPermissionsAsync();
         if (status !== "granted") {
           Alert.alert(
-            "Permission required",
-            "Please enable notifications to receive reminders.",
+            t('medication.permissionRequired'),
+            t('medication.enableNotifications'),
           );
           return;
         }
 
         // Find the medication in our nested structure
         const med = allMeds.find((m) => m.id === medId);
-        const title = "Medication reminder";
+        const title = t('medication.medReminderNotif');
         const body = med
-          ? `Please check medication for ${med.elderly}: ${med.name}`
-          : "Please check medication";
+          ? t('medication.checkMedFor', { name: med.elderly }) + `: ${med.name}`
+          : t('medication.medReminderNotif');
 
         await Notifications.scheduleNotificationAsync({
           content: { title, body, data: { medId } },
           trigger: { type: "timeInterval", seconds: 5, repeats: false } as any,
         });
 
-        Alert.alert("Reminder set", "Notification will appear in 5 seconds.");
+        Alert.alert(t('medication.reminderSet'), t('medication.notifIn5Sec'));
       } catch (e: any) {
         console.warn("Failed to schedule notification", e);
         const isExpoGo =
           Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
         if (isExpoGo) {
           Alert.alert(
-            "Not Supported",
-            "Notifications are not supported in Expo Go on Android (SDK 53+). Please use a Development Build.",
+            t('medication.notSupported'),
+            t('medication.notSupportedDesc'),
           );
         } else {
-          Alert.alert("Error", "Unable to schedule reminder.");
+          Alert.alert(t('common.error'), t('medication.unableToSchedule'));
         }
       }
     })();
@@ -397,7 +399,7 @@ export default function MedicationManagement() {
         })),
       );
     } catch (err) {
-      Alert.alert("Error", "Failed to update status.");
+      Alert.alert(t('common.error'), t('medication.failedToUpdateStatus'));
     }
   };
 
@@ -443,7 +445,7 @@ export default function MedicationManagement() {
             }}
           >
             <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-              Today&apos;s Plan
+              {t('medication.todaysPlan')}
             </Text>
             <View style={{ flexDirection: "row" }}>
               <Button
@@ -455,8 +457,12 @@ export default function MedicationManagement() {
                 labelStyle={{ fontSize: 14 }}
               >
                 {statusFilter === "all"
-                  ? "Status"
-                  : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                  ? t('medication.filterStatus')
+                  : statusFilter === "pending"
+                    ? t('common.pending')
+                    : statusFilter === "completed"
+                      ? t('common.completed')
+                      : t('common.missed')}
               </Button>
               <Button
                 mode="text"
@@ -467,10 +473,10 @@ export default function MedicationManagement() {
                 labelStyle={{ fontSize: 14 }}
               >
                 {selectedElderlyId === "All"
-                  ? "Everyone"
+                  ? t('medication.everyone')
                   : linkedElderly
                       .find((e) => e.$id === selectedElderlyId)
-                      ?.name.split(" ")[0] || "Unknown"}
+                      ?.name.split(" ")[0] || t('common.unknown')}
               </Button>
             </View>
           </View>
@@ -478,7 +484,7 @@ export default function MedicationManagement() {
           {filteredGroups.length === 0 ? (
             <View style={{ alignItems: "center", marginTop: 20 }}>
               <Text style={{ color: theme.colors.outline }}>
-                No medication records found.
+                {t('medication.noMedRecords')}
               </Text>
             </View>
           ) : (
@@ -530,7 +536,7 @@ export default function MedicationManagement() {
                         marginBottom: 10,
                       }}
                     >
-                      No medications scheduled.
+                      {t('medication.noMedsScheduled')}
                     </Text>
                   ) : (
                     /* Group medications by TIME */

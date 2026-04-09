@@ -1,40 +1,41 @@
 import {
-  createHealthRecord,
-  fetchHealthDataForElderly,
-  getLatestMetrics,
-  HEALTH_METRIC_TYPES,
+    createHealthRecord,
+    fetchHealthDataForElderly,
+    getLatestMetrics,
+    HEALTH_METRIC_TYPES,
 } from "@/lib/health-data";
 import { HealthData } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useState,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  Dimensions,
-  FlatList,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    Dimensions,
+    FlatList,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import {
-  Button,
-  Card,
-  Dialog,
-  FAB,
-  Portal,
-  Surface,
-  Text,
-  TextInput,
-  useTheme
+    Button,
+    Card,
+    Dialog,
+    FAB,
+    Portal,
+    Surface,
+    Text,
+    TextInput,
+    useTheme
 } from "react-native-paper";
 
 export default function HealthDataPage() {
@@ -45,6 +46,7 @@ export default function HealthDataPage() {
   const theme = useTheme();
   const router = useRouter();
   const navigation = useNavigation();
+  const { t } = useTranslation();
 
   const [records, setRecords] = useState<HealthData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +85,7 @@ export default function HealthDataPage() {
             size={28}
             color={theme.colors.onSurface}
           />
-          <Text style={{ marginLeft: 5, fontSize: 16 }}>Back</Text>
+          <Text style={{ marginLeft: 5, fontSize: 16 }}>{t('common.back')}</Text>
         </TouchableOpacity>
       ),
     });
@@ -174,14 +176,14 @@ export default function HealthDataPage() {
           strokeWidth: 2,
         },
       ],
-      legend: ["Systolic", "Diastolic"],
+      legend: [t('healthData.systolicShort'), t('healthData.diastolicShort')],
     };
-  }, [records]);
+  }, [records, t]);
 
   // ── Add record handler ────────────────────────────────────────────────
   const handleAddRecord = async () => {
     if (!elderlyId || !newRecord.value.trim()) {
-      Alert.alert("Error", "Please fill in the value.");
+      Alert.alert(t('common.error'), t('healthData.fillInValue'));
       return;
     }
     setSaving(true);
@@ -211,7 +213,7 @@ export default function HealthDataPage() {
       fetchData(); // Refresh list
     } catch (error) {
       console.error("Error adding health record:", error);
-      Alert.alert("Error", "Failed to add record.");
+      Alert.alert(t('common.error'), t('healthData.failedToAddRecord'));
     } finally {
       setSaving(false);
     }
@@ -258,6 +260,20 @@ export default function HealthDataPage() {
       default:
         return "chart-timeline-variant";
     }
+  };
+
+  /** Translate Appwrite health record type names to the current language */
+  const translateType = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      "Blood Pressure": t('healthData.bloodPressure'),
+      "Heart Rate": t('healthData.heartRate'),
+      "Temperature": t('healthData.temperature'),
+      "Weight": t('healthData.weight'),
+      "Blood Sugar": t('healthData.bloodSugar'),
+      "Oxygen Saturation": t('healthData.oxygenSaturation'),
+      "Steps": t('healthData.stepsLabel'),
+    };
+    return typeMap[type] || type;
   };
 
   const formatTime = (timeStr: string | null) => {
@@ -355,7 +371,7 @@ export default function HealthDataPage() {
                   { color: theme.colors.onSurfaceVariant },
                 ]}
               >
-                {item.type || "Health Record"}
+                {item.type ? translateType(item.type) : t('healthData.healthRecord')}
               </Text>
               <Text
                 style={[
@@ -396,16 +412,16 @@ export default function HealthDataPage() {
 
   const bpSub = latestMetrics["Blood Pressure"]?.time
     ? formatTime(latestMetrics["Blood Pressure"].time).date
-    : "No data";
+    : t('common.noData');
   const hrSub = latestMetrics["Heart Rate"]?.time
     ? formatTime(latestMetrics["Heart Rate"].time).date
-    : "No data";
+    : t('common.noData');
   const tempSub = latestMetrics["Temperature"]?.time
     ? formatTime(latestMetrics["Temperature"].time).date
-    : "No data";
+    : t('common.noData');
   const weightSub = latestMetrics["Weight"]?.time
     ? formatTime(latestMetrics["Weight"].time).date
-    : "No data";
+    : t('common.noData');
 
   return (
     <View
@@ -420,7 +436,7 @@ export default function HealthDataPage() {
         {/* Header Title Area */}
         <View style={styles.pageHeader}>
           <Text variant="headlineMedium" style={{ fontWeight: "bold" }}>
-            Health Data
+            {t('tabs.healthData')}
           </Text>
           {elderlyName ? (
             <View
@@ -446,14 +462,14 @@ export default function HealthDataPage() {
         {/* Summary Statistics */}
         <View style={styles.statsRow}>
           {renderSummaryCard(
-            "Blood Pressure",
+            t('healthData.bloodPressure'),
             latestBP,
             bpSub,
             "heart-pulse",
             "#2196F3",
           )}
           {renderSummaryCard(
-            "Heart Rate",
+            t('healthData.heartRate'),
             latestHR,
             hrSub,
             "heart-flash",
@@ -462,14 +478,14 @@ export default function HealthDataPage() {
         </View>
         <View style={styles.statsRow}>
           {renderSummaryCard(
-            "Temperature",
+            t('healthData.temperature'),
             latestTemp,
             tempSub,
             "thermometer",
             "#FF9800",
           )}
           {renderSummaryCard(
-            "Weight",
+            t('healthData.weight'),
             latestWeight,
             weightSub,
             "scale-bathroom",
@@ -481,7 +497,7 @@ export default function HealthDataPage() {
         {chartData && (
           <Card style={styles.chartCard}>
             <Card.Title
-              title="BP Trends (Last 6)"
+              title={t('healthData.bpTrends')}
               left={(props) => (
                 <MaterialCommunityIcons {...props} name="chart-line" />
               )}
@@ -514,15 +530,15 @@ export default function HealthDataPage() {
         <View style={[styles.filterSection, { paddingHorizontal: 16 }]}>
           {[
             [
-              { label: "All",            short: "All",   icon: "view-grid-outline", color: "" },
-              { label: "Blood Pressure", short: "BP",    icon: "heart-pulse",       color: "#2196F3" },
-              { label: "Heart Rate",     short: "HR",    icon: "heart-flash",       color: "#F44336" },
-              { label: "Temperature",    short: "Temp",  icon: "thermometer",       color: "#FF9800" },
+              { label: "All",            short: t('common.all'),   icon: "view-grid-outline", color: "" },
+              { label: "Blood Pressure", short: t('healthData.bp'),    icon: "heart-pulse",       color: "#2196F3" },
+              { label: "Heart Rate",     short: t('healthData.hr'),    icon: "heart-flash",       color: "#F44336" },
+              { label: "Temperature",    short: t('healthData.temp'),  icon: "thermometer",       color: "#FF9800" },
             ],
             [
-              { label: "Weight",            short: "Weight", icon: "scale-bathroom", color: "#4CAF50" },
-              { label: "Blood Sugar",       short: "Sugar",  icon: "water",           color: "#9C27B0" },
-              { label: "Oxygen Saturation", short: "SpO₂",  icon: "lungs",           color: "#00BCD4" },
+              { label: "Weight",            short: t('healthData.weight'), icon: "scale-bathroom", color: "#4CAF50" },
+              { label: "Blood Sugar",       short: t('healthData.sugar'),  icon: "water",           color: "#9C27B0" },
+              { label: "Oxygen Saturation", short: t('healthData.spo2'),  icon: "lungs",           color: "#00BCD4" },
             ],
           ].map((row, rowIdx) => (
             <View key={rowIdx} style={{ flexDirection: "row", gap: 8, marginBottom: rowIdx === 0 ? 8 : 0 }}>
@@ -621,12 +637,12 @@ export default function HealthDataPage() {
             }}
           >
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              Activity Log ({filteredRecords.length})
+              {t('healthData.activityLog')} ({filteredRecords.length})
             </Text>
           </View>
           {loading ? (
             <View style={styles.emptyState}>
-              <Text variant="bodyLarge">Loading...</Text>
+              <Text variant="bodyLarge">{t('common.loading')}</Text>
             </View>
           ) : filteredRecords.length === 0 ? (
             <Surface
@@ -642,7 +658,7 @@ export default function HealthDataPage() {
                 color={theme.colors.onSurfaceVariant}
               />
               <Text variant="bodyLarge" style={{ marginTop: 12 }}>
-                No health records yet
+                {t('healthData.noHealthRecords')}
               </Text>
               <Text
                 variant="bodySmall"
@@ -651,7 +667,7 @@ export default function HealthDataPage() {
                   marginTop: 4,
                 }}
               >
-                Tap + to add a health record
+                {t('healthData.tapToAdd')}
               </Text>
             </Surface>
           ) : (
@@ -672,7 +688,7 @@ export default function HealthDataPage() {
           onDismiss={() => setAddDialogVisible(false)}
           style={{ backgroundColor: theme.colors.surface }}
         >
-          <Dialog.Title>Add Health Record</Dialog.Title>
+          <Dialog.Title>{t('healthData.addHealthRecord')}</Dialog.Title>
           <Dialog.ScrollArea style={{ paddingHorizontal: 0 }}>
             <ScrollView style={{ paddingHorizontal: 24 }}>
               {/* Type Selection – icon card grid */}
@@ -680,7 +696,7 @@ export default function HealthDataPage() {
                 variant="labelLarge"
                 style={{ marginBottom: 10, marginTop: 8 }}
               >
-                Type
+                {t('healthData.typeLabel')}
               </Text>
               <View
                 style={{
@@ -761,8 +777,8 @@ export default function HealthDataPage() {
                 mode="outlined"
                 label={
                   selectedTypeConfig?.hasSecond
-                    ? "Systolic (upper)"
-                    : `Value (${newRecord.unit})`
+                    ? t('healthData.systolic')
+                    : `${t('healthData.value')} (${newRecord.unit})`
                 }
                 value={newRecord.numericValue}
                 onChangeText={(text) => {
@@ -785,7 +801,7 @@ export default function HealthDataPage() {
               {selectedTypeConfig?.hasSecond && (
                 <TextInput
                   mode="outlined"
-                  label="Diastolic (lower)"
+                  label={t('healthData.diastolic')}
                   value={newRecord.secondValue}
                   onChangeText={(text) => {
                     const secondaryValue = text;
@@ -807,7 +823,7 @@ export default function HealthDataPage() {
               {/* Display Value (auto-generated or manual) */}
               <TextInput
                 mode="outlined"
-                label="Display Value"
+                label={t('healthData.displayValue')}
                 value={newRecord.value}
                 onChangeText={(text) =>
                   setNewRecord((prev) => ({ ...prev, value: text }))
@@ -818,7 +834,7 @@ export default function HealthDataPage() {
               {/* Note */}
               <TextInput
                 mode="outlined"
-                label="Note (optional)"
+                label={t('healthData.noteOptional')}
                 value={newRecord.note}
                 onChangeText={(text) =>
                   setNewRecord((prev) => ({ ...prev, note: text }))
@@ -830,14 +846,14 @@ export default function HealthDataPage() {
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
-            <Button onPress={() => setAddDialogVisible(false)}>Cancel</Button>
+            <Button onPress={() => setAddDialogVisible(false)}>{t('common.cancel')}</Button>
             <Button
               mode="contained"
               onPress={handleAddRecord}
               loading={saving}
               disabled={saving || !newRecord.value.trim()}
             >
-              Save
+              {t('common.save')}
             </Button>
           </Dialog.Actions>
         </Dialog>

@@ -3,6 +3,7 @@ import { Moment, MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoPlayer, VideoView } from "expo-video";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Alert, Image, Modal, Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
 
@@ -47,6 +48,7 @@ function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boo
 
 export default function MomentCard({ moment, currentUserId, onLike, onComment, onAIRequest, onDelete }: MomentCardProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const [liked, setLiked] = useState(moment.likes?.includes(currentUserId) || false);
   const [likesCount, setLikesCount] = useState(moment.likes?.length || 0);
   const [loadingAI, setLoadingAI] = useState(false);
@@ -129,7 +131,7 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
         <TouchableOpacity style={[styles.videoBox, { borderColor: theme.colors.outline }]} onPress={handleOpenVideo}>
           <MaterialCommunityIcons name="video" size={24} color={theme.colors.primary} />
           <Text variant="bodyMedium" style={{ marginTop: 6 }}>
-            Tap to watch video
+            {t('moments.tapToWatchVideo')}
           </Text>
         </TouchableOpacity>
       )}
@@ -139,7 +141,7 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
         <View style={styles.aiLoading}>
             <ActivityIndicator size="small" color={theme.colors.tertiary} />
             <Text variant="bodySmall" style={{ marginLeft: 8, color: theme.colors.tertiary }}>
-                AI is thinking...
+                {t('moments.aiThinking')}
             </Text>
         </View>
       )}
@@ -149,7 +151,7 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                 <MaterialCommunityIcons name="robot" size={16} color={theme.colors.onTertiaryContainer} />
                 <Text variant="labelSmall" style={{ marginLeft: 4, color: theme.colors.onTertiaryContainer, fontWeight: 'bold' }}>
-                    AI Insight
+                    {t('moments.aiInsight')}
                 </Text>
             </View>
             <Text variant="bodyMedium" style={{ color: theme.colors.onTertiaryContainer }}>
@@ -168,14 +170,14 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
             color={liked ? theme.colors.error : theme.colors.onSurfaceVariant} 
           />
           <Text variant="bodyMedium" style={{ marginLeft: 6, color: theme.colors.onSurfaceVariant }}>
-            {likesCount > 0 ? likesCount : "Like"}
+            {likesCount > 0 ? likesCount : t('moments.like')}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionBtn} onPress={() => onComment(moment.$id)}>
           <MaterialCommunityIcons name="comment-outline" size={20} color={theme.colors.onSurfaceVariant} />
           <Text variant="bodyMedium" style={{ marginLeft: 6, color: theme.colors.onSurfaceVariant }}>
-            {moment.comments_count > 0 ? moment.comments_count : "Comment"}
+            {moment.comments_count > 0 ? moment.comments_count : t('moments.comment')}
           </Text>
         </TouchableOpacity>
 
@@ -186,7 +188,7 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
         >
           <MaterialCommunityIcons name="creation" size={20} color={theme.colors.tertiary} />
           <Text variant="bodyMedium" style={{ marginLeft: 6, color: theme.colors.tertiary, fontWeight: '600' }}>
-            AI Discuss
+            {t('moments.aiDiscuss')}
           </Text>
         </TouchableOpacity>
       </View>
