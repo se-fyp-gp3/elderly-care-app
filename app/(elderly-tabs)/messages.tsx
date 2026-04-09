@@ -21,8 +21,8 @@ import { getGroupUnreadCount, getLastGroupMessage } from "@/lib/group-messaging"
 import { getGroupsForUser } from "@/lib/groups";
 import { buildConversationId, getLastMessage, getUnreadCountPerConversation } from "@/lib/messaging";
 import { isUserOnline } from "@/lib/presence";
-import { DirectMessage, Group, GroupMessage } from "@/types/messaging";
 import { Caregiver, Elderly } from "@/types/appwrite";
+import { DirectMessage, Group, GroupMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";

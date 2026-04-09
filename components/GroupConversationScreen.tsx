@@ -14,7 +14,6 @@ import {
 import { getGroupMembers } from "@/lib/groups";
 import { GroupMember, GroupMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import * as Clipboard from "expo-clipboard";
 import type { AudioPlayer } from "expo-audio";
 import {
     createAudioPlayer,
@@ -23,6 +22,7 @@ import {
     setAudioModeAsync,
     useAudioRecorder,
 } from "expo-audio";
+import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
