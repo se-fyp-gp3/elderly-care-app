@@ -1,8 +1,8 @@
 import { clientReactNative, DATABASE_ID, DIRECT_MESSAGES_TABLE_ID, MOMENTS_COMMENTS_TABLE_ID } from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { FontSizeProvider, useFontSize } from "@/lib/font-size-context";
-import "@/lib/i18n"; // side-effect: initializes i18next
 import { UnreadBadgeProvider, useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
+import "@/lib/i18n"; // side-effect: initializes i18next
 import { LanguageProvider } from "@/lib/language-context";
 import { getUserMomentIds } from "@/lib/moments";
 import {
