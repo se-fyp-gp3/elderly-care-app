@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
+import { useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
 import { addAIResponse, createMoment, getLatestComments, getMoments, getVisibleCommentCount, likeMoment } from "@/lib/moments";
 import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -19,6 +20,7 @@ export default function MomentsView() {
   const theme = useTheme();
   const { user, preferences } = useAuth();
   const { t } = useTranslation();
+  const { resetMomentUnread } = useUnreadBadge();
   const [moments, setMoments] = useState<Moment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,6 +32,11 @@ export default function MomentsView() {
   const [commentMomentId, setCommentMomentId] = useState<string | null>(null);
   const [allowedIds, setAllowedIds] = useState<string[]>([]);
   const [latestCommentsMap, setLatestCommentsMap] = useState<Record<string, MomentComment[]>>({});
+
+  // Clear moment unread badge when user views the Moments tab
+  useEffect(() => {
+    resetMomentUnread();
+  }, [resetMomentUnread]);
 
   const loadMoments = useCallback(async () => {
     if (!user) return;

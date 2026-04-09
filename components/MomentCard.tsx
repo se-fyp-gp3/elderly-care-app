@@ -2,9 +2,22 @@ import { formatRelativeTime } from "@/lib/contacts";
 import { MediaItem, Moment, MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoPlayer, VideoView } from "expo-video";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Image, Modal, Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
 
 interface MomentCardProps {
@@ -16,50 +29,260 @@ interface MomentCardProps {
   latestComments?: MomentComment[];
 }
 
-function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boolean; onClose: () => void }) {
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
+
+/* ──────────────────────────── Gallery: Video Page ──────────────────────────── */
+function GalleryVideoPage({ uri, isActive }: { uri: string; isActive: boolean }) {
+  const { t } = useTranslation();
+  const [error, setError] = useState(false);
+
   const player = useVideoPlayer(uri, (p: VideoPlayer) => {
     p.loop = false;
   });
 
   useEffect(() => {
-    if (visible) {
+    if (isActive) {
       player.play();
     } else {
       player.pause();
     }
-  }, [visible, player]);
+  }, [isActive, player]);
+
+  if (error) {
+    return (
+      <Pressable
+        style={galleryStyles.errorWrap}
+        onPress={() => { setError(false); player.play(); }}
+      >
+        <MaterialCommunityIcons name="alert-circle-outline" size={48} color="#fff" />
+        <Text style={{ color: "#fff", marginTop: 8 }}>{t("moments.videoLoadError")}</Text>
+        <Text style={{ color: "#aaa", marginTop: 4, fontSize: 12 }}>{t("moments.tapToRetry")}</Text>
+      </Pressable>
+    );
+  }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.videoModalOverlay}>
-        <VideoView
-          player={player}
-          style={styles.videoPlayer}
-          fullscreenOptions={{ enable: true }}
-          allowsPictureInPicture
+    <View style={galleryStyles.page}>
+      <VideoView
+        player={player}
+        style={galleryStyles.video}
+        fullscreenOptions={{ enable: true }}
+        allowsPictureInPicture
+      />
+    </View>
+  );
+}
+
+/* ──────────────────────────── Gallery: Image Page ──────────────────────────── */
+function GalleryImagePage({ uri }: { uri: string }) {
+  return (
+    <View style={galleryStyles.page}>
+      <ScrollView
+        maximumZoomScale={4}
+        minimumZoomScale={1}
+        contentContainerStyle={galleryStyles.zoomContainer}
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+        bouncesZoom
+      >
+        <Image
+          source={{ uri }}
+          style={galleryStyles.image}
+          resizeMode="contain"
         />
-        <Pressable style={styles.videoCloseBtn} onPress={onClose}>
-          <MaterialCommunityIcons name="close-circle" size={36} color="#fff" />
+      </ScrollView>
+    </View>
+  );
+}
+
+/* ──────────────────────── Media Gallery Modal ──────────────────────── */
+function MediaGalleryModal({
+  items,
+  initialIndex,
+  visible,
+  onClose,
+}: {
+  items: MediaItem[];
+  initialIndex: number;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const flatListRef = useRef<FlatList>(null);
+
+  // Reset index when modal opens
+  useEffect(() => {
+    if (visible) {
+      setCurrentIndex(initialIndex);
+      // Scroll to initial index after a frame
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+      }, 50);
+    }
+  }, [visible, initialIndex]);
+
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+    setCurrentIndex(idx);
+  }, []);
+
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: SCREEN_W,
+    offset: SCREEN_W * index,
+    index,
+  }), []);
+
+  const renderItem = useCallback(({ item, index }: { item: MediaItem; index: number }) => {
+    if (item.type === "video" && item.url) {
+      return <GalleryVideoPage uri={item.url} isActive={visible && index === currentIndex} />;
+    }
+    if (item.type === "image" && item.url) {
+      return <GalleryImagePage uri={item.url} />;
+    }
+    return <View style={galleryStyles.page} />;
+  }, [visible, currentIndex]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.95)" />
+      <View style={galleryStyles.overlay}>
+        {/* Close button */}
+        <Pressable style={galleryStyles.closeBtn} onPress={onClose} hitSlop={12}>
+          <MaterialCommunityIcons name="close" size={28} color="#fff" />
         </Pressable>
+
+        {/* Page indicator */}
+        {items.length > 1 && (
+          <View style={galleryStyles.indicator}>
+            <Text style={galleryStyles.indicatorText}>
+              {t("moments.mediaOf", { current: currentIndex + 1, total: items.length })}
+            </Text>
+          </View>
+        )}
+
+        {/* Horizontal paging list */}
+        <FlatList
+          ref={flatListRef}
+          data={items}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(_, i) => String(i)}
+          getItemLayout={getItemLayout}
+          initialScrollIndex={initialIndex}
+          onMomentumScrollEnd={onScroll}
+          renderItem={renderItem}
+        />
+
+        {/* Dot indicators for multiple items */}
+        {items.length > 1 && (
+          <View style={galleryStyles.dots}>
+            {items.map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  galleryStyles.dot,
+                  { opacity: i === currentIndex ? 1 : 0.4 },
+                ]}
+              />
+            ))}
+          </View>
+        )}
       </View>
     </Modal>
   );
 }
 
+const galleryStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)",
+    justifyContent: "center",
+  },
+  closeBtn: {
+    position: "absolute",
+    top: 48,
+    right: 16,
+    zIndex: 10,
+    padding: 4,
+  },
+  indicator: {
+    position: "absolute",
+    top: 52,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    alignItems: "center",
+  },
+  indicatorText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  page: {
+    width: SCREEN_W,
+    height: SCREEN_H,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  zoomContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  image: {
+    width: SCREEN_W,
+    height: SCREEN_H * 0.75,
+  },
+  video: {
+    width: SCREEN_W,
+    height: SCREEN_H * 0.5,
+  },
+  errorWrap: {
+    width: SCREEN_W,
+    height: SCREEN_H,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.95)",
+  },
+  dots: {
+    position: "absolute",
+    bottom: 60,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#fff",
+  },
+});
+
 /** Render a single media item (image or video) in the grid */
 function MediaGridItem({
   item,
-  onPlayVideo,
+  index,
+  onPressMedia,
   gridStyle,
 }: {
   item: MediaItem;
-  onPlayVideo: (uri: string) => void;
+  index: number;
+  onPressMedia: (index: number) => void;
   gridStyle: any;
 }) {
   const theme = useTheme();
 
   if (item.type === "image" && item.url) {
-    return <Image source={{ uri: item.url }} style={[styles.gridImage, gridStyle]} resizeMode="cover" />;
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={() => onPressMedia(index)} style={[gridStyle, { overflow: "hidden" }]}>
+        <Image source={{ uri: item.url }} style={styles.gridImage} resizeMode="cover" />
+      </TouchableOpacity>
+    );
   }
 
   if (item.type === "video") {
@@ -67,7 +290,7 @@ function MediaGridItem({
     return (
       <TouchableOpacity
         style={[styles.gridVideoContainer, gridStyle, { borderColor: theme.colors.outline }]}
-        onPress={() => item.url && onPlayVideo(item.url)}
+        onPress={() => onPressMedia(index)}
         activeOpacity={0.8}
       >
         {thumbUri ? (
@@ -91,13 +314,13 @@ function MediaGridItem({
 }
 
 /** Render media items in a grid layout */
-function MediaGrid({ items, onPlayVideo }: { items: MediaItem[]; onPlayVideo: (uri: string) => void }) {
+function MediaGrid({ items, onPressMedia }: { items: MediaItem[]; onPressMedia: (index: number) => void }) {
   if (items.length === 0) return null;
 
   if (items.length === 1) {
     return (
       <View style={styles.mediaGridWrap}>
-        <MediaGridItem item={items[0]} onPlayVideo={onPlayVideo} gridStyle={styles.singleMedia} />
+        <MediaGridItem item={items[0]} index={0} onPressMedia={onPressMedia} gridStyle={styles.singleMedia} />
       </View>
     );
   }
@@ -106,7 +329,7 @@ function MediaGrid({ items, onPlayVideo }: { items: MediaItem[]; onPlayVideo: (u
     return (
       <View style={[styles.mediaGridWrap, styles.gridRow]}>
         {items.map((item, i) => (
-          <MediaGridItem key={i} item={item} onPlayVideo={onPlayVideo} gridStyle={styles.halfMedia} />
+          <MediaGridItem key={i} item={item} index={i} onPressMedia={onPressMedia} gridStyle={styles.halfMedia} />
         ))}
       </View>
     );
@@ -117,13 +340,13 @@ function MediaGrid({ items, onPlayVideo }: { items: MediaItem[]; onPlayVideo: (u
     <View style={styles.mediaGridWrap}>
       <View style={styles.gridRow}>
         {items.slice(0, 2).map((item, i) => (
-          <MediaGridItem key={i} item={item} onPlayVideo={onPlayVideo} gridStyle={styles.halfMedia} />
+          <MediaGridItem key={i} item={item} index={i} onPressMedia={onPressMedia} gridStyle={styles.halfMedia} />
         ))}
       </View>
       {items.length > 2 && (
         <View style={styles.gridRow}>
           {items.slice(2, 4).map((item, i) => (
-            <MediaGridItem key={i + 2} item={item} onPlayVideo={onPlayVideo} gridStyle={items.length === 3 && i === 0 ? styles.singleMedia : styles.halfMedia} />
+            <MediaGridItem key={i + 2} item={item} index={i + 2} onPressMedia={onPressMedia} gridStyle={items.length === 3 && i === 0 ? styles.singleMedia : styles.halfMedia} />
           ))}
         </View>
       )}
@@ -175,7 +398,7 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
   const [likesCount, setLikesCount] = useState(moment.likes?.length || 0);
   const [loadingAI, setLoadingAI] = useState(false);
   const [aiComment, setAIComment] = useState<MomentComment | null>(null);
-  const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
 
   const mediaItems = moment.parsedMediaItems || [];
 
@@ -199,17 +422,18 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
     }
   };
 
-  const handlePlayVideo = (uri: string) => {
-    setVideoUri(uri);
+  const handlePressMedia = (index: number) => {
+    setGalleryIndex(index);
   };
 
   return (
     <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-      {videoUri && (
-        <VideoPlayerModal
-          uri={videoUri}
-          visible={!!videoUri}
-          onClose={() => setVideoUri(null)}
+      {galleryIndex !== null && (
+        <MediaGalleryModal
+          items={mediaItems}
+          initialIndex={galleryIndex}
+          visible
+          onClose={() => setGalleryIndex(null)}
         />
       )}
       <View style={styles.header}>
@@ -234,7 +458,7 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
       )}
 
       {/* Multi-media grid */}
-      <MediaGrid items={mediaItems} onPlayVideo={handlePlayVideo} />
+      <MediaGrid items={mediaItems} onPressMedia={handlePressMedia} />
 
       {/* AI Response Section */}
       {loadingAI && (
@@ -380,22 +604,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     width: "100%",
-  },
-  // Video modal
-  videoModalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.92)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  videoPlayer: {
-    width: "100%",
-    height: 280,
-  },
-  videoCloseBtn: {
-    position: "absolute",
-    top: 48,
-    right: 16,
   },
   // Inline comments
   inlineComments: {

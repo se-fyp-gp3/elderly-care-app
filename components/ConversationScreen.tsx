@@ -230,8 +230,13 @@ export default function ConversationScreen({
   useEffect(() => {
     const unsubscribe = subscribeToConversation(conversationId, (newMsg) => {
       setMessages((prev) => {
-        // Avoid duplicates
-        if (prev.some((m) => m.$id === newMsg.$id)) return prev;
+        const idx = prev.findIndex((m) => m.$id === newMsg.$id);
+        if (idx !== -1) {
+          // Update existing message (e.g. is_read changed)
+          const updated = [...prev];
+          updated[idx] = newMsg;
+          return updated;
+        }
         return [...prev, newMsg];
       });
       // Mark as read if we're the receiver

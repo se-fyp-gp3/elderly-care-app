@@ -186,7 +186,10 @@
     "couldNotStartRecording": "Could not start recording.",
     "couldNotStopRecording": "Could not stop recording.",
     "noRecordedSample": "No recorded sample found.",
-    "couldNotPickAudio": "Could not pick audio file."
+    "couldNotPickAudio": "Could not pick audio file.",
+    "changeAvatar": "Tap to change avatar",
+    "avatarUpdated": "Avatar updated!",
+    "avatarUploadFailed": "Failed to upload avatar. Please try again."
   },
   "home": {
     "hello": "Hello, {{name}}!",
@@ -264,7 +267,32 @@
     "sendMessageTo": "Send a message to {{name}}",
     "micPermission": "Microphone access is required to send voice messages.",
     "couldNotStartRecording": "Could not start recording.",
-    "failedToSendVoice": "Failed to send voice message."
+    "failedToSendVoice": "Failed to send voice message.",
+    "createGroup": "Create Group",
+    "createGroupChat": "Create Group Chat",
+    "groupName": "Group Name",
+    "groupNamePlaceholder": "Enter group name...",
+    "selectMembers": "Select Members",
+    "minMembers": "Select at least 2 members",
+    "groupCreated": "Group created!",
+    "addNewFriend": "Add New Friend",
+    "addFriendOrGroup": "Add Friend or Group",
+    "groupMembers": "Group Members",
+    "pinConversation": "Pin Conversation",
+    "unpinConversation": "Unpin Conversation",
+    "pinned": "Pinned",
+    "leaveGroup": "Leave Group",
+    "leaveGroupConfirm": "Are you sure you want to leave this group?",
+    "disbandGroup": "Disband Group",
+    "disbandConfirm": "Are you sure you want to disband this group? This cannot be undone.",
+    "groupSettings": "Group Settings",
+    "removeMember": "Remove Member",
+    "removeMemberConfirm": "Remove {{name}} from this group?",
+    "muteNotifications": "Mute Notifications",
+    "admin": "Admin",
+    "member": "Member",
+    "notAdmin": "Only admin can do this",
+    "groupNameUpdated": "Group name updated"
   },
   "medication": {
     "toTakeToday": "To Take Today",
@@ -768,7 +796,10 @@
     "maxMediaReached": "Media limit reached",
     "mediaCount": "Media ({{count}})",
     "newCommentOnPost": "Commented on your post",
-    "repliedToYourComment": "Replied to your comment"
+    "repliedToYourComment": "Replied to your comment",
+    "mediaOf": "{{current}} / {{total}}",
+    "videoLoadError": "Failed to load video",
+    "tapToRetry": "Tap to retry"
   },
   "qrPairing": {
     "settingUp": "Setting up...",

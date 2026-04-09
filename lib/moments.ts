@@ -219,8 +219,9 @@ function extractErrorMessage(error: unknown): string {
 
 function buildMediaUrl(bucketId: string, fileId: string): string | undefined {
   try {
-    // Use getFileDownloadURL for better video streaming compatibility
-    return storage.getFileDownloadURL(bucketId, fileId).toString();
+    // Use getFileViewURL – serves files inline with correct Content-Type,
+    // which is required for video streaming and image display.
+    return storage.getFileViewURL(bucketId, fileId).toString();
   } catch (error) {
     console.warn("Failed to build moment media URL:", error);
     return undefined;

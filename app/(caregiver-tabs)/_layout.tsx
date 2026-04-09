@@ -147,6 +147,22 @@ export default function TabsLayout() {
           headerShown: false,
         }}
       />
+      <Tabs.Screen
+        name="group-conversation"
+        options={{
+          href: null,
+          title: t('tabs.conversation'),
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="group-settings"
+        options={{
+          href: null,
+          title: t('chat.groupSettings'),
+          headerShown: false,
+        }}
+      />
     </Tabs>
   );
 }

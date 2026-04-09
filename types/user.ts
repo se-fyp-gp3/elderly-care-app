@@ -31,5 +31,6 @@ export type UserPreferences = {
   aiVoiceCaregiverId?: string;
   aiVoiceCaregiverName?: string;
   uiVersion?: UIVersion;
+  pinnedConversations?: string[];
   [key: string]: any;
 };

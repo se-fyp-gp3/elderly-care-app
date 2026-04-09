@@ -72,6 +72,12 @@ export const CAREGIVER_CONNECTIONS_TABLE_ID =
 export const MOMENTS_TABLE_ID = process.env.EXPO_PUBLIC_MOMENTS_TABLE_ID || "moments";
 export const MOMENTS_COMMENTS_TABLE_ID = process.env.EXPO_PUBLIC_MOMENTS_COMMENTS_TABLE_ID || "moments_comments";
 
+export const GROUPS_TABLE_ID = process.env.EXPO_PUBLIC_GROUPS_TABLE_ID || "groups";
+export const GROUP_MEMBERS_TABLE_ID = process.env.EXPO_PUBLIC_GROUP_MEMBERS_TABLE_ID || "group_members";
+export const GROUP_MESSAGES_TABLE_ID = process.env.EXPO_PUBLIC_GROUP_MESSAGES_TABLE_ID || "group_messages";
+export const GROUP_READ_CURSORS_TABLE_ID = process.env.EXPO_PUBLIC_GROUP_READ_CURSORS_TABLE_ID || "group_read_cursors";
+export const USER_ICON_BUCKET_ID = process.env.EXPO_PUBLIC_USER_ICON_BUCKET_ID || "696f4129000d8ad7f041";
+
 export const ROLE_MANAGEMENT_FUNCTION_ID =
   process.env.EXPO_PUBLIC_ROLE_MANAGEMENT_FUNCTION_ID!;
 export const VOICE_CLONE_FUNCTION_ID =

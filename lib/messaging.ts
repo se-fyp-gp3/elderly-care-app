@@ -183,3 +183,45 @@ export function subscribeToConversation(
     return () => {};
   }
 }
+
+/**
+ * Get unread message count grouped by conversation for a given receiver.
+ * Returns a Map of conversationId → unread count.
+ */
+export async function getUnreadCountPerConversation(
+  receiverId: string,
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  try {
+    let cursor: string | undefined;
+    let hasMore = true;
+    while (hasMore) {
+      const queries = [
+        Query.equal("receiver_id", receiverId),
+        Query.equal("is_read", false),
+        Query.limit(100),
+      ];
+      if (cursor) queries.push(Query.cursorAfter(cursor));
+
+      const response = await tablesDB.listRows<DirectMessage>({
+        databaseId: DATABASE_ID,
+        tableId: DIRECT_MESSAGES_TABLE_ID,
+        queries,
+      });
+
+      for (const msg of response.rows) {
+        const convId = msg.conversation_id;
+        result.set(convId, (result.get(convId) ?? 0) + 1);
+      }
+
+      if (response.rows.length < 100) {
+        hasMore = false;
+      } else {
+        cursor = response.rows[response.rows.length - 1].$id;
+      }
+    }
+  } catch (error) {
+    console.error("Error getting unread count per conversation:", error);
+  }
+  return result;
+}

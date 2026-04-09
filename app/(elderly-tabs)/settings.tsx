@@ -8,14 +8,17 @@ import {
 } from "@/lib/elderly";
 import { useFontSize } from "@/lib/font-size-context";
 import { useLanguage } from "@/lib/language-context";
+import { uploadAvatar, updateProfileAvatar, buildAvatarUrl } from "@/lib/user";
 import { Caregiver, CustomVoice, Elderly } from "@/types/appwrite";
 import { FontSize, UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -75,6 +78,33 @@ export default function ElderlySettings() {
     (preferences.voiceReplyLang as string) ?? "cantonese",
   );
 
+  // ── Avatar state ──
+  const [avatarFileId, setAvatarFileId] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleChangeAvatar = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+      if (result.canceled || !result.assets?.length) return;
+
+      setUploadingAvatar(true);
+      const fileId = await uploadAvatar(result.assets[0]);
+      await updateProfileAvatar(elderlyProfile!.$id, "elderly", fileId);
+      setAvatarFileId(fileId);
+      Alert.alert(t('settings.avatarUpdated'));
+    } catch (e) {
+      console.error("Avatar upload error:", e);
+      Alert.alert(t('settings.avatarUploadFailed'));
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   // Load elderly profile + linked caregivers
   const loadEmergencyData = useCallback(async () => {
     if (!user) return;
@@ -82,6 +112,7 @@ export default function ElderlySettings() {
       const profile = await getElderlyByUserId(user.$id);
       if (!profile) return;
       setElderlyProfile(profile);
+      setAvatarFileId((profile as any).avatar_file_id ?? null);
       setEmergencyContact(profile.emergency_contact ?? null);
       const caregivers = await getLinkedCaregivers(profile.$id);
       setLinkedCaregivers(caregivers);
@@ -256,6 +287,41 @@ export default function ElderlySettings() {
             style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}
           >
             {t('settings.customizeExperience')}
+          </Text>
+        </View>
+
+        {/* ── Profile Avatar ── */}
+        <View style={styles.avatarSection}>
+          <TouchableOpacity onPress={handleChangeAvatar} disabled={uploadingAvatar || !elderlyProfile} activeOpacity={0.7}>
+            <View style={styles.avatarWrapper}>
+              {avatarFileId ? (
+                <Image
+                  source={{ uri: buildAvatarUrl(avatarFileId).toString() }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Avatar.Text
+                  size={80}
+                  label={(user?.name ?? "??").substring(0, 2).toUpperCase()}
+                  style={{ backgroundColor: theme.colors.primaryContainer }}
+                  labelStyle={{ color: theme.colors.onPrimaryContainer, fontWeight: "600", fontSize: 28 }}
+                />
+              )}
+              {uploadingAvatar && (
+                <View style={styles.avatarOverlay}>
+                  <ActivityIndicator size="small" color="#fff" />
+                </View>
+              )}
+              <View style={[styles.avatarEditBadge, { backgroundColor: theme.colors.primary }]}>
+                <MaterialCommunityIcons name="camera" size={14} color={theme.colors.onPrimary} />
+              </View>
+            </View>
+          </TouchableOpacity>
+          <Text variant="titleMedium" style={{ marginTop: 10, fontWeight: "600", color: theme.colors.onSurface }}>
+            {user?.name ?? ""}
+          </Text>
+          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+            {t('settings.changeAvatar')}
           </Text>
         </View>
 
@@ -1188,6 +1254,37 @@ const styles = StyleSheet.create({
   },
   title: {
     fontWeight: "bold",
+  },
+  avatarSection: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  avatarWrapper: {
+    position: "relative",
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 40,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarEditBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   sectionTitle: {
     fontWeight: "bold",
