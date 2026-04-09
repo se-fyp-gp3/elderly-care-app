@@ -1,44 +1,41 @@
+import {
+    DATABASE_ID,
+    EMERGENCY_ALERTS_TABLE_ID,
+    safeSubscribe
+} from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-  fetchEmergencyAlerts,
-  resolveEmergencyAlert,
-  updateAlertStatus,
+    fetchEmergencyAlerts,
+    resolveEmergencyAlert,
+    updateAlertStatus,
 } from "@/lib/emergency";
 import type { EmergencyAlert } from "@/types/appwrite";
-import {
-  APPWRITE_ENDPOINT,
-  APPWRITE_PROJECT_ID,
-  DATABASE_ID,
-  EMERGENCY_ALERTS_TABLE_ID,
-  clientReactNative,
-} from "@/lib/appwrite";
-import { safeSubscribe } from "@/lib/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Linking,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Linking,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  Button,
-  Card,
-  Chip,
-  Dialog,
-  Divider,
-  Menu,
-  Portal,
-  Searchbar,
-  Surface,
-  Text,
-  useTheme,
+    Button,
+    Card,
+    Chip,
+    Dialog,
+    Divider,
+    Menu,
+    Portal,
+    Searchbar,
+    Surface,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 /* ── Helpers ────────────────────────────────────────────── */

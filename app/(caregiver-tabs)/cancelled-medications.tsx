@@ -1,36 +1,33 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-  confirmCancelMedication,
-} from "@/lib/medication_tracking";
-import {
-  fetchCaregiverPendingCancelReminders,
-  type PendingCancelReminder,
+    fetchCaregiverPendingCancelReminders,
+    type PendingCancelReminder,
 } from "@/lib/medication";
+import {
+    confirmCancelMedication,
+} from "@/lib/medication_tracking";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useNavigation, useRouter } from "expo-router";
+import { useFocusEffect, useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import {
-  Alert,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Button,
-  Card,
-  Chip,
-  Divider,
-  IconButton,
-  Menu,
-  Searchbar,
-  Surface,
-  Text,
-  useTheme,
+    ActivityIndicator,
+    Button,
+    Chip,
+    Divider,
+    Menu,
+    Searchbar,
+    Surface,
+    Text,
+    useTheme
 } from "react-native-paper";
-import { useFocusEffect } from "expo-router";
 
 type SortMode = "newest" | "oldest" | "elderly" | "medication";
 

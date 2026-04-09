@@ -1,46 +1,45 @@
 import { AddMedicationDialog, MedicationFormData } from "@/components/AddMedicationDialog";
 import ElderlyGroupSummary from "@/components/ElderlyGroupSummary";
 import {
-  ConfirmMedicationDialog,
-  ElderlyFilterDialog,
-  StatusFilterDialog,
+    ConfirmMedicationDialog,
+    ElderlyFilterDialog,
+    StatusFilterDialog,
 } from "@/components/MedFilterDialogs";
 import { MedicationItem } from "@/components/MedicationCard";
 import MedStatsCard from "@/components/MedStatsCard";
 import TimeSlotCard from "@/components/TimeSlotCard";
 import { useAuth } from "@/lib/auth-context";
 import {
-  addMedication,
-  confirmMedicationTaking,
-  ElderlyGroup,
-  fetchCaregiverPendingCancelReminders,
-  fetchCaregiverMedicationData,
-  markMedicationProcessed,
-  PendingCancelReminder,
-  undoMedicationTaking,
+    addMedication,
+    confirmMedicationTaking,
+    ElderlyGroup,
+    fetchCaregiverMedicationData,
+    fetchCaregiverPendingCancelReminders,
+    markMedicationProcessed,
+    PendingCancelReminder,
+    undoMedicationTaking,
 } from "@/lib/medication";
 import { Elderly } from "@/types/appwrite";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  AppState,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
+    Alert,
+    AppState,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
 import {
-  Button,
-  Divider,
-  FAB,
-  IconButton,
-  Portal,
-  Text,
-  useTheme,
+    Button,
+    Divider,
+    FAB,
+    IconButton,
+    Portal,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 // Start notification handler

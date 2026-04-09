@@ -6,33 +6,32 @@
  * it grabs the GPS location and sends an SOS to all linked caregivers.
  */
 
+import {
+    CAREGIVER_ELDERLY_TABLE_ID,
+    DATABASE_ID,
+    ELDERLY_TABLE_ID,
+    tablesDB,
+} from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { createEmergencyAlert } from "@/lib/emergency";
 import { sendImmediateNotification } from "@/lib/notifications";
+import type { CaregiverElderly, Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Modal,
-  StyleSheet,
-  Vibration,
-  View,
+    Modal,
+    StyleSheet,
+    Vibration,
+    View,
 } from "react-native";
+import { Query } from "react-native-appwrite";
 import { Button, Text, useTheme } from "react-native-paper";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
-import { getContactsForElderly } from "@/lib/contacts";
-import {
-  CAREGIVER_ELDERLY_TABLE_ID,
-  DATABASE_ID,
-  ELDERLY_TABLE_ID,
-  tablesDB,
-} from "@/lib/appwrite";
-import { Query } from "react-native-appwrite";
-import type { CaregiverElderly, Elderly } from "@/types/appwrite";
 
 const COUNTDOWN_SECONDS = 15;
 

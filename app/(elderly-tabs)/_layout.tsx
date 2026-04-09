@@ -1,4 +1,3 @@
-import React, { useEffect, useState } from "react";
 import FallCountdownOverlay from "@/components/FallCountdownOverlay";
 import MiniSettingsGearButton from "@/components/MiniSettingsGearButton";
 import { useAuth } from "@/lib/auth-context";
@@ -6,6 +5,7 @@ import { startFallDetection, stopFallDetection } from "@/lib/fall-detection";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import React, { useEffect, useState } from "react";
 import { useTheme } from "react-native-paper";
 
 type TabVisibility = {

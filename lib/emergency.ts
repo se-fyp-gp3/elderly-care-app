@@ -1,10 +1,10 @@
+import type { EmergencyAlert } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
-  DATABASE_ID,
-  EMERGENCY_ALERTS_TABLE_ID,
-  tablesDB,
+    DATABASE_ID,
+    EMERGENCY_ALERTS_TABLE_ID,
+    tablesDB,
 } from "./appwrite";
-import type { EmergencyAlert } from "@/types/appwrite";
 
 export async function createEmergencyAlert(data: {
   type: string;

@@ -475,6 +475,28 @@ export default function ElderlySchedule() {
                       <Chip compact style={{ backgroundColor: `${accentColor}18` }} textStyle={{ color: accentColor, fontSize: 12 }}>
                         {schedule.status}
                       </Chip>
+                      {!isCompleted && (
+                        <>
+                          <View style={{ flex: 1 }} />
+                          <Button
+                            mode="contained"
+                            compact
+                            icon="check"
+                            onPress={async () => {
+                              try {
+                                await markScheduleTaskCompleted(schedule.$id);
+                                await fetchSchedules();
+                              } catch (e) {
+                                Alert.alert("Error", "Failed to mark as completed");
+                              }
+                            }}
+                            style={{ borderRadius: 20 }}
+                            labelStyle={{ fontSize: 12 }}
+                          >
+                            Complete
+                          </Button>
+                        </>
+                      )}
                     </View>
                   </View>
                 );
