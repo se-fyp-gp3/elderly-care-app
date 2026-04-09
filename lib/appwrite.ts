@@ -1,11 +1,11 @@
 import { Account, Client } from "appwrite";
 import {
-    Account as AccountReactNative,
-    Client as ClientReactNative,
-    Functions,
-    ID,
-    Storage,
-    TablesDB,
+  Account as AccountReactNative,
+  Client as ClientReactNative,
+  Functions,
+  ID,
+  Storage,
+  TablesDB,
 } from "react-native-appwrite";
 
 export const APPWRITE_ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!;
@@ -71,6 +71,7 @@ export const CAREGIVER_CONNECTIONS_TABLE_ID =
 
 export const MOMENTS_TABLE_ID = process.env.EXPO_PUBLIC_MOMENTS_TABLE_ID || "moments";
 export const MOMENTS_COMMENTS_TABLE_ID = process.env.EXPO_PUBLIC_MOMENTS_COMMENTS_TABLE_ID || "moments_comments";
+export const EMERGENCY_ALERTS_TABLE_ID = process.env.EXPO_PUBLIC_EMERGENCY_ALERTS_TABLE_ID || "emergency_alerts";
 
 export const ROLE_MANAGEMENT_FUNCTION_ID =
   process.env.EXPO_PUBLIC_ROLE_MANAGEMENT_FUNCTION_ID!;
@@ -86,20 +87,43 @@ export interface RealtimeResponse {
  * Safe wrapper around `clientReactNative.subscribe` that catches
  * INVALID_STATE_ERR thrown when the WebSocket is not yet open
  * (e.g. during rapid page transitions). On failure it retries once
- * after a short delay.
+ * after a short delay.  Also patches the global error handler so
+ * that the SDK's internal WebSocket-ping INVALID_STATE_ERR is
+ * silently swallowed instead of crashing / flooding the console.
  */
+let _wsPatchApplied = false;
+function patchWebSocketErrors() {
+  if (_wsPatchApplied) return;
+  _wsPatchApplied = true;
+
+  const _origSend = WebSocket.prototype.send;
+  WebSocket.prototype.send = function (data: string | ArrayBuffer | Blob | ArrayBufferView) {
+    if (this.readyState !== WebSocket.OPEN) return;
+    try {
+      return _origSend.call(this, data);
+    } catch {
+      // Silently ignore INVALID_STATE_ERR from stale WebSocket
+    }
+  };                                                  
+}
+
 export function safeSubscribe(
   channel: string,
   callback: (response: RealtimeResponse) => void,
 ): () => void {
+  patchWebSocketErrors();
+
   let unsubscribe: (() => void) | null = null;
+  let disposed = false;
 
   const doSubscribe = () => {
+    if (disposed) return;
     try {
       unsubscribe = clientReactNative.subscribe(channel, callback);
     } catch (err: any) {
       console.warn("[Realtime] subscribe failed, retrying in 1s:", err?.message);
       const timer = setTimeout(() => {
+        if (disposed) return;
         try {
           unsubscribe = clientReactNative.subscribe(channel, callback);
         } catch (retryErr) {
@@ -114,6 +138,7 @@ export function safeSubscribe(
   doSubscribe();
 
   return () => {
+    disposed = true;
     try {
       unsubscribe?.();
     } catch {

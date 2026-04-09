@@ -1,16 +1,16 @@
 import {
-    ElderlyMedicationReminder,
-    Medication,
-    MedicationLogs,
+  ElderlyMedicationReminder,
+  Medication,
+  MedicationLogs,
 } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
-    DATABASE_ID,
-    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-    ELDERLY_MEDICATION_TABLE_ID,
-    MEDICATION_LOGS_TABLE_ID,
-    MEDICATION_TABLE_ID,
-    tablesDB,
+  DATABASE_ID,
+  ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+  ELDERLY_MEDICATION_TABLE_ID,
+  MEDICATION_LOGS_TABLE_ID,
+  MEDICATION_TABLE_ID,
+  tablesDB,
 } from "./appwrite";
 import { getElderlyByUserId } from "./elderly";
 
@@ -473,6 +473,7 @@ export async function fetchFinishedMedicationReminders(
       queries: [
         Query.equal("elderly", profile.$id),
         Query.equal("is_finished", true),
+        Query.equal("active", true),
         Query.orderDesc("end_date"),
         Query.limit(50),
       ],
@@ -694,4 +695,53 @@ export async function getFormattedTodayMedicationSummary(
   }
 
   return `Here is your medication schedule for today:\n${items.join("\n")}`;
+}
+
+/**
+ * Fetch medication reminders that the elderly has cancelled (active=false)
+ * but not yet confirmed by the caregiver (is_finished=false).
+ */
+export async function fetchPendingCancelReminders(
+  elderlyIds: string[],
+): Promise<ElderlyMedicationReminder[]> {
+  if (!ELDERLY_MEDICATION_REMINDER_TABLE_ID || elderlyIds.length === 0)
+    return [];
+
+  try {
+    const response = await tablesDB.listRows<ElderlyMedicationReminder>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+      queries: [
+        Query.equal("elderly", elderlyIds),
+        Query.equal("active", false),
+        Query.equal("is_finished", false),
+        Query.orderDesc("$updatedAt"),
+        Query.limit(100),
+      ],
+    });
+    return response.rows;
+  } catch (error) {
+    console.error("Error fetching pending cancel reminders:", error);
+    return [];
+  }
+}
+
+/**
+ * Caregiver confirms that a cancelled medication reminder is finished.
+ * Sets is_finished=true and end_date=now.
+ */
+export async function confirmCancelMedication(
+  reminderId: string,
+): Promise<void> {
+  if (!ELDERLY_MEDICATION_REMINDER_TABLE_ID) return;
+
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+    rowId: reminderId,
+    data: {
+      is_finished: true,
+      end_date: new Date().toISOString(),
+    },
+  });
 }

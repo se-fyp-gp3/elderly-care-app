@@ -6,7 +6,12 @@
  */
 
 import { MedicationItem } from "@/components/MedicationCard";
-import { Elderly, ElderlyMedication, Medication } from "@/types/appwrite";
+import {
+    Elderly,
+    ElderlyMedication,
+    ElderlyMedicationReminder,
+    Medication,
+} from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
     DATABASE_ID,
@@ -29,6 +34,16 @@ export interface ElderlyGroup {
 export interface FetchMedicationResult {
   elderlyGroups: ElderlyGroup[];
   linkedElderly: Elderly[];
+}
+
+export interface PendingCancelReminder {
+  reminderId: string;
+  elderlyId: string;
+  elderlyName: string;
+  medicationName: string;
+  dosage: string;
+  reminderTimes: string[];
+  updatedAt: string;
 }
 
 export interface AddMedicationData {
@@ -95,11 +110,23 @@ export async function fetchCaregiverMedicationData(
     queries: [Query.equal("elderly", elderlyIds), Query.limit(100)],
   });
 
-  // 2a. Fetch Reminders (to link logs)
+  // 2a. Fetch Reminders (to link logs) — only active ones
   const remindersResponse = await tablesDB.listRows<any>({
     databaseId: DATABASE_ID,
     tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-    queries: [Query.equal("elderly", elderlyIds), Query.limit(1000)],
+    queries: [Query.equal("elderly", elderlyIds), Query.equal("active", true), Query.limit(1000)],
+  });
+
+  // Also fetch inactive reminders to know which prescriptions are cancelled
+  const inactiveRemindersResponse = await tablesDB.listRows<any>({
+    databaseId: DATABASE_ID,
+    tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+    queries: [Query.equal("elderly", elderlyIds), Query.equal("active", false), Query.limit(1000)],
+  });
+  const cancelledPrescriptionIds = new Set<string>();
+  inactiveRemindersResponse.rows.forEach((reminder) => {
+    const prescriptionId = getRelationshipId(reminder.elderly_medication);
+    if (prescriptionId) cancelledPrescriptionIds.add(prescriptionId);
   });
 
   // Map Prescription ID -> Reminder ID
@@ -151,7 +178,12 @@ export async function fetchCaregiverMedicationData(
     .map((elderly) => {
       const elderlyPrescriptions = prescriptionsResponse.rows.filter((row) => {
         const elderlyId = getRelationshipId(row.elderly);
-        return elderlyId === elderly.$id;
+        if (elderlyId !== elderly.$id) return false;
+        // Exclude prescriptions whose reminders are inactive (cancelled)
+        if (cancelledPrescriptionIds.has(row.$id)) return false;
+        // Only include prescriptions that have an active reminder
+        if (!prescriptionToReminderMap.has(row.$id)) return false;
+        return true;
       });
 
       const dailyMeds: MedicationItem[] = [];
@@ -333,6 +365,105 @@ export async function fetchCaregiverMedicationData(
     .filter((g) => g.medications.length > 0);
 
   return { elderlyGroups: groups, linkedElderly: elderlyList };
+}
+
+export async function fetchCaregiverPendingCancelReminders(
+  userId: string,
+): Promise<PendingCancelReminder[]> {
+  const caregiver = await getCaregiverByUserId(userId);
+  if (!caregiver) return [];
+
+  const elderlyList = await getLinkedElderly(caregiver.$id);
+  if (elderlyList.length === 0) return [];
+
+  const elderlyIds = elderlyList.map((elderly) => elderly.$id);
+  const elderlyMap = new Map(elderlyList.map((elderly) => [elderly.$id, elderly]));
+
+  const remindersResponse = await tablesDB.listRows<ElderlyMedicationReminder>({
+    databaseId: DATABASE_ID,
+    tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+    queries: [
+      Query.equal("elderly", elderlyIds),
+      Query.equal("active", false),
+      Query.equal("is_finished", false),
+      Query.orderDesc("$updatedAt"),
+      Query.limit(100),
+    ],
+  });
+
+  const prescriptionIds = Array.from(
+    new Set(
+      remindersResponse.rows
+        .map((reminder) => getRelationshipId(reminder.elderly_medication))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  const prescriptionMap = new Map<string, ElderlyMedication>();
+  if (prescriptionIds.length > 0) {
+    const prescriptionsResponse = await tablesDB.listRows<ElderlyMedication>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_MEDICATION_TABLE_ID,
+      queries: [Query.equal("$id", prescriptionIds), Query.limit(100)],
+    });
+    prescriptionsResponse.rows.forEach((row) => {
+      prescriptionMap.set(row.$id, row);
+    });
+  }
+
+  const medicationIds = Array.from(
+    new Set(
+      Array.from(prescriptionMap.values())
+        .map((prescription) => getRelationshipId(prescription.medication))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  const medicationMap = new Map<string, Medication>();
+  if (medicationIds.length > 0) {
+    const medicationsResponse = await tablesDB.listRows<Medication>({
+      databaseId: DATABASE_ID,
+      tableId: MEDICATION_TABLE_ID,
+      queries: [Query.equal("$id", medicationIds), Query.limit(100)],
+    });
+    medicationsResponse.rows.forEach((row) => {
+      medicationMap.set(row.$id, row);
+    });
+  }
+
+  return remindersResponse.rows.map((reminder) => {
+    const elderlyId = getRelationshipId(reminder.elderly) || "";
+    const elderlyName =
+      elderlyMap.get(elderlyId)?.name ||
+      (typeof reminder.elderly === "object" && reminder.elderly?.name) ||
+      "Unknown elderly";
+
+    const prescriptionId = getRelationshipId(reminder.elderly_medication);
+    const prescription = prescriptionId ? prescriptionMap.get(prescriptionId) : null;
+    const medicationId = prescription ? getRelationshipId(prescription.medication) : null;
+    const medication = medicationId ? medicationMap.get(medicationId) : null;
+
+    const medicationName =
+      medication?.name ||
+      (typeof prescription?.medication === "object" && prescription.medication?.name) ||
+      "Unknown medication";
+
+    const dosageValue = prescription?.dosage;
+    const dosageUnit = medication?.unit ||
+      (typeof prescription?.medication === "object" && prescription.medication?.unit) ||
+      "";
+    const dosage = dosageValue ? `${dosageValue} ${dosageUnit}`.trim() : "";
+
+    return {
+      reminderId: reminder.$id,
+      elderlyId,
+      elderlyName,
+      medicationName,
+      dosage,
+      reminderTimes: reminder.reminder_times || [],
+      updatedAt: reminder.$updatedAt,
+    };
+  });
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────

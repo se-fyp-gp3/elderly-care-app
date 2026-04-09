@@ -220,16 +220,28 @@ export async function fetchDayMedicationEvents(
     queries: [Query.equal("elderly", elderlyIds), Query.limit(100)],
   });
 
-  // 2. Reminders keyed by prescription ID ─────────────────────────────────────
+  // 2. Reminders keyed by prescription ID — only active ones ──────────────────
   const medicationRemindersResponse = await tablesDB.listRows<any>({
     databaseId: DATABASE_ID,
     tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-    queries: [Query.equal("elderly", elderlyIds), Query.limit(100)],
+    queries: [Query.equal("elderly", elderlyIds), Query.equal("active", true), Query.limit(100)],
   });
   const prescriptionToReminderMap = new Map<string, string>();
   medicationRemindersResponse.rows.forEach((reminder) => {
     const prescriptionId = getRelationshipId(reminder.elderly_medication);
     if (prescriptionId) prescriptionToReminderMap.set(prescriptionId, reminder.$id);
+  });
+
+  // Also fetch inactive to exclude cancelled prescriptions
+  const inactiveRemindersResponse = await tablesDB.listRows<any>({
+    databaseId: DATABASE_ID,
+    tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+    queries: [Query.equal("elderly", elderlyIds), Query.equal("active", false), Query.limit(100)],
+  });
+  const cancelledPrescriptionIds = new Set<string>();
+  inactiveRemindersResponse.rows.forEach((reminder) => {
+    const prescriptionId = getRelationshipId(reminder.elderly_medication);
+    if (prescriptionId) cancelledPrescriptionIds.add(prescriptionId);
   });
 
   // 3. Medication details keyed by medication ID ───────────────────────────────
@@ -274,6 +286,10 @@ export async function fetchDayMedicationEvents(
   elderlyMedicationResponse.rows.forEach((prescription) => {
     const elderlyId = getRelationshipId(prescription.elderly);
     if (!elderlyId) return;
+    // Skip cancelled prescriptions
+    if (cancelledPrescriptionIds.has(prescription.$id)) return;
+    // Only include prescriptions that have an active reminder
+    if (!prescriptionToReminderMap.has(prescription.$id)) return;
     const elderlyName = elderlyMap.get(elderlyId) || "Unknown";
 
     const medicationId = getRelationshipId(prescription.medication);

@@ -1,5 +1,8 @@
+import React, { useEffect, useState } from "react";
+import FallCountdownOverlay from "@/components/FallCountdownOverlay";
 import MiniSettingsGearButton from "@/components/MiniSettingsGearButton";
 import { useAuth } from "@/lib/auth-context";
+import { startFallDetection, stopFallDetection } from "@/lib/fall-detection";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
@@ -36,8 +39,23 @@ export default function ElderlyTabsLayout() {
   const isNonDefault = isAccessible || isSimplified;
   const iconSize = isSimplified ? 36 : isAccessible ? 32 : undefined;
 
+  // ── Fall Detection ──
+  const [fallDetected, setFallDetected] = useState(false);
+
+  useEffect(() => {
+    startFallDetection(() => setFallDetected(true));
+    return () => {
+      stopFallDetection();
+    };
+  }, []);
+
   return (
-    <Tabs
+    <>
+      <FallCountdownOverlay
+        visible={fallDetected}
+        onDismiss={() => setFallDetected(false)}
+      />
+      <Tabs
       screenOptions={{
         headerStyle: { backgroundColor: theme.colors.surface },
         headerTintColor: theme.colors.onSurface,
@@ -161,5 +179,6 @@ export default function ElderlyTabsLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }

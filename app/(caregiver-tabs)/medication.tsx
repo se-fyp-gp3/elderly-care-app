@@ -13,14 +13,17 @@ import {
   addMedication,
   confirmMedicationTaking,
   ElderlyGroup,
+  fetchCaregiverPendingCancelReminders,
   fetchCaregiverMedicationData,
   markMedicationProcessed,
+  PendingCancelReminder,
   undoMedicationTaking,
 } from "@/lib/medication";
 import { Elderly } from "@/types/appwrite";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Notifications from "expo-notifications";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -52,6 +55,7 @@ Notifications.setNotificationHandler({
 
 export default function MedicationManagement() {
   const theme = useTheme();
+  const router = useRouter();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -74,6 +78,9 @@ export default function MedicationManagement() {
   );
   const [undoVisible, setUndoVisible] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(null);
+
+  // Pending cancel reminders (active=false, is_finished=false)
+  const [pendingCancels, setPendingCancels] = useState<PendingCancelReminder[]>([]);
 
   // Add Medication State
   const [addMedDialogVisible, setAddMedDialogVisible] = useState(false);
@@ -139,6 +146,9 @@ export default function MedicationManagement() {
       const result = await fetchCaregiverMedicationData(user.$id);
       setLinkedElderly(result.linkedElderly);
       setElderlyGroups(result.elderlyGroups);
+
+      const cancels = await fetchCaregiverPendingCancelReminders(user.$id);
+      setPendingCancels(cancels);
     } catch (err) {
       console.error("Error fetching medications", err);
     } finally {
@@ -410,6 +420,20 @@ export default function MedicationManagement() {
           />
         </View>
 
+        {pendingCancels.length > 0 && (
+          <View style={styles.section}>
+            <Button
+              mode="contained-tonal"
+              icon="alert-circle-outline"
+              contentStyle={styles.cancelQuickActionContent}
+              labelStyle={styles.cancelQuickActionLabel}
+              onPress={() => router.push("/cancelled-medications" as any)}
+            >
+              {`Cancelled by elderly: ${pendingCancels.length} waiting for confirmation`}
+            </Button>
+          </View>
+        )}
+
         <View style={styles.section}>
           <View
             style={{
@@ -557,6 +581,7 @@ export default function MedicationManagement() {
             ))
           )}
         </View>
+
       </ScrollView>
 
       <Portal>
@@ -659,5 +684,12 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
+  },
+  cancelQuickActionContent: {
+    minHeight: 52,
+  },
+  cancelQuickActionLabel: {
+    fontSize: 14,
+    textAlign: "left",
   },
 });

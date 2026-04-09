@@ -155,21 +155,38 @@ export async function computeElderlyStatus(
       if (prescriptions.length === 0) {
         medicationSummary = "No schedule";
       } else {
-        // 2b. Fetch reminders to link prescriptions -> logs
+        // 2b. Fetch reminders to link prescriptions -> logs (only active)
         const remindersRes = await tablesDB.listRows<any>({
           databaseId: DATABASE_ID,
           tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
           queries: [
             Query.equal("elderly", elderlyId),
+            Query.equal("active", true),
             Query.limit(200),
           ],
         });
 
-        // Map prescription ID -> reminder ID
+        // Map prescription ID -> reminder ID (active reminders only)
         const prescriptionToReminder = new Map<string, string>();
         remindersRes.rows.forEach((rem: any) => {
           const pId = resolveRelationId(rem.elderly_medication);
           if (pId) prescriptionToReminder.set(pId, rem.$id);
+        });
+
+        // Fetch inactive reminders to exclude cancelled prescriptions
+        const inactiveRemindersRes = await tablesDB.listRows<any>({
+          databaseId: DATABASE_ID,
+          tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+          queries: [
+            Query.equal("elderly", elderlyId),
+            Query.equal("active", false),
+            Query.limit(200),
+          ],
+        });
+        const cancelledPrescriptionIds = new Set<string>();
+        inactiveRemindersRes.rows.forEach((rem: any) => {
+          const pId = resolveRelationId(rem.elderly_medication);
+          if (pId) cancelledPrescriptionIds.add(pId);
         });
 
         // Collect all reminder IDs
@@ -207,7 +224,12 @@ export async function computeElderlyStatus(
         let missedSlots = 0;
         let pendingSlots = 0;
 
-        prescriptions.forEach((prescription: any) => {
+        // Filter out cancelled prescriptions (active=false) and orphaned ones without active reminder
+        const activePrescriptions = prescriptions.filter(
+          (p: any) => !cancelledPrescriptionIds.has(p.$id) && prescriptionToReminder.has(p.$id),
+        );
+
+        activePrescriptions.forEach((prescription: any) => {
           const times: string[] = prescription.approx_times || [];
           times.forEach((tStr: string) => {
             const scheduled = new Date();

@@ -1,6 +1,6 @@
 import { useAuth } from "@/lib/auth-context";
 import { fetchElderlySchedulesForUser, getElderlyByUserId } from "@/lib/elderly";
-import { createScheduleTask, fetchScheduleCategories } from "@/lib/schedule";
+import { createScheduleTask, fetchScheduleCategories, markScheduleTaskCompleted } from "@/lib/schedule";
 import { Schedule, ScheduleCategory } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -386,6 +386,24 @@ export default function ElderlySchedule() {
                         {schedule.type}
                       </Chip>
                     ) : null}
+                    <View style={{ flex: 1 }} />
+                    <Button
+                      mode="contained"
+                      compact
+                      icon="check"
+                      onPress={async () => {
+                        try {
+                          await markScheduleTaskCompleted(schedule.$id);
+                          await fetchSchedules();
+                        } catch (e) {
+                          Alert.alert("Error", "Failed to mark as completed");
+                        }
+                      }}
+                      style={{ borderRadius: 20 }}
+                      labelStyle={{ fontSize: 12 }}
+                    >
+                      Complete
+                    </Button>
                   </View>
                 </View>
               );

@@ -207,3 +207,17 @@ export type CaregiverConnection = Models.Row & {
     status: string;
     created_at: string | null;
 }
+
+export type EmergencyAlert = Models.Row & {
+    type: string;
+    elderly_id: string;
+    elderly_name: string;
+    caregiver_user_id: string;
+    latitude: number | null;
+    longitude: number | null;
+    location_name: string | null;
+    status: string;
+    description: string | null;
+    resolved_at: string | null;
+    resolved_by: string | null;
+}
