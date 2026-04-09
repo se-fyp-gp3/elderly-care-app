@@ -1,13 +1,14 @@
+import i18n from "@/lib/i18n";
 import { ElderlyStatus, HealthData } from "@/types/appwrite";
 import { Query } from "react-native-appwrite";
 import {
-  DATABASE_ID,
-  ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-  ELDERLY_MEDICATION_TABLE_ID,
-  HEALTH_DATA_TABLE_ID,
-  MEDICATION_LOGS_TABLE_ID,
-  SCHEDULE_TABLE_ID,
-  tablesDB,
+    DATABASE_ID,
+    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+    ELDERLY_MEDICATION_TABLE_ID,
+    HEALTH_DATA_TABLE_ID,
+    MEDICATION_LOGS_TABLE_ID,
+    SCHEDULE_TABLE_ID,
+    tablesDB,
 } from "./appwrite";
 
 export interface ElderlyStatusInfo {
@@ -52,7 +53,7 @@ export async function computeElderlyStatus(
   let lastCheckTime: string | null = null;
   let missedMedCount = 0;
   let nextAppointment: string | null = null;
-  let medicationSummary = "Up to date";
+  let medicationSummary = i18n.t('medication.upToDate');
 
   try {
     // ── 1. Latest health data ───────────────────────────────────────────
@@ -78,10 +79,10 @@ export async function computeElderlyStatus(
         const dia = latestBP.second_value ?? 0;
         if (sys >= 140 || dia >= 90) {
           status = ElderlyStatus.WARNING;
-          reasons.push(`High BP: ${sys}/${dia} mmHg`);
+          reasons.push(i18n.t('healthData.highBP', { sys, dia }));
         } else if (sys <= 90 || dia <= 60) {
           status = ElderlyStatus.WARNING;
-          reasons.push(`Low BP: ${sys}/${dia} mmHg`);
+          reasons.push(i18n.t('healthData.lowBP', { sys, dia }));
         }
       }
 
@@ -91,10 +92,10 @@ export async function computeElderlyStatus(
         const hr = latestHR.numeric_value;
         if (hr > 100) {
           status = ElderlyStatus.WARNING;
-          reasons.push(`High heart rate: ${hr} bpm`);
+          reasons.push(i18n.t('healthData.highHeartRate', { hr }));
         } else if (hr < 50) {
           status = ElderlyStatus.WARNING;
-          reasons.push(`Low heart rate: ${hr} bpm`);
+          reasons.push(i18n.t('healthData.lowHeartRate', { hr }));
         }
       }
 
@@ -104,10 +105,10 @@ export async function computeElderlyStatus(
         const temp = latestTemp.numeric_value;
         if (temp >= 38) {
           status = ElderlyStatus.WARNING;
-          reasons.push(`Fever: ${temp}°C`);
+          reasons.push(i18n.t('healthData.fever', { temp }));
         } else if (temp <= 35) {
           status = ElderlyStatus.WARNING;
-          reasons.push(`Low temperature: ${temp}°C`);
+          reasons.push(i18n.t('healthData.lowTemperature', { temp }));
         }
       }
 
@@ -120,12 +121,12 @@ export async function computeElderlyStatus(
           if (status === ElderlyStatus.NORMAL) {
             status = ElderlyStatus.WARNING;
           }
-          reasons.push(`No check-in for ${Math.floor(diffDays)} days`);
+          reasons.push(i18n.t('healthData.noCheckIn', { days: Math.floor(diffDays) }));
         }
       }
     } else {
       // No health data at all
-      reasons.push("No health data recorded");
+      reasons.push(i18n.t('healthData.noHealthDataRecorded'));
     }
 
     // ── 2. Medication status (based on prescription plans + logs) ──────
@@ -143,7 +144,7 @@ export async function computeElderlyStatus(
       const prescriptions = prescriptionsRes.rows;
 
       if (prescriptions.length === 0) {
-        medicationSummary = "No schedule";
+        medicationSummary = i18n.t('medication.noSchedule');
       } else {
         // 2b. Fetch reminders to link prescriptions -> logs
         const remindersRes = await tablesDB.listRows<any>({
@@ -231,23 +232,23 @@ export async function computeElderlyStatus(
 
         if (missedSlots > 0) {
           status = ElderlyStatus.WARNING;
-          reasons.push(`${missedSlots} missed medication(s) today`);
+          reasons.push(i18n.t('medication.missedMedToday', { count: missedSlots }));
           if (pendingSlots > 0) {
-            medicationSummary = `${missedSlots} missed, ${pendingSlots} pending`;
+            medicationSummary = i18n.t('medication.missedAndPending', { missed: missedSlots, pending: pendingSlots });
           } else {
-            medicationSummary = `${missedSlots} missed`;
+            medicationSummary = i18n.t('medication.xMissed', { count: missedSlots });
           }
         } else if (pendingSlots > 0) {
-          medicationSummary = `${pendingSlots} pending`;
+          medicationSummary = i18n.t('medication.xPending', { count: pendingSlots });
         } else if (takenSlots > 0) {
-          medicationSummary = "All taken";
+          medicationSummary = i18n.t('medication.allTakenText');
         } else {
-          medicationSummary = "No schedule";
+          medicationSummary = i18n.t('medication.noSchedule');
         }
       }
     } catch {
       // Medication query may fail if table is empty; ignore
-      medicationSummary = "Unknown";
+      medicationSummary = i18n.t('medication.unknownMedStatus');
     }
 
     // ── 3. Next appointment / schedule ──────────────────────────────────
@@ -299,14 +300,14 @@ export async function computeElderlyStatus(
  * Format a lastCheckTime into a human-readable relative string.
  */
 export function formatLastCheck(timeStr: string | null): string {
-  if (!timeStr) return "Never";
+  if (!timeStr) return i18n.t('common.never');
   const diff = Date.now() - new Date(timeStr).getTime();
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return i18n.t('common.justNow');
+  if (minutes < 60) return i18n.t('common.minutesAgo', { minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return i18n.t('common.hoursAgo', { hours });
   const days = Math.floor(hours / 24);
-  if (days === 1) return "Yesterday";
-  return `${days}d ago`;
+  if (days === 1) return i18n.t('common.yesterday');
+  return i18n.t('common.daysAgo', { days });
 }

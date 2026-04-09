@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, Card, Chip, IconButton, Text } from "react-native-paper";
 
@@ -38,6 +39,8 @@ export default function MedicationCard({
   onRemind,
   onMarkProcessed,
 }: MedicationCardProps) {
+  const { t } = useTranslation();
+
   return (
     <Card style={styles.medicationCard}>
       <Card.Content>
@@ -64,29 +67,29 @@ export default function MedicationCard({
             }
           >
             {med.status === "completed"
-              ? "Completed"
+              ? t('common.completed')
               : med.status === "pending"
-                ? "Pending"
-                : "Expired"}
+                ? t('common.pending')
+                : t('common.missed')}
           </Chip>
         </View>
 
         <View style={styles.medDetails}>
           <View style={styles.detailRow}>
             <MaterialCommunityIcons name="pill" size={16} />
-            <Text variant="bodySmall"> Dose: {med.dosage}</Text>
+            <Text variant="bodySmall"> {t('medication.dose', { dosage: med.dosage })}</Text>
           </View>
           <View style={styles.detailRow}>
             <MaterialCommunityIcons name="repeat" size={16} />
-            <Text variant="bodySmall"> Frequency: {med.frequency}</Text>
+            <Text variant="bodySmall"> {t('medication.frequencyLabel', { frequency: med.frequency })}</Text>
           </View>
           <View style={styles.detailRow}>
             <MaterialCommunityIcons name="clock-outline" size={16} />
-            <Text variant="bodySmall"> Time: {med.time}</Text>
+            <Text variant="bodySmall"> {t('medication.timeLabel', { time: med.time })}</Text>
           </View>
           <View style={styles.detailRow}>
             <MaterialCommunityIcons name="history" size={16} />
-            <Text variant="bodySmall"> Last taken: {med.lastTaken}</Text>
+            <Text variant="bodySmall"> {t('medication.lastTaken', { time: med.lastTaken })}</Text>
           </View>
         </View>
 
@@ -98,16 +101,16 @@ export default function MedicationCard({
                 compact
                 onPress={() => onConfirmPress(med)}
               >
-                Confirm taking
+                {t('medication.confirmTaking')}
               </Button>
               <Button mode="outlined" compact onPress={() => onRemind(med.id)}>
-                Remind me later
+                {t('medication.remindLater')}
               </Button>
             </>
           )}
           {med.status === "completed" && (
             <Button mode="outlined" compact disabled>
-              Completed
+              {t('common.completed')}
             </Button>
           )}
           {med.status === "overdue" && (
@@ -117,7 +120,7 @@ export default function MedicationCard({
               style={styles.overdueButton}
               onPress={() => onMarkProcessed(med.id)}
             >
-              Mark Processed
+              {t('medication.markProcessed')}
             </Button>
           )}
           <IconButton

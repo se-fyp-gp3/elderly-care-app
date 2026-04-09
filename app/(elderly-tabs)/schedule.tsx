@@ -3,12 +3,14 @@ import { fetchElderlySchedulesForUser } from "@/lib/elderly";
 import { Schedule } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card, Chip, List, Text, useTheme } from "react-native-paper";
 
 export default function ElderlySchedule() {
   const { user } = useAuth();
   const theme = useTheme();
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = React.useState(false);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
 
@@ -62,28 +64,28 @@ export default function ElderlySchedule() {
       {/* Header */}
       <View style={styles.header}>
         <Text variant="headlineSmall" style={styles.title}>
-          My Schedule
+          {t('schedule.mySchedule')}
         </Text>
         <Text
           variant="bodyMedium"
           style={{ color: theme.colors.onSurfaceVariant }}
         >
-          View your appointments and reminders
+          {t('schedule.viewAppointments')}
         </Text>
       </View>
 
       {/* Today's Schedule */}
       <Text variant="titleMedium" style={styles.sectionTitle}>
-        Upcoming
+        {t('home.upcoming')}
       </Text>
       <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         {todaySchedules.length > 0 ? (
           todaySchedules.map((schedule, index) => (
             <List.Item
               key={index}
-              title={schedule.title || "Appointment"}
+              title={schedule.title || t('home.appointment')}
               description={
-                schedule.description || schedule.time || "No details"
+                schedule.description || schedule.time || t('home.noDetails')
               }
               left={() => (
                 <View
@@ -107,7 +109,7 @@ export default function ElderlySchedule() {
                   }}
                   textStyle={{ color: getStatusColor(schedule.status) }}
                 >
-                  {schedule.status || "Upcoming"}
+                  {schedule.status || t('home.upcoming')}
                 </Chip>
               )}
               style={styles.scheduleItem}
@@ -121,13 +123,13 @@ export default function ElderlySchedule() {
               color="#4CAF50"
             />
             <Text variant="bodyLarge" style={{ marginTop: 8 }}>
-              No upcoming events
+              {t('home.noUpcomingEvents')}
             </Text>
             <Text
               variant="bodySmall"
               style={{ color: theme.colors.onSurfaceVariant }}
             >
-              Your schedule is clear
+              {t('home.scheduleIsClear')}
             </Text>
           </View>
         )}
@@ -137,7 +139,7 @@ export default function ElderlySchedule() {
       {pastSchedules.length > 0 && (
         <>
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            Past Events
+            {t('schedule.pastEvents')}
           </Text>
           <Card
             style={[styles.card, { backgroundColor: theme.colors.surface }]}
@@ -145,8 +147,8 @@ export default function ElderlySchedule() {
             {pastSchedules.slice(0, 5).map((schedule, index) => (
               <List.Item
                 key={index}
-                title={schedule.title || "Appointment"}
-                description={schedule.time || "No date"}
+                title={schedule.title || t('home.appointment')}
+                description={schedule.time || t('schedule.noDate')}
                 left={() => (
                   <View
                     style={[
@@ -203,15 +205,14 @@ export default function ElderlySchedule() {
               variant="titleSmall"
               style={{ marginLeft: 8, color: theme.colors.onPrimaryContainer }}
             >
-              Reminders
+              {t('schedule.reminders')}
             </Text>
           </View>
           <Text
             variant="bodyMedium"
             style={{ color: theme.colors.onPrimaryContainer, marginTop: 8 }}
           >
-            You will receive notifications before your scheduled appointments.
-            Make sure notifications are enabled.
+            {t('schedule.remindersDesc')}
           </Text>
         </Card.Content>
       </Card>

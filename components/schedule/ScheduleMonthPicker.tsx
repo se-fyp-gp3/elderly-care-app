@@ -1,4 +1,6 @@
-import React from "react";
+import { getDateLocale } from "@/lib/i18n";
+import React, { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Button, Dialog, Portal, Text, useTheme } from "react-native-paper";
 
@@ -11,11 +13,6 @@ interface ScheduleMonthPickerProps {
   onSelectMonth: (monthIndex: number) => void;
 }
 
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
 export default function ScheduleMonthPicker({
   visible,
   onDismiss,
@@ -25,6 +22,15 @@ export default function ScheduleMonthPicker({
   onSelectMonth,
 }: ScheduleMonthPickerProps) {
   const theme = useTheme();
+  const { t, i18n } = useTranslation();
+  const locale = getDateLocale(i18n.language);
+  const MONTHS = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) =>
+        new Date(2024, i).toLocaleDateString(locale, { month: "short" })
+      ),
+    [locale]
+  );
 
   return (
     <Portal>
@@ -47,7 +53,7 @@ export default function ScheduleMonthPicker({
               onPress={() => onChangeYear(pickerYear - 1)}
               compact
             >
-              Prev
+              {t('schedule.prev')}
             </Button>
             <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
               {pickerYear}
@@ -58,7 +64,7 @@ export default function ScheduleMonthPicker({
               onPress={() => onChangeYear(pickerYear + 1)}
               compact
             >
-              Next
+              {t('schedule.next')}
             </Button>
           </View>
           <View
@@ -99,7 +105,7 @@ export default function ScheduleMonthPicker({
           </View>
         </Dialog.Content>
         <Dialog.Actions>
-          <Button onPress={onDismiss}>Cancel</Button>
+          <Button onPress={onDismiss}>{t('common.cancel')}</Button>
         </Dialog.Actions>
       </Dialog>
     </Portal>

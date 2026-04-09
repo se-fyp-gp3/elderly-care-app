@@ -2,6 +2,7 @@ import { ScheduleEvent } from "@/lib/schedule";
 import { ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
     StyleSheet,
     TouchableOpacity,
@@ -31,6 +32,7 @@ export default function ScheduleSingleEventCard({
   onRemind,
 }: ScheduleSingleEventCardProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const isCompleted =
     String(item.status).toLowerCase() ===
     String(ScheduleStatus.COMPLETED).toLowerCase();
@@ -159,7 +161,7 @@ export default function ScheduleSingleEventCard({
                 uppercase={false}
                 onPress={() => onMarkDone(item.id)}
               >
-                Mark Done
+                {t('schedule.markDone')}
               </Button>
             </View>
           )}
@@ -174,7 +176,7 @@ export default function ScheduleSingleEventCard({
                 icon="undo"
                 onPress={() => onUndoTask(item.id)}
               >
-                Undo
+                {t('schedule.undo')}
               </Button>
             </View>
           )}

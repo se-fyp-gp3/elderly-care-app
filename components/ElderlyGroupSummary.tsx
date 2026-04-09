@@ -1,6 +1,7 @@
 import { MedicationItem } from "@/components/MedicationCard";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 
@@ -12,7 +13,7 @@ export default function ElderlyGroupSummary({
   medications,
 }: ElderlyGroupSummaryProps) {
   const theme = useTheme();
-
+  const { t } = useTranslation();
   if (medications.length === 0) return null;
 
   const totalMeds = medications.length;
@@ -108,12 +109,12 @@ export default function ElderlyGroupSummary({
         }}
       >
         {allDone
-          ? "All taken today"
+          ? t('medication.allTakenToday')
           : nextPending
-            ? `Next: ${nextPending.time} ${nextPending.name}${missedMedsCount > 0 ? ` · ${missedMedsCount} missed` : ""}`
+            ? `${t('medication.nextMed', { time: nextPending.time, name: nextPending.name })}${missedMedsCount > 0 ? ` · ${t('medication.multipleMissed', { count: missedMedsCount })}` : ""}`
             : missedMedsCount === 1
-              ? `1 missed · ${medications.find((m) => m.status === "missed")?.name || ""}`
-              : `${missedMedsCount} missed`}
+              ? t('medication.oneMissed', { name: medications.find((m) => m.status === "missed")?.name || "" })
+              : t('medication.multipleMissed', { count: missedMedsCount })}
       </Text>
     </View>
   );

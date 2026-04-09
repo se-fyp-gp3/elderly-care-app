@@ -1,14 +1,16 @@
 import { MedicationItem } from "@/components/MedicationCard";
+import { translateFrequency } from "@/lib/schedule";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { TouchableOpacity, View } from "react-native";
 import {
-    Avatar,
-    Button,
-    Card,
-    IconButton,
-    Text,
-    useTheme,
+  Avatar,
+  Button,
+  Card,
+  IconButton,
+  Text,
+  useTheme,
 } from "react-native-paper";
 
 interface TimeSlotCardProps {
@@ -34,6 +36,7 @@ export default function TimeSlotCard({
   setNoteText,
 }: TimeSlotCardProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const totalMeds = meds.length;
   const completedMeds = meds.filter((m) => m.status === "completed").length;
@@ -44,15 +47,15 @@ export default function TimeSlotCard({
   let summaryText = "";
   let summaryIcon = "information-outline";
   if (allDone) {
-    summaryText = "All taken";
+    summaryText = t('medication.allTaken');
     summaryIcon = "check-circle";
   } else if (missedMeds > 0 && completedMeds + missedMeds === totalMeds) {
-    summaryText = `${missedMeds} missed`;
+    summaryText = `${missedMeds} ${t('common.missed').toLowerCase()}`;
     summaryIcon = "alert-circle-outline";
   } else {
     const pendingCount = totalMeds - completedMeds - missedMeds;
-    summaryText = `${pendingCount} pending`;
-    if (missedMeds > 0) summaryText += ` · ${missedMeds} missed`;
+    summaryText = `${pendingCount} ${t('common.pending').toLowerCase()}`;
+    if (missedMeds > 0) summaryText += ` · ${missedMeds} ${t('common.missed').toLowerCase()}`;
     summaryIcon = "clock-outline";
   }
 
@@ -66,7 +69,7 @@ export default function TimeSlotCard({
       <Card.Title
         title={timeSlot}
         titleStyle={{ fontWeight: "bold", fontSize: 20 }}
-        subtitle={`${totalMeds} medication${totalMeds > 1 ? "s" : ""}`}
+        subtitle={t('medication.medications', { count: totalMeds })}
         left={(props) => (
           <Avatar.Icon
             {...props}
@@ -229,7 +232,7 @@ export default function TimeSlotCard({
                     variant="bodySmall"
                     style={{ color: theme.colors.outline }}
                   >
-                    {med.dosage} • {med.frequency}
+                    {med.dosage} • {translateFrequency(med.frequency)}
                   </Text>
                 </View>
 
@@ -260,11 +263,10 @@ export default function TimeSlotCard({
                     }}
                   >
                     {med.status === "completed"
-                      ? "Taken"
+                      ? t('common.taken')
                       : med.status === "pending"
-                        ? "Pending"
-                        : med.status.charAt(0).toUpperCase() +
-                          med.status.slice(1)}
+                        ? t('common.pending')
+                        : t('common.missed')}
                   </Text>
                 </View>
               </View>
@@ -292,7 +294,7 @@ export default function TimeSlotCard({
                       }}
                       style={{ marginLeft: 4 }}
                     >
-                      Take
+                      {t('medication.take')}
                     </Button>
                   </>
                 ) : (
@@ -330,7 +332,7 @@ export default function TimeSlotCard({
                         onPress={() => onUndoTaking(med)}
                         labelStyle={{ fontSize: 12 }}
                       >
-                        Undo
+                        {t('medication.undo')}
                       </Button>
                     </View>
                   )

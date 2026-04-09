@@ -6,6 +6,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text, useTheme } from "react-native-paper";
 
@@ -13,6 +14,7 @@ export default function ElderlyQRRegisterScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { signInWithToken } = useAuth();
+  const { t } = useTranslation();
 
   const { status, qrPayload, errorMsg, refresh, cleanupAndLeave } =
     useQRPairing({
@@ -58,10 +60,10 @@ export default function ElderlyQRRegisterScreen() {
             color="#4CAF50"
           />
           <Text variant="headlineSmall" style={styles.title}>
-            Account Created!
+            {t('qrRegister.accountCreated')}
           </Text>
           <Text variant="bodyMedium" style={styles.statusText}>
-            Signing you in...
+            {t('qrRegister.signingIn')}
           </Text>
           <ActivityIndicator size="large" style={{ marginTop: 16 }} />
         </>
@@ -76,10 +78,10 @@ export default function ElderlyQRRegisterScreen() {
             color="#4CAF50"
           />
           <Text variant="headlineSmall" style={styles.title}>
-            Welcome!
+            {t('qrRegister.welcome')}
           </Text>
           <Text variant="bodyMedium" style={styles.statusText}>
-            Redirecting...
+            {t('qrRegister.redirecting')}
           </Text>
         </>
       );
@@ -104,7 +106,7 @@ export default function ElderlyQRRegisterScreen() {
               marginHorizontal: 12,
             }}
           >
-            OR
+            {t('common.or')}
           </Text>
           <View
             style={[
@@ -119,7 +121,7 @@ export default function ElderlyQRRegisterScreen() {
           icon="account-plus"
           style={styles.manualButton}
         >
-          Register Manually
+          {t('qrRegister.registerManually')}
         </Button>
       </>
     ),
@@ -134,12 +136,12 @@ export default function ElderlyQRRegisterScreen() {
       onRefresh={refresh}
       onGoBack={handleGoBack}
       icon="human-cane"
-      title="Register as Elderly"
-      subtitle={`Ask your caregiver to scan this QR code\nto set up your account`}
-      scannedHint="Scan successful! Caregiver is setting up your account..."
-      waitingHint="Waiting for caregiver to complete registration..."
-      cancelledTitle="Registration Cancelled"
-      cancelledSubtitle="The caregiver cancelled the registration. Tap refresh to try again."
+      title={t('qrRegister.registerAsElderly')}
+      subtitle={t('qrRegister.askCaregiverToScan')}
+      scannedHint={t('qrRegister.scanSuccess')}
+      waitingHint={t('qrRegister.waitingForCaregiver')}
+      cancelledTitle={t('qrRegister.registrationCancelled')}
+      cancelledSubtitle={t('qrRegister.cancelledDesc')}
       renderExtra={renderExtra}
       renderFooter={renderFooter}
     />

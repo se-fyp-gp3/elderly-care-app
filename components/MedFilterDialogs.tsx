@@ -2,6 +2,7 @@ import { MedicationItem } from "@/components/MedicationCard";
 import { Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, TouchableOpacity } from "react-native";
 import {
     Avatar,
@@ -34,6 +35,7 @@ export function ElderlyFilterDialog({
   onSearchChange,
 }: ElderlyFilterDialogProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   return (
     <Dialog
@@ -41,10 +43,10 @@ export function ElderlyFilterDialog({
       onDismiss={onDismiss}
       style={{ backgroundColor: theme.colors.surface }}
     >
-      <Dialog.Title>Select Elderly</Dialog.Title>
+      <Dialog.Title>{t('medication.selectElderly')}</Dialog.Title>
       <Dialog.Content style={{ paddingBottom: 0 }}>
         <Searchbar
-          placeholder="Search"
+          placeholder={t('common.search')}
           onChangeText={onSearchChange}
           value={searchQuery}
           style={{
@@ -75,7 +77,7 @@ export function ElderlyFilterDialog({
                 backgroundColor: theme.colors.secondary,
               }}
             />
-            <Text variant="titleMedium">Everyone</Text>
+            <Text variant="titleMedium">{t('medication.everyone')}</Text>
             {selectedElderlyId === "All" && (
               <MaterialCommunityIcons
                 name="check"
@@ -125,7 +127,7 @@ export function ElderlyFilterDialog({
         </ScrollView>
       </Dialog.Content>
       <Dialog.Actions>
-        <Button onPress={onDismiss}>Cancel</Button>
+        <Button onPress={onDismiss}>{t('common.cancel')}</Button>
       </Dialog.Actions>
     </Dialog>
   );
@@ -147,6 +149,7 @@ export function StatusFilterDialog({
   onSelect,
 }: StatusFilterDialogProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   return (
     <Dialog
@@ -154,7 +157,7 @@ export function StatusFilterDialog({
       onDismiss={onDismiss}
       style={{ backgroundColor: theme.colors.surface }}
     >
-      <Dialog.Title>Filter Status</Dialog.Title>
+      <Dialog.Title>{t('medication.filterStatus')}</Dialog.Title>
       <Dialog.Content>
         {["all", "pending", "completed", "missed"].map((status) => (
           <TouchableOpacity
@@ -186,8 +189,8 @@ export function StatusFilterDialog({
             />
             <Text variant="titleMedium">
               {status === "all"
-                ? "All Status"
-                : status.charAt(0).toUpperCase() + status.slice(1)}
+                ? t('medication.allStatus')
+                : status === "pending" ? t('common.pending') : status === "completed" ? t('common.completed') : t('common.missed')}
             </Text>
             {statusFilter === status && (
               <MaterialCommunityIcons
@@ -201,7 +204,7 @@ export function StatusFilterDialog({
         ))}
       </Dialog.Content>
       <Dialog.Actions>
-        <Button onPress={onDismiss}>Cancel</Button>
+        <Button onPress={onDismiss}>{t('common.cancel')}</Button>
       </Dialog.Actions>
     </Dialog>
   );
@@ -220,17 +223,19 @@ export function ConfirmMedicationDialog({
   onDismiss,
   onConfirm,
 }: ConfirmMedicationDialogProps) {
+  const { t } = useTranslation();
+
   return (
     <Dialog visible={medItem !== null} onDismiss={onDismiss}>
-      <Dialog.Title>Confirm Medication</Dialog.Title>
+      <Dialog.Title>{t('medication.confirmMedication')}</Dialog.Title>
       <Dialog.Content>
         <Text>
-          Confirm {medItem?.name} for {medItem?.elderly}?
+          {t('medication.confirmMedFor', { name: medItem?.name, elderly: medItem?.elderly })}
         </Text>
       </Dialog.Content>
       <Dialog.Actions>
-        <Button onPress={onDismiss}>Cancel</Button>
-        <Button onPress={onConfirm}>Confirm</Button>
+        <Button onPress={onDismiss}>{t('common.cancel')}</Button>
+        <Button onPress={onConfirm}>{t('common.confirm')}</Button>
       </Dialog.Actions>
     </Dialog>
   );

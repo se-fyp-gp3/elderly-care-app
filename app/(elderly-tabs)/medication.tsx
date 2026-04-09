@@ -1,62 +1,64 @@
 import {
-  clientReactNative,
-  DATABASE_ID,
-  MEDICATION_LOGS_TABLE_ID,
+    clientReactNative,
+    DATABASE_ID,
+    MEDICATION_LOGS_TABLE_ID,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-  createElderlyMedicationWithReminder,
-  fetchCaregiversForElderly,
+    createElderlyMedicationWithReminder,
+    fetchCaregiversForElderly,
 } from "@/lib/elderly";
 import {
-  checkAndMarkSkippedMedications,
-  deactivateMedicationReminder,
-  fetchActiveMedicationReminders,
-  fetchDailyMedicationLogs,
-  fetchFinishedMedicationReminders,
-  logMedicationAction,
-  markPreviousDaysPendingAsMissing,
+    checkAndMarkSkippedMedications,
+    deactivateMedicationReminder,
+    fetchActiveMedicationReminders,
+    fetchDailyMedicationLogs,
+    fetchFinishedMedicationReminders,
+    logMedicationAction,
+    markPreviousDaysPendingAsMissing,
 } from "@/lib/medication_tracking";
 import {
-  cancelAllNotifications,
-  registerForPushNotificationsAsync,
-  scheduleMedicationNotification,
-  sendImmediateNotification,
+    cancelAllNotifications,
+    registerForPushNotificationsAsync,
+    scheduleMedicationNotification,
+    sendImmediateNotification,
 } from "@/lib/notifications";
+import { translateUnit } from "@/lib/schedule";
 import {
-  Caregiver,
-  ElderlyMedicationReminder,
-  MedicationLogs,
+    Caregiver,
+    ElderlyMedicationReminder,
+    MedicationLogs,
 } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  Animated,
-  AppState,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    Animated,
+    AppState,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
 import {
-  Button,
-  Card,
-  Divider,
-  FAB,
-  IconButton,
-  Modal,
-  Portal,
-  Switch,
-  Text,
-  TextInput,
-  useTheme
+    Button,
+    Card,
+    Divider,
+    FAB,
+    IconButton,
+    Modal,
+    Portal,
+    Switch,
+    Text,
+    TextInput,
+    useTheme
 } from "react-native-paper";
 
 // --- AI / Scan Configuration ---
@@ -89,6 +91,7 @@ type TimeGroup = {
 export default function ElderlyMedicationScreen() {
   const { user } = useAuth();
   const theme = useTheme();
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = React.useState(false);
 
   const [reminders, setReminders] = React.useState<ElderlyMedicationReminder[]>(
@@ -249,7 +252,7 @@ export default function ElderlyMedicationScreen() {
         // @ts-ignore
         const medUnit = medications[0]?.unit || "dose";
         // @ts-ignore
-        const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+        const medDosage = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
 
         list.push({
           reminder: r,
@@ -303,8 +306,8 @@ export default function ElderlyMedicationScreen() {
       if (newMissing.length > 0) {
         // Summarize
         const names = newMissing.map((i) => i.medicationName).join(", ");
-        const body = `You have missed your scheduled medication: ${names}. Please take it as soon as possible!`;
-        await sendImmediateNotification("Missed Medication Alert", body);
+        const body = t('medication.missedMedAlertDesc', { medications: names });
+        await sendImmediateNotification(t('medication.missedMedAlert'), body);
 
         // Mark as notified
         newMissing.forEach((i) => {
@@ -335,8 +338,8 @@ export default function ElderlyMedicationScreen() {
         if (triggerDate.getTime() > Date.now()) {
           const medList = names.join(", ");
           await scheduleMedicationNotification(
-            "Medication Reminder",
-            `It's time to take your medication: ${medList}`,
+            t('medication.medicationReminder'),
+            t('medication.medReminder', { medications: medList }),
             triggerDate,
           );
         }
@@ -387,7 +390,7 @@ export default function ElderlyMedicationScreen() {
 
   const analyzeMedicationImage = async (uri: string) => {
     if (!OPENROUTER_API_KEY) {
-      Alert.alert("Configuration Error", "API Key missing.");
+      Alert.alert(t('medication.configError'), t('medication.apiKeyMissing'));
       return null;
     }
 
@@ -434,7 +437,7 @@ export default function ElderlyMedicationScreen() {
       return JSON.parse(jsonString);
     } catch (error) {
       console.error("AI Analysis failed:", error);
-      Alert.alert("Error", "Failed to analyze image.");
+      Alert.alert(t('common.error'), t('medication.scanFailed'));
       return null;
     }
   };
@@ -443,7 +446,7 @@ export default function ElderlyMedicationScreen() {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission needed", "Camera permission is required.");
+        Alert.alert(t('common.permissionNeeded'), t('medication.cameraPermissionRequired'));
         return;
       }
 
@@ -476,12 +479,12 @@ export default function ElderlyMedicationScreen() {
 
           if (data.durationDays) setDurationDays(Number(data.durationDays));
 
-          Alert.alert("Success", "Medication details scanned!");
+          Alert.alert(t('common.success'), t('medication.medDetailsScanned'));
         }
       }
     } catch (error) {
       setIsScanning(false);
-      Alert.alert("Error", "Scan failed.");
+      Alert.alert(t('common.error'), t('medication.scanFailed'));
     }
   };
 
@@ -504,7 +507,7 @@ export default function ElderlyMedicationScreen() {
       );
       await fetchData();
     } catch (error) {
-      Alert.alert("Error", "Failed to update status");
+      Alert.alert(t('common.error'), t('medication.failedToUpdateStatus'));
     }
   };
 
@@ -629,12 +632,12 @@ export default function ElderlyMedicationScreen() {
     if (!user) return;
 
     if (!medicineName.trim()) {
-      showMessage("Missing info", "Please enter medicine name.");
+      showMessage(t('medication.missingInfo'), t('medication.enterMedicineName'));
       return;
     }
 
     if (timesPerDay < 1 || timesPerDay > 10) {
-      showMessage("Invalid value", "Times per day must be between 1 and 10.");
+      showMessage(t('medication.invalidValue'), t('medication.timesPerDayRange'));
       return;
     }
 
@@ -643,7 +646,7 @@ export default function ElderlyMedicationScreen() {
       .filter(Boolean);
 
     if (cleanedTimes.length === 0) {
-      showMessage("Missing info", "Please add at least one reminder time.");
+      showMessage(t('medication.missingInfo'), t('medication.addReminderTime'));
       return;
     }
 
@@ -666,7 +669,7 @@ export default function ElderlyMedicationScreen() {
       await fetchData();
     } catch (error) {
       console.error("Error saving medication:", error);
-      showMessage("Error", "Failed to save medication.");
+      showMessage(t('common.error'), t('medication.failedToSave'));
     } finally {
       setSaving(false);
     }
@@ -694,7 +697,7 @@ export default function ElderlyMedicationScreen() {
       >
         {/* To Take Today - Grouped by Time */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
-          To Take Today
+          {t('medication.toTakeToday')}
         </Text>
         {groupedTodoList.length > 0 ? (
           groupedTodoList.map((group) => {
@@ -735,7 +738,7 @@ export default function ElderlyMedicationScreen() {
                     </Text>
                   </View>
                   <Text variant="bodySmall" style={{ color: "#999" }}>
-                    {group.items.length} medication{group.items.length > 1 ? "s" : ""}
+                    {t('medication.medications', { count: group.items.length })}
                   </Text>
                 </View>
 
@@ -784,7 +787,7 @@ export default function ElderlyMedicationScreen() {
                               color="#2E7D32"
                             />
                             <Text style={{ color: "#2E7D32", fontSize: 12, fontWeight: "600", marginLeft: 4 }}>
-                              Taken
+                              {t('common.taken')}
                             </Text>
                           </TouchableOpacity>
                         ) : (
@@ -802,7 +805,7 @@ export default function ElderlyMedicationScreen() {
                               color="#FFF"
                             />
                             <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "bold", marginLeft: 4 }}>
-                              {isMissing ? "Take" : "Take"}
+                              {t('medication.take')}
                             </Text>
                           </TouchableOpacity>
                         )}
@@ -825,7 +828,7 @@ export default function ElderlyMedicationScreen() {
                 variant="bodyLarge"
                 style={{ marginTop: 8, color: "#666" }}
               >
-                No medications scheduled for today.
+                {t('medication.noMedsToday')}
               </Text>
             </View>
           </Card>
@@ -833,7 +836,7 @@ export default function ElderlyMedicationScreen() {
 
         {/* My Medications List (Overview) */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
-          Active Prescriptions
+          {t('medication.activePrescriptions')}
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           {reminders.length > 0 ? (
@@ -847,12 +850,12 @@ export default function ElderlyMedicationScreen() {
 
               const handleDelete = () => {
                 Alert.alert(
-                  "Remove Prescription",
-                  "Are you sure you want to remove this prescription? It will be hidden from your active list and pending schedules.",
+                  t('medication.removePrescription'),
+                  t('medication.removePrescriptionConfirm'),
                   [
-                    { text: "Cancel", style: "cancel" },
+                    { text: t('common.cancel'), style: "cancel" },
                     {
-                      text: "Remove",
+                      text: t('common.remove'),
                       style: "destructive",
                       onPress: async () => {
                         try {
@@ -865,8 +868,8 @@ export default function ElderlyMedicationScreen() {
                         } catch (e) {
                           console.error(e);
                           Alert.alert(
-                            "Error",
-                            "Could not remove prescription.",
+                            t('common.error'),
+                            t('medication.couldNotRemove'),
                           );
                           await fetchData();
                         }
@@ -924,7 +927,7 @@ export default function ElderlyMedicationScreen() {
                         variant="bodyMedium"
                         style={{ color: "#666", marginTop: 2 }}
                       >
-                        {r.reminder_times.length} times daily ({r.reminder_times.join(", ")})
+                        {t('medication.timesDaily', { times: r.reminder_times.length })} ({r.reminder_times.join(", ")})
                       </Text>
                     </View>
                     <MaterialCommunityIcons
@@ -948,7 +951,7 @@ export default function ElderlyMedicationScreen() {
                 variant="bodyLarge"
                 style={{ marginTop: 8, color: "#666" }}
               >
-                No active prescriptions.
+                {t('medication.noActivePrescriptions')}
               </Text>
             </View>
           )}
@@ -956,7 +959,7 @@ export default function ElderlyMedicationScreen() {
 
         {/* Finished Medications */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
-          Finished Medications
+          {t('medication.finishedMedications')}
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           {finishedReminders.length > 0 ? (
@@ -969,7 +972,7 @@ export default function ElderlyMedicationScreen() {
               const name = meds[0]?.name || "Medication";
               // @ts-ignore
               const medUnit = meds[0]?.unit || "dose";
-              const dosageStr = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+              const dosageStr = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
 
               const endDateStr = r.end_date
                 ? new Date(r.end_date).toLocaleDateString("en-GB", {
@@ -1007,7 +1010,7 @@ export default function ElderlyMedicationScreen() {
                       variant="bodySmall"
                       style={{ color: "#90A4AE", marginTop: 2 }}
                     >
-                      {dosageStr} · {r.reminder_times.length}x daily
+                      {dosageStr} · {t('medication.timesDaily', { times: r.reminder_times.length })}
                     </Text>
                     <Text
                       variant="bodySmall"
@@ -1017,7 +1020,7 @@ export default function ElderlyMedicationScreen() {
                     </Text>
                   </View>
                   <View style={styles.finishedBadge}>
-                    <Text style={styles.finishedBadgeText}>Completed</Text>
+                    <Text style={styles.finishedBadgeText}>{t('common.completed')}</Text>
                   </View>
                 </View>
               );
@@ -1033,7 +1036,7 @@ export default function ElderlyMedicationScreen() {
                 variant="bodyLarge"
                 style={{ marginTop: 8, color: "#666" }}
               >
-                No finished medications yet.
+                {t('medication.noFinishedMeds')}
               </Text>
             </View>
           )}
@@ -1072,16 +1075,14 @@ export default function ElderlyMedicationScreen() {
                   fontWeight: "700",
                 }}
               >
-                Reminder
+                {t('medication.reminder')}
               </Text>
             </View>
             <Text
               variant="bodyLarge"
               style={{ color: "#2E7D32", marginTop: 10, lineHeight: 24 }}
             >
-              Take your medications with water. If you miss a dose, take it as
-              soon as you remember unless it&apos;s almost time for the next
-              dose.
+              {t('medication.reminderTip')}
             </Text>
           </Card.Content>
         </Card>
@@ -1093,7 +1094,7 @@ export default function ElderlyMedicationScreen() {
         icon="plus"
         style={styles.fab}
         onPress={openAddModal}
-        label="Add Medication"
+        label={t('medication.addMedication')}
       />
 
       <Portal>
@@ -1107,7 +1108,7 @@ export default function ElderlyMedicationScreen() {
         >
           <ScrollView contentContainerStyle={{ padding: 20 }}>
             <Text variant="titleLarge" style={styles.modalTitle}>
-              Add Medication
+              {t('medication.addMedication')}
             </Text>
 
             <Button
@@ -1118,16 +1119,16 @@ export default function ElderlyMedicationScreen() {
               disabled={isScanning}
               style={{ marginBottom: 20 }}
             >
-              Scan Medication
+              {t('medication.scanMedication')}
             </Button>
             {isScanning && (
               <Text style={{ textAlign: "center", marginBottom: 16 }}>
-                Analyzing image...
+                {t('medication.analyzingImage')}
               </Text>
             )}
 
             <TextInput
-              label="Medicine Name *"
+              label={t('medication.medicineName') + ' *'}
               value={medicineName}
               onChangeText={setMedicineName}
               style={styles.input}
@@ -1135,7 +1136,7 @@ export default function ElderlyMedicationScreen() {
             />
 
             <TextInput
-              label="Unit (e.g., tablet)"
+              label={t('medication.unit')}
               value={unit}
               onChangeText={setUnit}
               style={styles.input}
@@ -1143,7 +1144,7 @@ export default function ElderlyMedicationScreen() {
             />
 
             <TextInput
-              label="Dosage"
+              label={t('medication.dosage')}
               value={dosage}
               onChangeText={setDosage}
               style={styles.input}
@@ -1152,7 +1153,7 @@ export default function ElderlyMedicationScreen() {
             />
 
             <Text variant="labelLarge" style={styles.label}>
-              Times Per Day (1-10) *
+              {t('medication.timesPerDay')} *
             </Text>
             <View style={styles.counterRow}>
               <IconButton
@@ -1177,7 +1178,7 @@ export default function ElderlyMedicationScreen() {
             </View>
 
             <Text variant="labelLarge" style={styles.label}>
-              Duration (Days)
+              {t('medication.durationDays')}
             </Text>
             <View style={styles.counterRow}>
               <IconButton
@@ -1196,7 +1197,7 @@ export default function ElderlyMedicationScreen() {
             </View>
 
             <TextInput
-              label="Follow-up Caregiver(s)"
+              label={t('medication.followUpCaregivers')}
               value={followUpCaregiver}
               mode="outlined"
               style={styles.input}
@@ -1205,19 +1206,19 @@ export default function ElderlyMedicationScreen() {
             />
 
             <View style={styles.switchRow}>
-              <Text variant="bodyLarge">Take after meal?</Text>
+              <Text variant="bodyLarge">{t('medication.takeAfterMeal')}</Text>
               <Switch value={afterMeal} onValueChange={handleAfterMealChange} />
             </View>
 
             <Divider style={styles.divider} />
 
             <Text variant="titleMedium" style={styles.timesTitle}>
-              Reminder Times ({reminderTimes.length})
+              {t('medication.reminderTimes', { count: reminderTimes.length })}
             </Text>
 
             {reminderTimes.map((timeSlot, index) => (
               <View key={index} style={styles.timeInputRow}>
-                <Text variant="bodyLarge">Time {index + 1}:</Text>
+                <Text variant="bodyLarge">{t('medication.time', { index: index + 1 })}:</Text>
                 {Platform.OS === "web" ? (
                   <input
                     type="time"
@@ -1253,7 +1254,7 @@ export default function ElderlyMedicationScreen() {
                 style={styles.modalButton}
                 disabled={saving}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 mode="contained"
@@ -1262,7 +1263,7 @@ export default function ElderlyMedicationScreen() {
                 loading={saving}
                 disabled={saving}
               >
-                Save
+                {t('common.save')}
               </Button>
             </View>
           </ScrollView>

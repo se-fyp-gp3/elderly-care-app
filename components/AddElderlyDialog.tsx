@@ -4,6 +4,7 @@ import { getElderlyByPhone } from "@/lib/elderly";
 import { Elderly } from "@/types/appwrite";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Keyboard, StyleSheet, View } from "react-native";
 import {
     ActivityIndicator,
@@ -32,6 +33,7 @@ export default function AddElderlyDialog({
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function AddElderlyDialog({
 
   const handleSearch = async () => {
     if (!phone.trim()) {
-      setError("Please enter a phone number");
+      setError(t('linkElderly.enterPhoneNumber'));
       return;
     }
 
@@ -54,11 +56,11 @@ export default function AddElderlyDialog({
       if (elderly) {
         setFoundElderly(elderly);
       } else {
-        setError("No elderly found with this phone number");
+        setError(t('linkElderly.noElderlyFound'));
       }
     } catch (err: any) {
       console.error(err);
-      setError("Error searching for elderly");
+      setError(t('linkElderly.errorSearching'));
     } finally {
       setLoading(false);
     }
@@ -71,9 +73,7 @@ export default function AddElderlyDialog({
     try {
       const caregiver = await getCaregiverByUserId(user.$id);
       if (!caregiver) {
-        setError(
-          "Caregiver profile not found. Please complete your profile first.",
-        );
+        setError(t('linkElderly.caregiverNotFound'));
         return;
       }
 
@@ -85,7 +85,7 @@ export default function AddElderlyDialog({
       handleDismiss();
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Failed to link elderly");
+      setError(err.message || t('linkElderly.failedToLink'));
     } finally {
       setLinking(false);
     }
@@ -106,7 +106,7 @@ export default function AddElderlyDialog({
         style={{ backgroundColor: theme.colors.background }}
       >
         <Dialog.Title style={{ textAlign: "center" }}>
-          Link Elderly
+          {t('linkElderly.title')}
         </Dialog.Title>
         <Dialog.Content>
           {!foundElderly ? (
@@ -120,7 +120,7 @@ export default function AddElderlyDialog({
                 }}
                 style={{ marginBottom: 16 }}
               >
-                Scan Elderly QR Code
+                {t('linkElderly.scanQRCode')}
               </Button>
 
               <Divider style={{ marginBottom: 12 }} />
@@ -133,12 +133,11 @@ export default function AddElderlyDialog({
                   color: theme.colors.secondary,
                 }}
               >
-                Or enter the phone number of the elderly person you want to care
-                for.
+                {t('linkElderly.orEnterPhone')}
               </Text>
 
               <TextInput
-                label="Phone Number"
+                label={t('linkElderly.phoneNumber')}
                 value={phone}
                 onChangeText={(text) => {
                   setPhone(text);
@@ -187,7 +186,7 @@ export default function AddElderlyDialog({
                   variant="labelSmall"
                   style={{ color: theme.colors.onSurfaceVariant }}
                 >
-                  Account Found
+                  {t('linkElderly.accountFound')}
                 </Text>
               </View>
             </View>
@@ -205,7 +204,7 @@ export default function AddElderlyDialog({
         </Dialog.Content>
         <Dialog.Actions style={{ paddingHorizontal: 24, paddingBottom: 16 }}>
           <Button onPress={handleDismiss} style={{ marginRight: 8 }}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           {foundElderly ? (
             <Button
@@ -214,7 +213,7 @@ export default function AddElderlyDialog({
               loading={linking}
               disabled={linking}
             >
-              Confirm Link
+              {t('linkElderly.confirmLink')}
             </Button>
           ) : (
             <Button
@@ -223,7 +222,7 @@ export default function AddElderlyDialog({
               loading={loading}
               disabled={loading || !phone.trim()}
             >
-              Search
+              {t('common.search')}
             </Button>
           )}
         </Dialog.Actions>

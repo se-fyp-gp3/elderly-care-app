@@ -124,6 +124,14 @@
           "size": 255,
           "default": null,
           "encrypt": false
+        },
+        {
+          "key": "last_active",
+          "type": "datetime",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": ""
         }
       ],
       "indexes": [
@@ -182,6 +190,14 @@
         },
         {
           "key": "birth",
+          "type": "datetime",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": ""
+        },
+        {
+          "key": "last_active",
           "type": "datetime",
           "required": false,
           "array": false,

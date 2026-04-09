@@ -6,6 +6,7 @@ import {
     DIRECT_MESSAGES_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+import { updatePresence } from "./presence";
 
 /**
  * Build a deterministic conversation ID from two profile IDs.
@@ -47,6 +48,10 @@ export async function sendDirectMessage(input: {
       message_type: input.messageType ?? "text",
     },
   });
+
+  // Update sender's presence so they appear online after sending a message
+  updatePresence(input.senderId, input.senderRole).catch(() => {});
+
   return doc as unknown as DirectMessage;
 }
 

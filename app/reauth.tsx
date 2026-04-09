@@ -3,6 +3,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as LocalAuthentication from "expo-local-authentication";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,6 +15,7 @@ export default function ReAuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [biometricLabel, setBiometricLabel] = useState<string>("Biometrics");
+  const { t } = useTranslation();
 
   useEffect(() => {
     LocalAuthentication.supportedAuthenticationTypesAsync()
@@ -36,7 +38,7 @@ export default function ReAuthScreen() {
       await reAuthenticateElderly();
       // Navigation will be handled by RouteGuard
     } catch (err: any) {
-      setError(err?.message || "Authentication failed. Please try again.");
+      setError(err?.message || t('auth.unexpectedError'));
     } finally {
       setLoading(false);
     }
@@ -58,13 +60,13 @@ export default function ReAuthScreen() {
           color={theme.colors.primary}
         />
         <Text variant="headlineSmall" style={styles.title}>
-          Session Expired
+          {t('auth.sessionExpired')}
         </Text>
         <Text
           variant="bodyMedium"
           style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}
         >
-          Please authenticate to continue using the app.
+          {t('auth.authenticateToContinue')}
         </Text>
 
         {error && (
@@ -86,14 +88,14 @@ export default function ReAuthScreen() {
               icon="fingerprint"
               style={styles.authButton}
             >
-              Authenticate with {biometricLabel}
+              {t('auth.authenticateWith', { label: biometricLabel })}
             </Button>
             <Button
               mode="text"
               onPress={handleSignOut}
               style={styles.signOutButton}
             >
-              Sign in with a different account
+              {t('auth.signInDifferent')}
             </Button>
           </>
         )}

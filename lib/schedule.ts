@@ -1,3 +1,4 @@
+import i18n from "@/lib/i18n";
 import {
     ElderlyMedication,
     Medication,
@@ -16,6 +17,31 @@ import {
     SCHEDULE_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+
+/** Translate a medication unit string (e.g. "tablet" → "片") using i18n. */
+export function translateUnit(unit: string): string {
+  if (!unit) return "";
+  const map: Record<string, string> = {
+    tablet: i18n.t('medication.unitTablet'),
+    capsule: i18n.t('medication.unitCapsule'),
+    pill: i18n.t('medication.unitPill'),
+    drop: i18n.t('medication.unitDrop'),
+    ml: i18n.t('medication.unitMl'),
+    piece: i18n.t('medication.unitPiece'),
+    dose: i18n.t('medication.unitDose'),
+  };
+  return map[unit.toLowerCase()] || unit;
+}
+
+/** Translate a frequency string stored in DB (e.g. "Daily" → "每日"). */
+export function translateFrequency(freq: string): string {
+  if (!freq) return "";
+  if (freq === "Daily") return i18n.t('medication.daily');
+  if (freq === "Weekly") return i18n.t('medication.weekly');
+  const m = freq.match(/^(\d+)\s*times?\/day$/i);
+  if (m) return i18n.t('medication.timesDaily', { times: m[1] });
+  return freq;
+}
 
 /**
  * A unified event item shown on the schedule timeline,
@@ -279,7 +305,18 @@ export async function fetchDayMedicationEvents(
     const medicationId = getRelationshipId(prescription.medication);
     const medicationInfo = medicationId ? medicationById.get(medicationId) : null;
     const medicationName = medicationInfo?.name || "Unknown Drug";
-    const dosage = `${prescription.dosage || ""} ${medicationInfo?.unit || ""}`;
+    const rawUnit = medicationInfo?.unit || "";
+    const unitMap: Record<string, string> = {
+      tablet: i18n.t('medication.unitTablet'),
+      capsule: i18n.t('medication.unitCapsule'),
+      pill: i18n.t('medication.unitPill'),
+      drop: i18n.t('medication.unitDrop'),
+      ml: i18n.t('medication.unitMl'),
+      piece: i18n.t('medication.unitPiece'),
+      dose: i18n.t('medication.unitDose'),
+    };
+    const translatedUnit = unitMap[rawUnit.toLowerCase()] || rawUnit;
+    const dosage = `${prescription.dosage || ""} ${translatedUnit}`;
 
     const approxTimes = prescription.approx_times || [];
     const reminderId = prescriptionToReminderMap.get(prescription.$id);

@@ -61,6 +61,7 @@ export type Elderly = Models.Row & {
     gender: string | null;
     blood_type: string | null;
     emergency_contact: string | null;
+    last_active?: string | null;
 }
 
 export type Caregiver = Models.Row & {
@@ -68,6 +69,7 @@ export type Caregiver = Models.Row & {
     name: string | null;
     phone: string | null;
     birth: string | null;
+    last_active?: string | null;
 }
 
 export type CaregiverElderly = Models.Row & {
