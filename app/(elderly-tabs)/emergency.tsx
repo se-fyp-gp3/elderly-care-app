@@ -1,7 +1,11 @@
+import CreateGroupModal from "@/components/CreateGroupModal";
+import UserAvatar from "@/components/UserAvatar";
 import {
     clientReactNative,
     DATABASE_ID,
     DIRECT_MESSAGES_TABLE_ID,
+    GROUP_MEMBERS_TABLE_ID,
+    GROUP_MESSAGES_TABLE_ID,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -16,12 +20,15 @@ import {
     searchElderlyByPhone,
 } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
-import { buildConversationId, getLastMessage } from "@/lib/messaging";
+import { getGroupUnreadCount, getLastGroupMessage } from "@/lib/group-messaging";
+import { getGroupsForUser } from "@/lib/groups";
+import { buildConversationId, getLastMessage, getUnreadCountPerConversation } from "@/lib/messaging";
+import { isUserOnline } from "@/lib/presence";
 import { Elderly } from "@/types/appwrite";
-import { DirectMessage } from "@/types/messaging";
+import { DirectMessage, Group, GroupMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
     Alert,
@@ -41,7 +48,9 @@ import {
 import {
     ActivityIndicator,
     Avatar,
+    Badge,
     Button,
+    Menu,
     Searchbar,
     Text,
     TextInput,
@@ -50,9 +59,24 @@ import {
 
 import MomentsView from "@/components/MomentsView";
 
+type ChatListItem =
+  | { type: "direct"; contact: Contact; lastMsg: DirectMessage | null; unread: number }
+  | { type: "group"; group: Group; lastMsg: GroupMessage | null; unread: number };
+
+function chatListItemId(item: ChatListItem): string {
+  return item.type === "direct" ? item.contact.id : `group_${item.group.$id}`;
+}
+
+function chatListItemTime(item: ChatListItem): string {
+  if (item.type === "direct") {
+    return item.lastMsg?.created_at ?? item.contact.lastActive ?? "";
+  }
+  return item.lastMsg?.created_at ?? item.group.created_at ?? "";
+}
+
 export default function ElderlyEmergency() {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user, preferences, updatePreferences } = useAuth();
   const router = useRouter();
   const { t } = useTranslation();
 
@@ -61,13 +85,25 @@ export default function ElderlyEmergency() {
 
   // ── Contacts & messages state ──
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [lastMessages, setLastMessages] = useState<
     Record<string, DirectMessage | null>
   >({});
+
+  // ── Group state ──
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [groupLastMessages, setGroupLastMessages] = useState<Record<string, GroupMessage | null>>({});
+  const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
+  const [groupUnreadCounts, setGroupUnreadCounts] = useState<Record<string, number>>({});
+  const pinnedConversations: string[] = (preferences.pinnedConversations as string[]) ?? [];
+
+  // ── Menu & Group creation ──
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [longPressItem, setLongPressItem] = useState<ChatListItem | null>(null);
+  const [showLongPressMenu, setShowLongPressMenu] = useState(false);
 
   // ── Add contact dialog state ──
   const [addDialogVisible, setAddDialogVisible] = useState(false);
@@ -98,13 +134,17 @@ export default function ElderlyEmergency() {
       }
       setElderlyProfile(elderly);
 
-      // Get both caregiver contacts and elderly-to-elderly contacts
-      const [caregiverData, elderlyData, pending] = await Promise.all([
+      // Get both caregiver contacts, elderly-to-elderly contacts, groups, and DM unread counts
+      const [caregiverData, elderlyData, pending, userGroups, dmUnreadMap] = await Promise.all([
         getContactsForElderly(elderly.$id),
         getElderlyContacts(elderly.$id),
         getPendingConnectionRequests(elderly.$id),
+        getGroupsForUser(elderly.$id),
+        getUnreadCountPerConversation(elderly.$id),
       ]);
       setPendingRequests(pending);
+      setUnreadCounts(dmUnreadMap);
+      setGroups(userGroups);
       const data = [...caregiverData, ...elderlyData];
 
       const lastMsgs: Record<string, DirectMessage | null> = {};
@@ -116,6 +156,22 @@ export default function ElderlyEmergency() {
       );
       setLastMessages(lastMsgs);
 
+      // Fetch group last messages + group unread counts
+      const gLastMsgs: Record<string, GroupMessage | null> = {};
+      const gUnreads: Record<string, number> = {};
+      await Promise.all(
+        userGroups.map(async (g) => {
+          const [lastGMsg, count] = await Promise.all([
+            getLastGroupMessage(g.$id),
+            getGroupUnreadCount(g.$id, elderly.$id),
+          ]);
+          gLastMsgs[g.$id] = lastGMsg;
+          gUnreads[g.$id] = count;
+        }),
+      );
+      setGroupLastMessages(gLastMsgs);
+      setGroupUnreadCounts(gUnreads);
+
       // Sort by most recent message first
       data.sort((a, b) => {
         const msgA = lastMsgs[a.id];
@@ -126,7 +182,6 @@ export default function ElderlyEmergency() {
       });
 
       setContacts(data);
-      setFilteredContacts(data);
     } catch (error) {
       console.error("Error fetching contacts:", error);
     } finally {
@@ -141,6 +196,8 @@ export default function ElderlyEmergency() {
   // ── Realtime message subscription ──
   useEffect(() => {
     if (!elderlyProfile) return;
+
+    // Subscribe to Direct Messages
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
     const unsubscribe = clientReactNative.subscribe(channel, (response) => {
       if (response.events.some((event) => event.endsWith(".create"))) {
@@ -154,37 +211,100 @@ export default function ElderlyEmergency() {
               ? payload.receiver_id
               : payload.sender_id;
           setLastMessages((prev) => ({ ...prev, [otherUserId]: payload }));
-          setContacts((prev) => {
-            const idx = prev.findIndex((c) => c.id === otherUserId);
-            if (idx === -1) return prev;
-            const updated = [...prev];
-            const [moved] = updated.splice(idx, 1);
-            updated.unshift(moved);
-            return updated;
-          });
+
+          // Increment unread count if I am receiver
+          if (payload.receiver_id === elderlyProfile.$id) {
+            setUnreadCounts((prev) => {
+              const n = new Map(prev);
+              const convId = payload.conversation_id;
+              n.set(convId, (n.get(convId) ?? 0) + 1);
+              return n;
+            });
+          }
+
+          // Only mark the other user as online if THEY sent the message
+          if (payload.sender_id !== elderlyProfile.$id) {
+            const now = new Date().toISOString();
+            setContacts((prev) => {
+              const idx = prev.findIndex((c) => c.id === otherUserId);
+              if (idx === -1) return prev;
+              const updated = [...prev];
+              const [moved] = updated.splice(idx, 1);
+              updated.unshift({ ...moved, lastActive: now });
+              return updated;
+            });
+          }
         }
       }
     });
+
+    // Subscribe to Group Messages
+    const groupChannel = `databases.${DATABASE_ID}.collections.${GROUP_MESSAGES_TABLE_ID}.documents`;
+    const unsubGroup = clientReactNative.subscribe(groupChannel, (response) => {
+      if (!response.events.some((e) => e.endsWith(".create"))) return;
+      const payload = response.payload as GroupMessage;
+      setGroupLastMessages((prev) => ({ ...prev, [payload.group_id]: payload }));
+      if (payload.sender_id !== elderlyProfile.$id) {
+        setGroupUnreadCounts((prev) => ({ ...prev, [payload.group_id]: (prev[payload.group_id] ?? 0) + 1 }));
+      }
+    });
+
+    // Subscribe to group_members for realtime group discovery
+    const groupMembersChannel = `databases.${DATABASE_ID}.collections.${GROUP_MEMBERS_TABLE_ID}.documents`;
+    const unsubMembers = clientReactNative.subscribe(groupMembersChannel, (response) => {
+      if (!response.events.some((e) => e.endsWith(".create"))) return;
+      const payload = response.payload as { user_profile_id?: string };
+      if (payload?.user_profile_id === elderlyProfile.$id) {
+        fetchContacts();
+      }
+    });
+
     return () => {
       unsubscribe();
+      unsubGroup();
+      unsubMembers();
     };
   }, [elderlyProfile]);
 
-  // ── Search filter ──
-  useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredContacts(contacts);
-    } else {
-      const q = searchQuery.toLowerCase();
-      setFilteredContacts(
-        contacts.filter(
-          (c) =>
-            c.name.toLowerCase().includes(q) ||
-            (c.phone && c.phone.includes(q)),
-        ),
-      );
-    }
-  }, [searchQuery, contacts]);
+  // ── Build unified chat list (DMs + groups, with search & pin) ──
+  const chatList: ChatListItem[] = useMemo(() => {
+    const items: ChatListItem[] = [];
+    const query = searchQuery.toLowerCase();
+
+    contacts.forEach((c) => {
+      if (query && !c.name.toLowerCase().includes(query) && !(c.phone && c.phone.includes(query))) return;
+      const convId = buildConversationId(elderlyProfile?.$id ?? "", c.id);
+      items.push({
+        type: "direct",
+        contact: c,
+        lastMsg: lastMessages[c.id] ?? null,
+        unread: unreadCounts.get(convId) ?? 0,
+      });
+    });
+
+    groups.forEach((g) => {
+      if (query && !g.name.toLowerCase().includes(query)) return;
+      items.push({
+        type: "group",
+        group: g,
+        lastMsg: groupLastMessages[g.$id] ?? null,
+        unread: groupUnreadCounts[g.$id] ?? 0,
+      });
+    });
+
+    items.sort((a, b) => {
+      const aId = chatListItemId(a);
+      const bId = chatListItemId(b);
+      const aPinned = pinnedConversations.includes(aId);
+      const bPinned = pinnedConversations.includes(bId);
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+      const timeA = new Date(chatListItemTime(a)).getTime() || 0;
+      const timeB = new Date(chatListItemTime(b)).getTime() || 0;
+      return timeB - timeA;
+    });
+
+    return items;
+  }, [contacts, groups, lastMessages, groupLastMessages, unreadCounts, groupUnreadCounts, pinnedConversations, searchQuery, elderlyProfile]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -195,6 +315,8 @@ export default function ElderlyEmergency() {
   // ── Navigation & actions ──
   const navigateToConversation = useCallback(
     (contact: Contact) => {
+      const convId = buildConversationId(elderlyProfile?.$id ?? "", contact.id);
+      setUnreadCounts((prev) => { const n = new Map(prev); n.delete(convId); return n; });
       router.push({
         pathname: "/conversation",
         params: {
@@ -204,8 +326,40 @@ export default function ElderlyEmergency() {
         },
       });
     },
+    [router, elderlyProfile],
+  );
+
+  const navigateToGroupConversation = useCallback(
+    (group: Group) => {
+      setGroupUnreadCounts((prev) => ({ ...prev, [group.$id]: 0 }));
+      router.push({
+        pathname: "/group-conversation",
+        params: { groupId: group.$id, groupName: group.name },
+      });
+    },
     [router],
   );
+
+  // ── Pin / Unpin ──
+  const handleTogglePin = useCallback(
+    async (itemId: string) => {
+      const current = pinnedConversations;
+      const newPinned = current.includes(itemId)
+        ? current.filter((id) => id !== itemId)
+        : [...current, itemId];
+      try {
+        await updatePreferences({ pinnedConversations: newPinned });
+      } catch (e) {
+        console.error("Failed to update pinned:", e);
+      }
+    },
+    [pinnedConversations, updatePreferences],
+  );
+
+  const handleLongPress = useCallback((item: ChatListItem) => {
+    setLongPressItem(item);
+    setShowLongPressMenu(true);
+  }, []);
 
   const handleCall = useCallback((phone?: string | null) => {
     if (!phone)
@@ -323,47 +477,100 @@ export default function ElderlyEmergency() {
     }
   };
 
-  // ── Render conversation card ──
-  const renderConversation = ({ item }: { item: Contact }) => {
-    const lastMsg = lastMessages[item.id];
-    const lastMsgTime = lastMsg?.created_at || item.lastActive;
+  // ── Render chat list item (DM or Group) ──
+  const renderChatListItem = ({ item }: { item: ChatListItem }) => {
+    const itemId = chatListItemId(item);
+    const isPinned = pinnedConversations.includes(itemId);
+
+    if (item.type === "group") {
+      const group = item.group;
+      const lastMsg = item.lastMsg;
+      const time = lastMsg?.created_at ?? group.created_at;
+      const preview = lastMsg?.body;
+      return (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => navigateToGroupConversation(group)}
+          onLongPress={() => handleLongPress(item)}
+          style={[styles.conversationCard, { backgroundColor: isPinned ? theme.colors.surfaceVariant : theme.colors.surface }]}
+        >
+          <View style={styles.avatarWrap}>
+            <Avatar.Icon size={52} icon="account-group" style={{ backgroundColor: theme.colors.tertiaryContainer }} />
+            {item.unread > 0 && (
+              <Badge size={18} style={styles.unreadBadge}>{item.unread}</Badge>
+            )}
+          </View>
+          <View style={styles.conversationInfo}>
+            <View style={styles.nameRow}>
+              <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+                {isPinned && <MaterialCommunityIcons name="pin" size={14} color={theme.colors.primary} style={{ marginRight: 4 }} />}
+                <Text variant="titleMedium" style={{ fontWeight: "600", flex: 1 }} numberOfLines={1}>
+                  {group.name}
+                </Text>
+              </View>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                {formatRelativeTime(time)}
+              </Text>
+            </View>
+            {preview ? (
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 3 }} numberOfLines={1}>
+                {lastMsg?.sender_id === elderlyProfile?.$id ? t('common.you') : `${lastMsg?.sender_name}: `}
+                {lastMsg?.message_type === "voice" ? t('common.voiceMessage') : preview}
+              </Text>
+            ) : (
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 3 }}>
+                {t('emergency.tapToChat')}
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    // Direct message item
+    const contact = item.contact;
+    const lastMsg = item.lastMsg;
+    const lastMsgTime = lastMsg?.created_at || contact.lastActive;
     const preview = lastMsg?.body;
+    const online = isUserOnline(contact.lastActive);
 
     return (
       <TouchableOpacity
         activeOpacity={0.7}
-        onPress={() => navigateToConversation(item)}
-        style={[styles.conversationCard, { backgroundColor: theme.colors.surface }]}
+        onPress={() => navigateToConversation(contact)}
+        onLongPress={() => handleLongPress(item)}
+        style={[styles.conversationCard, { backgroundColor: isPinned ? theme.colors.surfaceVariant : theme.colors.surface }]}
       >
         {/* Avatar */}
         <View style={styles.avatarWrap}>
-          <Avatar.Text
-            size={52}
-            label={item.avatarLabel}
-            style={{ backgroundColor: theme.colors.tertiaryContainer }}
-            labelStyle={{ color: theme.colors.onTertiaryContainer, fontWeight: "600", fontSize: 18 }}
-          />
-          <View style={[styles.onlineDot, { backgroundColor: "#4CAF50", borderColor: theme.colors.surface }]} />
+          <UserAvatar avatarFileId={contact.avatarFileId} name={contact.name} size={52} role={contact.role} />
+          <View style={[styles.onlineDot, { backgroundColor: online ? "#4CAF50" : "#BDBDBD", borderColor: theme.colors.surface }]} />
+          {item.unread > 0 && (
+            <Badge size={18} style={styles.unreadBadge}>{item.unread}</Badge>
+          )}
         </View>
 
         {/* Name / preview */}
         <View style={styles.conversationInfo}>
           <View style={styles.nameRow}>
-            <Text variant="titleMedium" style={{ fontWeight: "600", flex: 1 }} numberOfLines={1}>
-              {item.name}
-            </Text>
+            <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+              {isPinned && <MaterialCommunityIcons name="pin" size={14} color={theme.colors.primary} style={{ marginRight: 4 }} />}
+              <Text variant="titleMedium" style={{ fontWeight: "600", flex: 1 }} numberOfLines={1}>
+                {contact.name}
+              </Text>
+            </View>
             <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
               {formatRelativeTime(lastMsgTime)}
             </Text>
           </View>
           <View style={styles.roleRow}>
             <MaterialCommunityIcons
-              name={item.role === "caregiver" ? "shield-account" : "account-heart"}
+              name={contact.role === "caregiver" ? "shield-account" : "account-heart"}
               size={12}
               color={theme.colors.tertiary}
             />
             <Text variant="labelSmall" style={{ color: theme.colors.tertiary, marginLeft: 3 }}>
-              {item.role === "caregiver" ? t('common.caregiver') : t('common.friend')}
+              {contact.role === "caregiver" ? t('common.caregiver') : t('common.friend')}
             </Text>
           </View>
           {preview ? (
@@ -390,7 +597,7 @@ export default function ElderlyEmergency() {
 
         {/* Quick call button */}
         <TouchableOpacity
-          onPress={(e) => { e.stopPropagation(); handleCall(item.phone); }}
+          onPress={(e) => { e.stopPropagation(); handleCall(contact.phone); }}
           style={[styles.callBtn, { backgroundColor: "#E8F5E9" }]}
         >
           <MaterialCommunityIcons name="phone" size={20} color="#2E7D32" />
@@ -415,7 +622,7 @@ export default function ElderlyEmergency() {
   // ── Page renderers ──
   const renderChatPage = () => (
     <View style={{ width, flex: 1 }}>
-      {/* Search bar + Add button */}
+      {/* Search bar + Add menu */}
       <View style={styles.searchWrap}>
         <Searchbar
           placeholder={t('emergency.searchContacts')}
@@ -425,13 +632,30 @@ export default function ElderlyEmergency() {
           inputStyle={styles.searchInput}
           elevation={0}
         />
-        <TouchableOpacity
-          onPress={openAddDialog}
-          style={[styles.addBtn, { backgroundColor: theme.colors.primary }]}
-          activeOpacity={0.8}
+        <Menu
+          visible={showAddMenu}
+          onDismiss={() => setShowAddMenu(false)}
+          anchor={
+            <TouchableOpacity
+              onPress={() => setShowAddMenu(true)}
+              style={[styles.addBtn, { backgroundColor: theme.colors.primary }]}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="plus" size={22} color={theme.colors.onPrimary} />
+            </TouchableOpacity>
+          }
         >
-          <MaterialCommunityIcons name="account-plus" size={22} color={theme.colors.onPrimary} />
-        </TouchableOpacity>
+          <Menu.Item
+            leadingIcon="account-plus"
+            title={t('chat.addNewFriend')}
+            onPress={() => { setShowAddMenu(false); openAddDialog(); }}
+          />
+          <Menu.Item
+            leadingIcon="account-group"
+            title={t('chat.createGroupChat')}
+            onPress={() => { setShowAddMenu(false); setShowCreateGroup(true); }}
+          />
+        </Menu>
       </View>
 
       {/* Pending Friend Requests */}
@@ -494,16 +718,16 @@ export default function ElderlyEmergency() {
         </View>
       ) : (
         <FlatList
-          data={filteredContacts}
-          renderItem={renderConversation}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={[styles.listContent, filteredContacts.length === 0 && styles.emptyList]}
+          data={chatList}
+          renderItem={renderChatListItem}
+          keyExtractor={(item) => chatListItemId(item)}
+          contentContainerStyle={[styles.listContent, chatList.length === 0 && styles.emptyList]}
           ListEmptyComponent={renderEmpty}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ItemSeparatorComponent={() => (
             <View style={{ height: 1, marginLeft: 80, backgroundColor: theme.colors.outlineVariant ?? "#E0E0E0" }} />
           )}
-          extraData={lastMessages}
+          extraData={[lastMessages, groupLastMessages, unreadCounts, groupUnreadCounts, pinnedConversations]}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -670,6 +894,58 @@ export default function ElderlyEmergency() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      {/* ── Create Group Modal ── */}
+      <CreateGroupModal
+        visible={showCreateGroup}
+        onDismiss={() => setShowCreateGroup(false)}
+        contacts={contacts}
+        myProfileId={elderlyProfile?.$id ?? ""}
+        myName={elderlyProfile?.name || user?.name || "Me"}
+        myRole="elderly"
+        onGroupCreated={() => {
+          setShowCreateGroup(false);
+          fetchContacts();
+        }}
+      />
+
+      {/* ── Long-press Pin/Unpin Modal ── */}
+      <Modal
+        visible={showLongPressMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLongPressMenu(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowLongPressMenu(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.surface, padding: 16 }]}>
+              {longPressItem && (() => {
+                const itemId = chatListItemId(longPressItem);
+                const isPinned = pinnedConversations.includes(itemId);
+                return (
+                  <TouchableOpacity
+                    style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}
+                    onPress={() => {
+                      handleTogglePin(itemId);
+                      setShowLongPressMenu(false);
+                    }}
+                  >
+                    <MaterialCommunityIcons
+                      name={isPinned ? "pin-off" : "pin"}
+                      size={22}
+                      color={theme.colors.onSurface}
+                      style={{ marginRight: 12 }}
+                    />
+                    <Text variant="bodyLarge" style={{ color: theme.colors.onSurface }}>
+                      {isPinned ? t('chat.unpinConversation') : t('chat.pinConversation')}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })()}
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
@@ -702,6 +978,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 2,
+  },
+  unreadBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#E53935",
   },
   // ── Conversation card ──
   conversationCard: {
