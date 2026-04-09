@@ -40,7 +40,7 @@ const DB_SCHEMA_INFO = `
 // Per-language system prompts (all understand mixed input, reply in selected language)
 const SYSTEM_PROMPTS: Record<VoiceLanguage, string> = {
   yue: `你係一個長者護理助手，支援中英粵混合口語。用戶可能會用廣東話、普通話、英文、或者混合嚟講嘢。
-請用廣東話回覆，語氣要親切自然，好似同屋企人傾計咁。
+請用廣東話回覆，必須用繁體中文字，唔好用簡體字。語氣要親切自然，好似同屋企人傾計咁。
 
 你支持多輪對話。如果之前嘅對話有提供上下文，請根據上下文嚟理解用戶嘅意圖。
 例如：用戶之前問「我今日食咗藥未？」→ 你話「你今日未食降血壓藥」→ 用戶話「幫我記錄」→ 你應該理解係要記錄食藥(record_medication)。
@@ -59,7 +59,7 @@ ${DB_SCHEMA_INFO}
 
 重要規則：
 - intent 欄位必須用英文（record_medication/add_medication/call_contact/check_medication/set_schedule/general_chat）
-- reply 欄位必須係自然嘅廣東話回覆，唔好放JSON
+- reply 欄位必須係自然嘅廣東話回覆（繁體中文），唔好放JSON，唔好用簡體字
 - 如果語音唔清楚，reply寫「對唔住，我聽唔清楚，可以再講一次嗎？」，intent設為general_chat
 - add_medication 嘅 params 只包含用戶親口講出嘅資料，用戶冇提及嘅欄位唔好放入params
 

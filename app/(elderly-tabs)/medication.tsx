@@ -220,6 +220,20 @@ export default function ElderlyMedicationScreen() {
           return;
         }
 
+        // Hide if scheduled_at is beyond duration_days
+        if (r.start_date && r.duration_days) {
+          const startDateMs = new Date(r.start_date).getTime();
+          const startHkDate = new Date(startDateMs + hkOffset).toISOString().slice(0, 10);
+          const firstCandBase = new Date(startHkDate);
+          firstCandBase.setUTCHours(hours, minutes, 0, 0);
+          const firstCandUtcMs = firstCandBase.getTime() - hkOffset;
+          const startDelay = firstCandUtcMs <= startDateMs ? 1 : 0;
+          const lastValidUtcMs = firstCandUtcMs + (startDelay + r.duration_days - 1) * 86400000;
+          if (scheduledDate.getTime() > lastValidUtcMs) {
+            return;
+          }
+        }
+
         // Find if logged
         const log = todayLogs.find((l) => {
           const logRemId =

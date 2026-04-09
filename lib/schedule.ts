@@ -226,10 +226,10 @@ export async function fetchDayMedicationEvents(
     tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
     queries: [Query.equal("elderly", elderlyIds), Query.equal("active", true), Query.limit(100)],
   });
-  const prescriptionToReminderMap = new Map<string, string>();
+  const prescriptionToReminderMap = new Map<string, any>();
   medicationRemindersResponse.rows.forEach((reminder) => {
     const prescriptionId = getRelationshipId(reminder.elderly_medication);
-    if (prescriptionId) prescriptionToReminderMap.set(prescriptionId, reminder.$id);
+    if (prescriptionId) prescriptionToReminderMap.set(prescriptionId, reminder);
   });
 
   // Also fetch inactive to exclude cancelled prescriptions
@@ -297,8 +297,9 @@ export async function fetchDayMedicationEvents(
     const medicationName = medicationInfo?.name || "Unknown Drug";
     const dosage = `${prescription.dosage || ""} ${medicationInfo?.unit || ""}`;
 
-    const approxTimes = prescription.approx_times || [];
-    const reminderId = prescriptionToReminderMap.get(prescription.$id);
+    const reminder = prescriptionToReminderMap.get(prescription.$id);
+    const reminderId = reminder?.$id;
+    const approxTimes = reminder?.reminder_times || prescription.approx_times || [];
 
     // Filter logs that belong to this reminder
     const candidateLogs = reminderId
@@ -308,7 +309,41 @@ export async function fetchDayMedicationEvents(
         )
       : [];
 
+    // HK timezone offset for start_date filtering
+    const hkOffset = 8 * 60 * 60 * 1000;
+    const hkDate = new Date(date.getTime() + hkOffset);
+    const dayStr = hkDate.toISOString().slice(0, 10);
+
     approxTimes.forEach((approxTimeStr: string, slotIndex: number) => {
+      // Apply start_date & duration_days filter
+      if (reminder?.start_date) {
+        const [h, m] = approxTimeStr.includes(":")
+          ? approxTimeStr.split(":").map(Number)
+          : [0, 0];
+        const baseDate = new Date(dayStr);
+        baseDate.setUTCHours(h, m, 0, 0);
+        const scheduledUtcMs = baseDate.getTime() - hkOffset;
+        const startDateMs = new Date(reminder.start_date).getTime();
+
+        // Skip slots before start_date
+        if (scheduledUtcMs < startDateMs) {
+          return;
+        }
+
+        // Skip slots beyond duration_days
+        if (reminder.duration_days) {
+          const startHkDate = new Date(startDateMs + hkOffset).toISOString().slice(0, 10);
+          const firstCandBase = new Date(startHkDate);
+          firstCandBase.setUTCHours(h, m, 0, 0);
+          const firstCandUtcMs = firstCandBase.getTime() - hkOffset;
+          const startDelay = firstCandUtcMs <= startDateMs ? 1 : 0;
+          const lastValidUtcMs = firstCandUtcMs + (startDelay + reminder.duration_days - 1) * 86400000;
+          if (scheduledUtcMs > lastValidUtcMs) {
+            return;
+          }
+        }
+      }
+
       // Parse the approx time into a full Date for this day ──────────────────
       const slotDate = new Date(date);
       if (approxTimeStr.includes("T")) {

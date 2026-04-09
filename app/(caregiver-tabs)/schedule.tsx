@@ -25,7 +25,7 @@ import { Elderly, ScheduleCategory, ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Notifications from "expo-notifications";
-import { useNavigation, useRouter } from "expo-router";
+import { useFocusEffect, useNavigation, useRouter } from "expo-router";
 import React, {
   useCallback,
   useEffect,
@@ -238,6 +238,12 @@ export default function SchedulePage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData]),
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

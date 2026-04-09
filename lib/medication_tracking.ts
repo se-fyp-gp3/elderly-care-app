@@ -1,16 +1,16 @@
 import {
-  ElderlyMedicationReminder,
-  Medication,
-  MedicationLogs,
+    ElderlyMedicationReminder,
+    Medication,
+    MedicationLogs,
 } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
-  DATABASE_ID,
-  ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-  ELDERLY_MEDICATION_TABLE_ID,
-  MEDICATION_LOGS_TABLE_ID,
-  MEDICATION_TABLE_ID,
-  tablesDB,
+    DATABASE_ID,
+    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+    ELDERLY_MEDICATION_TABLE_ID,
+    MEDICATION_LOGS_TABLE_ID,
+    MEDICATION_TABLE_ID,
+    tablesDB,
 } from "./appwrite";
 import { getElderlyByUserId } from "./elderly";
 
@@ -599,6 +599,20 @@ export async function getFormattedTodayMedicationSummary(
 
       if (r.start_date && new Date(scheduledAt) < new Date(r.start_date)) {
         return;
+      }
+
+      // Hide if scheduled_at is beyond duration_days
+      if (r.start_date && r.duration_days) {
+        const startDateMs = new Date(r.start_date).getTime();
+        const startHkDate = new Date(startDateMs + hkOffset).toISOString().slice(0, 10);
+        const firstCandBase = new Date(startHkDate);
+        firstCandBase.setUTCHours(hours, minutes, 0, 0);
+        const firstCandUtcMs = firstCandBase.getTime() - hkOffset;
+        const startDelay = firstCandUtcMs <= startDateMs ? 1 : 0;
+        const lastValidUtcMs = firstCandUtcMs + (startDelay + r.duration_days - 1) * 86400000;
+        if (scheduledDate.getTime() > lastValidUtcMs) {
+          return;
+        }
       }
 
       const log = todayLogs.find((l) => {

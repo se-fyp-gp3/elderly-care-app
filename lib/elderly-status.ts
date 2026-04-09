@@ -1,14 +1,14 @@
 import { ElderlyStatus, HealthData } from "@/types/appwrite";
 import { Query } from "react-native-appwrite";
 import {
-  DATABASE_ID,
-  ELDERLY_DAILY_STEPS_TABLE_ID,
-  ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-  ELDERLY_MEDICATION_TABLE_ID,
-  HEALTH_DATA_TABLE_ID,
-  MEDICATION_LOGS_TABLE_ID,
-  SCHEDULE_TABLE_ID,
-  tablesDB,
+    DATABASE_ID,
+    ELDERLY_DAILY_STEPS_TABLE_ID,
+    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+    ELDERLY_MEDICATION_TABLE_ID,
+    HEALTH_DATA_TABLE_ID,
+    MEDICATION_LOGS_TABLE_ID,
+    SCHEDULE_TABLE_ID,
+    tablesDB,
 } from "./appwrite";
 
 export interface ElderlyStatusInfo {
@@ -166,11 +166,11 @@ export async function computeElderlyStatus(
           ],
         });
 
-        // Map prescription ID -> reminder ID (active reminders only)
-        const prescriptionToReminder = new Map<string, string>();
+        // Map prescription ID -> reminder object (active reminders only)
+        const prescriptionToReminder = new Map<string, any>();
         remindersRes.rows.forEach((rem: any) => {
           const pId = resolveRelationId(rem.elderly_medication);
-          if (pId) prescriptionToReminder.set(pId, rem.$id);
+          if (pId) prescriptionToReminder.set(pId, rem);
         });
 
         // Fetch inactive reminders to exclude cancelled prescriptions
@@ -190,7 +190,7 @@ export async function computeElderlyStatus(
         });
 
         // Collect all reminder IDs
-        const reminderIds = Array.from(prescriptionToReminder.values());
+        const reminderIds = Array.from(prescriptionToReminder.values()).map((r: any) => r.$id);
 
         // 2c. Fetch today's logs for these reminders
         const todayStart = new Date();
@@ -230,15 +230,44 @@ export async function computeElderlyStatus(
         );
 
         activePrescriptions.forEach((prescription: any) => {
-          const times: string[] = prescription.approx_times || [];
+          const reminder = prescriptionToReminder.get(prescription.$id);
+          const times: string[] = reminder?.reminder_times || prescription.approx_times || [];
+
+          // ── start_date filter ──
+          const startDate = reminder?.start_date ? new Date(reminder.start_date) : null;
+
+          // ── duration_days end boundary helpers ──
+          const hkOffset = 8 * 60 * 60 * 1000;
+          const durationDays = typeof reminder?.duration_days === "number" ? reminder.duration_days : null;
+
           times.forEach((tStr: string) => {
             const scheduled = new Date();
+            let slotH = 0;
+            let slotM = 0;
             if (tStr.includes("T")) {
               const d = new Date(tStr);
-              scheduled.setHours(d.getHours(), d.getMinutes(), 0, 0);
+              slotH = d.getHours();
+              slotM = d.getMinutes();
             } else if (tStr.includes(":")) {
               const parts = tStr.split(":");
-              scheduled.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+              slotH = parseInt(parts[0]);
+              slotM = parseInt(parts[1]);
+            }
+            scheduled.setHours(slotH, slotM, 0, 0);
+
+            const scheduledUtcMs = scheduled.getTime();
+
+            // Skip slots before medication start_date
+            if (startDate && scheduledUtcMs < startDate.getTime()) return;
+
+            // Skip slots beyond duration_days end boundary
+            if (startDate && durationDays !== null && durationDays > 0) {
+              const startDateHkMs = startDate.getTime() + hkOffset;
+              const startDayHkMs = startDateHkMs - (startDateHkMs % 86400000);
+              const firstCandidateUtcMs = startDayHkMs + slotH * 3600000 + slotM * 60000 - hkOffset;
+              const startDelay = firstCandidateUtcMs <= startDate.getTime() ? 1 : 0;
+              const lastValidUtcMs = firstCandidateUtcMs + (startDelay + durationDays - 1) * 86400000;
+              if (scheduledUtcMs > lastValidUtcMs) return;
             }
 
             totalSlots++;

@@ -3,43 +3,43 @@ import VoiceCommandButton from "@/components/VoiceCommandButton";
 import { useAuth } from "@/lib/auth-context";
 import { Contact, getContactsForElderly } from "@/lib/contacts";
 import {
-  fetchElderlySchedulesForUser,
-  getElderlyByUserId,
+    fetchElderlySchedulesForUser,
+    getElderlyByUserId,
 } from "@/lib/elderly";
 import { useStepSync } from "@/lib/hooks/useStepSync";
 import {
-  checkAndMarkSkippedMedications,
-  fetchActiveMedicationReminders,
-  fetchDailyMedicationLogs,
-  logMedicationAction,
+    checkAndMarkSkippedMedications,
+    fetchActiveMedicationReminders,
+    fetchDailyMedicationLogs,
+    logMedicationAction,
 } from "@/lib/medication_tracking";
 import {
-  Elderly,
-  ElderlyMedicationReminder,
-  MedicationLogs,
-  Schedule,
+    Elderly,
+    ElderlyMedicationReminder,
+    MedicationLogs,
+    Schedule,
 } from "@/types/appwrite";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { openURL } from "expo-linking";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  AppState,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    Alert,
+    AppState,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
 import {
-  Button,
-  Card,
-  Chip,
-  Text,
-  TouchableRipple,
-  useTheme
+    Button,
+    Card,
+    Chip,
+    Text,
+    TouchableRipple,
+    useTheme
 } from "react-native-paper";
 
 type TodoItem = {
@@ -127,10 +127,13 @@ export default function ElderlyHome() {
     }
   }, [user]);
 
-  React.useEffect(() => {
-    fetchElderlyData();
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchElderlyData();
+    }, [fetchElderlyData]),
+  );
 
-    // Refresh when app comes to foreground
+  React.useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       if (nextAppState === "active") {
         fetchElderlyData();
@@ -202,6 +205,20 @@ export default function ElderlyHome() {
         // Hide if scheduled_at is before start_date
         if (r.start_date && new Date(scheduledAt) < new Date(r.start_date)) {
           return;
+        }
+
+        // Hide if scheduled_at is beyond duration_days
+        if (r.start_date && r.duration_days) {
+          const startDateMs = new Date(r.start_date).getTime();
+          const startHkDate = new Date(startDateMs + hkOffset).toISOString().slice(0, 10);
+          const firstCandBase = new Date(startHkDate);
+          firstCandBase.setUTCHours(hours, minutes, 0, 0);
+          const firstCandUtcMs = firstCandBase.getTime() - hkOffset;
+          const startDelay = firstCandUtcMs <= startDateMs ? 1 : 0;
+          const lastValidUtcMs = firstCandUtcMs + (startDelay + r.duration_days - 1) * 86400000;
+          if (scheduledDate.getTime() > lastValidUtcMs) {
+            return;
+          }
         }
 
         // Find if logged

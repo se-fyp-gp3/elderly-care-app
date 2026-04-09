@@ -129,11 +129,11 @@ export async function fetchCaregiverMedicationData(
     if (prescriptionId) cancelledPrescriptionIds.add(prescriptionId);
   });
 
-  // Map Prescription ID -> Reminder ID
-  const prescriptionToReminderMap = new Map<string, string>();
+  // Map Prescription ID -> Reminder (full object for start_date & reminder_times)
+  const prescriptionToReminderMap = new Map<string, any>();
   remindersResponse.rows.forEach((reminder) => {
     const prescriptionId = getRelationshipId(reminder.elderly_medication);
-    if (prescriptionId) prescriptionToReminderMap.set(prescriptionId, reminder.$id);
+    if (prescriptionId) prescriptionToReminderMap.set(prescriptionId, reminder);
   });
 
   // 3. Fetch Medication Details
@@ -196,8 +196,9 @@ export async function fetchCaregiverMedicationData(
           : "Unknown Drug";
         const medicationUnit = medication ? medication.unit || "" : "";
         const dosage = `${prescription.dosage || "?"} ${medicationUnit}`;
-        const times = prescription.approx_times || [];
-        const reminderId = prescriptionToReminderMap.get(prescription.$id);
+        const reminder = prescriptionToReminderMap.get(prescription.$id);
+        const reminderId = reminder?.$id;
+        const times: string[] = reminder?.reminder_times || prescription.approx_times || [];
 
         if (times.length === 0) {
           dailyMeds.push({
@@ -228,6 +229,11 @@ export async function fetchCaregiverMedicationData(
                   reminderId,
               )
             : [];
+
+          // HK timezone offset for start_date filtering
+          const hkOffset = 8 * 60 * 60 * 1000;
+          const hkNow = new Date(Date.now() + hkOffset);
+          const todayStr = hkNow.toISOString().slice(0, 10);
 
           const slots = times.map((tStr, index) => {
             const todayScheduledTime = new Date();
@@ -263,6 +269,33 @@ export async function fetchCaregiverMedicationData(
           const matchedLogIds = new Set<string>();
 
           slots.forEach((slot) => {
+            // Apply start_date & duration_days filter
+            if (reminder?.start_date) {
+              const [hours, minutes] = slot.tStr.split(":").map(Number);
+              const baseDate = new Date(todayStr);
+              baseDate.setUTCHours(hours, minutes, 0, 0);
+              const scheduledUtcMs = baseDate.getTime() - hkOffset;
+              const startDateMs = new Date(reminder.start_date).getTime();
+
+              // Skip slots before start_date
+              if (scheduledUtcMs < startDateMs) {
+                return;
+              }
+
+              // Skip slots beyond duration_days
+              if (reminder.duration_days) {
+                const startHkDate = new Date(startDateMs + hkOffset).toISOString().slice(0, 10);
+                const firstCandBase = new Date(startHkDate);
+                firstCandBase.setUTCHours(hours, minutes, 0, 0);
+                const firstCandUtcMs = firstCandBase.getTime() - hkOffset;
+                const startDelay = firstCandUtcMs <= startDateMs ? 1 : 0;
+                const lastValidUtcMs = firstCandUtcMs + (startDelay + reminder.duration_days - 1) * 86400000;
+                if (scheduledUtcMs > lastValidUtcMs) {
+                  return;
+                }
+              }
+            }
+
             let status = "pending";
             let takenAt = null;
             let currentLogId: string | undefined = undefined;

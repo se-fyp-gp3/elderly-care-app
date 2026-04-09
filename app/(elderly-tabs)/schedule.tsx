@@ -4,6 +4,7 @@ import { createScheduleTask, fetchScheduleCategories, markScheduleTaskCompleted 
 import { Schedule, ScheduleCategory } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useFocusEffect } from "expo-router";
 import React from "react";
 import {
   Alert,
@@ -83,9 +84,14 @@ export default function ElderlySchedule() {
   }, []);
 
   React.useEffect(() => {
-    fetchSchedules();
     loadCategories();
-  }, [fetchSchedules, loadCategories]);
+  }, [loadCategories]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchSchedules();
+    }, [fetchSchedules]),
+  );
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);

@@ -14,6 +14,7 @@ import {
 import type { ChatSession as AppwriteChatSession, Elderly } from "@/types/appwrite";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
@@ -194,6 +195,12 @@ export default function CaregiverChatBot() {
   useEffect(() => {
     buildElderlyContext();
   }, [buildElderlyContext]);
+
+  useFocusEffect(
+    useCallback(() => {
+      buildElderlyContext();
+    }, [buildElderlyContext]),
+  );
 
   /* ─── Chat history ────────────────────────────────────────────────── */
   const loadHistory = useCallback(async () => {

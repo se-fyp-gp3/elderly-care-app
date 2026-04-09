@@ -6,7 +6,7 @@ import {
 } from "@/lib/health-data";
 import { HealthData } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, {
   useCallback,
   useEffect,
@@ -110,6 +110,12 @@ export default function HealthDataPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
