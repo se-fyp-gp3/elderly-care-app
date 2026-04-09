@@ -1001,7 +1001,7 @@ export default function ElderlySettings() {
                           styles.iconContainer,
                           {
                             backgroundColor: isSelected
-                              ? theme.colors.primary + "20"
+                              ? theme.colors.primary
                               : "#E8F0FE",
                           },
                         ]}
@@ -1011,7 +1011,7 @@ export default function ElderlySettings() {
                           size={26}
                           color={
                             isSelected
-                              ? theme.colors.primary
+                              ? theme.colors.onPrimary
                               : theme.colors.onSurfaceVariant
                           }
                         />
