@@ -1,11 +1,11 @@
 import { GroupMessage, GroupReadCursor } from "@/types/messaging";
 import { ID, Query } from "react-native-appwrite";
 import {
-  clientReactNative,
-  DATABASE_ID,
-  GROUP_MESSAGES_TABLE_ID,
-  GROUP_READ_CURSORS_TABLE_ID,
-  tablesDB,
+    clientReactNative,
+    DATABASE_ID,
+    GROUP_MESSAGES_TABLE_ID,
+    GROUP_READ_CURSORS_TABLE_ID,
+    tablesDB,
 } from "./appwrite";
 
 /**

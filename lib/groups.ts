@@ -1,12 +1,12 @@
 import { Group, GroupMember } from "@/types/messaging";
 import { ID, Query } from "react-native-appwrite";
 import {
-  DATABASE_ID,
-  GROUPS_TABLE_ID,
-  GROUP_MEMBERS_TABLE_ID,
-  USER_ICON_BUCKET_ID,
-  storage,
-  tablesDB,
+    DATABASE_ID,
+    GROUPS_TABLE_ID,
+    GROUP_MEMBERS_TABLE_ID,
+    USER_ICON_BUCKET_ID,
+    storage,
+    tablesDB,
 } from "./appwrite";
 
 /**

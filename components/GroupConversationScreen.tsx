@@ -1,52 +1,49 @@
 import {
-  DATABASE_ID,
-  GROUP_MESSAGES_TABLE_ID,
-  ID,
-  storage,
-  VOICE_MESSAGES_BUCKET_ID,
+    ID,
+    storage,
+    VOICE_MESSAGES_BUCKET_ID
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-  fetchGroupMessages,
-  sendGroupMessage,
-  subscribeToGroupMessages,
-  updateGroupReadCursor,
+    fetchGroupMessages,
+    sendGroupMessage,
+    subscribeToGroupMessages,
+    updateGroupReadCursor,
 } from "@/lib/group-messaging";
 import { getGroupMembers } from "@/lib/groups";
-import UserAvatar from "./UserAvatar";
 import { GroupMember, GroupMessage } from "@/types/messaging";
-import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
 import {
-  createAudioPlayer,
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  useAudioRecorder,
+    createAudioPlayer,
+    RecordingPresets,
+    requestRecordingPermissionsAsync,
+    setAudioModeAsync,
+    useAudioRecorder,
 } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  IconButton,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    IconButton,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import UserAvatar from "./UserAvatar";
 
 interface GroupConversationScreenProps {
   myProfileId: string;

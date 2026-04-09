@@ -1,26 +1,26 @@
 import { Contact } from "@/lib/contacts";
 import { createGroup } from "@/lib/groups";
-import UserAvatar from "./UserAvatar";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  FlatList,
-  Keyboard,
-  Modal,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    Alert,
+    FlatList,
+    Keyboard,
+    Modal,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import {
-  Button,
-  Checkbox,
-  Text,
-  TextInput,
-  useTheme,
+    Button,
+    Checkbox,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
+import UserAvatar from "./UserAvatar";
 
 interface CreateGroupModalProps {
   visible: boolean;

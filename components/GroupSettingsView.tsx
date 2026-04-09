@@ -1,43 +1,41 @@
-import { useAuth } from "@/lib/auth-context";
 import {
-  addGroupMember,
-  disbandGroup,
-  getGroupMembers,
-  getGroupsForUser,
-  isGroupMuted,
-  leaveGroup,
-  removeGroupMember,
-  toggleGroupMute,
-  updateGroupAvatar,
-  updateGroupName,
+    disbandGroup,
+    getGroupMembers,
+    getGroupsForUser,
+    isGroupMuted,
+    leaveGroup,
+    removeGroupMember,
+    toggleGroupMute,
+    updateGroupAvatar,
+    updateGroupName
 } from "@/lib/groups";
 import { uploadAvatar } from "@/lib/user";
-import UserAvatar from "./UserAvatar";
-import { Group, GroupMember } from "@/types/messaging";
+import { GroupMember } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Button,
-  Divider,
-  IconButton,
-  List,
-  Switch,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Button,
+    Divider,
+    IconButton,
+    List,
+    Switch,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import UserAvatar from "./UserAvatar";
 
 interface GroupSettingsViewProps {
   groupId: string;

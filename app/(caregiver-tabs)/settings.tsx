@@ -1,24 +1,24 @@
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
-  deleteCustomVoiceRecord,
-  getCustomVoicesForCaregiver,
-  saveCustomVoiceRecord,
+    deleteCustomVoiceRecord,
+    getCustomVoicesForCaregiver,
+    saveCustomVoiceRecord,
 } from "@/lib/custom-voice";
 import { useFontSize } from "@/lib/font-size-context";
 import { useLanguage } from "@/lib/language-context";
 import { createPersonalVoice, readAudioFileAsBase64 } from "@/lib/personal-voice";
-import { uploadAvatar, updateProfileAvatar, buildAvatarUrl } from "@/lib/user";
+import { buildAvatarUrl, updateProfileAvatar, uploadAvatar } from "@/lib/user";
 import { Caregiver, CustomVoice, CustomVoiceStatus, Elderly } from "@/types/appwrite";
 import { FontSize } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
-  createAudioPlayer,
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  useAudioRecorder,
-  type AudioPlayer,
+    createAudioPlayer,
+    RecordingPresets,
+    requestRecordingPermissionsAsync,
+    setAudioModeAsync,
+    useAudioRecorder,
+    type AudioPlayer,
 } from "expo-audio";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -26,20 +26,20 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Banner,
-  Button,
-  Card,
-  Chip,
-  Divider,
-  IconButton,
-  List,
-  SegmentedButtons,
-  Switch,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Banner,
+    Button,
+    Card,
+    Chip,
+    Divider,
+    IconButton,
+    List,
+    SegmentedButtons,
+    Switch,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 type VoiceCreationStep = "idle" | "recording" | "converting" | "cloning" | "done" | "error";
