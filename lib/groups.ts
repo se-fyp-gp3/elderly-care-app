@@ -50,7 +50,7 @@ export async function createGroup(input: {
     },
   });
 
-  // Add other members
+  // Add other members as "invited" (they must accept to join)
   await Promise.all(
     input.members.map((m) =>
       tablesDB.createRow<GroupMember>({
@@ -64,7 +64,7 @@ export async function createGroup(input: {
           user_role: m.role,
           member_role: "member",
           joined_at: now,
-          status: "active",
+          status: "invited",
         },
       }),
     ),
@@ -81,6 +81,89 @@ export async function createGroup(input: {
   });
 
   return group as unknown as Group;
+}
+
+/**
+ * Get all pending group invitations for a user.
+ * Returns the GroupMember rows with status "invited" plus the associated Group data.
+ */
+export async function getPendingGroupInvitations(
+  profileId: string,
+): Promise<{ membership: GroupMember; group: Group }[]> {
+  try {
+    const memberships = await tablesDB.listRows<GroupMember>({
+      databaseId: DATABASE_ID,
+      tableId: GROUP_MEMBERS_TABLE_ID,
+      queries: [
+        Query.equal("user_profile_id", profileId),
+        Query.equal("status", "invited"),
+        Query.limit(100),
+      ],
+    });
+
+    if (memberships.rows.length === 0) return [];
+
+    const groupIds = [...new Set(memberships.rows.map((m) => m.group_id))];
+    const groups = await tablesDB.listRows<Group>({
+      databaseId: DATABASE_ID,
+      tableId: GROUPS_TABLE_ID,
+      queries: [Query.equal("$id", groupIds), Query.limit(100)],
+    });
+
+    const groupMap = new Map(groups.rows.map((g) => [g.$id, g as unknown as Group]));
+
+    return memberships.rows
+      .filter((m) => groupMap.has(m.group_id))
+      .map((m) => ({
+        membership: m as unknown as GroupMember,
+        group: groupMap.get(m.group_id)!,
+      }));
+  } catch (error) {
+    console.error("Error fetching pending group invitations:", error);
+    return [];
+  }
+}
+
+/**
+ * Accept a group invitation – sets the membership status to "active"
+ * and sends a system message announcing the user joined.
+ */
+export async function acceptGroupInvitation(
+  membershipId: string,
+  groupId: string,
+  userName: string,
+  userRole: "elderly" | "caregiver",
+  userId: string,
+): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: GROUP_MEMBERS_TABLE_ID,
+    rowId: membershipId,
+    data: { status: "active" },
+  });
+
+  await sendGroupMessage({
+    groupId,
+    senderId: userId,
+    senderName: userName,
+    senderRole: userRole,
+    body: `${userName} joined the group`,
+    messageType: "system",
+  });
+}
+
+/**
+ * Reject a group invitation – sets the membership status to "left".
+ */
+export async function rejectGroupInvitation(
+  membershipId: string,
+): Promise<void> {
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: GROUP_MEMBERS_TABLE_ID,
+    rowId: membershipId,
+    data: { status: "left" },
+  });
 }
 
 /**

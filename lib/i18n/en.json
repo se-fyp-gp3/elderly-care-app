@@ -295,7 +295,14 @@
     "groupNameUpdated": "Group name updated",
     "reply": "Reply",
     "copy": "Copy",
-    "readBy": "Read by"
+    "readBy": "Read by",
+    "groupInvitations": "Group Invitations ({{count}})",
+    "invitedYouToGroup": "invited you to join",
+    "acceptedGroupInvite": "You joined the group",
+    "failedToAcceptInvite": "Failed to accept invitation",
+    "failedToDeclineInvite": "Failed to decline invitation",
+    "declineGroupInvite": "Decline Invitation",
+    "declineGroupConfirm": "Decline the invitation to join \"{{name}}\"?"
   },
   "medication": {
     "toTakeToday": "To Take Today",

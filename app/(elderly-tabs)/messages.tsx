@@ -18,11 +18,11 @@ import {
 } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { getGroupUnreadCount, getLastGroupMessage } from "@/lib/group-messaging";
-import { getGroupsForUser } from "@/lib/groups";
+import { acceptGroupInvitation, getGroupsForUser, getPendingGroupInvitations, rejectGroupInvitation } from "@/lib/groups";
 import { buildConversationId, getLastMessage, getUnreadCountPerConversation } from "@/lib/messaging";
 import { isUserOnline } from "@/lib/presence";
 import { Caregiver, Elderly } from "@/types/appwrite";
-import { DirectMessage, Group, GroupMessage } from "@/types/messaging";
+import { DirectMessage, Group, GroupMember, GroupMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -99,6 +99,12 @@ export default function ElderlyMessages() {
   const [longPressItem, setLongPressItem] = useState<ChatListItem | null>(null);
   const [showLongPressMenu, setShowLongPressMenu] = useState(false);
 
+  // ── Pending group invitations ──
+  const [pendingGroupInvites, setPendingGroupInvites] = useState<
+    { membership: GroupMember; group: Group }[]
+  >([]);
+  const [acceptingGroupId, setAcceptingGroupId] = useState<string | null>(null);
+
   const { width } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState(0);
   const pagerRef = React.useRef<FlatList<number>>(null);
@@ -124,13 +130,15 @@ export default function ElderlyMessages() {
       setElderlyProfileId(elderly.$id);
       setElderlyName(elderly.name || user.name || "Me");
 
-      const [data, userGroups, dmUnreadMap] = await Promise.all([
+      const [data, userGroups, dmUnreadMap, groupInvites] = await Promise.all([
         getContactsForElderly(elderly.$id),
         getGroupsForUser(elderly.$id),
         getUnreadCountPerConversation(elderly.$id),
+        getPendingGroupInvitations(elderly.$id),
       ]);
       setUnreadCounts(dmUnreadMap);
       setGroups(userGroups);
+      setPendingGroupInvites(groupInvites);
 
       // Fetch last messages for each contact
       const lastMsgs: Record<string, DirectMessage | null> = {};
@@ -295,6 +303,45 @@ export default function ElderlyMessages() {
       setAddingContact(false);
     }
   }, [foundUser, elderlyProfileId, contacts, closeAddDialog, fetchContacts]);
+
+  // ── Accept / Reject group invitation handlers ──
+  const handleAcceptGroupInvite = useCallback(async (invite: { membership: GroupMember; group: Group }) => {
+    if (!elderlyProfileId) return;
+    setAcceptingGroupId(invite.membership.$id);
+    try {
+      await acceptGroupInvitation(
+        invite.membership.$id,
+        invite.group.$id,
+        elderlyName,
+        "elderly",
+        elderlyProfileId,
+      );
+      Alert.alert(t('chat.acceptedGroupInvite'), invite.group.name);
+      await fetchContacts();
+    } catch (e) {
+      Alert.alert(t('common.error'), t('chat.failedToAcceptInvite'));
+    } finally {
+      setAcceptingGroupId(null);
+    }
+  }, [elderlyProfileId, elderlyName, fetchContacts, t]);
+
+  const handleRejectGroupInvite = useCallback((invite: { membership: GroupMember; group: Group }) => {
+    Alert.alert(t('chat.declineGroupInvite'), t('chat.declineGroupConfirm', { name: invite.group.name }), [
+      { text: t('common.cancel'), style: "cancel" },
+      {
+        text: t('emergency.decline'),
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await rejectGroupInvitation(invite.membership.$id);
+            setPendingGroupInvites((prev) => prev.filter((i) => i.membership.$id !== invite.membership.$id));
+          } catch (e) {
+            Alert.alert(t('common.error'), t('chat.failedToDeclineInvite'));
+          }
+        },
+      },
+    ]);
+  }, [t]);
 
   // ── Build unified chat list ──
   const chatList: ChatListItem[] = React.useMemo(() => {
@@ -781,6 +828,55 @@ export default function ElderlyMessages() {
           </Menu>
         </View>
       </View>
+
+      {/* Pending Group Invitations */}
+      {pendingGroupInvites.length > 0 && !loading && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+            <MaterialCommunityIcons name="account-group" size={20} color={theme.colors.primary} />
+            <Text variant="titleSmall" style={{ marginLeft: 6, fontWeight: "700", color: theme.colors.primary }}>
+              {t('chat.groupInvitations', { count: pendingGroupInvites.length })}
+            </Text>
+          </View>
+          {pendingGroupInvites.map((invite) => (
+            <View
+              key={invite.membership.$id}
+              style={{ flexDirection: "row", alignItems: "center", borderRadius: 14, padding: 12, marginBottom: 8, backgroundColor: theme.colors.primaryContainer }}
+            >
+              <Avatar.Icon
+                size={40}
+                icon="account-group"
+                style={{ backgroundColor: theme.colors.tertiaryContainer }}
+              />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text variant="titleSmall" style={{ fontWeight: "600" }}>
+                  {invite.group.name}
+                </Text>
+                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                  {t('chat.invitedYouToGroup')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => handleAcceptGroupInvite(invite)}
+                disabled={acceptingGroupId === invite.membership.$id}
+                style={{ width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center", marginLeft: 8, backgroundColor: "#4CAF50" }}
+              >
+                {acceptingGroupId === invite.membership.$id ? (
+                  <ActivityIndicator size={16} color="#fff" />
+                ) : (
+                  <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleRejectGroupInvite(invite)}
+                style={{ width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center", marginLeft: 6, backgroundColor: "#FFCDD2" }}
+              >
+                <MaterialCommunityIcons name="close" size={18} color="#D32F2F" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Contact List */}
       {loading ? (

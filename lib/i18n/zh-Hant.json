@@ -295,7 +295,14 @@
     "groupNameUpdated": "群組名稱已更新",
     "reply": "回覆",
     "copy": "複製",
-    "readBy": "已讀"
+    "readBy": "已讀",
+    "groupInvitations": "群聊邀請 ({{count}})",
+    "invitedYouToGroup": "邀請你加入",
+    "acceptedGroupInvite": "你已加入群聊",
+    "failedToAcceptInvite": "接受邀請失敗",
+    "failedToDeclineInvite": "拒絕邀請失敗",
+    "declineGroupInvite": "拒絕邀請",
+    "declineGroupConfirm": "拒絕加入 \"{{name}}\" 的邀請？"
   },
   "medication": {
     "toTakeToday": "今日待服用",
