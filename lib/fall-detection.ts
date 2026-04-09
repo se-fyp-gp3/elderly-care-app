@@ -16,11 +16,11 @@ import { AppState, Platform } from "react-native";
 const BACKGROUND_LOCATION_TASK = "FALL_DETECTION_BG_LOCATION";
 
 /* ── Thresholds ─────────────────────────────────────────── */
-const ACCEL_SPIKE_THRESHOLD = 22; // m/s² total magnitude (lowered for better sensitivity)
-const GYRO_RAPID_THRESHOLD = 3; // rad/s total rotation rate
+const ACCEL_SPIKE_THRESHOLD = 16; // m/s² total magnitude (~1.6 g — above brisk walking, reachable by falls)
+const GYRO_RAPID_THRESHOLD = 2; // rad/s total rotation rate (~115°/s)
 const STILLNESS_THRESHOLD = 14; // m/s² — higher value = more forgiving stillness check
-const STILLNESS_WINDOW_MS = 800; // must stay still for this long (reduced)
-const SPIKE_TO_STILL_MAX_MS = 5000; // max gap between spike and stillness (increased)
+const STILLNESS_WINDOW_MS = 600; // must stay still for this long
+const SPIKE_TO_STILL_MAX_MS = 5000; // max gap between spike and stillness
 const COOLDOWN_MS = 30_000; // ignore repeated triggers
 const SENSOR_INTERVAL_MS = 100; // 10 Hz
 
