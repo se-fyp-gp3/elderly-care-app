@@ -757,7 +757,18 @@
     "failedToPost": "Failed to post moment",
     "comments": "Comments",
     "noCommentsYet": "No comments yet. Be the first!",
-    "addComment": "Add a comment..."
+    "addComment": "Add a comment...",
+    "reply": "Reply",
+    "repliedTo": "Replied to",
+    "replyToComment": "Reply to {{name}}",
+    "replyPlaceholder": "Reply to @{{name}}...",
+    "showMore": "Show more",
+    "collapse": "Collapse",
+    "viewAllComments": "View all comments",
+    "maxMediaReached": "Media limit reached",
+    "mediaCount": "Media ({{count}})",
+    "newCommentOnPost": "Commented on your post",
+    "repliedToYourComment": "Replied to your comment"
   },
   "qrPairing": {
     "settingUp": "Setting up...",

@@ -1,5 +1,5 @@
 import { formatRelativeTime } from "@/lib/contacts";
-import { addComment, getComments } from "@/lib/moments";
+import { addComment, getComments, likeComment } from "@/lib/moments";
 import { MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -25,6 +25,7 @@ const SHEET_HEIGHT = SCREEN_HEIGHT * 0.7;
 interface CommentSheetProps {
   visible: boolean;
   momentId: string;
+  momentAuthorId?: string;
   onClose: () => void;
   currentUserId: string;
   currentUserName: string;
@@ -33,8 +34,28 @@ interface CommentSheetProps {
   onCommentAdded?: () => void;
 }
 
-function CommentItem({ comment }: { comment: MomentComment }) {
+function CommentItem({
+  comment,
+  currentUserId,
+  allComments,
+  onReply,
+  onLike,
+}: {
+  comment: MomentComment;
+  currentUserId: string;
+  allComments: MomentComment[];
+  onReply: (comment: MomentComment) => void;
+  onLike: (comment: MomentComment) => void;
+}) {
   const theme = useTheme();
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const likes = comment.likes || [];
+  const isLiked = likes.includes(currentUserId);
+  const longText = (comment.content?.length || 0) > 200;
+  const parentComment = comment.reply_to_comment_id
+    ? allComments.find((c) => c.$id === comment.reply_to_comment_id)
+    : null;
 
   return (
     <View style={styles.commentItem}>
@@ -61,16 +82,66 @@ function CommentItem({ comment }: { comment: MomentComment }) {
               <Text style={{ color: theme.colors.tertiary, fontWeight: "normal" }}> • AI</Text>
             )}
           </Text>
-          <Text variant="bodyMedium" style={{ marginTop: 2, lineHeight: 20 }}>
+
+          {/* Reply indicator with quoted parent */}
+          {!!comment.reply_to_user_name && (
+            <View style={[styles.replyQuote, { borderLeftColor: theme.colors.outlineVariant, backgroundColor: theme.colors.surfaceVariant }]}>
+              <Text variant="labelSmall" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
+                ↳ @{comment.reply_to_user_name}
+              </Text>
+              {parentComment ? (
+                <Text
+                  variant="labelSmall"
+                  numberOfLines={2}
+                  style={{ color: theme.colors.onSurfaceVariant, marginTop: 1 }}
+                >
+                  {parentComment.content}
+                </Text>
+              ) : null}
+            </View>
+          )}
+
+          <Text
+            variant="bodyMedium"
+            numberOfLines={expanded || !longText ? undefined : 4}
+            style={{ marginTop: 2, lineHeight: 20 }}
+          >
             {comment.content}
           </Text>
+          {longText && (
+            <Pressable onPress={() => setExpanded(!expanded)}>
+              <Text variant="labelSmall" style={{ color: theme.colors.primary, marginTop: 2 }}>
+                {expanded ? t('moments.collapse') : t('moments.showMore')}
+              </Text>
+            </Pressable>
+          )}
         </View>
-        <Text
-          variant="labelSmall"
-          style={{ color: theme.colors.onSurfaceVariant, marginTop: 4, marginLeft: 4 }}
-        >
-          {formatRelativeTime(comment.$createdAt)}
-        </Text>
+
+        {/* Footer row: time + reply + like */}
+        <View style={styles.commentFooter}>
+          <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+            {formatRelativeTime(comment.$createdAt)}
+          </Text>
+          {comment.author_role !== "ai" && (
+            <Pressable onPress={() => onReply(comment)} hitSlop={8} style={styles.footerBtn}>
+              <Text variant="labelSmall" style={{ color: theme.colors.primary }}>
+                {t('moments.reply')}
+              </Text>
+            </Pressable>
+          )}
+          <Pressable onPress={() => onLike(comment)} hitSlop={8} style={styles.footerBtn}>
+            <MaterialCommunityIcons
+              name={isLiked ? "heart" : "heart-outline"}
+              size={14}
+              color={isLiked ? theme.colors.error : theme.colors.onSurfaceVariant}
+            />
+            {likes.length > 0 && (
+              <Text variant="labelSmall" style={{ marginLeft: 2, color: theme.colors.onSurfaceVariant }}>
+                {likes.length}
+              </Text>
+            )}
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -79,6 +150,7 @@ function CommentItem({ comment }: { comment: MomentComment }) {
 export default function CommentSheet({
   visible,
   momentId,
+  momentAuthorId,
   onClose,
   currentUserId,
   currentUserName,
@@ -91,6 +163,7 @@ export default function CommentSheet({
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<MomentComment | null>(null);
   const inputRef = useRef<RNTextInput>(null);
   const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const { t } = useTranslation();
@@ -111,6 +184,7 @@ export default function CommentSheet({
   useEffect(() => {
     if (visible) {
       loadComments();
+      setReplyTarget(null);
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
@@ -124,6 +198,7 @@ export default function CommentSheet({
 
   const handleClose = () => {
     Keyboard.dismiss();
+    setReplyTarget(null);
     Animated.timing(slideAnim, {
       toValue: SHEET_HEIGHT,
       duration: 250,
@@ -131,20 +206,60 @@ export default function CommentSheet({
     }).start(() => onClose());
   };
 
+  const handleReply = (comment: MomentComment) => {
+    setReplyTarget(comment);
+    inputRef.current?.focus();
+  };
+
+  const handleLikeComment = async (comment: MomentComment) => {
+    // Optimistic update
+    const currentLikes = comment.likes || [];
+    const isLiked = currentLikes.includes(currentUserId);
+    const optimisticLikes = isLiked
+      ? currentLikes.filter((id) => id !== currentUserId)
+      : [...currentLikes, currentUserId];
+    setComments((prev) =>
+      prev.map((c) => (c.$id === comment.$id ? { ...c, likes: optimisticLikes } : c))
+    );
+    try {
+      const serverLikes = await likeComment(comment.$id, currentUserId, currentLikes);
+      setComments((prev) =>
+        prev.map((c) => (c.$id === comment.$id ? { ...c, likes: serverLikes } : c))
+      );
+    } catch (e) {
+      // Revert on error
+      setComments((prev) =>
+        prev.map((c) => (c.$id === comment.$id ? { ...c, likes: currentLikes } : c))
+      );
+      console.error(e);
+    }
+  };
+
   const handlePost = async () => {
     const trimmed = text.trim();
     if (!trimmed || posting) return;
     setPosting(true);
     try {
+      const replyOptions = replyTarget
+        ? {
+            replyToCommentId: replyTarget.$id,
+            replyToUserId: replyTarget.author_id,
+            replyToUserName: replyTarget.author_name,
+            momentAuthorId,
+          }
+        : { momentAuthorId };
+
       const newComment = await addComment(
         momentId,
         trimmed,
         currentUserId,
         currentUserName,
-        currentUserRole
+        currentUserRole,
+        replyOptions
       );
       setComments((prev) => [newComment, ...prev]);
       setText("");
+      setReplyTarget(null);
       onCommentAdded?.();
     } catch (e) {
       console.error(e);
@@ -200,7 +315,15 @@ export default function CommentSheet({
             <FlatList
               data={comments}
               keyExtractor={(item) => item.$id}
-              renderItem={({ item }) => <CommentItem comment={item} />}
+              renderItem={({ item }) => (
+                <CommentItem
+                  comment={item}
+                  currentUserId={currentUserId}
+                  allComments={comments}
+                  onReply={handleReply}
+                  onLike={handleLikeComment}
+                />
+              )}
               contentContainerStyle={styles.listContent}
               keyboardShouldPersistTaps="handled"
               ListEmptyComponent={
@@ -221,6 +344,18 @@ export default function CommentSheet({
             />
           )}
 
+          {/* Reply indicator bar */}
+          {replyTarget && (
+            <View style={[styles.replyBar, { backgroundColor: theme.colors.surfaceVariant }]}>
+              <Text variant="labelSmall" numberOfLines={1} style={{ flex: 1, color: theme.colors.onSurfaceVariant }}>
+                {t('moments.replyToComment', { name: replyTarget.author_name })}
+              </Text>
+              <Pressable onPress={() => setReplyTarget(null)} hitSlop={8}>
+                <MaterialCommunityIcons name="close" size={16} color={theme.colors.onSurfaceVariant} />
+              </Pressable>
+            </View>
+          )}
+
           {/* Input bar */}
           <Divider />
           <View style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}>
@@ -239,7 +374,11 @@ export default function CommentSheet({
                   color: theme.colors.onSurface,
                 },
               ]}
-              placeholder={t('moments.addComment')}
+              placeholder={
+                replyTarget
+                  ? t('moments.replyPlaceholder', { name: replyTarget.author_name })
+                  : t('moments.addComment')
+              }
               placeholderTextColor={theme.colors.onSurfaceVariant}
               value={text}
               onChangeText={setText}
@@ -319,6 +458,32 @@ const styles = StyleSheet.create({
   },
   commentBubble: {
     flexShrink: 1,
+  },
+  replyQuote: {
+    borderLeftWidth: 3,
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  commentFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    marginLeft: 4,
+    gap: 12,
+  },
+  footerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  replyBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    gap: 8,
   },
   inputBar: {
     flexDirection: "row",

@@ -1,4 +1,5 @@
 import { usePresence } from "@/lib/hooks/usePresence";
+import { useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -8,6 +9,7 @@ export default function TabsLayout() {
   const theme = useTheme();
   const { t } = useTranslation();
   usePresence();
+  const { totalUnread } = useUnreadBadge();
 
   return (
     <Tabs
@@ -42,6 +44,7 @@ export default function TabsLayout() {
         name="messages"
         options={{
           title: t('tabs.messages'),
+          tabBarBadge: totalUnread > 0 ? totalUnread : undefined,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="chat" size={size} color={color} />
           ),

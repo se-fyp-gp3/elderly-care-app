@@ -1,6 +1,7 @@
 import MiniSettingsGearButton from "@/components/MiniSettingsGearButton";
 import { useAuth } from "@/lib/auth-context";
 import { usePresence } from "@/lib/hooks/usePresence";
+import { useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
@@ -32,6 +33,7 @@ export default function ElderlyTabsLayout() {
   const { t } = useTranslation();
   const { preferences } = useAuth();
   usePresence();
+  const { totalUnread } = useUnreadBadge();
   const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
   const visible = getVisibleTabs(uiVersion);
 
@@ -113,6 +115,7 @@ export default function ElderlyTabsLayout() {
           title: t('tabs.community'),
           href: visible.emergency ? undefined : null,
           headerRight: isAccessible ? () => <MiniSettingsGearButton /> : undefined,
+          tabBarBadge: totalUnread > 0 ? totalUnread : undefined,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="account-group"

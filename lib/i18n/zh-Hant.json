@@ -766,7 +766,18 @@
     "failedToPost": "發佈動態失敗",
     "comments": "評論",
     "noCommentsYet": "暫無評論。成為第一個評論的人吧！",
-    "addComment": "新增評論..."
+    "addComment": "新增評論...",
+    "reply": "回覆",
+    "repliedTo": "回覆了",
+    "replyToComment": "回覆 {{name}}",
+    "replyPlaceholder": "回覆 @{{name}}...",
+    "showMore": "展開",
+    "collapse": "收合",
+    "viewAllComments": "查看所有評論",
+    "maxMediaReached": "已達媒體上限",
+    "mediaCount": "媒體 ({{count}})",
+    "newCommentOnPost": "評論了你的動態",
+    "repliedToYourComment": "回覆了你的評論"
   },
   "qrPairing": {
     "settingUp": "正在設定...",

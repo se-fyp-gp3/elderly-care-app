@@ -7,8 +7,9 @@ import {
     MOMENTS_TABLE_ID,
     storage,
 } from "@/lib/appwrite";
-import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
+import { MediaItem, Moment, MomentComment, MomentMediaInput } from "@/types/moments";
 import * as FileSystem from "expo-file-system";
+import * as VideoThumbnails from "expo-video-thumbnails";
 import { Databases, ID, Permission, Query, Role } from "react-native-appwrite";
 
 const databases = new Databases(clientReactNative);
@@ -32,13 +33,14 @@ export async function getMoments(page = 1, allowedAuthorIds?: string[]): Promise
 
   const documents = response.documents as unknown as Moment[];
   return documents.map((doc) => {
+    // Build parsedMediaItems from new media_items JSON or legacy fields
+    const parsed = parseMomentMedia(doc);
+    const result = { ...doc, parsedMediaItems: parsed };
+    // Also set legacy media_url for backward compat
     if (doc.media_bucket_id && doc.media_file_id) {
-      return {
-        ...doc,
-        media_url: buildMediaUrl(doc.media_bucket_id, doc.media_file_id),
-      };
+      result.media_url = buildMediaUrl(doc.media_bucket_id, doc.media_file_id);
     }
-    return doc;
+    return result;
   });
 }
 
@@ -47,11 +49,38 @@ export async function createMoment(
   userId: string,
   userName: string,
   userRole: "elderly" | "caregiver",
-  media?: MomentMediaInput | null
+  mediaList?: MomentMediaInput[] | null
 ): Promise<Moment> {
   let mediaFields: Partial<Moment> = {};
-  if (media) {
-    mediaFields = await uploadMomentMedia(media);
+  let mediaItemsJson: string | undefined;
+
+  if (mediaList && mediaList.length > 0) {
+    if (mediaList.length === 1) {
+      // Single media – populate both legacy fields and media_items for compat
+      const uploaded = await uploadMomentMedia(mediaList[0]);
+      mediaFields = uploaded.legacyFields;
+      mediaItemsJson = JSON.stringify([uploaded.item]);
+    } else {
+      // Multiple media – use media_items JSON only
+      const uploadedItems: MediaItem[] = [];
+      for (const m of mediaList) {
+        const uploaded = await uploadMomentMedia(m);
+        uploadedItems.push(uploaded.item);
+      }
+      mediaItemsJson = JSON.stringify(uploadedItems);
+      // Set legacy fields from first item for backward compat
+      const first = uploadedItems[0];
+      mediaFields = {
+        media_type: first.type,
+        media_bucket_id: first.bucket_id,
+        media_file_id: first.file_id,
+        media_mime_type: first.mime_type,
+        media_width: first.width,
+        media_height: first.height,
+        media_duration_ms: first.duration_ms,
+        media_thumbnail_file_id: first.thumbnail_file_id,
+      };
+    }
   }
 
   const response = await databases.createDocument(
@@ -67,17 +96,24 @@ export async function createMoment(
       comments_count: 0,
       ai_generated: false,
       ...mediaFields,
+      ...(mediaItemsJson ? { media_items: mediaItemsJson } : {}),
     }
   );
 
   const created = response as unknown as Moment;
+  created.parsedMediaItems = parseMomentMedia(created);
   if (created.media_bucket_id && created.media_file_id) {
     created.media_url = buildMediaUrl(created.media_bucket_id, created.media_file_id);
   }
   return created;
 }
 
-async function uploadMomentMedia(media: MomentMediaInput): Promise<Partial<Moment>> {
+interface UploadResult {
+  legacyFields: Partial<Moment>;
+  item: MediaItem;
+}
+
+async function uploadMomentMedia(media: MomentMediaInput): Promise<UploadResult> {
   const guessedExtension = getFileExtension(media.fileName, media.mimeType, media.type);
   const cleanFileName = media.fileName?.trim() || `${media.type}_${Date.now()}.${guessedExtension}`;
   const mimeType = media.mimeType || (media.type === "video" ? "video/mp4" : "image/jpeg");
@@ -103,7 +139,46 @@ async function uploadMomentMedia(media: MomentMediaInput): Promise<Partial<Momen
     );
   }
 
-  const baseFields: Partial<Moment> = {
+  // Generate thumbnail for video
+  let thumbnailFileId: string | undefined;
+  if (media.type === "video") {
+    try {
+      const thumb = await VideoThumbnails.getThumbnailAsync(media.uri, { time: 500 });
+      if (thumb?.uri) {
+        const thumbInfo = await FileSystem.getInfoAsync(thumb.uri);
+        const thumbSize = (thumbInfo.exists && typeof thumbInfo.size === "number") ? thumbInfo.size : 1;
+        const thumbFile = await storage.createFile({
+          bucketId: MOMENTS_MEDIA_BUCKET_ID,
+          fileId: ID.unique(),
+          file: {
+            name: `thumb_${Date.now()}.jpg`,
+            type: "image/jpeg",
+            size: thumbSize,
+            uri: thumb.uri,
+          },
+          permissions: [Permission.read(Role.users())],
+        });
+        thumbnailFileId = thumbFile.$id;
+      }
+    } catch (e) {
+      console.warn("Video thumbnail generation failed:", e);
+    }
+  }
+
+  const item: MediaItem = {
+    file_id: uploadedFile.$id,
+    bucket_id: MOMENTS_MEDIA_BUCKET_ID,
+    type: media.type,
+    mime_type: mimeType,
+    width: media.width,
+    height: media.height,
+    duration_ms: media.durationMs,
+    thumbnail_file_id: thumbnailFileId,
+    url: buildMediaUrl(MOMENTS_MEDIA_BUCKET_ID, uploadedFile.$id),
+    thumbnail_url: thumbnailFileId ? buildMediaUrl(MOMENTS_MEDIA_BUCKET_ID, thumbnailFileId) : undefined,
+  };
+
+  const legacyFields: Partial<Moment> = {
     media_type: media.type,
     media_bucket_id: MOMENTS_MEDIA_BUCKET_ID,
     media_file_id: uploadedFile.$id,
@@ -111,9 +186,10 @@ async function uploadMomentMedia(media: MomentMediaInput): Promise<Partial<Momen
     media_width: media.width,
     media_height: media.height,
     media_duration_ms: media.durationMs,
+    media_thumbnail_file_id: thumbnailFileId,
   };
 
-  return baseFields;
+  return { legacyFields, item };
 }
 
 async function resolveFileSize(media: MomentMediaInput): Promise<number> {
@@ -143,12 +219,52 @@ function extractErrorMessage(error: unknown): string {
 
 function buildMediaUrl(bucketId: string, fileId: string): string | undefined {
   try {
-    return storage.getFileViewURL(bucketId, fileId).toString();
+    // Use getFileDownloadURL for better video streaming compatibility
+    return storage.getFileDownloadURL(bucketId, fileId).toString();
   } catch (error) {
     console.warn("Failed to build moment media URL:", error);
     return undefined;
   }
 }
+
+/** Parse a Moment's media into a unified MediaItem[] array */
+function parseMomentMedia(doc: Moment): MediaItem[] {
+  // Try new multi-media JSON field first
+  if (doc.media_items) {
+    try {
+      const items: MediaItem[] = JSON.parse(doc.media_items);
+      return items.map((item) => ({
+        ...item,
+        url: item.url || buildMediaUrl(item.bucket_id, item.file_id),
+        thumbnail_url: item.thumbnail_url || (item.thumbnail_file_id ? buildMediaUrl(item.bucket_id, item.thumbnail_file_id) : undefined),
+      }));
+    } catch {
+      // Fall through to legacy
+    }
+  }
+  // Legacy single-media fields
+  if (doc.media_bucket_id && doc.media_file_id) {
+    const url = buildMediaUrl(doc.media_bucket_id, doc.media_file_id);
+    const thumbnailUrl = doc.media_thumbnail_file_id
+      ? buildMediaUrl(doc.media_bucket_id, doc.media_thumbnail_file_id)
+      : undefined;
+    return [{
+      file_id: doc.media_file_id,
+      bucket_id: doc.media_bucket_id,
+      type: doc.media_type || "image",
+      mime_type: doc.media_mime_type || "image/jpeg",
+      width: doc.media_width,
+      height: doc.media_height,
+      duration_ms: doc.media_duration_ms,
+      thumbnail_file_id: doc.media_thumbnail_file_id,
+      url,
+      thumbnail_url: thumbnailUrl,
+    }];
+  }
+  return [];
+}
+
+export { parseMomentMedia };
 
 function getFileExtension(
   fileName?: string,
@@ -242,19 +358,32 @@ export async function addComment(
   content: string,
   userId: string,
   userName: string,
-  userRole: "elderly" | "caregiver"
+  userRole: "elderly" | "caregiver",
+  options?: {
+    replyToCommentId?: string;
+    replyToUserId?: string;
+    replyToUserName?: string;
+    momentAuthorId?: string;
+  }
 ): Promise<MomentComment> {
+  const data: Record<string, any> = {
+    moment_id: momentId,
+    content,
+    author_id: userId,
+    author_name: userName,
+    author_role: userRole,
+    likes: [],
+  };
+  if (options?.replyToCommentId) data.reply_to_comment_id = options.replyToCommentId;
+  if (options?.replyToUserId) data.reply_to_user_id = options.replyToUserId;
+  if (options?.replyToUserName) data.reply_to_user_name = options.replyToUserName;
+  if (options?.momentAuthorId) data.moment_author_id = options.momentAuthorId;
+
   const comment = await databases.createDocument(
     DATABASE_ID,
     MOMENTS_COMMENTS_TABLE_ID,
     ID.unique(),
-    {
-      moment_id: momentId,
-      content,
-      author_id: userId,
-      author_name: userName,
-      author_role: userRole,
-    }
+    data
   );
 
   // Increment comments_count on the moment
@@ -268,6 +397,57 @@ export async function addComment(
   }
 
   return comment as unknown as MomentComment;
+}
+
+/**
+ * Toggle like on a comment. Returns the new likes array.
+ */
+export async function likeComment(commentId: string, userId: string, currentLikes: string[]): Promise<string[]> {
+  const isLiked = currentLikes.includes(userId);
+  const newLikes = isLiked ? currentLikes.filter(id => id !== userId) : [...currentLikes, userId];
+  try {
+    await databases.updateDocument(DATABASE_ID, MOMENTS_COMMENTS_TABLE_ID, commentId, { likes: newLikes });
+  } catch (error) {
+    console.error("Error liking comment:", error);
+  }
+  return newLikes;
+}
+
+/**
+ * Get the latest N comments for a moment (for inline card preview).
+ */
+export async function getLatestComments(momentId: string, limit = 3, allowedAuthorIds?: string[]): Promise<MomentComment[]> {
+  try {
+    const queries = [
+      Query.equal("moment_id", momentId),
+      Query.orderDesc("$createdAt"),
+      Query.limit(limit),
+    ];
+    if (allowedAuthorIds && allowedAuthorIds.length > 0) {
+      queries.push(Query.equal("author_id", allowedAuthorIds));
+    }
+    const response = await databases.listDocuments(DATABASE_ID, MOMENTS_COMMENTS_TABLE_ID, queries);
+    return response.documents as unknown as MomentComment[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Get IDs of all moments authored by a specific user.
+ * Used for notification logic to check "someone commented on my post".
+ */
+export async function getUserMomentIds(userId: string): Promise<string[]> {
+  try {
+    const response = await databases.listDocuments(DATABASE_ID, MOMENTS_TABLE_ID, [
+      Query.equal("author_id", userId),
+      Query.select(["$id"]),
+      Query.limit(500),
+    ]);
+    return response.documents.map(d => d.$id);
+  } catch {
+    return [];
+  }
 }
 
 export async function addAIResponse(momentId: string, content: string): Promise<MomentComment> {

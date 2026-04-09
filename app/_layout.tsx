@@ -1,13 +1,16 @@
-import { clientReactNative, DATABASE_ID, DIRECT_MESSAGES_TABLE_ID } from "@/lib/appwrite";
+import { clientReactNative, DATABASE_ID, DIRECT_MESSAGES_TABLE_ID, MOMENTS_COMMENTS_TABLE_ID } from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { FontSizeProvider, useFontSize } from "@/lib/font-size-context";
 import "@/lib/i18n"; // side-effect: initializes i18next
+import { UnreadBadgeProvider, useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
 import { LanguageProvider } from "@/lib/language-context";
+import { getUserMomentIds } from "@/lib/moments";
 import {
   registerForPushNotificationsAsync,
   sendImmediateNotification,
 } from "@/lib/notifications";
 import { DirectMessage } from "@/types/messaging";
+import { MomentComment } from "@/types/moments";
 import { Role } from "@/types/user";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
@@ -84,11 +87,14 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   const appState = useRef(AppState.currentState);
 
   // Global Notification Listener for Direct Messages
+  const { incrementMomentUnread, refreshChatUnread } = useUnreadBadge();
   useEffect(() => {
     if (!user?.$id) return;
 
     // Register for permissions on mount
     registerForPushNotificationsAsync();
+    // Initial chat unread count
+    refreshChatUnread(user.$id);
 
     // Subscribe to ALL new messages in the collection
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
@@ -115,6 +121,37 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
             contactRole: payload.sender_role,
           }
         );
+        refreshChatUnread(user.$id);
+      }
+    });
+
+    // Subscribe to moments comments for notifications
+    const commentsChannel = `databases.${DATABASE_ID}.collections.${MOMENTS_COMMENTS_TABLE_ID}.documents`;
+    let myMomentIds: string[] = [];
+    getUserMomentIds(user.$id).then((ids) => { myMomentIds = ids; }).catch(() => {});
+
+    const unsubscribeComments = clientReactNative.subscribe(commentsChannel, async (response) => {
+      if (!response.events.some((e) => e.endsWith(".create"))) return;
+
+      const payload = response.payload as MomentComment;
+      // Skip own comments
+      if (payload.author_id === user.$id) return;
+
+      // Notify if: comment on my moment OR reply to me
+      const isOnMyMoment = payload.moment_author_id === user.$id || myMomentIds.includes(payload.moment_id);
+      const isReplyToMe = payload.reply_to_user_id === user.$id;
+
+      if (isOnMyMoment || isReplyToMe) {
+        const title = payload.author_name || "New Comment";
+        const body = isReplyToMe
+          ? `Replied to your comment: ${(payload.content || "").substring(0, 80)}`
+          : `Commented on your post: ${(payload.content || "").substring(0, 80)}`;
+
+        await sendImmediateNotification(title, body, {
+          type: "moment_comment",
+          momentId: payload.moment_id,
+        });
+        incrementMomentUnread();
       }
     });
 
@@ -122,7 +159,6 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
       const rawData = response.notification.request.content.data as any;
       
-      // Safe cast or property access
       if (rawData && rawData.type === "direct_message") {
         const contactId = rawData.contactId as string;
         const contactName = rawData.contactName as string;
@@ -138,15 +174,20 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
             contactRole,
           },
         });
+      } else if (rawData && rawData.type === "moment_comment") {
+        // Navigate to community / emergency tab (where moments are shown)
+        const targetPath = role === "elderly" ? "/(elderly-tabs)/emergency" : "/(caregiver-tabs)/caregiver";
+        router.push(targetPath);
       }
     });
 
     return () => {
       // Cleanup subscription
       unsubscribe();
+      unsubscribeComments();
       subscription.remove();
     };
-  }, [user?.$id, router, role]);
+  }, [user?.$id, router, role, incrementMomentUnread, refreshChatUnread]);
 
   useEffect(() => {
     const currentRoute = segments[0];
@@ -260,6 +301,7 @@ function ThemedApp() {
         style={{ flex: 1, backgroundColor: theme.colors.background }}
       >
         <AuthProvider>
+          <UnreadBadgeProvider>
           <SafeAreaProvider>
             <RouteGuard>
               <Stack>
@@ -286,6 +328,7 @@ function ThemedApp() {
               </Stack>
             </RouteGuard>
           </SafeAreaProvider>
+          </UnreadBadgeProvider>
         </AuthProvider>
       </GestureHandlerRootView>
     </PaperProvider>

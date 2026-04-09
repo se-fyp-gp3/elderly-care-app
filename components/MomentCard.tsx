@@ -1,5 +1,5 @@
 import { formatRelativeTime } from "@/lib/contacts";
-import { Moment, MomentComment } from "@/types/moments";
+import { MediaItem, Moment, MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoPlayer, VideoView } from "expo-video";
 import React, { useEffect, useState } from "react";
@@ -13,6 +13,7 @@ interface MomentCardProps {
   onLike: (id: string) => void;
   onComment: (id: string) => void;
   onAIRequest: (id: string, content: string) => Promise<MomentComment>;
+  latestComments?: MomentComment[];
 }
 
 function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boolean; onClose: () => void }) {
@@ -45,14 +46,138 @@ function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boo
   );
 }
 
-export default function MomentCard({ moment, currentUserId, onLike, onComment, onAIRequest }: MomentCardProps) {
+/** Render a single media item (image or video) in the grid */
+function MediaGridItem({
+  item,
+  onPlayVideo,
+  gridStyle,
+}: {
+  item: MediaItem;
+  onPlayVideo: (uri: string) => void;
+  gridStyle: any;
+}) {
+  const theme = useTheme();
+
+  if (item.type === "image" && item.url) {
+    return <Image source={{ uri: item.url }} style={[styles.gridImage, gridStyle]} resizeMode="cover" />;
+  }
+
+  if (item.type === "video") {
+    const thumbUri = item.thumbnail_url;
+    return (
+      <TouchableOpacity
+        style={[styles.gridVideoContainer, gridStyle, { borderColor: theme.colors.outline }]}
+        onPress={() => item.url && onPlayVideo(item.url)}
+        activeOpacity={0.8}
+      >
+        {thumbUri ? (
+          <>
+            <Image source={{ uri: thumbUri }} style={[styles.gridImage, gridStyle]} resizeMode="cover" />
+            <View style={styles.playOverlay}>
+              <MaterialCommunityIcons name="play-circle" size={48} color="rgba(255,255,255,0.9)" />
+            </View>
+          </>
+        ) : (
+          <View style={styles.videoPlaceholderInner}>
+            <MaterialCommunityIcons name="video" size={32} color={theme.colors.primary} />
+            <MaterialCommunityIcons name="play-circle-outline" size={20} color={theme.colors.primary} style={{ position: "absolute", bottom: 8, right: 8 }} />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }
+
+  return null;
+}
+
+/** Render media items in a grid layout */
+function MediaGrid({ items, onPlayVideo }: { items: MediaItem[]; onPlayVideo: (uri: string) => void }) {
+  if (items.length === 0) return null;
+
+  if (items.length === 1) {
+    return (
+      <View style={styles.mediaGridWrap}>
+        <MediaGridItem item={items[0]} onPlayVideo={onPlayVideo} gridStyle={styles.singleMedia} />
+      </View>
+    );
+  }
+
+  if (items.length === 2) {
+    return (
+      <View style={[styles.mediaGridWrap, styles.gridRow]}>
+        {items.map((item, i) => (
+          <MediaGridItem key={i} item={item} onPlayVideo={onPlayVideo} gridStyle={styles.halfMedia} />
+        ))}
+      </View>
+    );
+  }
+
+  // 3 or 4 items: 2x2 grid
+  return (
+    <View style={styles.mediaGridWrap}>
+      <View style={styles.gridRow}>
+        {items.slice(0, 2).map((item, i) => (
+          <MediaGridItem key={i} item={item} onPlayVideo={onPlayVideo} gridStyle={styles.halfMedia} />
+        ))}
+      </View>
+      {items.length > 2 && (
+        <View style={styles.gridRow}>
+          {items.slice(2, 4).map((item, i) => (
+            <MediaGridItem key={i + 2} item={item} onPlayVideo={onPlayVideo} gridStyle={items.length === 3 && i === 0 ? styles.singleMedia : styles.halfMedia} />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** Inline comment preview (max 3, truncated) */
+function InlineCommentPreview({
+  comments,
+  onPressComments,
+}: {
+  comments: MomentComment[];
+  onPressComments: () => void;
+}) {
+  const theme = useTheme();
+  const { t } = useTranslation();
+
+  if (!comments || comments.length === 0) return null;
+
+  return (
+    <TouchableOpacity onPress={onPressComments} activeOpacity={0.7} style={styles.inlineComments}>
+      {comments.map((c) => (
+        <View key={c.$id} style={styles.inlineCommentRow}>
+          <Text variant="labelMedium" style={{ fontWeight: "bold", color: theme.colors.primary }}>
+            {c.author_name}
+            {c.reply_to_user_name && (
+              <Text style={{ fontWeight: "normal", color: theme.colors.onSurfaceVariant }}>
+                {" "}▸ {c.reply_to_user_name}
+              </Text>
+            )}
+          </Text>
+          <Text variant="bodySmall" numberOfLines={2} style={{ color: theme.colors.onSurface, marginTop: 1 }}>
+            {c.content}
+          </Text>
+        </View>
+      ))}
+      <Text variant="labelSmall" style={{ color: theme.colors.primary, marginTop: 4 }}>
+        {t('moments.viewAllComments')}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+export default function MomentCard({ moment, currentUserId, onLike, onComment, onAIRequest, latestComments }: MomentCardProps) {
   const theme = useTheme();
   const { t } = useTranslation();
   const [liked, setLiked] = useState(moment.likes?.includes(currentUserId) || false);
   const [likesCount, setLikesCount] = useState(moment.likes?.length || 0);
   const [loadingAI, setLoadingAI] = useState(false);
   const [aiComment, setAIComment] = useState<MomentComment | null>(null);
-  const [videoVisible, setVideoVisible] = useState(false);
+  const [videoUri, setVideoUri] = useState<string | null>(null);
+
+  const mediaItems = moment.parsedMediaItems || [];
 
   const handleLike = () => {
     const newLiked = !liked;
@@ -74,19 +199,17 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
     }
   };
 
-  const handleOpenVideo = () => {
-    if (moment.media_url) {
-      setVideoVisible(true);
-    }
+  const handlePlayVideo = (uri: string) => {
+    setVideoUri(uri);
   };
 
   return (
     <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-      {moment.media_url && moment.media_type === "video" && (
+      {videoUri && (
         <VideoPlayerModal
-          uri={moment.media_url}
-          visible={videoVisible}
-          onClose={() => setVideoVisible(false)}
+          uri={videoUri}
+          visible={!!videoUri}
+          onClose={() => setVideoUri(null)}
         />
       )}
       <View style={styles.header}>
@@ -104,22 +227,14 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
         </View>
       </View>
 
-      <Text variant="bodyLarge" style={styles.content}>
-        {moment.content}
-      </Text>
-
-      {moment.media_url && moment.media_type === "image" && (
-        <Image source={{ uri: moment.media_url }} style={styles.mediaImage} resizeMode="cover" />
+      {!!moment.content && (
+        <Text variant="bodyLarge" style={styles.content}>
+          {moment.content}
+        </Text>
       )}
 
-      {moment.media_type === "video" && (
-        <TouchableOpacity style={[styles.videoBox, { borderColor: theme.colors.outline }]} onPress={handleOpenVideo}>
-          <MaterialCommunityIcons name="video" size={24} color={theme.colors.primary} />
-          <Text variant="bodyMedium" style={{ marginTop: 6 }}>
-            {t('moments.tapToWatchVideo')}
-          </Text>
-        </TouchableOpacity>
-      )}
+      {/* Multi-media grid */}
+      <MediaGrid items={mediaItems} onPlayVideo={handlePlayVideo} />
 
       {/* AI Response Section */}
       {loadingAI && (
@@ -177,6 +292,9 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Inline comment preview */}
+      <InlineCommentPreview comments={latestComments || []} onPressComments={() => onComment(moment.$id)} />
     </View>
   );
 }
@@ -222,20 +340,48 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 8,
   },
-  mediaImage: {
+  // Media grid
+  mediaGridWrap: {
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  gridRow: {
+    flexDirection: "row",
+    gap: 2,
+  },
+  singleMedia: {
     width: "100%",
     height: 240,
     borderRadius: 12,
-    marginBottom: 12,
   },
-  videoBox: {
-    borderWidth: 1,
-    borderRadius: 12,
-    minHeight: 120,
-    alignItems: "center",
+  halfMedia: {
+    flex: 1,
+    height: 160,
+  },
+  gridImage: {
+    width: "100%",
+    height: "100%",
+  },
+  gridVideoContainer: {
+    overflow: "hidden",
+    backgroundColor: "#000",
     justifyContent: "center",
-    marginBottom: 12,
+    alignItems: "center",
   },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.25)",
+  },
+  videoPlaceholderInner: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
+  },
+  // Video modal
   videoModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.92)",
@@ -250,5 +396,13 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 48,
     right: 16,
+  },
+  // Inline comments
+  inlineComments: {
+    marginTop: 10,
+    paddingTop: 8,
+  },
+  inlineCommentRow: {
+    marginBottom: 6,
   },
 });

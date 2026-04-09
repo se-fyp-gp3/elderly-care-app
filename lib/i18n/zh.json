@@ -755,7 +755,18 @@
     "failedToPost": "发布动态失败",
     "comments": "评论",
     "noCommentsYet": "暂无评论。成为第一个评论的人吧！",
-    "addComment": "添加评论..."
+    "addComment": "添加评论...",
+    "reply": "回复",
+    "repliedTo": "回复了",
+    "replyToComment": "回复 {{name}}",
+    "replyPlaceholder": "回复 @{{name}}...",
+    "showMore": "展开",
+    "collapse": "收起",
+    "viewAllComments": "查看所有评论",
+    "maxMediaReached": "已达媒体上限",
+    "mediaCount": "媒体 ({{count}})",
+    "newCommentOnPost": "评论了你的动态",
+    "repliedToYourComment": "回复了你的评论"
   },
   "qrPairing": {
     "settingUp": "正在设置...",
