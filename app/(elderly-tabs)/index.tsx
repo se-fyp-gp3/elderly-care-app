@@ -37,12 +37,12 @@ import {
   View,
 } from "react-native";
 import {
-  Button,
-  Card,
-  Chip,
-  Text,
-  TouchableRipple,
-  useTheme
+    Button,
+    Card,
+    Chip,
+    Text,
+    TouchableRipple,
+    useTheme
 } from "react-native-paper";
 
 type TodoItem = {
@@ -110,11 +110,7 @@ export default function ElderlyHome() {
         try {
           const schedResponse = await fetchElderlySchedulesForUser(user.$id);
           const now = new Date();
-          const todayStart = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate(),
-          );
+          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
           const tomorrowEnd = new Date(todayStart);
           tomorrowEnd.setDate(tomorrowEnd.getDate() + 2); // end of tomorrow
 
@@ -125,9 +121,7 @@ export default function ElderlyHome() {
             return t >= todayStart && t < tomorrowEnd;
           });
           // Sort by time ascending
-          nonMedSchedules.sort(
-            (a, b) => new Date(a.time!).getTime() - new Date(b.time!).getTime(),
-          );
+          nonMedSchedules.sort((a, b) => new Date(a.time!).getTime() - new Date(b.time!).getTime());
           setSchedules(nonMedSchedules.slice(0, 10));
         } catch {
           console.log("No schedules found");
@@ -224,15 +218,12 @@ export default function ElderlyHome() {
         // Hide if scheduled_at is beyond duration_days
         if (r.start_date && r.duration_days) {
           const startDateMs = new Date(r.start_date).getTime();
-          const startHkDate = new Date(startDateMs + hkOffset)
-            .toISOString()
-            .slice(0, 10);
+          const startHkDate = new Date(startDateMs + hkOffset).toISOString().slice(0, 10);
           const firstCandBase = new Date(startHkDate);
           firstCandBase.setUTCHours(hours, minutes, 0, 0);
           const firstCandUtcMs = firstCandBase.getTime() - hkOffset;
           const startDelay = firstCandUtcMs <= startDateMs ? 1 : 0;
-          const lastValidUtcMs =
-            firstCandUtcMs + (startDelay + r.duration_days - 1) * 86400000;
+          const lastValidUtcMs = firstCandUtcMs + (startDelay + r.duration_days - 1) * 86400000;
           if (scheduledDate.getTime() > lastValidUtcMs) {
             return;
           }
@@ -314,15 +305,15 @@ export default function ElderlyHome() {
 
     if (!emergencyNumber) {
       Alert.alert(
-        t("home.noEmergencyContact"),
-        t("home.noEmergencyContactDesc"),
+        "No Emergency",
+        "You do not have an emergency caregiver set. Please ask a caregiver or administrator to configure one for you.",
       );
       return;
     }
 
     Alert.alert(
-      t("home.emergencyCall"),
-      t("home.emergencyCallConfirm", { number: emergencyNumber }),
+      "Emergency Call",
+      `Are you sure you want to call your emergency number (${emergencyNumber})?`,
       [
         { text: t("common.cancel"), style: "cancel" },
         {
@@ -360,35 +351,42 @@ export default function ElderlyHome() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView
-        style={[styles.container, { backgroundColor: theme.colors.background }]}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      {/* Greeting */}
+      <View style={styles.greetingSection}>
+        <Text variant="headlineMedium" style={[styles.greetingName, accessibleStyles?.greetingName]}>
+          Hello, {elderlyProfile?.name || user?.name || "there"}!
+        </Text>
+        <Text variant="bodyLarge" style={[styles.greetingSubtitle, accessibleStyles?.greetingSubtitle]}>
+          How are you feeling today?
+        </Text>
+      </View>
+
+      {/* Emergency */}
+      <Card
+        style={styles.emergencyCard}
+        onPress={handleEmergencyCall}
       >
-        {/* Greeting */}
-        <View style={styles.greetingSection}>
-          <Text
-            variant="headlineMedium"
-            style={[
-              styles.greetingName,
-              { color: theme.colors.onSurface },
-              accessibleStyles?.greetingName,
-            ]}
-          >
-            Hello, {elderlyProfile?.name || user?.name || t("common.there")}!
-          </Text>
-          <Text
-            variant="bodyLarge"
-            style={[
-              styles.greetingSubtitle,
-              { color: theme.colors.onSurfaceVariant },
-              accessibleStyles?.greetingSubtitle,
-            ]}
-          >
-            {t("home.howAreYou")}
-          </Text>
-        </View>
+        <Card.Content style={styles.emergencyCardContent}>
+          <View style={styles.emergencyIconCircle}>
+            <MaterialCommunityIcons name="phone-in-talk" size={28} color="#D32F2F" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="titleMedium" style={{ fontWeight: "700", color: "#C62828" }}>
+              Emergency
+            </Text>
+            <Text variant="bodyMedium" style={{ color: "#999", marginTop: 2 }}>
+              Tap to call your emergency number
+            </Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={24} color="#E57373" />
+        </Card.Content>
+      </Card>
 
         {/* Emergency Contact */}
         <Card
@@ -441,393 +439,129 @@ export default function ElderlyHome() {
           </Card.Content>
         </Card>
 
-        {/* Today's Medications */}
-        <Text
-          variant="titleLarge"
-          style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}
-        >
-          {t("home.todaysMedications")}
-        </Text>
-        {todoList.length > 0 ? (
-          todoList.slice(0, 3).map((item, index) => {
-            const isTaken = item.status === "taken";
-            const isMissing = item.status === "missing";
-            const accentColor = isTaken
-              ? "#4CAF50"
-              : isMissing
-                ? "#E53935"
-                : "#FF8F00";
+      {/* Upcoming Schedule (Today & Tomorrow) */}
+      <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>
+        Today &amp; Tomorrow
+      </Text>
+      {schedules.length > 0 ? (
+        schedules.slice(0, 3).map((schedule, index) => {
+          const isCompleted = schedule.status === "Completed";
+          const isMissed = schedule.status === "Missed";
+          const accentColor = isCompleted
+            ? "#4CAF50"
+            : isMissed
+              ? "#F44336"
+              : "#2196F3";
+          const typeIcon = (() => {
+            switch (schedule.type) {
+              case "appointment": return "doctor";
+              case "meal": return "food-apple";
+              case "checkup": return "stethoscope";
+              case "activity": return "run";
+              default: return "calendar-clock";
+            }
+          })();
+          const scheduleTime = (() => {
+            if (!schedule.time) return "";
+            try {
+              const d = new Date(schedule.time);
+              return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            } catch {
+              return "";
+            }
+          })();
+          const scheduleDate = (() => {
+            if (!schedule.time) return "";
+            try {
+              const d = new Date(schedule.time);
+              return d.toLocaleDateString([], { month: "short", day: "numeric" });
+            } catch {
+              return "";
+            }
+          })();
 
-            return (
-              <View
-                key={`${item.reminder.$id}-${item.time}-${index}`}
-                style={[
-                  styles.medCard,
-                  {
-                    borderLeftColor: accentColor,
-                    backgroundColor: theme.colors.surface,
-                  },
-                ]}
-              >
-                <View style={styles.medCardTop}>
-                  <View
-                    style={[
-                      styles.medCardIcon,
-                      {
-                        backgroundColor: isTaken
-                          ? isDark
-                            ? "rgba(76,175,80,0.15)"
-                            : "#E8F5E9"
-                          : isDark
-                            ? "rgba(94,53,177,0.15)"
-                            : "#EDE7F6",
-                      },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={isTaken ? "check-circle" : "pill"}
-                      size={26}
-                      color={isTaken ? "#4CAF50" : "#5E35B1"}
-                    />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text variant="titleMedium" style={{ fontWeight: "700" }}>
-                      {item.medicationName}
-                    </Text>
-                    <Text
-                      variant="bodyMedium"
-                      style={{
-                        color: theme.colors.onSurfaceVariant,
-                        marginTop: 2,
-                      }}
-                    >
-                      {item.dosage}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.medCardTime,
-                      { backgroundColor: theme.colors.surfaceVariant },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="clock-outline"
-                      size={15}
-                      color={theme.colors.onSurfaceVariant}
-                    />
-                    <Text
-                      variant="bodyMedium"
-                      style={{
-                        color: theme.colors.onSurfaceVariant,
-                        marginLeft: 4,
-                        fontWeight: "600",
-                      }}
-                    >
-                      {item.time}
-                    </Text>
-                  </View>
+          return (
+            <View
+              key={`sched-${schedule.$id || index}`}
+              style={[styles.medCard, { borderLeftColor: accentColor }]}
+            >
+              <View style={styles.medCardTop}>
+                <View
+                  style={[
+                    styles.medCardIcon,
+                    { backgroundColor: isCompleted ? "#E8F5E9" : "#E3F2FD" },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={isCompleted ? "check-circle" : typeIcon}
+                    size={26}
+                    color={isCompleted ? "#4CAF50" : "#1976D2"}
+                  />
                 </View>
-                {isTaken ? (
-                  <TouchableRipple
-                    onPress={() => handleTakeMedication(item)}
-                    style={[
-                      styles.medCardDone,
-                      {
-                        backgroundColor: isDark
-                          ? "rgba(76,175,80,0.15)"
-                          : "#E8F5E9",
-                      },
-                    ]}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <MaterialCommunityIcons
-                        name="check-circle"
-                        size={18}
-                        color={isDark ? "#81C784" : "#2E7D32"}
-                      />
-                      <Text
-                        style={{
-                          color: isDark ? "#81C784" : "#2E7D32",
-                          fontSize: 14,
-                          fontWeight: "600",
-                        }}
-                      >
-                        {t("home.takenTapToUndo")}
-                      </Text>
-                    </View>
-                  </TouchableRipple>
-                ) : (
-                  <TouchableRipple
-                    onPress={() => handleTakeMedication(item)}
-                    style={[
-                      styles.medCardAction,
-                      { backgroundColor: isMissing ? "#E53935" : "#4CAF50" },
-                    ]}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <MaterialCommunityIcons
-                        name="check-bold"
-                        size={20}
-                        color="#FFF"
-                      />
-                      <Text
-                        style={{
-                          color: "#FFF",
-                          fontSize: 16,
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {isMissing
-                          ? t("home.takeNowMissed")
-                          : t("home.markAsTaken")}
-                      </Text>
-                    </View>
-                  </TouchableRipple>
-                )}
-              </View>
-            );
-          })
-        ) : (
-          <Card
-            style={[styles.listCard, { backgroundColor: theme.colors.surface }]}
-          >
-            <View style={{ alignItems: "center", padding: 28 }}>
-              <MaterialCommunityIcons
-                name="check-circle-outline"
-                size={44}
-                color="#A5D6A7"
-              />
-              <Text
-                variant="bodyLarge"
-                style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}
-              >
-                {t("home.noMedsToday")}
-              </Text>
-            </View>
-          </Card>
-        )}
-        <Button
-          mode="text"
-          onPress={() => router.push("/medication" as never)}
-          style={styles.viewAllButton}
-        >
-          {t("home.viewAllMedications")}
-        </Button>
-
-        {/* Upcoming Schedule (Today & Tomorrow) */}
-        <Text
-          variant="titleLarge"
-          style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}
-        >
-          {t("home.upcomingSchedule")}
-        </Text>
-        {schedules.length > 0 ? (
-          schedules.slice(0, 3).map((schedule, index) => {
-            const isCompleted = schedule.status === "Completed";
-            const isMissed = schedule.status === "Missed";
-            const accentColor = isCompleted
-              ? "#4CAF50"
-              : isMissed
-                ? "#F44336"
-                : "#2196F3";
-            const typeIcon = (() => {
-              switch (schedule.type) {
-                case "appointment":
-                  return "doctor";
-                case "meal":
-                  return "food-apple";
-                case "checkup":
-                  return "stethoscope";
-                case "activity":
-                  return "run";
-                default:
-                  return "calendar-clock";
-              }
-            })();
-            const scheduleTime = (() => {
-              if (!schedule.time) return "";
-              try {
-                const d = new Date(schedule.time);
-                return d.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-              } catch {
-                return "";
-              }
-            })();
-            const scheduleDate = (() => {
-              if (!schedule.time) return "";
-              try {
-                const d = new Date(schedule.time);
-                return d.toLocaleDateString([], {
-                  month: "short",
-                  day: "numeric",
-                });
-              } catch {
-                return "";
-              }
-            })();
-
-            return (
-              <View
-                key={`sched-${schedule.$id || index}`}
-                style={[
-                  styles.medCard,
-                  {
-                    borderLeftColor: accentColor,
-                    backgroundColor: theme.colors.surface,
-                  },
-                ]}
-              >
-                <View style={styles.medCardTop}>
-                  <View
-                    style={[
-                      styles.medCardIcon,
-                      {
-                        backgroundColor: isCompleted
-                          ? isDark
-                            ? "rgba(76,175,80,0.15)"
-                            : "#E8F5E9"
-                          : isDark
-                            ? "rgba(33,150,243,0.15)"
-                            : "#E3F2FD",
-                      },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={isCompleted ? "check-circle" : typeIcon}
-                      size={26}
-                      color={isCompleted ? "#4CAF50" : "#1976D2"}
-                    />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text variant="titleMedium" style={{ fontWeight: "700" }}>
-                      {schedule.title || t("home.appointment")}
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text variant="titleMedium" style={{ fontWeight: "700" }}>
+                    {schedule.title || "Appointment"}
+                  </Text>
+                  {schedule.description ? (
+                    <Text variant="bodyMedium" style={{ color: "#666", marginTop: 2 }} numberOfLines={1}>
+                      {schedule.description}
                     </Text>
-                    {schedule.description ? (
-                      <Text
-                        variant="bodyMedium"
-                        style={{
-                          color: theme.colors.onSurfaceVariant,
-                          marginTop: 2,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {schedule.description}
+                  ) : null}
+                </View>
+                {scheduleTime ? (
+                  <View style={{ alignItems: "flex-end" }}>
+                    <View style={styles.medCardTime}>
+                      <MaterialCommunityIcons name="clock-outline" size={15} color="#888" />
+                      <Text variant="bodyMedium" style={{ color: "#555", marginLeft: 4, fontWeight: "600" }}>
+                        {scheduleTime}
+                      </Text>
+                    </View>
+                    {scheduleDate ? (
+                      <Text variant="labelSmall" style={{ color: "#999", marginTop: 3 }}>
+                        {scheduleDate}
                       </Text>
                     ) : null}
                   </View>
-                  {scheduleTime ? (
-                    <View style={{ alignItems: "flex-end" }}>
-                      <View
-                        style={[
-                          styles.medCardTime,
-                          { backgroundColor: theme.colors.surfaceVariant },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="clock-outline"
-                          size={15}
-                          color={theme.colors.onSurfaceVariant}
-                        />
-                        <Text
-                          variant="bodyMedium"
-                          style={{
-                            color: theme.colors.onSurfaceVariant,
-                            marginLeft: 4,
-                            fontWeight: "600",
-                          }}
-                        >
-                          {scheduleTime}
-                        </Text>
-                      </View>
-                      {scheduleDate ? (
-                        <Text
-                          variant="labelSmall"
-                          style={{
-                            color: theme.colors.onSurfaceVariant,
-                            marginTop: 3,
-                          }}
-                        >
-                          {scheduleDate}
-                        </Text>
-                      ) : null}
-                    </View>
-                  ) : null}
-                </View>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginTop: 8,
-                    gap: 8,
-                  }}
+                ) : null}
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, gap: 8 }}>
+                <Chip
+                  compact
+                  style={{ backgroundColor: `${accentColor}18` }}
+                  textStyle={{ color: accentColor, fontSize: 12 }}
                 >
+                  {schedule.status || "Pending"}
+                </Chip>
+                {schedule.type ? (
                   <Chip
                     compact
-                    style={{ backgroundColor: `${accentColor}18` }}
-                    textStyle={{ color: accentColor, fontSize: 12 }}
+                    style={{ backgroundColor: "#F5F5F5" }}
+                    textStyle={{ fontSize: 12, color: "#666", textTransform: "capitalize" }}
                   >
-                    {schedule.status || t("common.pending")}
+                    {schedule.type}
                   </Chip>
-                  {schedule.type ? (
-                    <Chip
-                      compact
-                      style={{ backgroundColor: theme.colors.surfaceVariant }}
-                      textStyle={{
-                        fontSize: 12,
-                        color: theme.colors.onSurfaceVariant,
-                        textTransform: "capitalize",
-                      }}
-                    >
-                      {schedule.type}
-                    </Chip>
-                  ) : null}
-                </View>
+                ) : null}
               </View>
-            );
-          })
-        ) : (
-          <Card
-            style={[styles.listCard, { backgroundColor: theme.colors.surface }]}
-          >
-            <View style={{ alignItems: "center", padding: 28 }}>
-              <MaterialCommunityIcons
-                name="calendar-check"
-                size={44}
-                color="#A5D6A7"
-              />
-              <Text
-                variant="bodyLarge"
-                style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}
-              >
-                {t("home.noUpcomingEvents")}
-              </Text>
             </View>
-          </Card>
-        )}
-        <Button
-          mode="text"
-          onPress={() => router.push("/schedule" as never)}
-          style={styles.viewAllButton}
-        >
-          {t("home.viewFullSchedule")}
-        </Button>
+          );
+        })
+      ) : (
+        <Card style={[styles.listCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={{ alignItems: "center", padding: 28 }}>
+            <MaterialCommunityIcons name="calendar-check" size={44} color="#A5D6A7" />
+            <Text variant="bodyLarge" style={{ marginTop: 8, color: "#666" }}>
+              No upcoming events
+            </Text>
+          </View>
+        </Card>
+      )}
+      <Button
+        mode="text"
+        onPress={() => router.push("/schedule" as never)}
+        style={styles.viewAllButton}
+      >
+        View Full Schedule
+      </Button>
 
         {/* Today's Steps */}
         <Text

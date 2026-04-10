@@ -1,20 +1,15 @@
 import CreateGroupModal from "@/components/CreateGroupModal";
 import UserAvatar from "@/components/UserAvatar";
 import {
-  CAREGIVER_TABLE_ID,
-  clientReactNative,
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
-  GROUP_MEMBERS_TABLE_ID,
-  GROUP_MESSAGES_TABLE_ID,
+    DATABASE_ID,
+    DIRECT_MESSAGES_TABLE_ID,
+    safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-  addElderlyConnection,
-  Contact,
-  formatRelativeTime,
-  getContactsForElderly,
-  searchUserByPhone,
+    Contact,
+    formatRelativeTime,
+    getContactsForElderly,
 } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { getGroupUnreadCount, getLastGroupMessage } from "@/lib/group-messaging";
@@ -28,30 +23,23 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  FlatList,
-  Keyboard,
-  Linking,
-  Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  useWindowDimensions,
-  View,
+    Alert,
+    FlatList,
+    Linking,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Badge,
-  Button,
-  Menu,
-  Searchbar,
-  Text,
-  TextInput,
-  useTheme
+    ActivityIndicator,
+    Avatar,
+    Searchbar,
+    Text,
+    useTheme
 } from "react-native-paper";
 
 import MomentsView from "@/components/MomentsView";
@@ -392,7 +380,7 @@ export default function ElderlyMessages() {
 
     // Subscribe to Direct Messages table for realtime updates
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+    const unsubscribe = safeSubscribe(channel, (response) => {
       if (response.events.some((event) => event.endsWith(".create"))) {
         const payload = response.payload as DirectMessage;
 

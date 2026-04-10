@@ -1,53 +1,43 @@
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
-  createChatSession,
-  deleteChatSession,
-  listChatSessionsForUser,
-  updateChatSession,
+    createChatSession,
+    deleteChatSession,
+    listChatSessionsForUser,
+    updateChatSession,
 } from "@/lib/chat";
 import {
-  fetchDayMedicationEvents,
-  fetchDayScheduleEvents,
-  fetchScheduleCategories,
+    fetchDayMedicationEvents,
+    fetchDayScheduleEvents,
+    fetchScheduleCategories
 } from "@/lib/schedule";
-import type {
-  ChatSession as AppwriteChatSession,
-  Elderly,
-} from "@/types/appwrite";
+import type { ChatSession as AppwriteChatSession, Elderly } from "@/types/appwrite";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "expo-router";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Card,
-  IconButton,
-  Menu,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Card,
+    IconButton,
+    Menu,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
@@ -100,17 +90,13 @@ const deserializeMessages = (raw: string): Message[] => {
 /* ─── Component ─────────────────────────────────────────────────────── */
 export default function CaregiverChatBot() {
   const theme = useTheme();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const { user } = useAuth();
 
   /* State */
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(
-    null,
-  );
+  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
 
@@ -133,8 +119,7 @@ export default function CaregiverChatBot() {
   const DASHSCOPE_API_KEY = process.env.EXPO_PUBLIC_DASHSCOPE_API_KEY?.trim();
   const DASHSCOPE_API_URL = process.env.EXPO_PUBLIC_DASHSCOPE_API_URL?.trim();
   const DASHSCOPE_TEXT_MODEL = process.env.EXPO_PUBLIC_DASHSCOPE_MODEL?.trim();
-  const DASHSCOPE_IMAGE_MODEL =
-    process.env.EXPO_PUBLIC_DASHSCOPE_IMAGE_MODEL?.trim();
+  const DASHSCOPE_IMAGE_MODEL = process.env.EXPO_PUBLIC_DASHSCOPE_IMAGE_MODEL?.trim();
   const REQUEST_TIMEOUT_MS = 90000;
   const USE_MOCK_MODE = false;
 
@@ -239,19 +224,10 @@ export default function CaregiverChatBot() {
     const serialized = serializeMessages(messages);
     try {
       if (currentChatId) {
-        const updated = await updateChatSession(currentChatId, {
-          title,
-          messages: serialized,
-        });
-        setChatHistory((prev) =>
-          prev.map((c) => (c.$id === currentChatId ? updated : c)),
-        );
+        const updated = await updateChatSession(currentChatId, { title, messages: serialized });
+        setChatHistory((prev) => prev.map((c) => (c.$id === currentChatId ? updated : c)));
       } else {
-        const created = await createChatSession({
-          userId: user.$id,
-          title,
-          messages: serialized,
-        });
+        const created = await createChatSession({ userId: user.$id, title, messages: serialized });
         setCurrentChatId(created.$id);
         setChatHistory((prev) => [created, ...prev]);
       }
@@ -299,11 +275,7 @@ export default function CaregiverChatBot() {
   // Auto-save after AI response
   const prevMessagesLenRef = useRef(0);
   useEffect(() => {
-    if (
-      messages.length > 0 &&
-      messages.length > prevMessagesLenRef.current &&
-      !isLoading
-    ) {
+    if (messages.length > 0 && messages.length > prevMessagesLenRef.current && !isLoading) {
       saveCurrentChatToHistory();
     }
     prevMessagesLenRef.current = messages.length;
@@ -311,9 +283,7 @@ export default function CaregiverChatBot() {
   }, [messages.length, isLoading]);
 
   /* ─── System prompt builder ───────────────────────────────────────── */
-  const buildConversationMessages = (
-    latestUserMessage: string,
-  ): ChatMessage[] => {
+  const buildConversationMessages = (latestUserMessage: string): ChatMessage[] => {
     const history: ChatMessage[] = messages.slice(-8).map((msg) => ({
       role: msg.isUser ? "user" : "assistant",
       content: msg.text,
@@ -326,7 +296,8 @@ export default function CaregiverChatBot() {
     return [
       {
         role: "system",
-        content: `You are an AI care assistant for caregivers who manage elderly patients. Provide clear, professional, and helpful responses about the elderly's daily schedule, medication status, and health tasks.\n\nIMPORTANT: Keep your response concise — no more than 120 words. Be brief and to the point.\n\nWhen responding about tasks, medications, or schedules, use the data provided. Do NOT invent data that is not listed below. If you don't have enough data, say so.\n\nYou can identify medication from photos — provide name, common uses, dosage, and warnings. If unsure, advise consulting a pharmacist.\n\nAlways remind the caregiver to consult healthcare professionals for serious concerns.${dataBlock}`,
+        content:
+          `You are an AI care assistant for caregivers who manage elderly patients. Provide clear, professional, and helpful responses about the elderly's daily schedule, medication status, and health tasks.\n\nIMPORTANT: Keep your response concise — no more than 120 words. Be brief and to the point.\n\nWhen responding about tasks, medications, or schedules, use the data provided. Do NOT invent data that is not listed below. If you don't have enough data, say so.\n\nYou can identify medication from photos — provide name, common uses, dosage, and warnings. If unsure, advise consulting a pharmacist.\n\nAlways remind the caregiver to consult healthcare professionals for serious concerns.${dataBlock}`,
       },
       ...history,
       { role: "user", content: latestUserMessage },
@@ -353,13 +324,8 @@ export default function CaregiverChatBot() {
       [{ resize: { width: 1024 } }],
       { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true },
     );
-    if (!manipulated.base64)
-      throw new Error("Failed to encode image to base64");
-    return {
-      uri: manipulated.uri,
-      mimeType: "image/jpeg",
-      base64: manipulated.base64,
-    };
+    if (!manipulated.base64) throw new Error("Failed to encode image to base64");
+    return { uri: manipulated.uri, mimeType: "image/jpeg", base64: manipulated.base64 };
   };
 
   const handleImageOptions = () => {
@@ -424,8 +390,7 @@ export default function CaregiverChatBot() {
     image?: SelectedImage | null,
     allowImageFallback = true,
   ): Promise<string> => {
-    const sleep = (ms: number) =>
-      new Promise((resolve) => setTimeout(resolve, ms));
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     if (USE_MOCK_MODE) {
       await sleep(1000);
@@ -437,9 +402,7 @@ export default function CaregiverChatBot() {
     }
 
     const preparedImage = image ? await prepareImageForUpload(image) : null;
-    const resolvedModel = preparedImage
-      ? DASHSCOPE_IMAGE_MODEL
-      : DASHSCOPE_TEXT_MODEL;
+    const resolvedModel = preparedImage ? DASHSCOPE_IMAGE_MODEL : DASHSCOPE_TEXT_MODEL;
     const baseMessages = buildConversationMessages(userMessage);
     const messagesPayload: ChatMessage[] = preparedImage
       ? baseMessages.slice(0, -1).concat({
@@ -470,10 +433,7 @@ export default function CaregiverChatBot() {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         abortControllerRef.current = new AbortController();
-        const timeoutId = setTimeout(
-          () => abortControllerRef.current?.abort(),
-          REQUEST_TIMEOUT_MS,
-        );
+        const timeoutId = setTimeout(() => abortControllerRef.current?.abort(), REQUEST_TIMEOUT_MS);
 
         const response = await fetch(`${DASHSCOPE_API_URL}/chat/completions`, {
           method: "POST",
@@ -491,62 +451,39 @@ export default function CaregiverChatBot() {
         if (response.ok) {
           const data: AIAPIResponse = rawText ? JSON.parse(rawText) : {};
           const content = data.choices?.[0]?.message?.content;
-          if (!content)
-            throw new Error(data.error?.message || "No response from AI API");
+          if (!content) throw new Error(data.error?.message || "No response from AI API");
           if (typeof content === "string") return content;
-          const textParts = content
-            .filter((p: any) => p.type === "text")
-            .map((p: any) => p.text)
-            .filter(Boolean);
+          const textParts = content.filter((p: any) => p.type === "text").map((p: any) => p.text).filter(Boolean);
           if (textParts.length > 0) return textParts.join("\n");
           throw new Error("No response from AI API");
         }
 
         const errorData: AIAPIResponse = rawText ? JSON.parse(rawText) : {};
-        const providerMessage =
-          errorData?.error?.message ||
-          rawText?.slice(0, 300) ||
-          "Provider error";
+        const providerMessage = errorData?.error?.message || rawText?.slice(0, 300) || "Provider error";
 
         if (response.status === 401) throw new Error("Authentication failed.");
         if (response.status === 429) {
           lastError = new Error(providerMessage || "Rate limit reached.");
-          if (attempt < maxAttempts) {
-            await sleep(500 * attempt * attempt);
-            continue;
-          }
+          if (attempt < maxAttempts) { await sleep(500 * attempt * attempt); continue; }
           throw lastError;
         }
 
-        lastError = new Error(
-          providerMessage || `API request failed: ${response.status}`,
-        );
+        lastError = new Error(providerMessage || `API request failed: ${response.status}`);
         break;
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           lastError = new Error("Request timed out.");
-          if (attempt < maxAttempts) {
-            await sleep(500 * attempt * attempt);
-            continue;
-          }
+          if (attempt < maxAttempts) { await sleep(500 * attempt * attempt); continue; }
           break;
         }
-        lastError =
-          error instanceof Error ? error : new Error("Provider returned error");
-        if (attempt < maxAttempts) {
-          await sleep(500 * attempt * attempt);
-          continue;
-        }
+        lastError = error instanceof Error ? error : new Error("Provider returned error");
+        if (attempt < maxAttempts) { await sleep(500 * attempt * attempt); continue; }
         break;
       }
     }
 
     if (image && allowImageFallback) {
-      try {
-        return await callAIAPI(userMessage, null, false);
-      } catch {
-        /* fall through */
-      }
+      try { return await callAIAPI(userMessage, null, false); } catch { /* fall through */ }
     }
 
     if (lastError) throw lastError;
@@ -611,8 +548,7 @@ export default function CaregiverChatBot() {
     try {
       let messageForAPI = userMessage.text;
       if (selectedImage) {
-        const isMedQuery =
-          /medication|medicine|pill|藥|药|capsule|tablet/i.test(messageForAPI);
+        const isMedQuery = /medication|medicine|pill|藥|药|capsule|tablet/i.test(messageForAPI);
         messageForAPI = isMedQuery
           ? `${messageForAPI}\n[Photo of medication. Please identify it.]`
           : `${messageForAPI}\n[User has shared an image]`;
@@ -653,100 +589,41 @@ export default function CaregiverChatBot() {
     const idx = messages.findIndex((m) => m.id === messageId);
     if (idx === -1) return;
     setInputText(messages[idx].text);
-    setSelectedImage(
-      messages[idx].imageUri
-        ? { uri: messages[idx].imageUri!, mimeType: "image/jpeg" }
-        : null,
-    );
+    setSelectedImage(messages[idx].imageUri ? { uri: messages[idx].imageUri!, mimeType: "image/jpeg" } : null);
     setMessages(messages.slice(0, idx));
     setPendingMessageId(null);
   };
 
   /* ─── Render ──────────────────────────────────────────────────────── */
   const renderMessage = ({ item }: { item: Message }) => (
-    <View
-      style={[
-        styles.messageRow,
-        item.isUser ? styles.userMessageRow : styles.aiMessageRow,
-      ]}
-    >
-      {!item.isUser && (
-        <Avatar.Icon size={44} icon="robot" style={styles.avatarAI} />
-      )}
+    <View style={[styles.messageRow, item.isUser ? styles.userMessageRow : styles.aiMessageRow]}>
+      {!item.isUser && <Avatar.Icon size={44} icon="robot" style={styles.avatarAI} />}
       <View style={styles.messageBubbleContainer}>
-        <Card
-          style={[
-            styles.messageCard,
-            item.isUser
-              ? styles.userMessage
-              : [
-                  styles.aiMessage,
-                  { backgroundColor: theme.colors.surfaceVariant },
-                ],
-          ]}
-        >
+        <Card style={[styles.messageCard, item.isUser ? styles.userMessage : styles.aiMessage]}>
           <Card.Content style={styles.messageContent}>
             {item.imageUri && (
-              <TouchableOpacity
-                onPress={() => setPreviewImageUri(item.imageUri!)}
-              >
-                <Image
-                  source={{ uri: item.imageUri }}
-                  style={styles.messageImage}
-                  resizeMode="cover"
-                />
+              <TouchableOpacity onPress={() => setPreviewImageUri(item.imageUri!)}>
+                <Image source={{ uri: item.imageUri }} style={styles.messageImage} resizeMode="cover" />
               </TouchableOpacity>
             )}
-            <Text
-              style={[
-                styles.messageText,
-                { color: item.isUser ? "#FFF" : theme.colors.onSurface },
-              ]}
-              selectable
-            >
+            <Text style={[styles.messageText, { color: item.isUser ? "#FFF" : "#000" }]} selectable>
               {item.text}
             </Text>
-            <Text
-              style={[
-                styles.timestamp,
-                {
-                  color: item.isUser
-                    ? "rgba(255,255,255,0.8)"
-                    : theme.colors.onSurfaceVariant,
-                },
-              ]}
-            >
-              {item.timestamp.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+            <Text style={[styles.timestamp, { color: item.isUser ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.5)" }]}>
+              {item.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </Text>
             {item.isUser && (
               <View style={styles.messageActionsRow}>
                 {pendingMessageId === item.id && (
-                  <IconButton
-                    icon="stop-circle-outline"
-                    size={18}
-                    onPress={stopGenerating}
-                    style={styles.messageActionButton}
-                    iconColor="#FFF"
-                  />
+                  <IconButton icon="stop-circle-outline" size={18} onPress={stopGenerating} style={styles.messageActionButton} iconColor="#FFF" />
                 )}
-                <IconButton
-                  icon="pencil"
-                  size={18}
-                  onPress={() => editMessage(item.id)}
-                  style={styles.messageActionButton}
-                  iconColor="#FFF"
-                />
+                <IconButton icon="pencil" size={18} onPress={() => editMessage(item.id)} style={styles.messageActionButton} iconColor="#FFF" />
               </View>
             )}
           </Card.Content>
         </Card>
       </View>
-      {item.isUser && (
-        <Avatar.Icon size={44} icon="account" style={styles.avatarUser} />
-      )}
+      {item.isUser && <Avatar.Icon size={44} icon="account" style={styles.avatarUser} />}
     </View>
   );
 
@@ -754,31 +631,14 @@ export default function CaregiverChatBot() {
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={
-        Platform.OS === "ios" ? 90 : Platform.OS === "android" ? 98 : 0
-      }
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : Platform.OS === "android" ? 98 : 0}
     >
       {/* Top bar */}
       <View style={styles.topBar}>
-        <IconButton
-          icon="history"
-          size={28}
-          onPress={openHistory}
-          iconColor={theme.colors.onSurface}
-        />
+        <IconButton icon="history" size={28} onPress={openHistory} iconColor={theme.colors.onSurface} />
         <View style={styles.topBarSpacer} />
-        <IconButton
-          icon="refresh"
-          size={24}
-          onPress={buildElderlyContext}
-          iconColor={theme.colors.onSurface}
-        />
-        <IconButton
-          icon="plus"
-          size={28}
-          onPress={startNewChat}
-          iconColor={theme.colors.onSurface}
-        />
+        <IconButton icon="refresh" size={24} onPress={buildElderlyContext} iconColor={theme.colors.onSurface} />
+        <IconButton icon="plus" size={28} onPress={startNewChat} iconColor={theme.colors.onSurface} />
       </View>
 
       {/* Messages */}
@@ -790,55 +650,27 @@ export default function CaregiverChatBot() {
           renderItem={renderMessage}
           style={styles.messagesList}
           contentContainerStyle={styles.messagesListContent}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         />
 
         {/* Empty state */}
         {messages.length === 0 && !isLoading && (
           <View style={styles.emptyState}>
-            <Avatar.Icon
-              size={72}
-              icon="robot-happy-outline"
-              style={{ backgroundColor: theme.colors.primaryContainer }}
-            />
-            <Text
-              variant="headlineSmall"
-              style={{ marginTop: 16, fontWeight: "bold" }}
-            >
+            <Avatar.Icon size={72} icon="robot-happy-outline" style={{ backgroundColor: theme.colors.primaryContainer }} />
+            <Text variant="headlineSmall" style={{ marginTop: 16, fontWeight: "bold" }}>
               Care Assistant
             </Text>
-            <Text
-              variant="bodyMedium"
-              style={{
-                color: theme.colors.outline,
-                textAlign: "center",
-                marginTop: 8,
-                paddingHorizontal: 32,
-              }}
-            >
-              Ask me about today's tasks, medications, or schedules for your
-              elderly patients.
+            <Text variant="bodyMedium" style={{ color: theme.colors.outline, textAlign: "center", marginTop: 8, paddingHorizontal: 32 }}>
+              Ask me about today's tasks, medications, or schedules for your elderly patients.
             </Text>
             <View style={styles.suggestionsContainer}>
               {quickSuggestions.map((suggestion, idx) => (
                 <TouchableOpacity
                   key={idx}
-                  style={[
-                    styles.suggestionChip,
-                    { backgroundColor: theme.colors.surfaceVariant },
-                  ]}
+                  style={[styles.suggestionChip, { backgroundColor: theme.colors.surfaceVariant }]}
                   onPress={() => sendSuggestion(suggestion)}
                 >
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      color: theme.colors.onSurfaceVariant,
-                    }}
-                  >
-                    {suggestion}
-                  </Text>
+                  <Text style={{ fontSize: 14, color: theme.colors.onSurfaceVariant }}>{suggestion}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -848,9 +680,7 @@ export default function CaregiverChatBot() {
         {isLoading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={theme.colors.primary} />
-            <Text style={{ marginLeft: 8, color: theme.colors.outline }}>
-              Thinking...
-            </Text>
+            <Text style={{ marginLeft: 8, color: theme.colors.outline }}>Thinking...</Text>
           </View>
         )}
       </View>
@@ -858,32 +688,14 @@ export default function CaregiverChatBot() {
       {/* Image preview strip */}
       {selectedImage && (
         <View style={styles.imagePreviewStrip}>
-          <Image
-            source={{ uri: selectedImage.uri }}
-            style={styles.previewThumb}
-          />
-          <IconButton
-            icon="close-circle"
-            size={20}
-            onPress={() => setSelectedImage(null)}
-            style={{ margin: 0 }}
-          />
+          <Image source={{ uri: selectedImage.uri }} style={styles.previewThumb} />
+          <IconButton icon="close-circle" size={20} onPress={() => setSelectedImage(null)} style={{ margin: 0 }} />
         </View>
       )}
 
       {/* Input area */}
-      <View
-        style={[
-          styles.inputContainer,
-          { backgroundColor: theme.colors.surface },
-        ]}
-      >
-        <IconButton
-          icon="camera"
-          size={24}
-          onPress={handleImageOptions}
-          iconColor={theme.colors.primary}
-        />
+      <View style={[styles.inputContainer, { backgroundColor: theme.colors.surface }]}>
+        <IconButton icon="camera" size={24} onPress={handleImageOptions} iconColor={theme.colors.primary} />
         <TextInput
           style={styles.textInput}
           value={inputText}
@@ -893,16 +705,9 @@ export default function CaregiverChatBot() {
           dense
           right={
             isLoading ? (
-              <TextInput.Icon
-                icon="stop-circle-outline"
-                onPress={stopGenerating}
-              />
+              <TextInput.Icon icon="stop-circle-outline" onPress={stopGenerating} />
             ) : (
-              <TextInput.Icon
-                icon="send"
-                onPress={sendMessage}
-                disabled={!inputText.trim() && !selectedImage}
-              />
+              <TextInput.Icon icon="send" onPress={sendMessage} disabled={!inputText.trim() && !selectedImage} />
             )
           }
           onSubmitEditing={sendMessage}
@@ -912,70 +717,34 @@ export default function CaregiverChatBot() {
       {/* History modal */}
       <Modal visible={isHistoryVisible} animationType="slide" transparent>
         <View style={styles.historyOverlay}>
-          <View
-            style={[
-              styles.historyContainer,
-              { backgroundColor: theme.colors.surface },
-            ]}
-          >
+          <View style={[styles.historyContainer, { backgroundColor: theme.colors.surface }]}>
             <View style={styles.historyHeader}>
-              <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-                Chat History
-              </Text>
-              <IconButton
-                icon="close"
-                onPress={() => setIsHistoryVisible(false)}
-              />
+              <Text variant="titleLarge" style={{ fontWeight: "bold" }}>Chat History</Text>
+              <IconButton icon="close" onPress={() => setIsHistoryVisible(false)} />
             </View>
             <FlatList
               data={chatHistory}
               keyExtractor={(item) => item.$id}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.historyItem,
-                    { borderBottomColor: theme.colors.outlineVariant },
-                  ]}
-                  onPress={() => loadChatFromHistory(item)}
-                >
+                <TouchableOpacity style={[styles.historyItem, { borderBottomColor: theme.colors.outlineVariant }]} onPress={() => loadChatFromHistory(item)}>
                   <View style={{ flex: 1 }}>
-                    <Text variant="bodyLarge" numberOfLines={1}>
-                      {item.title}
-                    </Text>
-                    <Text
-                      variant="bodySmall"
-                      style={{ color: theme.colors.outline }}
-                    >
+                    <Text variant="bodyLarge" numberOfLines={1}>{item.title}</Text>
+                    <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
                       {new Date(item.$updatedAt).toLocaleString()}
                     </Text>
                   </View>
                   <Menu
                     visible={historyMenuId === item.$id}
                     onDismiss={() => setHistoryMenuId(null)}
-                    anchor={
-                      <IconButton
-                        icon="dots-vertical"
-                        size={20}
-                        onPress={() => setHistoryMenuId(item.$id)}
-                      />
-                    }
+                    anchor={<IconButton icon="dots-vertical" size={20} onPress={() => setHistoryMenuId(item.$id)} />}
                   >
-                    <Menu.Item
-                      title="Delete"
-                      leadingIcon="delete"
-                      onPress={() => {
-                        setHistoryMenuId(null);
-                        handleDeleteChat(item.$id);
-                      }}
-                    />
+                    <Menu.Item title="Delete" leadingIcon="delete" onPress={() => { setHistoryMenuId(null); handleDeleteChat(item.$id); }} />
                   </Menu>
                 </TouchableOpacity>
               )}
               ListEmptyComponent={
                 <View style={{ alignItems: "center", marginTop: 40 }}>
-                  <Text style={{ color: theme.colors.outline }}>
-                    No chat history yet.
-                  </Text>
+                  <Text style={{ color: theme.colors.outline }}>No chat history yet.</Text>
                 </View>
               }
             />
@@ -985,16 +754,9 @@ export default function CaregiverChatBot() {
 
       {/* Full image preview */}
       <Modal visible={!!previewImageUri} transparent animationType="fade">
-        <Pressable
-          style={styles.imagePreviewOverlay}
-          onPress={() => setPreviewImageUri(null)}
-        >
+        <Pressable style={styles.imagePreviewOverlay} onPress={() => setPreviewImageUri(null)}>
           {previewImageUri && (
-            <Image
-              source={{ uri: previewImageUri }}
-              style={styles.fullPreviewImage}
-              resizeMode="contain"
-            />
+            <Image source={{ uri: previewImageUri }} style={styles.fullPreviewImage} resizeMode="contain" />
           )}
         </Pressable>
       </Modal>
@@ -1017,11 +779,7 @@ const styles = StyleSheet.create({
   chatContainer: { flex: 1 },
   messagesList: { flex: 1 },
   messagesListContent: { padding: 16, paddingBottom: 8 },
-  messageRow: {
-    flexDirection: "row",
-    marginBottom: 12,
-    alignItems: "flex-end",
-  },
+  messageRow: { flexDirection: "row", marginBottom: 12, alignItems: "flex-end" },
   userMessageRow: { justifyContent: "flex-end" },
   aiMessageRow: { justifyContent: "flex-start" },
   messageBubbleContainer: { maxWidth: "75%", flexShrink: 1 },
@@ -1032,82 +790,22 @@ const styles = StyleSheet.create({
   messageText: { fontSize: 15, lineHeight: 22 },
   messageImage: { width: 200, height: 150, borderRadius: 8, marginBottom: 8 },
   timestamp: { fontSize: 11, marginTop: 4, textAlign: "right" },
-  messageActionsRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 2,
-  },
+  messageActionsRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 2 },
   messageActionButton: { margin: 0, padding: 0 },
   avatarAI: { backgroundColor: "#E8F5E9", marginRight: 8 },
   avatarUser: { backgroundColor: "#E3F2FD", marginLeft: 8 },
-  emptyState: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  emptyState: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center" },
   suggestionsContainer: { marginTop: 24, paddingHorizontal: 16, width: "100%" },
-  suggestionChip: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  loadingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-  },
-  imagePreviewStrip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
+  suggestionChip: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, marginBottom: 8 },
+  loadingContainer: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 8 },
+  imagePreviewStrip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 4 },
   previewThumb: { width: 48, height: 48, borderRadius: 8 },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 4,
-    paddingVertical: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(0,0,0,0.1)",
-  },
+  inputContainer: { flexDirection: "row", alignItems: "center", paddingHorizontal: 4, paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(0,0,0,0.1)" },
   textInput: { flex: 1, marginRight: 4 },
-  historyOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  historyContainer: {
-    maxHeight: "80%",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 16,
-  },
-  historyHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(0,0,0,0.1)",
-  },
-  historyItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  imagePreviewOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.9)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  historyOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  historyContainer: { maxHeight: "80%", borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 16 },
+  historyHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "rgba(0,0,0,0.1)" },
+  historyItem: { flexDirection: "row", alignItems: "center", padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  imagePreviewOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" },
   fullPreviewImage: { width: "90%", height: "80%" },
 });

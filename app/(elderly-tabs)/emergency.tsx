@@ -1,11 +1,8 @@
 import CreateGroupModal from "@/components/CreateGroupModal";
 import UserAvatar from "@/components/UserAvatar";
 import {
-  clientReactNative,
   DATABASE_ID,
   DIRECT_MESSAGES_TABLE_ID,
-  GROUP_MEMBERS_TABLE_ID,
-  GROUP_MESSAGES_TABLE_ID,
   safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";

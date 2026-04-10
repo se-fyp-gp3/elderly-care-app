@@ -65,6 +65,12 @@ const MESSAGES_FOR_CANCEL: Record<string, string> = {
   en: "OK, cancelled.",
 };
 
+const MESSAGES_FOR_CANCEL: Record<string, string> = {
+  yue: "好嘅，取消咗。",
+  zh: "好的，已取消。",
+  en: "OK, cancelled.",
+};
+
 export default function VoiceCommandButton() {
   const theme = useTheme();
   const { user } = useAuth();
@@ -277,7 +283,7 @@ export default function VoiceCommandButton() {
         ? "對唔住，我聽唔清楚，請再講一次"
         : language === "zh"
           ? "对不起，我听不清楚，请再说一次"
-          : t('voiceCommand.processingFailed');
+          : "Sorry, I didn't catch that. Please try again.";
       setErrorMessage(friendlyError);
       setResultMessage(friendlyError);
       // Try to speak the error message too

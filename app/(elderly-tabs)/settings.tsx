@@ -2,13 +2,14 @@ import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 import { useAuth } from "@/lib/auth-context";
 import { getCustomVoicesForElderly } from "@/lib/custom-voice";
 import {
-  getElderlyByUserId,
-  getLinkedCaregivers,
-  updateElderlyEmergencyContact,
+    getElderlyByUserId,
+    getLinkedCaregivers,
+    updateElderlyEmergencyContact,
 } from "@/lib/elderly";
-import { useFontSize } from "@/lib/font-size-context";
-import { useLanguage } from "@/lib/language-context";
-import { buildAvatarUrl, updateProfileAvatar, uploadAvatar } from "@/lib/user";
+import {
+    getFallDetectionDiagnostics,
+    triggerFallDetectionTest,
+} from "@/lib/fall-detection";
 import { Caregiver, CustomVoice, Elderly } from "@/types/appwrite";
 import { FontSize, UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -17,27 +18,25 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  useColorScheme,
-  View,
+    Alert,
+    Linking,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Button,
-  Card,
-  Chip,
-  List,
-  SegmentedButtons,
-  Switch,
-  Text,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Button,
+    Card,
+    Chip,
+    List,
+    Switch,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 export default function ElderlySettings() {
@@ -58,6 +57,7 @@ export default function ElderlySettings() {
   const [versionPickerVisible, setVersionPickerVisible] = useState(false);
   const currentVersion =
     (preferences.uiVersion as UIVersion) || UIVersion.Default;
+  const fallDetectionEnabled = preferences.fallDetectionEnabled !== false;
 
   const handleVersionChange = async (version: UIVersion) => {
     await setPreference("uiVersion", version);
@@ -65,7 +65,7 @@ export default function ElderlySettings() {
     router.replace("/(elderly-tabs)/" as any);
   };
 
-  // ── Emergency contact state ──
+  // ── Emergency state ──
   const [elderlyProfile, setElderlyProfile] = useState<Elderly | null>(null);
   const [linkedCaregivers, setLinkedCaregivers] = useState<Caregiver[]>([]);
   const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
@@ -139,7 +139,7 @@ export default function ElderlySettings() {
     setAiVoiceEnabled(preferences.aiVoiceEnabled ?? false);
   }, [preferences.aiVoiceEnabled]);
 
-  // Get the name of the currently‐selected emergency contact
+  // Get the name of the currently-selected emergency caregiver
   const selectedCaregiverName = linkedCaregivers.find(
     (c) => c.phone === emergencyContact,
   )?.name;
@@ -167,11 +167,11 @@ export default function ElderlySettings() {
       setPickerVisible(false);
       Alert.alert(
         "Saved",
-        `Emergency contact set to ${caregiver.name ?? caregiver.phone}`,
+        `Emergency set to ${caregiver.name ?? caregiver.phone}`,
       );
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", "Failed to save emergency contact.");
+      Alert.alert("Error", "Failed to save emergency.");
     } finally {
       setSaving(false);
     }
@@ -183,9 +183,9 @@ export default function ElderlySettings() {
     try {
       await updateElderlyEmergencyContact(elderlyProfile.$id, null);
       setEmergencyContact(null);
-      Alert.alert("Cleared", "Emergency contact has been removed.");
+      Alert.alert("Cleared", "Emergency has been removed.");
     } catch (e) {
-      Alert.alert("Error", "Failed to clear emergency contact.");
+      Alert.alert("Error", "Failed to clear emergency.");
     } finally {
       setSaving(false);
     }
@@ -195,6 +195,60 @@ export default function ElderlySettings() {
     setNotifications(value);
     await updatePreferences({ ...preferences, notifications: value });
   };
+
+  const handleFallDetectionToggle = async (value: boolean) => {
+    await updatePreferences({ ...preferences, fallDetectionEnabled: value });
+  };
+
+  const handleCheckFallSensors = useCallback(async () => {
+    const diagnostics = await getFallDetectionDiagnostics();
+    const notes: string[] = [];
+
+    if (!diagnostics.accelerometerAvailable) {
+      notes.push("This phone does not provide an accelerometer, so fall detection cannot run.");
+    }
+    if (!diagnostics.gyroscopeAvailable) {
+      notes.push("This phone does not provide a gyroscope. The app has switched to an accelerometer-only fallback, so shake-style tests may be less reliable.");
+    }
+    if (!diagnostics.backgroundServiceRunning) {
+      notes.push("Background service is not running. On MIUI, battery saver or background restrictions may be stopping fall detection even when sensors are available.");
+    }
+    if (!notes.length) {
+      notes.push("Sensors look available on this phone. If the test alert opens, the emergency overlay path is working.");
+    }
+
+    Alert.alert(
+      "Fall Detection Check",
+      `Device: ${diagnostics.deviceModel || "Unknown"}\nProfile: ${diagnostics.profileName}\nSensor interval: ${diagnostics.sensorIntervalMs} ms\nAccelerometer: ${diagnostics.accelerometerAvailable ? "Available" : "Unavailable"} (g-force units)\nGyroscope: ${diagnostics.gyroscopeAvailable ? "Available" : "Unavailable"}\nDetector running: ${diagnostics.isRunning ? "Yes" : "No"}\nBackground service: ${diagnostics.backgroundServiceRunning ? "Running" : "Not running"}\n\n${notes.join("\n")}`,
+    );
+  }, []);
+
+  const handleTestFallAlert = useCallback(() => {
+    if (!fallDetectionEnabled) {
+      Alert.alert("Fall Detection Off", "Turn on fall detection first, then try the test alert again.");
+      return;
+    }
+
+    triggerFallDetectionTest();
+  }, [fallDetectionEnabled]);
+
+  const handleOpenMiuiGuide = useCallback(() => {
+    Alert.alert(
+      "MIUI Setup for Fall Detection",
+      "MIUI usually does not block sensors with a permission prompt. Instead, it kills or restricts apps in the background. Please check these settings:\n\n1. Battery saver -> set this app to No restrictions / Unrestricted\n2. Autostart -> allow this app to start automatically\n3. App info -> Other permissions / Background location -> allow always\n4. Recent apps screen -> lock this app so MIUI does not swipe-kill it\n5. Disable any Game Turbo / extreme battery saver mode while testing\n\nTap Open Settings to jump to the app settings page first.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Open Settings",
+          onPress: () => {
+            Linking.openSettings().catch(() => {
+              Alert.alert("Unable to open settings", "Please open Settings manually and search for this app.");
+            });
+          },
+        },
+      ],
+    );
+  }, []);
 
   const handleAiVoiceToggle = async (value: boolean) => {
     if (value && !hasVoiceOptions) {
@@ -386,18 +440,18 @@ export default function ElderlySettings() {
           />
         </Card>
 
-        {/* Emergency Contact */}
+        {/* Emergency */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
-          {t("settings.emergencyContact")}
+          Emergency
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <List.Item
-            title={t("settings.emergencyContact")}
+            title="Emergency"
             titleStyle={styles.listTitle}
             description={
               emergencyContact
-                ? `${selectedCaregiverName ?? t("common.caregiver")} (${emergencyContact})`
-                : t("settings.emergencyContactNotSet")
+                ? `${selectedCaregiverName ?? "Caregiver"} (${emergencyContact})`
+                : "Not set — tap to choose your emergency caregiver"
             }
             descriptionStyle={styles.listDescription}
             left={() => (
@@ -430,6 +484,69 @@ export default function ElderlySettings() {
             onPress={() => setPickerVisible(true)}
             style={styles.listItem}
           />
+          <View
+            style={[
+              styles.divider,
+              { backgroundColor: theme.colors.outlineVariant },
+            ]}
+          />
+          <List.Item
+            title="Fall Detection"
+            titleStyle={styles.listTitle}
+            description={fallDetectionEnabled ? "On" : "Off"}
+            descriptionStyle={styles.listDescription}
+            left={() => (
+              <View style={styles.iconContainer}>
+                <MaterialCommunityIcons
+                  name={fallDetectionEnabled ? "motion-sensor" : "motion-sensor-off"}
+                  size={26}
+                  color={theme.colors.primary}
+                />
+              </View>
+            )}
+            right={() => (
+              <View style={styles.rightContainer}>
+                <Switch
+                  value={fallDetectionEnabled}
+                  onValueChange={handleFallDetectionToggle}
+                />
+              </View>
+            )}
+            style={styles.listItem}
+          />
+          <View
+            style={[
+              styles.divider,
+              { backgroundColor: theme.colors.outlineVariant },
+            ]}
+          />
+          <List.Item
+            title="Fall Detection Test"
+            titleStyle={styles.listTitle}
+            description="Check sensors, test the alert, or review MIUI setup"
+            descriptionStyle={styles.listDescription}
+            left={() => (
+              <View style={styles.iconContainer}>
+                <MaterialCommunityIcons
+                  name="alert-decagram"
+                  size={26}
+                  color={theme.colors.primary}
+                />
+              </View>
+            )}
+            style={styles.listItem}
+          />
+          <View style={styles.emergencyToolsRow}>
+            <Button mode="outlined" onPress={handleCheckFallSensors} icon="cellphone-cog">
+              Check sensors
+            </Button>
+            <Button mode="contained" onPress={handleTestFallAlert} icon="alert-decagram">
+              Test alert
+            </Button>
+            <Button mode="text" onPress={handleOpenMiuiGuide} icon="cog-outline">
+              MIUI setup
+            </Button>
+          </View>
           {emergencyContact && (
             <View>
               <View
@@ -439,7 +556,7 @@ export default function ElderlySettings() {
                 ]}
               />
               <List.Item
-                title={t("settings.clearEmergencyContact")}
+                title="Clear Emergency"
                 titleStyle={[styles.listTitle, { color: theme.colors.error }]}
                 left={() => (
                   <View
@@ -932,7 +1049,7 @@ export default function ElderlySettings() {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* ── Emergency Contact Picker Modal ── */}
+      {/* ── Emergency Picker Modal ── */}
       <Modal
         visible={pickerVisible}
         transparent
@@ -950,7 +1067,7 @@ export default function ElderlySettings() {
               >
                 <View style={styles.modalHeader}>
                   <Text variant="titleLarge" style={{ fontWeight: "700" }}>
-                    {t("settings.selectEmergencyContact")}
+                    Select Emergency
                   </Text>
                   <TouchableOpacity onPress={() => setPickerVisible(false)}>
                     <MaterialCommunityIcons
@@ -1387,6 +1504,13 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     marginHorizontal: 20,
+  },
+  emergencyToolsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   infoCard: {
     borderRadius: 20,

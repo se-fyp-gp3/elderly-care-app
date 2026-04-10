@@ -1,8 +1,9 @@
 /**
  * Fall Detection Service
  *
- * Pattern: accelerometer detects sudden high-G spike → gyroscope confirms
- * rapid orientation change → brief stillness follows → trigger countdown.
+ * Two detection paths:
+ *   Path A (impact): accelerometer spike + gyroscope rotation → stillness
+ *   Path B (freefall): freefall (near 0 g) → impact → stillness (no gyro needed)
  *
  * Uses expo-sensors (Accelerometer + Gyroscope).
  * Uses expo-task-manager + expo-location to keep sensors alive in background.
@@ -16,13 +17,49 @@ import { AppState, Platform } from "react-native";
 const BACKGROUND_LOCATION_TASK = "FALL_DETECTION_BG_LOCATION";
 
 /* ── Thresholds ─────────────────────────────────────────── */
-const ACCEL_SPIKE_THRESHOLD = 16; // m/s² total magnitude (~1.6 g — above brisk walking, reachable by falls)
-const GYRO_RAPID_THRESHOLD = 2; // rad/s total rotation rate (~115°/s)
-const STILLNESS_THRESHOLD = 14; // m/s² — higher value = more forgiving stillness check
-const STILLNESS_WINDOW_MS = 600; // must stay still for this long
-const SPIKE_TO_STILL_MAX_MS = 5000; // max gap between spike and stillness
+type FallDetectionProfile = {
+  name: string;
+  accelSpikeThreshold: number;
+  gyroRapidThreshold: number;
+  gyroWindowMs: number;
+  freefallThreshold: number;
+  freefallMinMs: number;
+  freefallImpactThreshold: number;
+  stillnessToleranceG: number;
+  stillnessWindowMs: number;
+  spikeToStillMaxMs: number;
+  sensorIntervalMs: number;
+};
+
+const DEFAULT_PROFILE: FallDetectionProfile = {
+  name: "default",
+  accelSpikeThreshold: 1.55,
+  gyroRapidThreshold: 1.5,
+  gyroWindowMs: 1000,
+  freefallThreshold: 0.45,
+  freefallMinMs: 80,
+  freefallImpactThreshold: 1.35,
+  stillnessToleranceG: 0.22,
+  stillnessWindowMs: 500,
+  spikeToStillMaxMs: 5000,
+  sensorIntervalMs: 50,
+};
+
+const MI10_ULTRA_PROFILE: FallDetectionProfile = {
+  name: "mi-10-ultra",
+  accelSpikeThreshold: 1.25,
+  gyroRapidThreshold: 1.1,
+  gyroWindowMs: 1600,
+  freefallThreshold: 0.65,
+  freefallMinMs: 40,
+  freefallImpactThreshold: 1.15,
+  stillnessToleranceG: 0.3,
+  stillnessWindowMs: 350,
+  spikeToStillMaxMs: 6000,
+  sensorIntervalMs: 20,
+};
+
 const COOLDOWN_MS = 30_000; // ignore repeated triggers
-const SENSOR_INTERVAL_MS = 100; // 10 Hz
 
 /* ── State ──────────────────────────────────────────────── */
 let accelSub: ReturnType<typeof Accelerometer.addListener> | null = null;
@@ -36,6 +73,17 @@ let lastTriggerTime = 0;
 let isRunning = false;
 let bgRunning = false;
 let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
+let accelerometerAvailable = true;
+let gyroscopeAvailable = true;
+let activeProfile: FallDetectionProfile = DEFAULT_PROFILE;
+let activeDeviceModel = "unknown";
+
+// Freefall state
+let freefallStart = 0;
+let freefallConfirmed = false;
+
+// Gyro look-back: track last time gyro was high (allows detecting rotation BEFORE spike)
+let lastHighGyroTime = 0;
 
 /* ── Background Task (keeps process alive via foreground service) ── */
 TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async () => {
@@ -43,41 +91,96 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async () => {
   // so that the Accelerometer/Gyroscope listeners continue firing.
 });
 
+function getDeviceModelName(): string {
+  if (Platform.OS !== "android") return "non-android";
+
+  const constants = Platform.constants as {
+    Brand?: string;
+    Manufacturer?: string;
+    Model?: string;
+  };
+
+  return [constants.Manufacturer, constants.Brand, constants.Model]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function selectFallDetectionProfile(): FallDetectionProfile {
+  const model = getDeviceModelName();
+  activeDeviceModel = model;
+
+  if (model.includes("mi 10 ultra") || model.includes("m2007j1sc")) {
+    return MI10_ULTRA_PROFILE;
+  }
+
+  return DEFAULT_PROFILE;
+}
+
 /* ── Core ───────────────────────────────────────────────── */
 
 function reset() {
   spikeTime = 0;
   gyroConfirmed = false;
   stillStartTime = 0;
+  freefallStart = 0;
+  freefallConfirmed = false;
 }
 
 function handleAccelData(data: { x: number; y: number; z: number }) {
   const now = Date.now();
   const mag = Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z);
 
-  // Phase 1: detect spike
+  // ── Before spike detected: look for freefall or spike ──
   if (spikeTime === 0) {
-    if (mag > ACCEL_SPIKE_THRESHOLD) {
+    // Freefall tracking (Path B)
+    if (mag < activeProfile.freefallThreshold) {
+      if (freefallStart === 0) freefallStart = now;
+      if (!freefallConfirmed && now - freefallStart >= activeProfile.freefallMinMs) {
+        freefallConfirmed = true;
+      }
+      return; // still in freefall, wait for impact
+    }
+
+    // Exited low-g zone — check for impact after freefall (Path B)
+    if (freefallConfirmed && mag > activeProfile.freefallImpactThreshold) {
       spikeTime = now;
-      gyroConfirmed = false;
+      gyroConfirmed = true; // freefall + impact = skip gyro requirement
+      freefallStart = 0;
+      freefallConfirmed = false;
+      stillStartTime = 0;
+      return;
+    }
+
+    // Reset freefall if magnitude is normal and no freefall was confirmed
+    freefallStart = 0;
+    freefallConfirmed = false;
+
+    // Normal spike detection (Path A)
+    if (mag > activeProfile.accelSpikeThreshold) {
+      spikeTime = now;
+      // Check if gyro was recently high (rotation happened just before impact)
+      gyroConfirmed = !gyroscopeAvailable || now - lastHighGyroTime < activeProfile.gyroWindowMs;
       stillStartTime = 0;
     }
     return;
   }
 
+  // ── After spike detected ──
+
   // Timeout – reset if too long after spike
-  if (now - spikeTime > SPIKE_TO_STILL_MAX_MS) {
+  if (now - spikeTime > activeProfile.spikeToStillMaxMs) {
     reset();
     return;
   }
 
-  // Phase 3: detect stillness (after gyro confirmed)
+  // Stillness check (after gyro confirmed or freefall path)
   if (gyroConfirmed) {
-    const diff = Math.abs(mag - 9.8);
-    if (diff < (STILLNESS_THRESHOLD - 9.8)) {
-      // "still" means magnitude close to 1g
+    const diff = Math.abs(mag - 1);
+    if (diff < activeProfile.stillnessToleranceG) {
+      // Expo Accelerometer reports in g-force, so "still" means magnitude close to 1 g.
       if (stillStartTime === 0) stillStartTime = now;
-      if (now - stillStartTime >= STILLNESS_WINDOW_MS) {
+      if (now - stillStartTime >= activeProfile.stillnessWindowMs) {
         // Cooldown check
         if (now - lastTriggerTime > COOLDOWN_MS) {
           lastTriggerTime = now;
@@ -94,10 +197,17 @@ function handleAccelData(data: { x: number; y: number; z: number }) {
 }
 
 function handleGyroData(data: { x: number; y: number; z: number }) {
-  if (spikeTime === 0 || gyroConfirmed) return;
+  if (!gyroscopeAvailable) return;
+
+  const now = Date.now();
   const rate = Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z);
-  if (rate > GYRO_RAPID_THRESHOLD) {
-    gyroConfirmed = true;
+
+  if (rate > activeProfile.gyroRapidThreshold) {
+    lastHighGyroTime = now;
+    // If spike already detected but gyro not yet confirmed (Path A)
+    if (spikeTime > 0 && !gyroConfirmed) {
+      gyroConfirmed = true;
+    }
   }
 }
 
@@ -163,6 +273,32 @@ async function stopBackgroundService() {
 
 /* ── Public API ─────────────────────────────────────────── */
 
+export async function getFallDetectionDiagnostics() {
+  activeProfile = selectFallDetectionProfile();
+
+  const [accel, gyro] = await Promise.all([
+    Accelerometer.isAvailableAsync().catch(() => false),
+    Gyroscope.isAvailableAsync().catch(() => false),
+  ]);
+
+  accelerometerAvailable = accel;
+  gyroscopeAvailable = gyro;
+
+  return {
+    accelerometerAvailable: accel,
+    gyroscopeAvailable: gyro,
+    deviceModel: activeDeviceModel,
+    profileName: activeProfile.name,
+    sensorIntervalMs: activeProfile.sensorIntervalMs,
+    isRunning,
+    backgroundServiceRunning: bgRunning,
+  };
+}
+
+export function triggerFallDetectionTest() {
+  onFallDetected?.();
+}
+
 export async function startFallDetection(
   callback: () => void,
 ): Promise<boolean> {
@@ -171,11 +307,23 @@ export async function startFallDetection(
   onFallDetected = callback;
   reset();
 
-  Accelerometer.setUpdateInterval(SENSOR_INTERVAL_MS);
-  Gyroscope.setUpdateInterval(SENSOR_INTERVAL_MS);
+  const diagnostics = await getFallDetectionDiagnostics();
+  if (!diagnostics.accelerometerAvailable) {
+    console.warn("[FallDetection] Accelerometer unavailable on this device");
+    onFallDetected = null;
+    return false;
+  }
+  if (!diagnostics.gyroscopeAvailable) {
+    console.warn("[FallDetection] Gyroscope unavailable; using accelerometer-only fallback");
+  }
+
+  Accelerometer.setUpdateInterval(activeProfile.sensorIntervalMs);
+  if (gyroscopeAvailable) {
+    Gyroscope.setUpdateInterval(activeProfile.sensorIntervalMs);
+  }
 
   accelSub = Accelerometer.addListener(handleAccelData);
-  gyroSub = Gyroscope.addListener(handleGyroData);
+  gyroSub = gyroscopeAvailable ? Gyroscope.addListener(handleGyroData) : null;
   isRunning = true;
 
   // Start background foreground-service to keep sensors alive
@@ -186,11 +334,11 @@ export async function startFallDetection(
     if (state === "active" && isRunning) {
       // Re-ensure sensors are attached
       if (!accelSub) {
-        Accelerometer.setUpdateInterval(SENSOR_INTERVAL_MS);
+        Accelerometer.setUpdateInterval(activeProfile.sensorIntervalMs);
         accelSub = Accelerometer.addListener(handleAccelData);
       }
-      if (!gyroSub) {
-        Gyroscope.setUpdateInterval(SENSOR_INTERVAL_MS);
+      if (gyroscopeAvailable && !gyroSub) {
+        Gyroscope.setUpdateInterval(activeProfile.sensorIntervalMs);
         gyroSub = Gyroscope.addListener(handleGyroData);
       }
     }

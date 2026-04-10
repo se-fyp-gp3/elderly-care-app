@@ -1,49 +1,41 @@
 import {
-  DATABASE_ID,
-  EMERGENCY_ALERTS_TABLE_ID,
-  safeSubscribe,
+    DATABASE_ID,
+    EMERGENCY_ALERTS_TABLE_ID,
+    safeSubscribe
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-  fetchEmergencyAlerts,
-  resolveEmergencyAlert,
-  updateAlertStatus,
+    fetchEmergencyAlerts,
+    resolveEmergencyAlert,
+    updateAlertStatus,
 } from "@/lib/emergency";
 import type { EmergencyAlert } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation, useRouter } from "expo-router";
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useState,
-} from "react";
-import { useTranslation } from "react-i18next";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Linking,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Linking,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  Button,
-  Card,
-  Chip,
-  Dialog,
-  Divider,
-  Menu,
-  Portal,
-  Searchbar,
-  Surface,
-  Text,
-  useTheme,
+    Button,
+    Card,
+    Chip,
+    Dialog,
+    Divider,
+    Menu,
+    Portal,
+    Searchbar,
+    Surface,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 /* ── Helpers ────────────────────────────────────────────── */
@@ -51,19 +43,11 @@ import {
 function getTypeConfig(type: string) {
   switch (type) {
     case "fall":
-      return {
-        icon: "alert-decagram",
-        color: "#D32F2F",
-        label: "Fall Detected",
-      };
+      return { icon: "alert-decagram", color: "#D32F2F", label: "Fall Detected" };
     case "sos":
       return { icon: "bell-alert", color: "#C62828", label: "SOS Alert" };
     case "hr_warning":
-      return {
-        icon: "heart-broken",
-        color: "#E64A19",
-        label: "Health Warning",
-      };
+      return { icon: "heart-broken", color: "#E64A19", label: "Health Warning" };
     case "geo_fence":
       return { icon: "map-marker-alert", color: "#F57C00", label: "Geo-Fence" };
     default:
@@ -94,14 +78,11 @@ export default function EmergencyPage() {
   const router = useRouter();
   const navigation = useNavigation();
   const { user } = useAuth();
-  const { t } = useTranslation();
 
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(
-    null,
-  );
+  const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(null);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
@@ -143,14 +124,8 @@ export default function EmergencyPage() {
           onPress={() => router.navigate("/caregiver")}
           style={{ marginLeft: 10, flexDirection: "row", alignItems: "center" }}
         >
-          <MaterialCommunityIcons
-            name="arrow-left"
-            size={28}
-            color={theme.colors.onSurface}
-          />
-          <Text style={{ marginLeft: 5, fontSize: 16 }}>
-            {t("common.back")}
-          </Text>
+          <MaterialCommunityIcons name="arrow-left" size={28} color={theme.colors.onSurface} />
+          <Text style={{ marginLeft: 5, fontSize: 16 }}>Back</Text>
         </TouchableOpacity>
       ),
       headerRight: () => (
@@ -188,10 +163,7 @@ export default function EmergencyPage() {
   }, [alerts, filterStatus, search]);
 
   const activeCount = useMemo(
-    () =>
-      alerts.filter(
-        (a) => a.status === "active" || a.status === "investigating",
-      ).length,
+    () => alerts.filter((a) => a.status === "active" || a.status === "investigating").length,
     [alerts],
   );
 
@@ -208,37 +180,6 @@ export default function EmergencyPage() {
       loadAlerts();
     } catch (err) {
       Alert.alert("Error", "Failed to resolve alert.");
-    }
-  };
-
-  const getTypeConfig = (type: string) => {
-    switch (type) {
-      case "fall":
-        return {
-          icon: "alert-decagram",
-          color: "#D32F2F",
-          label: t("emergency.fallDetected"),
-        };
-      case "sos":
-        return {
-          icon: "bell-alert",
-          color: "#C62828",
-          label: t("emergency.sosAlert"),
-        };
-      case "hr_warning":
-        return {
-          icon: "heart-broken",
-          color: "#E64A19",
-          label: t("emergency.healthWarning"),
-        };
-      case "geo_fence":
-        return {
-          icon: "map-marker-alert",
-          color: "#F57C00",
-          label: t("emergency.geoFence"),
-        };
-      default:
-        return { icon: "alert", color: "#757575", label: t("emergency.alert") };
     }
   };
 
@@ -286,31 +227,16 @@ export default function EmergencyPage() {
   const renderLogItem = ({ item }: { item: EmergencyAlert }) => {
     const config = getTypeConfig(item.type);
     return (
-      <Surface
-        style={[styles.logCard, { borderLeftColor: config.color }]}
-        elevation={1}
-      >
+      <Surface style={[styles.logCard, { borderLeftColor: config.color }]} elevation={1}>
         <TouchableOpacity
           onPress={() => setSelectedAlert(item)}
           style={{ flexDirection: "row", alignItems: "center", padding: 12 }}
         >
-          <View
-            style={[styles.iconBox, { backgroundColor: config.color + "15" }]}
-          >
-            <MaterialCommunityIcons
-              name={config.icon as any}
-              size={28}
-              color={config.color}
-            />
+          <View style={[styles.iconBox, { backgroundColor: config.color + "15" }]}>
+            <MaterialCommunityIcons name={config.icon as any} size={28} color={config.color} />
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text variant="titleMedium" style={{ fontWeight: "bold" }}>
                 {config.label}
               </Text>
@@ -319,42 +245,15 @@ export default function EmergencyPage() {
             <Text variant="bodyMedium" style={{ marginTop: 2 }}>
               {item.elderly_name}
             </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginTop: 4,
-              }}
-            >
-              <MaterialCommunityIcons
-                name="clock-outline"
-                size={14}
-                color={theme.colors.onSurfaceVariant}
-              />
-              <Text
-                variant="bodySmall"
-                style={{
-                  color: theme.colors.onSurfaceVariant,
-                  marginLeft: 4,
-                  marginRight: 12,
-                }}
-              >
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+              <MaterialCommunityIcons name="clock-outline" size={14} color="#666" />
+              <Text variant="bodySmall" style={{ color: "#666", marginLeft: 4, marginRight: 12 }}>
                 {formatRelativeTime(item.$createdAt)}
               </Text>
               {item.location_name && (
                 <>
-                  <MaterialCommunityIcons
-                    name="map-marker-outline"
-                    size={14}
-                    color={theme.colors.onSurfaceVariant}
-                  />
-                  <Text
-                    variant="bodySmall"
-                    style={{
-                      color: theme.colors.onSurfaceVariant,
-                      marginLeft: 4,
-                    }}
-                  >
+                  <MaterialCommunityIcons name="map-marker-outline" size={14} color="#666" />
+                  <Text variant="bodySmall" style={{ color: "#666", marginLeft: 4 }}>
                     {item.location_name}
                   </Text>
                 </>
@@ -374,22 +273,14 @@ export default function EmergencyPage() {
   /* ── Render ── */
   if (loading) {
     return (
-      <View
-        style={[
-          styles.container,
-          styles.center,
-          { backgroundColor: theme.colors.background },
-        ]}
-      >
+      <View style={[styles.container, styles.center, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView
         contentContainerStyle={{ paddingBottom: 20 }}
         refreshControl={
@@ -408,9 +299,7 @@ export default function EmergencyPage() {
             styles.banner,
             {
               backgroundColor:
-                activeCount > 0
-                  ? theme.colors.errorContainer
-                  : theme.colors.primaryContainer,
+                activeCount > 0 ? theme.colors.errorContainer : theme.colors.primaryContainer,
             },
           ]}
           elevation={2}
@@ -419,36 +308,26 @@ export default function EmergencyPage() {
             <MaterialCommunityIcons
               name={activeCount > 0 ? "shield-alert" : "shield-check"}
               size={48}
-              color={
-                activeCount > 0 ? theme.colors.error : theme.colors.primary
-              }
+              color={activeCount > 0 ? theme.colors.error : theme.colors.primary}
             />
             <View style={{ marginLeft: 16, flex: 1 }}>
               <Text
                 variant="headlineSmall"
                 style={{
-                  color:
-                    activeCount > 0
-                      ? theme.colors.onErrorContainer
-                      : theme.colors.onPrimaryContainer,
+                  color: activeCount > 0 ? theme.colors.onErrorContainer : theme.colors.onPrimaryContainer,
                   fontWeight: "bold",
                 }}
               >
-                {activeCount > 0
-                  ? t("emergency.alertSystemActive")
-                  : "All Clear"}
+                {activeCount > 0 ? "Alert System Active" : "All Clear"}
               </Text>
               <Text
                 variant="bodyMedium"
                 style={{
-                  color:
-                    activeCount > 0
-                      ? theme.colors.onErrorContainer
-                      : theme.colors.onPrimaryContainer,
+                  color: activeCount > 0 ? theme.colors.onErrorContainer : theme.colors.onPrimaryContainer,
                 }}
               >
                 {activeCount > 0
-                  ? t("emergency.unresolvedAlerts", { count: activeCount })
+                  ? `${activeCount} unresolved alert${activeCount > 1 ? "s" : ""} require attention.`
                   : "No active alerts at this time."}
               </Text>
             </View>
@@ -464,7 +343,7 @@ export default function EmergencyPage() {
                 if (first) setSelectedAlert(first);
               }}
             >
-              {t("emergency.viewLatestAlert")}
+              View Latest Alert
             </Button>
           )}
         </Surface>
@@ -481,14 +360,8 @@ export default function EmergencyPage() {
             onPress={() => handleCallEmergency("999")}
           >
             <Card.Content style={styles.gridContent}>
-              <MaterialCommunityIcons
-                name="ambulance"
-                size={32}
-                color="#D32F2F"
-              />
-              <Text style={[styles.gridLabel, { color: "#D32F2F" }]}>
-                {t("emergency.call999")}
-              </Text>
+              <MaterialCommunityIcons name="ambulance" size={32} color="#D32F2F" />
+              <Text style={[styles.gridLabel, { color: "#D32F2F" }]}>Call 999</Text>
             </Card.Content>
           </Card>
           <Card
@@ -496,32 +369,17 @@ export default function EmergencyPage() {
             onPress={() => handleCallEmergency("110")}
           >
             <Card.Content style={styles.gridContent}>
-              <MaterialCommunityIcons
-                name="police-badge"
-                size={32}
-                color="#1976D2"
-              />
-              <Text style={[styles.gridLabel, { color: "#1976D2" }]}>
-                {t("emergency.police")}
-              </Text>
+              <MaterialCommunityIcons name="police-badge" size={32} color="#1976D2" />
+              <Text style={[styles.gridLabel, { color: "#1976D2" }]}>Police</Text>
             </Card.Content>
           </Card>
           <Card
             style={[styles.gridCard, { backgroundColor: "#fff" }]}
-            onPress={() =>
-              Alert.alert(
-                t("emergency.broadcast"),
-                t("emergency.broadcastDesc"),
-              )
-            }
+            onPress={() => Alert.alert("Broadcast", "Sending alert to all active staff...")}
           >
             <Card.Content style={styles.gridContent}>
-              <MaterialCommunityIcons
-                name="bullhorn-outline"
-                size={32}
-                color={theme.colors.primary}
-              />
-              <Text style={styles.gridLabel}>{t("emergency.broadcast")}</Text>
+              <MaterialCommunityIcons name="bullhorn-outline" size={32} color={theme.colors.primary} />
+              <Text style={styles.gridLabel}>Broadcast</Text>
             </Card.Content>
           </Card>
         </View>
@@ -549,51 +407,20 @@ export default function EmergencyPage() {
                 onPress={() => setFilterMenuVisible(true)}
                 icon="filter-variant"
               >
-                {filterStatus === "all"
-                  ? "All"
-                  : filterStatus.charAt(0).toUpperCase() +
-                    filterStatus.slice(1)}
+                {filterStatus === "all" ? "All" : filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)}
               </Button>
             }
           >
-            <Menu.Item
-              title="All"
-              onPress={() => {
-                setFilterStatus("all");
-                setFilterMenuVisible(false);
-              }}
-            />
-            <Menu.Item
-              title="Active"
-              onPress={() => {
-                setFilterStatus("active");
-                setFilterMenuVisible(false);
-              }}
-            />
-            <Menu.Item
-              title="Investigating"
-              onPress={() => {
-                setFilterStatus("investigating");
-                setFilterMenuVisible(false);
-              }}
-            />
-            <Menu.Item
-              title="Resolved"
-              onPress={() => {
-                setFilterStatus("resolved");
-                setFilterMenuVisible(false);
-              }}
-            />
+            <Menu.Item title="All" onPress={() => { setFilterStatus("all"); setFilterMenuVisible(false); }} />
+            <Menu.Item title="Active" onPress={() => { setFilterStatus("active"); setFilterMenuVisible(false); }} />
+            <Menu.Item title="Investigating" onPress={() => { setFilterStatus("investigating"); setFilterMenuVisible(false); }} />
+            <Menu.Item title="Resolved" onPress={() => { setFilterStatus("resolved"); setFilterMenuVisible(false); }} />
           </Menu>
         </View>
 
         {filtered.length === 0 ? (
           <View style={[styles.center, { paddingVertical: 48 }]}>
-            <MaterialCommunityIcons
-              name="shield-check-outline"
-              size={64}
-              color="#ccc"
-            />
+            <MaterialCommunityIcons name="shield-check-outline" size={64} color="#ccc" />
             <Text variant="bodyLarge" style={{ color: "#999", marginTop: 12 }}>
               No alerts found
             </Text>
@@ -616,11 +443,8 @@ export default function EmergencyPage() {
           onDismiss={() => setSelectedAlert(null)}
           style={{ backgroundColor: theme.colors.background }}
         >
-          <Dialog.Title
-            style={{ color: theme.colors.error, fontWeight: "bold" }}
-          >
-            <MaterialCommunityIcons name="alert" size={24} />{" "}
-            {t("emergency.incidentDetails")}
+          <Dialog.Title style={{ color: theme.colors.error, fontWeight: "bold" }}>
+            <MaterialCommunityIcons name="alert" size={24} /> Incident Details
           </Dialog.Title>
           <Dialog.Content>
             {selectedAlert && (
@@ -635,12 +459,8 @@ export default function EmergencyPage() {
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>
-                      {t("emergency.elderlyLabel")}
-                    </Text>
-                    <Text style={styles.detailValue}>
-                      {selectedAlert.elderly_name}
-                    </Text>
+                    <Text style={styles.detailLabel}>Elderly:</Text>
+                    <Text style={styles.detailValue}>{selectedAlert.elderly_name}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>
@@ -658,23 +478,18 @@ export default function EmergencyPage() {
                       {new Date(selectedAlert.$createdAt).toLocaleString()}
                     </Text>
                   </View>
-                  {selectedAlert.latitude != null &&
-                    selectedAlert.longitude != null && (
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>GPS:</Text>
-                        <Text style={styles.detailValue}>
-                          {selectedAlert.latitude.toFixed(5)},{" "}
-                          {selectedAlert.longitude.toFixed(5)}
-                        </Text>
-                      </View>
-                    )}
+                  {selectedAlert.latitude != null && selectedAlert.longitude != null && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>GPS:</Text>
+                      <Text style={styles.detailValue}>
+                        {selectedAlert.latitude.toFixed(5)}, {selectedAlert.longitude.toFixed(5)}
+                      </Text>
+                    </View>
+                  )}
                 </Surface>
 
-                <Text
-                  variant="titleMedium"
-                  style={{ marginTop: 16, marginBottom: 4 }}
-                >
-                  {t("emergency.description")}
+                <Text variant="titleMedium" style={{ marginTop: 16, marginBottom: 4 }}>
+                  Description
                 </Text>
                 <Text variant="bodyMedium" style={{ lineHeight: 20 }}>
                   {selectedAlert.description ?? "No description available."}
@@ -682,58 +497,38 @@ export default function EmergencyPage() {
 
                 <Divider style={{ marginVertical: 16 }} />
                 <Text variant="titleMedium" style={{ marginBottom: 12 }}>
-                  {t("emergency.suggestedActions")}
+                  Actions
                 </Text>
-                <View
-                  style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}
-                >
+                <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
                   <Chip icon="phone" onPress={() => handleCallEmergency("999")}>
-                    {t("emergency.call999")}
+                    Call 999
                   </Chip>
-                  <Chip
-                    icon="phone"
-                    onPress={() => handleCallEmergency("12345678")}
-                  >
-                    {t("emergency.callFamily")}
-                  </Chip>
-                  <Chip icon="video" onPress={() => {}}>
-                    {t("emergency.viewCamera")}
-                  </Chip>
-                  {selectedAlert.latitude != null &&
-                    selectedAlert.longitude != null && (
-                      <Chip
-                        icon="map-marker"
-                        onPress={() =>
-                          Linking.openURL(
-                            `https://maps.google.com/?q=${selectedAlert.latitude},${selectedAlert.longitude}`,
-                          )
-                        }
-                      >
-                        Open Map
-                      </Chip>
-                    )}
+                  {selectedAlert.latitude != null && selectedAlert.longitude != null && (
+                    <Chip
+                      icon="map-marker"
+                      onPress={() =>
+                        Linking.openURL(
+                          `https://maps.google.com/?q=${selectedAlert.latitude},${selectedAlert.longitude}`,
+                        )
+                      }
+                    >
+                      Open Map
+                    </Chip>
+                  )}
                 </View>
               </View>
             )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setSelectedAlert(null)}>
-              {t("common.close")}
-            </Button>
+            <Button onPress={() => setSelectedAlert(null)}>Close</Button>
             {selectedAlert?.status === "active" && (
-              <Button
-                mode="outlined"
-                onPress={() => handleInvestigate(selectedAlert!)}
-              >
+              <Button mode="outlined" onPress={() => handleInvestigate(selectedAlert!)}>
                 Investigating
               </Button>
             )}
             {selectedAlert?.status !== "resolved" && (
-              <Button
-                mode="contained"
-                onPress={() => handleResolve(selectedAlert!)}
-              >
-                {t("emergency.markResolved")}
+              <Button mode="contained" onPress={() => handleResolve(selectedAlert!)}>
+                Resolve
               </Button>
             )}
           </Dialog.Actions>

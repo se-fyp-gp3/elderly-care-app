@@ -2,13 +2,10 @@ import FallCountdownOverlay from "@/components/FallCountdownOverlay";
 import MiniSettingsGearButton from "@/components/MiniSettingsGearButton";
 import { useAuth } from "@/lib/auth-context";
 import { startFallDetection, stopFallDetection } from "@/lib/fall-detection";
-import { usePresence } from "@/lib/hooks/usePresence";
-import { useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
 import { useTheme } from "react-native-paper";
 
 type TabVisibility = {
@@ -38,6 +35,7 @@ export default function ElderlyTabsLayout() {
   usePresence();
   const { totalUnread } = useUnreadBadge();
   const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
+  const fallDetectionEnabled = preferences.fallDetectionEnabled !== false;
   const visible = getVisibleTabs(uiVersion);
 
   const isAccessible = uiVersion === UIVersion.Accessible;
@@ -49,11 +47,18 @@ export default function ElderlyTabsLayout() {
   const [fallDetected, setFallDetected] = useState(false);
 
   useEffect(() => {
-    startFallDetection(() => setFallDetected(true));
+    if (!fallDetectionEnabled) {
+      setFallDetected(false);
+      void stopFallDetection();
+      return;
+    }
+
+    void startFallDetection(() => setFallDetected(true));
+
     return () => {
-      stopFallDetection();
+      void stopFallDetection();
     };
-  }, []);
+  }, [fallDetectionEnabled]);
 
   return (
     <>

@@ -1,23 +1,10 @@
-import {
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
-  MOMENTS_COMMENTS_TABLE_ID,
-  safeSubscribe
-} from "@/lib/appwrite";
+import { DATABASE_ID, DIRECT_MESSAGES_TABLE_ID, safeSubscribe } from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getElderlyByUserId } from "@/lib/elderly";
-import { FontSizeProvider, useFontSize } from "@/lib/font-size-context";
 import {
-  UnreadBadgeProvider,
-  useUnreadBadge,
-} from "@/lib/hooks/useUnreadBadge";
-import "@/lib/i18n"; // side-effect: initializes i18next
-import { LanguageProvider } from "@/lib/language-context";
-import { getUserMomentIds } from "@/lib/moments";
-import {
-  registerForPushNotificationsAsync,
-  sendImmediateNotification,
+    registerForPushNotificationsAsync,
+    sendImmediateNotification,
 } from "@/lib/notifications";
 import { DirectMessage } from "@/types/messaging";
 import { MomentComment } from "@/types/moments";
@@ -113,7 +100,6 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     refreshChatUnread(user.$id);
 
     let unsubscribeRealtime: (() => void) | null = null;
-    let unsubscribeComments: (() => void) | null = null;
 
     // Resolve profile ID first, then subscribe
     const setup = async () => {
@@ -132,66 +118,23 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
       if (!myProfileId) return;
 
-      // Subscribe to direct messages for notifications
       const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
       unsubscribeRealtime = safeSubscribe(channel, async (response) => {
         if (!response.events.some((e) => e.endsWith(".create"))) return;
 
         const payload = response.payload as DirectMessage;
 
-        if (
-          payload.receiver_id === myProfileId &&
-          payload.sender_id !== myProfileId
-        ) {
+        if (payload.receiver_id === myProfileId && payload.sender_id !== myProfileId) {
           await sendImmediateNotification(
             payload.sender_name || "New Message",
-            payload.message_type === "voice"
-              ? "Sent a voice message"
-              : payload.body || "Sent a message",
+            payload.message_type === "voice" ? "Sent a voice message" : (payload.body || "Sent a message"),
             {
               type: "direct_message",
               contactId: payload.sender_id,
               contactName: payload.sender_name,
               contactRole: payload.sender_role,
-            },
+            }
           );
-          refreshChatUnread(user!.$id);
-        }
-      });
-
-      // Subscribe to moments comments for notifications
-      const commentsChannel = `databases.${DATABASE_ID}.collections.${MOMENTS_COMMENTS_TABLE_ID}.documents`;
-      let myMomentIds: string[] = [];
-      getUserMomentIds(user!.$id)
-        .then((ids) => {
-          myMomentIds = ids;
-        })
-        .catch(() => {});
-
-      unsubscribeComments = safeSubscribe(commentsChannel, async (response) => {
-        if (!response.events.some((e) => e.endsWith(".create"))) return;
-
-        const payload = response.payload as MomentComment;
-        // Skip own comments
-        if (payload.author_id === user!.$id) return;
-
-        // Notify if: comment on my moment OR reply to me
-        const isOnMyMoment =
-          payload.moment_author_id === user!.$id ||
-          myMomentIds.includes(payload.moment_id);
-        const isReplyToMe = payload.reply_to_user_id === user!.$id;
-
-        if (isOnMyMoment || isReplyToMe) {
-          const title = payload.author_name || "New Comment";
-          const body = isReplyToMe
-            ? `Replied to your comment: ${(payload.content || "").substring(0, 80)}`
-            : `Commented on your post: ${(payload.content || "").substring(0, 80)}`;
-
-          await sendImmediateNotification(title, body, {
-            type: "moment_comment",
-            momentId: payload.moment_id,
-          });
-          incrementMomentUnread();
         }
       });
     };
@@ -235,7 +178,6 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     return () => {
       // Cleanup subscription
       unsubscribeRealtime?.();
-      unsubscribeComments?.();
       subscription.remove();
     };
   }, [user?.$id, router, role, incrementMomentUnread, refreshChatUnread]);

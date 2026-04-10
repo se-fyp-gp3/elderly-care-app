@@ -6,12 +6,7 @@ import {
 } from "@/lib/health-data";
 import { HealthData } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import {
-  useFocusEffect,
-  useLocalSearchParams,
-  useNavigation,
-  useRouter,
-} from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, {
   useCallback,
   useEffect,

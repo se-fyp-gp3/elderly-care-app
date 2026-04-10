@@ -2,43 +2,17 @@ import { formatRelativeTime } from "@/lib/contacts";
 import { MediaItem, Moment, MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoPlayer, VideoView } from "expo-video";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import {
-  Alert,
-  Dimensions,
-  FlatList,
-  Image,
-  Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import {
-  ActivityIndicator,
-  Avatar,
-  Divider,
-  Text,
-  useTheme,
-} from "react-native-paper";
+import React, { useEffect, useState } from "react";
+import { Alert, Image, Modal, Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
 
 interface MomentCardProps {
   moment: Moment;
   currentUserId: string;
   onLike: (id: string) => void;
   onComment: (id: string) => void;
-  onAIRequest: (
-    id: string,
-    content: string,
-    imageUrl?: string,
-  ) => Promise<MomentComment>;
+  onAIRequest: (id: string, content: string, imageUrl?: string) => Promise<MomentComment>;
   onDelete?: (id: string) => void;
-  latestComments?: MomentComment[];
 }
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -257,87 +231,7 @@ function MediaGalleryModal({
   );
 }
 
-const galleryStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.95)",
-    justifyContent: "center",
-  },
-  closeBtn: {
-    position: "absolute",
-    top: 48,
-    right: 16,
-    zIndex: 10,
-    padding: 4,
-  },
-  indicator: {
-    position: "absolute",
-    top: 52,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    alignItems: "center",
-  },
-  indicatorText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  page: {
-    width: SCREEN_W,
-    height: SCREEN_H,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  zoomContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  image: {
-    width: SCREEN_W,
-    height: SCREEN_H * 0.75,
-  },
-  video: {
-    width: SCREEN_W,
-    height: SCREEN_H * 0.5,
-  },
-  errorWrap: {
-    width: SCREEN_W,
-    height: SCREEN_H,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.95)",
-  },
-  dots: {
-    position: "absolute",
-    bottom: 60,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: "#fff",
-  },
-});
-
-/** Render a single media item (image or video) in the grid */
-function MediaGridItem({
-  item,
-  index,
-  onPressMedia,
-  gridStyle,
-}: {
-  item: MediaItem;
-  index: number;
-  onPressMedia: (index: number) => void;
-  gridStyle: any;
-}) {
+export default function MomentCard({ moment, currentUserId, onLike, onComment, onAIRequest, onDelete }: MomentCardProps) {
   const theme = useTheme();
 
   if (item.type === "image" && item.url) {
@@ -568,8 +462,7 @@ export default function MomentCard({
     if (loadingAI || aiComment) return;
     setLoadingAI(true);
     try {
-      const imageUrl =
-        moment.media_type === "image" ? moment.media_url : undefined;
+      const imageUrl = moment.media_type === "image" ? moment.media_url : undefined;
       const comment = await onAIRequest(moment.$id, moment.content, imageUrl);
       setAIComment(comment);
     } catch (error) {
@@ -615,25 +508,13 @@ export default function MomentCard({
           <TouchableOpacity
             style={{ marginLeft: "auto", padding: 4 }}
             onPress={() => {
-              Alert.alert(
-                "Delete Post",
-                "Are you sure you want to delete this post?",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: () => onDelete(moment.$id),
-                  },
-                ],
-              );
+              Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
+                { text: "Cancel", style: "cancel" },
+                { text: "Delete", style: "destructive", onPress: () => onDelete(moment.$id) },
+              ]);
             }}
           >
-            <MaterialCommunityIcons
-              name="delete-outline"
-              size={22}
-              color={theme.colors.error}
-            />
+            <MaterialCommunityIcons name="delete-outline" size={22} color={theme.colors.error} />
           </TouchableOpacity>
         )}
       </View>
