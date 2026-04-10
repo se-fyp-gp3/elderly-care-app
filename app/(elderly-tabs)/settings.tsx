@@ -38,6 +38,7 @@ import {
     Chip,
     List,
     Switch,
+    SegmentedButtons,
     Text,
     useTheme,
 } from "react-native-paper";
