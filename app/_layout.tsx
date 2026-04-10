@@ -3,6 +3,7 @@ import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { FontSizeProvider, useFontSize } from "@/lib/font-size-context";
+import { UnreadBadgeProvider, useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
 import { LanguageProvider } from "@/lib/language-context";
 import {
     registerForPushNotificationsAsync,
@@ -13,7 +14,7 @@ import { MomentComment } from "@/types/moments";
 import { Role } from "@/types/user";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
