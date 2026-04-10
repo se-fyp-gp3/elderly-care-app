@@ -49,7 +49,11 @@
     "daysAgo": "{{days}}天前",
     "noData": "无数据",
     "medicationCount_one": "{{count}} 种药物",
-    "medicationCount_other": "{{count}} 种药物"
+    "medicationCount_other": "{{count}} 种药物",
+    "noDataFound": "未找到数据",
+    "loadingDetails": "正在加载详情...",
+    "yes": "是",
+    "no": "否"
   },
   "tabs": {
     "home": "首页",

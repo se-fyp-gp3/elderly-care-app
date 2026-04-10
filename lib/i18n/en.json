@@ -846,17 +846,17 @@
     "confirmLink": "Confirm Link"
   },
   "voiceCommand": {
-    "holdToSpeak": "撳住講嘢",
-    "listening": "聽緊...",
-    "thinking": "諗緊...",
-    "speaking": "講緊...",
-    "error": "出錯咗",
-    "needRecordingPermission": "需要錄音權限",
-    "processingFailed": "處理失敗，請再試一次",
-    "voiceAssistant": "🎙️ 語音助手（中英粵）",
-    "stopButton": "停止",
-    "startSpeaking": "開始講",
-    "closeButton": "關閉"
+    "holdToSpeak": "Hold to speak",
+    "listening": "Listening...",
+    "thinking": "Thinking...",
+    "speaking": "Speaking...",
+    "error": "An error occurred",
+    "needRecordingPermission": "Recording permission required",
+    "processingFailed": "Processing failed, please try again",
+    "voiceAssistant": "🎙️ Voice Assistant (EN/ZH/Cantonese)",
+    "stopButton": "Stop",
+    "startSpeaking": "Start speaking",
+    "closeButton": "Close"
   },
   "miniSettings": {
     "title": "Settings",
