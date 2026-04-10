@@ -65,7 +65,8 @@ import {
     Searchbar,
     Text,
     TextInput,
-    useTheme
+  Menu,
+  useTheme
 } from "react-native-paper";
 
 import MomentsView from "@/components/MomentsView";
