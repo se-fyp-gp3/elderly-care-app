@@ -5,14 +5,40 @@ import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
-import { addAIResponse, createMoment, getLatestComments, getMoments, getVisibleCommentCount, likeMoment } from "@/lib/moments";
+import {
+  addAIResponse,
+  createMoment,
+  deleteMoment,
+  getLatestComments,
+  getMoments,
+  getVisibleCommentCount,
+  likeMoment,
+} from "@/lib/moments";
 import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, FlatList, Image, Keyboard, Modal, ScrollView, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
-import { ActivityIndicator, Button, FAB, Text, TextInput, useTheme } from "react-native-paper";
+import {
+  Alert,
+  FlatList,
+  Image,
+  Keyboard,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
+import {
+  ActivityIndicator,
+  Button,
+  FAB,
+  Text,
+  TextInput,
+  useTheme,
+} from "react-native-paper";
 
 const MAX_MEDIA = 4;
 
@@ -26,12 +52,16 @@ export default function MomentsView() {
   const [refreshing, setRefreshing] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
-  const [selectedMediaList, setSelectedMediaList] = useState<MomentMediaInput[]>([]);
+  const [selectedMediaList, setSelectedMediaList] = useState<
+    MomentMediaInput[]
+  >([]);
   const [posting, setPosting] = useState(false);
   const [currentUserName, setCurrentUserName] = useState("");
   const [commentMomentId, setCommentMomentId] = useState<string | null>(null);
   const [allowedIds, setAllowedIds] = useState<string[]>([]);
-  const [latestCommentsMap, setLatestCommentsMap] = useState<Record<string, MomentComment[]>>({});
+  const [latestCommentsMap, setLatestCommentsMap] = useState<
+    Record<string, MomentComment[]>
+  >({});
 
   // Clear moment unread badge when user views the Moments tab
   useEffect(() => {
@@ -42,27 +72,28 @@ export default function MomentsView() {
     if (!user) return;
     try {
       setLoading(true);
-      
+
       // 1. Get contacts based on role
       let contacts: any[] = [];
       if (preferences.role === "caregiver") {
         const profile = await getCaregiverByUserId(user.$id);
         if (profile) {
-            contacts = await getContactsForCaregiver(profile.$id);
-            setCurrentUserName(profile.name || user.name || "Anonymous");
+          contacts = await getContactsForCaregiver(profile.$id);
+          setCurrentUserName(profile.name || user.name || "Anonymous");
         }
       } else if (preferences.role === "elderly") {
         const profile = await getElderlyByUserId(user.$id);
         if (profile) {
-            contacts = await getContactsForElderly(profile.$id);
-            setCurrentUserName(profile.name || user.name || "Anonymous");
+          contacts = await getContactsForElderly(profile.$id);
+          setCurrentUserName(profile.name || user.name || "Anonymous");
         }
       }
 
-      // 2. Extract User IDs allowed to be seen (My friends + Me)
+      // 2. Extract User IDs allowed to be seen (My friends + Me + AI)
       const ids = [
-        user.$id, 
-        ...contacts.map((c) => c.userId).filter((id) => !!id)
+        user.$id,
+        "ai-assistant",
+        ...contacts.map((c) => c.userId).filter((id) => !!id),
       ];
       setAllowedIds(ids);
 
@@ -107,15 +138,16 @@ export default function MomentsView() {
         user?.$id || "anon",
         currentUserName || user?.name || "Anonymous",
         (preferences.role as "elderly" | "caregiver") || "caregiver",
-        selectedMediaList.length > 0 ? selectedMediaList : undefined
+        selectedMediaList.length > 0 ? selectedMediaList : undefined,
       );
       setMoments([newMoment, ...moments]);
       setNewPostContent("");
       setSelectedMediaList([]);
       setCreateModalVisible(false);
     } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to post moment";
-        Alert.alert(t('moments.postFailed'), message);
+      const message =
+        error instanceof Error ? error.message : "Failed to post moment";
+      Alert.alert(t("moments.postFailed"), message);
     } finally {
       setPosting(false);
     }
@@ -124,15 +156,27 @@ export default function MomentsView() {
   const handleLike = async (momentId: string) => {
     // Optimistic update handled in MomentCard or here?
     // MomentCard handles visual state. We just fire and forget API call for simplicity
-    const moment = moments.find(m => m.$id === momentId);
+    const moment = moments.find((m) => m.$id === momentId);
     if (moment && user) {
-        await likeMoment(momentId, user.$id, moment.likes || []);
+      await likeMoment(momentId, user.$id, moment.likes || []);
     }
   };
 
-  const handleAIRequest = async (momentId: string, content: string): Promise<MomentComment> => {
-     // This will return the AI comment to be displayed in the card
-     return await addAIResponse(momentId, content);
+  const handleAIRequest = async (
+    momentId: string,
+    content: string,
+    imageUrl?: string,
+  ): Promise<MomentComment> => {
+    const comment = await addAIResponse(momentId, content, imageUrl);
+    // Increment local comments_count
+    setMoments((prev) =>
+      prev.map((m) =>
+        m.$id === momentId
+          ? { ...m, comments_count: (m.comments_count || 0) + 1 }
+          : m,
+      ),
+    );
+    return comment;
   };
 
   const handleComment = (momentId: string) => {
@@ -145,8 +189,8 @@ export default function MomentsView() {
       prev.map((m) =>
         m.$id === commentMomentId
           ? { ...m, comments_count: (m.comments_count || 0) + 1 }
-          : m
-      )
+          : m,
+      ),
     );
   };
 
@@ -158,13 +202,19 @@ export default function MomentsView() {
 
   const pickMedia = async () => {
     if (selectedMediaList.length >= MAX_MEDIA) {
-      Alert.alert(t('moments.maxMediaReached'), t('moments.mediaCount', { count: MAX_MEDIA }));
+      Alert.alert(
+        t("moments.maxMediaReached"),
+        t("moments.mediaCount", { count: MAX_MEDIA }),
+      );
       return;
     }
 
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(t('common.permissionNeeded'), t('moments.photoLibraryPermission'));
+      Alert.alert(
+        t("common.permissionNeeded"),
+        t("moments.photoLibraryPermission"),
+      );
       return;
     }
 
@@ -182,22 +232,74 @@ export default function MomentsView() {
 
     if (result.canceled || !result.assets?.length) return;
 
-    const newItems: MomentMediaInput[] = result.assets.slice(0, remaining).map((asset) => ({
-      uri: asset.uri,
-      type: asset.type === "video" ? ("video" as const) : ("image" as const),
-      mimeType: asset.mimeType,
-      fileName: asset.fileName ?? undefined,
-      fileSize: asset.fileSize,
-      width: asset.width,
-      height: asset.height,
-      durationMs: asset.duration ?? undefined,
-    }));
+    const newItems: MomentMediaInput[] = result.assets
+      .slice(0, remaining)
+      .map((asset) => ({
+        uri: asset.uri,
+        type: asset.type === "video" ? ("video" as const) : ("image" as const),
+        mimeType: asset.mimeType,
+        fileName: asset.fileName ?? undefined,
+        fileSize: asset.fileSize,
+        width: asset.width,
+        height: asset.height,
+        durationMs: asset.duration ?? undefined,
+      }));
 
     setSelectedMediaList((prev) => [...prev, ...newItems].slice(0, MAX_MEDIA));
   };
 
   const removeMedia = (index: number) => {
     setSelectedMediaList((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission needed",
+        "Please allow camera access to take photos.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      quality: 0.9,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    setSelectedMediaList((prev) =>
+      [
+        ...prev,
+        {
+          uri: asset.uri,
+          type: "image",
+          mimeType: asset.mimeType,
+          fileName: asset.fileName ?? undefined,
+          fileSize: asset.fileSize,
+          width: asset.width,
+          height: asset.height,
+        },
+      ].slice(0, MAX_MEDIA),
+    );
+  };
+
+  const handleDeleteMoment = async (momentId: string) => {
+    const moment = moments.find((m) => m.$id === momentId);
+    if (!moment) return;
+    try {
+      await deleteMoment(
+        momentId,
+        moment.media_bucket_id,
+        moment.media_file_id,
+      );
+      setMoments((prev) => prev.filter((m) => m.$id !== momentId));
+    } catch (err) {
+      console.error("Error deleting moment:", err);
+      Alert.alert("Error", "Failed to delete the post.");
+    }
   };
 
   return (
@@ -218,6 +320,7 @@ export default function MomentsView() {
               onComment={handleComment}
               onAIRequest={handleAIRequest}
               latestComments={latestCommentsMap[item.$id]}
+              onDelete={handleDeleteMoment}
             />
           )}
           refreshing={refreshing}
@@ -225,7 +328,7 @@ export default function MomentsView() {
           contentContainerStyle={{ padding: 8, paddingBottom: 80 }}
           ListEmptyComponent={
             <View style={styles.center}>
-                <Text>{t('moments.noMomentsYet')}</Text>
+              <Text>{t("moments.noMomentsYet")}</Text>
             </View>
           }
         />
@@ -236,17 +339,21 @@ export default function MomentsView() {
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         color={theme.colors.onPrimary}
         onPress={() => setCreateModalVisible(true)}
-        label={t('moments.post')}
+        label={t("moments.post")}
       />
 
       <CommentSheet
         visible={!!commentMomentId}
         momentId={commentMomentId || ""}
-        momentAuthorId={moments.find((m) => m.$id === commentMomentId)?.author_id}
+        momentAuthorId={
+          moments.find((m) => m.$id === commentMomentId)?.author_id
+        }
         onClose={() => setCommentMomentId(null)}
         currentUserId={user?.$id || ""}
         currentUserName={currentUserName || user?.name || "Anonymous"}
-        currentUserRole={(preferences.role as "elderly" | "caregiver") || "caregiver"}
+        currentUserRole={
+          (preferences.role as "elderly" | "caregiver") || "caregiver"
+        }
         allowedAuthorIds={allowedIds}
         onCommentAdded={handleCommentAdded}
       />
@@ -258,70 +365,137 @@ export default function MomentsView() {
         onRequestClose={closeCreateModal}
       >
         <TouchableWithoutFeedback onPress={closeCreateModal}>
-            <View style={styles.modalOverlay}>
-                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                    <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
-                        <Text variant="titleLarge" style={{ marginBottom: 16 }}>{t('moments.createPost')}</Text>
-                        <TextInput
-                            mode="outlined"
-                            multiline
-                            numberOfLines={4}
-                            placeholder={t('moments.whatsOnYourMind')}
-                            value={newPostContent}
-                            onChangeText={setNewPostContent}
-                            style={{ marginBottom: 16 }}
-                        />
-                        <View style={styles.mediaRow}>
-                          <Button mode="outlined" icon="image-multiple" onPress={pickMedia} disabled={selectedMediaList.length >= MAX_MEDIA}>
-                            {selectedMediaList.length > 0
-                              ? t('moments.mediaCount', { count: `${selectedMediaList.length}/${MAX_MEDIA}` })
-                              : t('moments.addPhotoVideo')}
-                          </Button>
-                          {selectedMediaList.length > 0 && (
-                            <Button onPress={() => setSelectedMediaList([])} textColor={theme.colors.error}>
-                              {t('moments.removeMedia')}
-                            </Button>
-                          )}
-                        </View>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View
+                style={[
+                  styles.modalContent,
+                  { backgroundColor: theme.colors.surface },
+                ]}
+              >
+                <Text variant="titleLarge" style={{ marginBottom: 16 }}>
+                  {t("moments.createPost")}
+                </Text>
+                <TextInput
+                  mode="outlined"
+                  multiline
+                  numberOfLines={4}
+                  placeholder={t("moments.whatsOnYourMind")}
+                  value={newPostContent}
+                  onChangeText={setNewPostContent}
+                  style={{ marginBottom: 16 }}
+                />
+                <View style={styles.mediaRow}>
+                  <Button
+                    mode="outlined"
+                    icon="image-multiple"
+                    onPress={pickMedia}
+                    disabled={selectedMediaList.length >= MAX_MEDIA}
+                  >
+                    {selectedMediaList.length > 0
+                      ? t("moments.mediaCount", {
+                          count: `${selectedMediaList.length}/${MAX_MEDIA}`,
+                        })
+                      : t("moments.addPhotoVideo")}
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    icon="camera"
+                    onPress={takePhoto}
+                    compact
+                    style={{ marginLeft: 8 }}
+                  >
+                    {t("moments.camera")}
+                  </Button>
+                  {selectedMediaList.length > 0 && (
+                    <Button
+                      onPress={() => setSelectedMediaList([])}
+                      textColor={theme.colors.error}
+                    >
+                      {t("moments.removeMedia")}
+                    </Button>
+                  )}
+                </View>
 
-                        {selectedMediaList.length > 0 && (
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.previewScroll}>
-                            {selectedMediaList.map((media, index) => (
-                              <View key={index} style={styles.previewThumbWrap}>
-                                {media.type === "image" ? (
-                                  <Image source={{ uri: media.uri }} style={styles.previewThumb} />
-                                ) : (
-                                  <View style={[styles.previewThumb, styles.videoThumbPlaceholder, { borderColor: theme.colors.outline }]}>
-                                    <MaterialCommunityIcons name="video" size={24} color={theme.colors.primary} />
-                                  </View>
-                                )}
-                                <TouchableOpacity style={styles.removeBtn} onPress={() => removeMedia(index)}>
-                                  <MaterialCommunityIcons name="close-circle" size={20} color={theme.colors.error} />
-                                </TouchableOpacity>
-                              </View>
-                            ))}
-                          </ScrollView>
+                {selectedMediaList.length > 0 && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.previewScroll}
+                  >
+                    {selectedMediaList.map((media, index) => (
+                      <View key={index} style={styles.previewThumbWrap}>
+                        {media.type === "image" ? (
+                          <Image
+                            source={{ uri: media.uri }}
+                            style={styles.previewThumb}
+                          />
+                        ) : (
+                          <View
+                            style={[
+                              styles.previewThumb,
+                              styles.videoThumbPlaceholder,
+                              { borderColor: theme.colors.outline },
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              name="video"
+                              size={24}
+                              color={theme.colors.primary}
+                            />
+                          </View>
                         )}
+                        <TouchableOpacity
+                          style={styles.removeBtn}
+                          onPress={() => removeMedia(index)}
+                        >
+                          <MaterialCommunityIcons
+                            name="close-circle"
+                            size={20}
+                            color={theme.colors.error}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
 
-                        <View style={styles.modalActions}>
-                            <Button onPress={closeCreateModal} style={{ marginRight: 8 }}>{t('common.cancel')}</Button>
-                            <Button mode="contained" onPress={handleCreatePost} loading={posting} disabled={posting || (!newPostContent.trim() && selectedMediaList.length === 0)}>
-                                {t('moments.post')}
-                            </Button>
-                        </View>
-                    </View>
-                </TouchableWithoutFeedback>
-            </View>
+                <View style={styles.modalActions}>
+                  <Button onPress={closeCreateModal} style={{ marginRight: 8 }}>
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    mode="contained"
+                    onPress={handleCreatePost}
+                    loading={posting}
+                    disabled={
+                      posting ||
+                      (!newPostContent.trim() && selectedMediaList.length === 0)
+                    }
+                  >
+                    {t("moments.post")}
+                  </Button>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
         </TouchableWithoutFeedback>
       </Modal>
     </View>
   );
 }
 
-function getSupportedPickerMediaTypes(): ImagePicker.MediaType | ImagePicker.MediaType[] {
-  const modernMediaType = (ImagePicker as unknown as {
-    MediaType?: { images?: ImagePicker.MediaType; videos?: ImagePicker.MediaType };
-  }).MediaType;
+function getSupportedPickerMediaTypes():
+  | ImagePicker.MediaType
+  | ImagePicker.MediaType[] {
+  const modernMediaType = (
+    ImagePicker as unknown as {
+      MediaType?: {
+        images?: ImagePicker.MediaType;
+        videos?: ImagePicker.MediaType;
+      };
+    }
+  ).MediaType;
   if (modernMediaType?.images && modernMediaType?.videos) {
     return [modernMediaType.images, modernMediaType.videos];
   }

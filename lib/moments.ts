@@ -1,20 +1,28 @@
 import { generateAIResponse } from "@/lib/ai";
 import {
-    clientReactNative,
-    DATABASE_ID,
-    MOMENTS_COMMENTS_TABLE_ID,
-    MOMENTS_MEDIA_BUCKET_ID,
-    MOMENTS_TABLE_ID,
-    storage,
+  clientReactNative,
+  DATABASE_ID,
+  MOMENTS_COMMENTS_TABLE_ID,
+  MOMENTS_MEDIA_BUCKET_ID,
+  MOMENTS_TABLE_ID,
+  storage,
 } from "@/lib/appwrite";
-import { MediaItem, Moment, MomentComment, MomentMediaInput } from "@/types/moments";
+import {
+  MediaItem,
+  Moment,
+  MomentComment,
+  MomentMediaInput,
+} from "@/types/moments";
 import * as FileSystem from "expo-file-system";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { Databases, ID, Permission, Query, Role } from "react-native-appwrite";
 
 const databases = new Databases(clientReactNative);
 
-export async function getMoments(page = 1, allowedAuthorIds?: string[]): Promise<Moment[]> {
+export async function getMoments(
+  page = 1,
+  allowedAuthorIds?: string[],
+): Promise<Moment[]> {
   const queries = [
     Query.orderDesc("$createdAt"),
     Query.limit(20),
@@ -28,7 +36,7 @@ export async function getMoments(page = 1, allowedAuthorIds?: string[]): Promise
   const response = await databases.listDocuments(
     DATABASE_ID,
     MOMENTS_TABLE_ID,
-    queries
+    queries,
   );
 
   const documents = response.documents as unknown as Moment[];
@@ -49,7 +57,7 @@ export async function createMoment(
   userId: string,
   userName: string,
   userRole: "elderly" | "caregiver",
-  mediaList?: MomentMediaInput[] | null
+  mediaList?: MomentMediaInput[] | null,
 ): Promise<Moment> {
   let mediaFields: Partial<Moment> = {};
   let mediaItemsJson: string | undefined;
@@ -97,13 +105,16 @@ export async function createMoment(
       ai_generated: false,
       ...mediaFields,
       ...(mediaItemsJson ? { media_items: mediaItemsJson } : {}),
-    }
+    },
   );
 
   const created = response as unknown as Moment;
   created.parsedMediaItems = parseMomentMedia(created);
   if (created.media_bucket_id && created.media_file_id) {
-    created.media_url = buildMediaUrl(created.media_bucket_id, created.media_file_id);
+    created.media_url = buildMediaUrl(
+      created.media_bucket_id,
+      created.media_file_id,
+    );
   }
   return created;
 }
@@ -113,10 +124,18 @@ interface UploadResult {
   item: MediaItem;
 }
 
-async function uploadMomentMedia(media: MomentMediaInput): Promise<UploadResult> {
-  const guessedExtension = getFileExtension(media.fileName, media.mimeType, media.type);
-  const cleanFileName = media.fileName?.trim() || `${media.type}_${Date.now()}.${guessedExtension}`;
-  const mimeType = media.mimeType || (media.type === "video" ? "video/mp4" : "image/jpeg");
+async function uploadMomentMedia(
+  media: MomentMediaInput,
+): Promise<UploadResult> {
+  const guessedExtension = getFileExtension(
+    media.fileName,
+    media.mimeType,
+    media.type,
+  );
+  const cleanFileName =
+    media.fileName?.trim() || `${media.type}_${Date.now()}.${guessedExtension}`;
+  const mimeType =
+    media.mimeType || (media.type === "video" ? "video/mp4" : "image/jpeg");
   const fileSize = await resolveFileSize(media);
 
   let uploadedFile;
@@ -135,7 +154,7 @@ async function uploadMomentMedia(media: MomentMediaInput): Promise<UploadResult>
   } catch (error: any) {
     const reason = extractErrorMessage(error);
     throw new Error(
-      `Media upload failed: ${reason}. Please ensure bucket "${MOMENTS_MEDIA_BUCKET_ID}" exists and allows uploads.`
+      `Media upload failed: ${reason}. Please ensure bucket "${MOMENTS_MEDIA_BUCKET_ID}" exists and allows uploads.`,
     );
   }
 
@@ -143,10 +162,15 @@ async function uploadMomentMedia(media: MomentMediaInput): Promise<UploadResult>
   let thumbnailFileId: string | undefined;
   if (media.type === "video") {
     try {
-      const thumb = await VideoThumbnails.getThumbnailAsync(media.uri, { time: 500 });
+      const thumb = await VideoThumbnails.getThumbnailAsync(media.uri, {
+        time: 500,
+      });
       if (thumb?.uri) {
         const thumbInfo = await FileSystem.getInfoAsync(thumb.uri);
-        const thumbSize = (thumbInfo.exists && typeof thumbInfo.size === "number") ? thumbInfo.size : 1;
+        const thumbSize =
+          thumbInfo.exists && typeof thumbInfo.size === "number"
+            ? thumbInfo.size
+            : 1;
         const thumbFile = await storage.createFile({
           bucketId: MOMENTS_MEDIA_BUCKET_ID,
           fileId: ID.unique(),
@@ -175,7 +199,9 @@ async function uploadMomentMedia(media: MomentMediaInput): Promise<UploadResult>
     duration_ms: media.durationMs,
     thumbnail_file_id: thumbnailFileId,
     url: buildMediaUrl(MOMENTS_MEDIA_BUCKET_ID, uploadedFile.$id),
-    thumbnail_url: thumbnailFileId ? buildMediaUrl(MOMENTS_MEDIA_BUCKET_ID, thumbnailFileId) : undefined,
+    thumbnail_url: thumbnailFileId
+      ? buildMediaUrl(MOMENTS_MEDIA_BUCKET_ID, thumbnailFileId)
+      : undefined,
   };
 
   const legacyFields: Partial<Moment> = {
@@ -199,7 +225,11 @@ async function resolveFileSize(media: MomentMediaInput): Promise<number> {
 
   try {
     const fileInfo = await FileSystem.getInfoAsync(media.uri);
-    if (fileInfo.exists && typeof fileInfo.size === "number" && fileInfo.size > 0) {
+    if (
+      fileInfo.exists &&
+      typeof fileInfo.size === "number" &&
+      fileInfo.size > 0
+    ) {
       return fileInfo.size;
     }
   } catch {
@@ -237,7 +267,11 @@ function parseMomentMedia(doc: Moment): MediaItem[] {
       return items.map((item) => ({
         ...item,
         url: item.url || buildMediaUrl(item.bucket_id, item.file_id),
-        thumbnail_url: item.thumbnail_url || (item.thumbnail_file_id ? buildMediaUrl(item.bucket_id, item.thumbnail_file_id) : undefined),
+        thumbnail_url:
+          item.thumbnail_url ||
+          (item.thumbnail_file_id
+            ? buildMediaUrl(item.bucket_id, item.thumbnail_file_id)
+            : undefined),
       }));
     } catch {
       // Fall through to legacy
@@ -249,18 +283,20 @@ function parseMomentMedia(doc: Moment): MediaItem[] {
     const thumbnailUrl = doc.media_thumbnail_file_id
       ? buildMediaUrl(doc.media_bucket_id, doc.media_thumbnail_file_id)
       : undefined;
-    return [{
-      file_id: doc.media_file_id,
-      bucket_id: doc.media_bucket_id,
-      type: doc.media_type || "image",
-      mime_type: doc.media_mime_type || "image/jpeg",
-      width: doc.media_width,
-      height: doc.media_height,
-      duration_ms: doc.media_duration_ms,
-      thumbnail_file_id: doc.media_thumbnail_file_id,
-      url,
-      thumbnail_url: thumbnailUrl,
-    }];
+    return [
+      {
+        file_id: doc.media_file_id,
+        bucket_id: doc.media_bucket_id,
+        type: doc.media_type || "image",
+        mime_type: doc.media_mime_type || "image/jpeg",
+        width: doc.media_width,
+        height: doc.media_height,
+        duration_ms: doc.media_duration_ms,
+        thumbnail_file_id: doc.media_thumbnail_file_id,
+        url,
+        thumbnail_url: thumbnailUrl,
+      },
+    ];
   }
   return [];
 }
@@ -270,7 +306,7 @@ export { parseMomentMedia };
 function getFileExtension(
   fileName?: string,
   mimeType?: string,
-  mediaType?: "image" | "video"
+  mediaType?: "image" | "video",
 ): string {
   if (fileName && fileName.includes(".")) {
     return fileName.split(".").pop() || "bin";
@@ -281,25 +317,24 @@ function getFileExtension(
   return mediaType === "video" ? "mp4" : "jpg";
 }
 
-export async function likeMoment(momentId: string, userId: string, currentLikes: string[]): Promise<string[]> {
+export async function likeMoment(
+  momentId: string,
+  userId: string,
+  currentLikes: string[],
+): Promise<string[]> {
   const isLiked = currentLikes.includes(userId);
   let newLikes = [...currentLikes];
-  
+
   if (isLiked) {
-    newLikes = newLikes.filter(id => id !== userId);
+    newLikes = newLikes.filter((id) => id !== userId);
   } else {
     newLikes.push(userId);
   }
 
   try {
-    await databases.updateDocument(
-      DATABASE_ID,
-      MOMENTS_TABLE_ID,
-      momentId,
-      {
-        likes: newLikes,
-      }
-    );
+    await databases.updateDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId, {
+      likes: newLikes,
+    });
     return newLikes;
   } catch (error) {
     console.error("Error liking moment:", error);
@@ -307,7 +342,10 @@ export async function likeMoment(momentId: string, userId: string, currentLikes:
   }
 }
 
-export async function getComments(momentId: string, allowedAuthorIds?: string[]): Promise<MomentComment[]> {
+export async function getComments(
+  momentId: string,
+  allowedAuthorIds?: string[],
+): Promise<MomentComment[]> {
   try {
     const queries = [
       Query.equal("moment_id", momentId),
@@ -322,7 +360,7 @@ export async function getComments(momentId: string, allowedAuthorIds?: string[])
     const response = await databases.listDocuments(
       DATABASE_ID,
       MOMENTS_COMMENTS_TABLE_ID,
-      queries
+      queries,
     );
     return response.documents as unknown as MomentComment[];
   } catch (error) {
@@ -333,20 +371,17 @@ export async function getComments(momentId: string, allowedAuthorIds?: string[])
 
 export async function getVisibleCommentCount(
   momentId: string,
-  allowedAuthorIds?: string[]
+  allowedAuthorIds?: string[],
 ): Promise<number> {
   try {
-    const queries = [
-      Query.equal("moment_id", momentId),
-      Query.limit(1),
-    ];
+    const queries = [Query.equal("moment_id", momentId), Query.limit(1)];
     if (allowedAuthorIds && allowedAuthorIds.length > 0) {
       queries.push(Query.equal("author_id", allowedAuthorIds));
     }
     const response = await databases.listDocuments(
       DATABASE_ID,
       MOMENTS_COMMENTS_TABLE_ID,
-      queries
+      queries,
     );
     return response.total;
   } catch {
@@ -365,7 +400,7 @@ export async function addComment(
     replyToUserId?: string;
     replyToUserName?: string;
     momentAuthorId?: string;
-  }
+  },
 ): Promise<MomentComment> {
   const data: Record<string, any> = {
     moment_id: momentId,
@@ -375,21 +410,27 @@ export async function addComment(
     author_role: userRole,
     likes: [],
   };
-  if (options?.replyToCommentId) data.reply_to_comment_id = options.replyToCommentId;
+  if (options?.replyToCommentId)
+    data.reply_to_comment_id = options.replyToCommentId;
   if (options?.replyToUserId) data.reply_to_user_id = options.replyToUserId;
-  if (options?.replyToUserName) data.reply_to_user_name = options.replyToUserName;
+  if (options?.replyToUserName)
+    data.reply_to_user_name = options.replyToUserName;
   if (options?.momentAuthorId) data.moment_author_id = options.momentAuthorId;
 
   const comment = await databases.createDocument(
     DATABASE_ID,
     MOMENTS_COMMENTS_TABLE_ID,
     ID.unique(),
-    data
+    data,
   );
 
   // Increment comments_count on the moment
   try {
-    const moment = await databases.getDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId);
+    const moment = await databases.getDocument(
+      DATABASE_ID,
+      MOMENTS_TABLE_ID,
+      momentId,
+    );
     await databases.updateDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId, {
       comments_count: (moment.comments_count || 0) + 1,
     });
@@ -403,11 +444,22 @@ export async function addComment(
 /**
  * Toggle like on a comment. Returns the new likes array.
  */
-export async function likeComment(commentId: string, userId: string, currentLikes: string[]): Promise<string[]> {
+export async function likeComment(
+  commentId: string,
+  userId: string,
+  currentLikes: string[],
+): Promise<string[]> {
   const isLiked = currentLikes.includes(userId);
-  const newLikes = isLiked ? currentLikes.filter(id => id !== userId) : [...currentLikes, userId];
+  const newLikes = isLiked
+    ? currentLikes.filter((id) => id !== userId)
+    : [...currentLikes, userId];
   try {
-    await databases.updateDocument(DATABASE_ID, MOMENTS_COMMENTS_TABLE_ID, commentId, { likes: newLikes });
+    await databases.updateDocument(
+      DATABASE_ID,
+      MOMENTS_COMMENTS_TABLE_ID,
+      commentId,
+      { likes: newLikes },
+    );
   } catch (error) {
     console.error("Error liking comment:", error);
   }
@@ -417,7 +469,11 @@ export async function likeComment(commentId: string, userId: string, currentLike
 /**
  * Get the latest N comments for a moment (for inline card preview).
  */
-export async function getLatestComments(momentId: string, limit = 3, allowedAuthorIds?: string[]): Promise<MomentComment[]> {
+export async function getLatestComments(
+  momentId: string,
+  limit = 3,
+  allowedAuthorIds?: string[],
+): Promise<MomentComment[]> {
   try {
     const queries = [
       Query.equal("moment_id", momentId),
@@ -427,7 +483,11 @@ export async function getLatestComments(momentId: string, limit = 3, allowedAuth
     if (allowedAuthorIds && allowedAuthorIds.length > 0) {
       queries.push(Query.equal("author_id", allowedAuthorIds));
     }
-    const response = await databases.listDocuments(DATABASE_ID, MOMENTS_COMMENTS_TABLE_ID, queries);
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      MOMENTS_COMMENTS_TABLE_ID,
+      queries,
+    );
     return response.documents as unknown as MomentComment[];
   } catch {
     return [];
@@ -440,53 +500,104 @@ export async function getLatestComments(momentId: string, limit = 3, allowedAuth
  */
 export async function getUserMomentIds(userId: string): Promise<string[]> {
   try {
-    const response = await databases.listDocuments(DATABASE_ID, MOMENTS_TABLE_ID, [
-      Query.equal("author_id", userId),
-      Query.select(["$id"]),
-      Query.limit(500),
-    ]);
-    return response.documents.map(d => d.$id);
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      MOMENTS_TABLE_ID,
+      [
+        Query.equal("author_id", userId),
+        Query.select(["$id"]),
+        Query.limit(500),
+      ],
+    );
+    return response.documents.map((d) => d.$id);
   } catch {
     return [];
   }
 }
 
-export async function addAIResponse(momentId: string, content: string): Promise<MomentComment> {
-  const aiContent = await generateAIResponse(content);
-  
+export async function addAIResponse(
+  momentId: string,
+  content: string,
+  imageUrl?: string,
+): Promise<MomentComment> {
+  const aiContent = await generateAIResponse(content, imageUrl);
+
   try {
-     // Create comment in comments collection if exists
-     /*
-     await databases.createDocument(
-        DATABASE_ID,
-        MOMENTS_COMMENTS_TABLE_ID,
-        ID.unique(),
-        {
-            moment_id: momentId,
-            content: aiContent,
-            author_id: "ai-assistant",
-            author_name: "AI Assistant",
-            author_role: "ai"
-        }
-     );
-     */
-     // For simplicity in this demo, we'll just return the comment object
-     return {
-        $id: ID.unique(),
-        $createdAt: new Date().toISOString(),
+    const doc = await databases.createDocument(
+      DATABASE_ID,
+      MOMENTS_COMMENTS_TABLE_ID,
+      ID.unique(),
+      {
+        moment_id: momentId,
         content: aiContent,
         author_id: "ai-assistant",
         author_name: "AI Assistant",
         author_role: "ai",
-        moment_id: momentId,
-        $collectionId: MOMENTS_COMMENTS_TABLE_ID,
-        $databaseId: DATABASE_ID,
-        $permissions: [],
-        $updatedAt: new Date().toISOString(),
-        $sequence: 0,
-     };
+      },
+    );
+
+    // Increment comments_count on the moment
+    try {
+      const moment = await databases.getDocument(
+        DATABASE_ID,
+        MOMENTS_TABLE_ID,
+        momentId,
+      );
+      await databases.updateDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId, {
+        comments_count: (moment.comments_count || 0) + 1,
+      });
+    } catch {
+      // Non-critical
+    }
+
+    return doc as unknown as MomentComment;
   } catch (error) {
-      console.error("Error generating AI response:", error);
-      throw error;
+    console.error("Error generating AI response:", error);
+    throw error;
+  }
+}
+
+export async function deleteMoment(
+  momentId: string,
+  mediaBucketId?: string | null,
+  mediaFileId?: string | null,
+): Promise<void> {
+  // Delete associated media file if exists
+  if (mediaBucketId && mediaFileId) {
+    try {
+      await storage.deleteFile(mediaBucketId, mediaFileId);
+    } catch (err) {
+      console.warn("Failed to delete media file:", err);
+    }
+  }
+
+  // Delete the moment document
+  await databases.deleteDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId);
+}
+
+export async function deleteComment(
+  commentId: string,
+  momentId: string,
+): Promise<void> {
+  await databases.deleteDocument(
+    DATABASE_ID,
+    MOMENTS_COMMENTS_TABLE_ID,
+    commentId,
+  );
+
+  // Decrement comments_count on the moment
+  try {
+    const moment = await databases.getDocument(
+      DATABASE_ID,
+      MOMENTS_TABLE_ID,
+      momentId,
+    );
+    const currentCount =
+      (moment as unknown as { comments_count?: number }).comments_count || 0;
+    await databases.updateDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId, {
+      comments_count: Math.max(0, currentCount - 1),
+    });
+  } catch (err) {
+    console.warn("Failed to decrement comments_count:", err);
   }
 }

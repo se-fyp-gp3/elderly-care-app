@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "elderly-care-app",
+    "name": "Elderly Care App",
     "slug": "elderly-care-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,9 +17,7 @@
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,
-        "com.apple.developer.healthkit.access": [
-          "health-records"
-        ]
+        "com.apple.developer.healthkit.access": ["health-records"]
       }
     },
     "android": {
@@ -34,7 +32,18 @@
       "package": "com.anonymous.elderlycareapp",
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.health.READ_STEPS"
+        "android.permission.health.READ_STEPS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.VIBRATE",
+        "android.permission.HIGH_SAMPLING_RATE_SENSORS",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
@@ -62,10 +71,9 @@
         }
       ],
       "expo-web-browser",
-      "react-native-localize",
       "@react-native-community/datetimepicker",
       "react-native-health-connect",
-      "react-native-health",
+      "./plugins/withHealthKit",
       [
         "expo-build-properties",
         {
@@ -77,11 +85,27 @@
       "./plugins/withHealthConnect",
       "expo-audio",
       "expo-secure-store",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "expo-sensors",
+      "expo-task-manager",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3d422aed-12f0-497f-99bb-3cba235c693f"
+      }
     }
   }
 }

@@ -1,10 +1,10 @@
 import { DirectMessage } from "@/types/messaging";
 import { ID, Query } from "react-native-appwrite";
 import {
-    clientReactNative,
-    DATABASE_ID,
-    DIRECT_MESSAGES_TABLE_ID,
-    tablesDB,
+  DATABASE_ID,
+  DIRECT_MESSAGES_TABLE_ID,
+  safeSubscribe,
+  tablesDB,
 } from "./appwrite";
 import { updatePresence } from "./presence";
 
@@ -35,7 +35,7 @@ export async function sendDirectMessage(input: {
   quotedBody?: string;
 }): Promise<DirectMessage> {
   const now = new Date().toISOString();
-  const data: Record<string, unknown> = {
+  const data = {
     conversation_id: input.conversationId,
     sender_id: input.senderId,
     sender_name: input.senderName,
@@ -45,12 +45,12 @@ export async function sendDirectMessage(input: {
     created_at: now,
     is_read: false,
     message_type: input.messageType ?? "text",
+    ...(input.quotedMessageId && {
+      quoted_message_id: input.quotedMessageId,
+      quoted_sender_name: input.quotedSenderName ?? "",
+      quoted_body: input.quotedBody ?? "",
+    }),
   };
-  if (input.quotedMessageId) {
-    data.quoted_message_id = input.quotedMessageId;
-    data.quoted_sender_name = input.quotedSenderName ?? "";
-    data.quoted_body = input.quotedBody ?? "";
-  }
   const doc = await tablesDB.createRow<DirectMessage>({
     databaseId: DATABASE_ID,
     tableId: DIRECT_MESSAGES_TABLE_ID,
@@ -180,7 +180,7 @@ export function subscribeToConversation(
 ): () => void {
   try {
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+    const unsubscribe = safeSubscribe(channel, (response) => {
       const payload = response.payload as unknown as DirectMessage;
       if (payload?.conversation_id === conversationId) {
         onMessage(payload);
@@ -233,4 +233,31 @@ export async function getUnreadCountPerConversation(
     console.error("Error getting unread count per conversation:", error);
   }
   return result;
+}
+
+/**
+ * Subscribe to ALL incoming messages for a specific user (by receiver_id).
+ * Used for global push notification triggering.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToUserMessages(
+  myProfileId: string,
+  onIncomingMessage: (message: DirectMessage) => void,
+): () => void {
+  try {
+    const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
+    const unsubscribe = safeSubscribe(channel, (response) => {
+      const payload = response.payload as unknown as DirectMessage;
+      if (
+        payload?.receiver_id === myProfileId &&
+        payload?.sender_id !== myProfileId
+      ) {
+        onIncomingMessage(payload);
+      }
+    });
+    return unsubscribe;
+  } catch (error) {
+    console.error("Error subscribing to user messages:", error);
+    return () => {};
+  }
 }

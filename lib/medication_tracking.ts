@@ -474,6 +474,7 @@ export async function fetchFinishedMedicationReminders(
       queries: [
         Query.equal("elderly", profile.$id),
         Query.equal("is_finished", true),
+        Query.equal("active", true),
         Query.orderDesc("end_date"),
         Query.limit(50),
       ],
@@ -560,6 +561,7 @@ export async function fetchFinishedMedicationReminders(
 
 export async function getFormattedTodayMedicationSummary(
   userId: string,
+  language: "yue" | "zh" | "en" = "yue",
 ): Promise<string> {
   const now = new Date();
   const hkOffset = 8 * 60 * 60 * 1000;
@@ -598,6 +600,20 @@ export async function getFormattedTodayMedicationSummary(
 
       if (r.start_date && new Date(scheduledAt) < new Date(r.start_date)) {
         return;
+      }
+
+      // Hide if scheduled_at is beyond duration_days
+      if (r.start_date && r.duration_days) {
+        const startDateMs = new Date(r.start_date).getTime();
+        const startHkDate = new Date(startDateMs + hkOffset).toISOString().slice(0, 10);
+        const firstCandBase = new Date(startHkDate);
+        firstCandBase.setUTCHours(hours, minutes, 0, 0);
+        const firstCandUtcMs = firstCandBase.getTime() - hkOffset;
+        const startDelay = firstCandUtcMs <= startDateMs ? 1 : 0;
+        const lastValidUtcMs = firstCandUtcMs + (startDelay + r.duration_days - 1) * 86400000;
+        if (scheduledDate.getTime() > lastValidUtcMs) {
+          return;
+        }
       }
 
       const log = todayLogs.find((l) => {
@@ -641,21 +657,106 @@ export async function getFormattedTodayMedicationSummary(
   todoList.sort((a, b) => a.time.localeCompare(b.time));
 
   if (todoList.length === 0) {
+    if (language === "yue") return "你今日冇藥要食。";
+    if (language === "zh") return "你今天没有药要吃。";
     return "You have no medications scheduled for today.";
   }
+
+  const statusLabel = (s: string) => {
+    if (language === "yue") {
+      return s === "taken" ? "已食" : s === "missing" ? "漏咗" : "未食";
+    }
+    if (language === "zh") {
+      return s === "taken" ? "已服" : s === "missing" ? "漏服" : "待服";
+    }
+    return s === "taken" ? "Taken" : s === "missing" ? "Missed" : "Pending";
+  };
 
   const items = todoList.map((item) => {
     const time = item.time;
     const name = item.medicationName;
     const dosage = item.dosage;
-    const status =
-      item.status === "taken"
-        ? "✅ Taken"
-        : item.status === "missing"
-          ? "❌ Missed"
-          : "⏳ Pending";
-    return `• ${time} - ${name} (${dosage}) : ${status}`;
+    const status = statusLabel(item.status);
+    if (language === "yue") {
+      return `${time} ${name}（${dosage}）— ${status}`;
+    }
+    if (language === "zh") {
+      return `${time} ${name}（${dosage}）— ${status}`;
+    }
+    return `${time} - ${name} (${dosage}): ${status}`;
   });
 
+  if (language === "yue") {
+    const pendingCount = todoList.filter(i => i.status === "pending").length;
+    const takenCount = todoList.filter(i => i.status === "taken").length;
+    let intro = `你今日有${todoList.length}次藥要食`;
+    if (takenCount > 0 && pendingCount > 0) {
+      intro += `，已經食咗${takenCount}次，仲有${pendingCount}次未食`;
+    } else if (takenCount === todoList.length) {
+      intro += `，全部都食晒喇，做得好！`;
+    }
+    return `${intro}：\n${items.join("\n")}`;
+  }
+  if (language === "zh") {
+    const pendingCount = todoList.filter(i => i.status === "pending").length;
+    const takenCount = todoList.filter(i => i.status === "taken").length;
+    let intro = `你今天有${todoList.length}次药要吃`;
+    if (takenCount > 0 && pendingCount > 0) {
+      intro += `，已经吃了${takenCount}次，还有${pendingCount}次没吃`;
+    } else if (takenCount === todoList.length) {
+      intro += `，全部都吃完了，做得好！`;
+    }
+    return `${intro}：\n${items.join("\n")}`;
+  }
+
   return `Here is your medication schedule for today:\n${items.join("\n")}`;
+}
+
+/**
+ * Fetch medication reminders that the elderly has cancelled (active=false)
+ * but not yet confirmed by the caregiver (is_finished=false).
+ */
+export async function fetchPendingCancelReminders(
+  elderlyIds: string[],
+): Promise<ElderlyMedicationReminder[]> {
+  if (!ELDERLY_MEDICATION_REMINDER_TABLE_ID || elderlyIds.length === 0)
+    return [];
+
+  try {
+    const response = await tablesDB.listRows<ElderlyMedicationReminder>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+      queries: [
+        Query.equal("elderly", elderlyIds),
+        Query.equal("active", false),
+        Query.equal("is_finished", false),
+        Query.orderDesc("$updatedAt"),
+        Query.limit(100),
+      ],
+    });
+    return response.rows;
+  } catch (error) {
+    console.error("Error fetching pending cancel reminders:", error);
+    return [];
+  }
+}
+
+/**
+ * Caregiver confirms that a cancelled medication reminder is finished.
+ * Sets is_finished=true and end_date=now.
+ */
+export async function confirmCancelMedication(
+  reminderId: string,
+): Promise<void> {
+  if (!ELDERLY_MEDICATION_REMINDER_TABLE_ID) return;
+
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+    rowId: reminderId,
+    data: {
+      is_finished: true,
+      end_date: new Date().toISOString(),
+    },
+  });
 }

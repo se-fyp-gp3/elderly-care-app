@@ -1,50 +1,62 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-    createChatSession,
-    deleteChatSession,
-    listChatSessionsForUser,
-    updateChatSession,
+  createChatSession,
+  deleteChatSession,
+  listChatSessionsForUser,
+  updateChatSession,
 } from "@/lib/chat";
 import {
-    buildScheduleSummary,
-    fetchElderlySchedulesForUser,
+  buildScheduleSummary,
+  fetchElderlySchedulesForUser,
 } from "@/lib/elderly";
 import { getFormattedTodayMedicationSummary } from "@/lib/medication_tracking";
 import { synthesizePersonalVoice } from "@/lib/personal-voice";
+import {
+  formatSearchResultsForContext,
+  searchWeb,
+  shouldSearch,
+} from "@/lib/search";
 import type { ChatSession as AppwriteChatSession } from "@/types/appwrite";
 import {
-    createAudioPlayer,
-    setAudioModeAsync,
-    type AudioPlayer,
+  createAudioPlayer,
+  setAudioModeAsync,
+  type AudioPlayer,
 } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    FlatList,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Card,
-    Chip,
-    IconButton,
-    Menu,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  Card,
+  Chip,
+  IconButton,
+  Menu,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 interface Message {
@@ -88,6 +100,8 @@ interface AIAPIResponse {
 
 export default function ElderlyChat() {
   const theme = useTheme();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const { user, preferences, updatePreferences } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
@@ -99,6 +113,7 @@ export default function ElderlyChat() {
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [chatHistory, setChatHistory] = useState<AppwriteChatSession[]>([]);
   const [isSuggestionsExpanded, setIsSuggestionsExpanded] = useState(false);
+  const [searchEnabled, setSearchEnabled] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
   const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
@@ -148,9 +163,13 @@ export default function ElderlyChat() {
           audioSourceUri = synthesized.audioUrl;
         } else if (synthesized.audioBase64) {
           const tempUri = `${FileSystem.cacheDirectory}ai-voice-${Date.now()}.mp3`;
-          await FileSystem.writeAsStringAsync(tempUri, synthesized.audioBase64, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
+          await FileSystem.writeAsStringAsync(
+            tempUri,
+            synthesized.audioBase64,
+            {
+              encoding: FileSystem.EncodingType.Base64,
+            },
+          );
           audioSourceUri = tempUri;
         }
 
@@ -214,8 +233,11 @@ export default function ElderlyChat() {
     { key: "english", label: "English" },
   ] as const;
 
-  const voiceReplyLang =
-    (typeof preferences.voiceReplyLang === "string" ? preferences.voiceReplyLang : "cantonese") as string;
+  const voiceReplyLang = (
+    typeof preferences.voiceReplyLang === "string"
+      ? preferences.voiceReplyLang
+      : "cantonese"
+  ) as string;
 
   const currentLangLabel =
     LANG_OPTIONS.find((o) => o.key === voiceReplyLang)?.label ?? "粵語";
@@ -281,10 +303,8 @@ export default function ElderlyChat() {
   }, [loadHistory]);
 
   const DASHSCOPE_API_KEY = process.env.EXPO_PUBLIC_DASHSCOPE_API_KEY?.trim();
-  const DASHSCOPE_API_URL =
-    process.env.EXPO_PUBLIC_DASHSCOPE_API_URL?.trim();
-  const DASHSCOPE_TEXT_MODEL =
-    process.env.EXPO_PUBLIC_DASHSCOPE_MODEL?.trim();
+  const DASHSCOPE_API_URL = process.env.EXPO_PUBLIC_DASHSCOPE_API_URL?.trim();
+  const DASHSCOPE_TEXT_MODEL = process.env.EXPO_PUBLIC_DASHSCOPE_MODEL?.trim();
   const DASHSCOPE_IMAGE_MODEL =
     process.env.EXPO_PUBLIC_DASHSCOPE_IMAGE_MODEL?.trim();
   const REQUEST_TIMEOUT_MS = 90000;
@@ -310,10 +330,10 @@ export default function ElderlyChat() {
 
   const quickSuggestions = useMemo(
     () => [
-      t('chat.questionMedicine'),
-      t('chat.questionSchedule'),
-      t('chat.questionUnwell'),
-      t('chat.questionPhotoMedId'),
+      t("chat.questionMedicine"),
+      t("chat.questionSchedule"),
+      t("chat.questionUnwell"),
+      t("chat.questionPhotoMedId"),
     ],
     [t],
   );
@@ -327,7 +347,16 @@ export default function ElderlyChat() {
       lower.includes("pill")
     ) {
       if (!user?.$id) return "I can't access your medication data right now.";
-      return await getFormattedTodayMedicationSummary(user.$id);
+      const lang =
+        voiceReplyLang === "cantonese"
+          ? "yue"
+          : voiceReplyLang === "mandarin"
+            ? "zh"
+            : "en";
+      return await getFormattedTodayMedicationSummary(
+        user.$id,
+        lang as "yue" | "zh" | "en",
+      );
     }
 
     if (
@@ -360,8 +389,7 @@ export default function ElderlyChat() {
     return [
       {
         role: "system",
-        content:
-          `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\n${langInstruction}\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
+        content: `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\nIMPORTANT: Keep your response concise — no more than 80 words. Be brief and to the point.\n\n${langInstruction}\n\nWhen the user's message contains [SEARCH RESULTS], you MUST base your answer strictly on those results. Do NOT make up or guess information — only use facts from the provided search data. Summarize the key points for the elderly user in a caring tone.\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
       },
       ...history,
       {
@@ -419,6 +447,7 @@ export default function ElderlyChat() {
     userMessage: string,
     image?: SelectedImage | null,
     allowImageFallback = true,
+    hasSearchContext = false,
   ): Promise<string> => {
     const sleep = (ms: number) =>
       new Promise((resolve) => setTimeout(resolve, ms));
@@ -475,8 +504,8 @@ export default function ElderlyChat() {
     const payload = {
       model: resolvedModel,
       messages: messagesPayload,
-      max_tokens: 1000,
-      temperature: 0.7,
+      max_tokens: 200,
+      temperature: hasSearchContext ? 0.2 : 0.7,
     };
 
     const maxAttempts = 3;
@@ -505,9 +534,7 @@ export default function ElderlyChat() {
           const data: AIAPIResponse = rawText ? JSON.parse(rawText) : {};
           const content = data.choices?.[0]?.message?.content;
           if (!content) {
-            throw new Error(
-              data.error?.message || "No response from AI API",
-            );
+            throw new Error(data.error?.message || "No response from AI API");
           }
 
           if (typeof content === "string") {
@@ -525,9 +552,7 @@ export default function ElderlyChat() {
           throw new Error("No response from AI API");
         }
 
-        const errorData: AIAPIResponse = rawText
-          ? JSON.parse(rawText)
-          : {};
+        const errorData: AIAPIResponse = rawText ? JSON.parse(rawText) : {};
 
         const providerMessage =
           errorData?.error?.message ||
@@ -833,9 +858,75 @@ export default function ElderlyChat() {
       }
 
       const localResponse = await tryHandleLocalDataRequest(messageForAPI);
-      const aiResponse =
-        localResponse ??
-        (await callAIAPI(messageForAPI, selectedImage));
+
+      // Selective search: only search when toggle is on AND query looks like it needs web info
+      let searchContext = "";
+      let rawSearchResponse: Awaited<ReturnType<typeof searchWeb>> | null =
+        null;
+      if (
+        searchEnabled &&
+        !localResponse &&
+        !selectedImage &&
+        shouldSearch(userMessage.text)
+      ) {
+        try {
+          rawSearchResponse = await searchWeb(userMessage.text);
+          searchContext = formatSearchResultsForContext(rawSearchResponse);
+        } catch (e) {
+          console.warn("Search failed, proceeding without:", e);
+        }
+      }
+
+      if (rawSearchResponse) {
+        console.log(
+          "[Search] Raw response:",
+          JSON.stringify(
+            {
+              hasAiOverview: !!rawSearchResponse.aiOverview?.text,
+              aiOverviewText: rawSearchResponse.aiOverview?.text ?? "(none)",
+              aiOverviewRefs: rawSearchResponse.aiOverview?.references ?? [],
+              answerBoxType: rawSearchResponse.answerBox?.type ?? "(none)",
+              answerBox: rawSearchResponse.answerBox ?? "(none)",
+              hasKG: !!rawSearchResponse.knowledgeGraph?.description,
+              knowledgeGraph: rawSearchResponse.knowledgeGraph ?? "(none)",
+              resultsCount: rawSearchResponse.results?.length ?? 0,
+              results:
+                rawSearchResponse.results?.map((r) => ({
+                  title: r.title,
+                  snippet: r.snippet,
+                })) ?? [],
+            },
+            null,
+            2,
+          ),
+        );
+      }
+      if (searchContext) {
+        console.log(
+          "[Search] Formatted context for AI (full):\n",
+          searchContext,
+        );
+      } else if (searchEnabled && shouldSearch(userMessage.text)) {
+        console.log(
+          "[Search] No search context produced — search may have returned empty results",
+        );
+      }
+
+      const finalMessage = searchContext
+        ? `${messageForAPI}\n\n[SEARCH RESULTS — you MUST base your answer ONLY on these facts. Do NOT add, guess, or invent any information not found below:]\n${searchContext}\n[END SEARCH RESULTS]\n\nUsing ONLY the search results above, answer the user's question concisely.`
+        : messageForAPI;
+
+      console.log("[AI] Final message to model (full):\n", finalMessage);
+
+      // Start AI call; fire TTS in parallel once we get the response
+      const hasSearch = searchContext.length > 0;
+      const aiResponsePromise = localResponse
+        ? Promise.resolve(localResponse)
+        : callAIAPI(finalMessage, selectedImage, true, hasSearch);
+
+      const aiResponse = await aiResponsePromise;
+
+      console.log("[AI] Model reply (full):", aiResponse);
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -844,6 +935,7 @@ export default function ElderlyChat() {
         timestamp: new Date(),
       };
 
+      // Update UI and start TTS in parallel (don't await TTS)
       setMessages((prev) => [...prev, aiMessage]);
       void speakAiResponse(aiResponse);
     } catch (error) {
@@ -888,14 +980,26 @@ export default function ElderlyChat() {
       ]}
     >
       {!item.isUser && (
-        <Avatar.Icon size={44} icon="robot" style={styles.avatarAI} />
+        <Avatar.Icon
+          size={44}
+          icon="robot"
+          style={[
+            styles.avatarAI,
+            { backgroundColor: isDark ? "rgba(76,175,80,0.15)" : "#E8F5E9" },
+          ]}
+        />
       )}
 
       <View style={styles.messageBubbleContainer}>
         <Card
           style={[
             styles.messageCard,
-            item.isUser ? styles.userMessage : styles.aiMessage,
+            item.isUser
+              ? styles.userMessage
+              : [
+                  styles.aiMessage,
+                  { backgroundColor: theme.colors.surfaceVariant },
+                ],
           ]}
         >
           <Card.Content style={styles.messageContent}>
@@ -915,7 +1019,7 @@ export default function ElderlyChat() {
             <Text
               style={[
                 styles.messageText,
-                { color: item.isUser ? "#FFFFFF" : "#000000" },
+                { color: item.isUser ? "#FFFFFF" : theme.colors.onSurface },
               ]}
               selectable
             >
@@ -927,7 +1031,7 @@ export default function ElderlyChat() {
                 {
                   color: item.isUser
                     ? "rgba(255,255,255,0.8)"
-                    : "rgba(0,0,0,0.5)",
+                    : theme.colors.onSurfaceVariant,
                 },
               ]}
             >
@@ -983,12 +1087,20 @@ export default function ElderlyChat() {
         Platform.OS === "ios" ? 90 : Platform.OS === "android" ? 98 : 0
       }
     >
-      <View style={styles.topBar}>
+      <View
+        style={[
+          styles.topBar,
+          { borderBottomColor: theme.colors.outlineVariant },
+        ]}
+      >
         <IconButton
           icon="history"
           size={28}
           onPress={openHistory}
-          style={styles.topBarButton}
+          style={[
+            styles.topBarButton,
+            { backgroundColor: theme.colors.surfaceVariant },
+          ]}
           iconColor={theme.colors.onSurface}
         />
         <View style={styles.topBarSpacer} />
@@ -996,7 +1108,10 @@ export default function ElderlyChat() {
           icon={aiVoiceEnabled ? "volume-high" : "volume-off"}
           size={24}
           onPress={handleToggleAiVoice}
-          style={styles.topBarButton}
+          style={[
+            styles.topBarButton,
+            { backgroundColor: theme.colors.surfaceVariant },
+          ]}
           iconColor={theme.colors.onSurface}
         />
         {aiVoiceEnabled && (
@@ -1026,10 +1141,26 @@ export default function ElderlyChat() {
           </Menu>
         )}
         <IconButton
+          icon={searchEnabled ? "magnify" : "magnify-close"}
+          size={24}
+          onPress={() => setSearchEnabled((prev) => !prev)}
+          style={[
+            styles.topBarButton,
+            { backgroundColor: theme.colors.surfaceVariant },
+            searchEnabled && {
+              backgroundColor: isDark ? "rgba(21,101,192,0.2)" : "#E3F2FD",
+            },
+          ]}
+          iconColor={searchEnabled ? "#1565C0" : theme.colors.onSurface}
+        />
+        <IconButton
           icon="plus"
           size={28}
           onPress={startNewChat}
-          style={styles.topBarButton}
+          style={[
+            styles.topBarButton,
+            { backgroundColor: theme.colors.surfaceVariant },
+          ]}
           iconColor={theme.colors.onSurface}
         />
       </View>
@@ -1048,23 +1179,50 @@ export default function ElderlyChat() {
         />
 
         {isLoading && (
-          <View style={styles.loadingContainer}>
+          <View
+            style={[
+              styles.loadingContainer,
+              { backgroundColor: isDark ? "rgba(21,101,192,0.1)" : "#F0F7FF" },
+            ]}
+          >
             <ActivityIndicator animating={true} color={theme.colors.primary} />
-            <Text style={styles.loadingText}>AI is thinking...</Text>
+            <Text
+              style={[
+                styles.loadingText,
+                { color: isDark ? "#64B5F6" : "#1565C0" },
+              ]}
+            >
+              AI is thinking...
+            </Text>
           </View>
         )}
 
         {(isVoiceSynthesizing || isVoiceSpeaking) && (
-          <View style={styles.loadingContainer}>
+          <View
+            style={[
+              styles.loadingContainer,
+              { backgroundColor: isDark ? "rgba(21,101,192,0.1)" : "#F0F7FF" },
+            ]}
+          >
             <ActivityIndicator animating={true} color={theme.colors.primary} />
-            <Text style={styles.loadingText}>
+            <Text
+              style={[
+                styles.loadingText,
+                { color: isDark ? "#64B5F6" : "#1565C0" },
+              ]}
+            >
               {isVoiceSynthesizing ? "Generating voice..." : "Playing voice..."}
             </Text>
           </View>
         )}
 
         {voiceError && (
-          <View style={styles.voiceErrorContainer}>
+          <View
+            style={[
+              styles.voiceErrorContainer,
+              { backgroundColor: isDark ? "rgba(183,28,28,0.12)" : "#FFEBEE" },
+            ]}
+          >
             <Text style={styles.voiceErrorText} numberOfLines={3}>
               Voice error: {voiceError}
             </Text>
@@ -1083,7 +1241,10 @@ export default function ElderlyChat() {
       <View
         style={[
           styles.suggestionsContainer,
-          { backgroundColor: theme.colors.surface },
+          {
+            backgroundColor: theme.colors.surface,
+            borderTopColor: theme.colors.outlineVariant,
+          },
         ]}
       >
         <View style={styles.suggestionsHeaderRow}>
@@ -1091,7 +1252,7 @@ export default function ElderlyChat() {
             variant="labelMedium"
             style={{ color: theme.colors.onSurfaceVariant }}
           >
-            {t('chat.quickQuestions')}
+            {t("chat.quickQuestions")}
           </Text>
           <TouchableOpacity
             onPress={() => setIsSuggestionsExpanded((prev) => !prev)}
@@ -1103,7 +1264,7 @@ export default function ElderlyChat() {
                 { color: theme.colors.primary },
               ]}
             >
-              {isSuggestionsExpanded ? t('chat.showLess') : t('chat.showMore')}
+              {isSuggestionsExpanded ? t("chat.showLess") : t("chat.showMore")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1137,7 +1298,10 @@ export default function ElderlyChat() {
       <View
         style={[
           styles.inputContainer,
-          { backgroundColor: theme.colors.surface },
+          {
+            backgroundColor: theme.colors.surface,
+            borderTopColor: theme.colors.outlineVariant,
+          },
         ]}
       >
         {selectedImage && (
@@ -1158,18 +1322,23 @@ export default function ElderlyChat() {
         )}
 
         <View style={styles.inputRow}>
-          <View style={styles.inputPill}>
+          <View
+            style={[
+              styles.inputPill,
+              { backgroundColor: theme.colors.surfaceVariant },
+            ]}
+          >
             <IconButton
               icon="camera"
               size={24}
               onPress={handleImageOptions}
               style={styles.photoButton}
-              iconColor="#6B7280"
+              iconColor={theme.colors.onSurfaceVariant}
             />
             <TextInput
               value={inputText}
               onChangeText={setInputText}
-              placeholder={t('chat.typeMessage')}
+              placeholder={t("chat.typeMessage")}
               mode="flat"
               style={styles.textInput}
               contentStyle={styles.textInputContent}
@@ -1189,7 +1358,7 @@ export default function ElderlyChat() {
               {
                 backgroundColor:
                   (!inputText.trim() && !selectedImage) || isLoading
-                    ? "#B0BEC5"
+                    ? theme.colors.surfaceVariant
                     : "#1565C0",
               },
             ]}
@@ -1208,8 +1377,16 @@ export default function ElderlyChat() {
           style={styles.modalOverlay}
           onPress={() => setIsHistoryVisible(false)}
         >
-          <Pressable style={styles.historyModal}>
-            <Text variant="titleMedium" style={styles.historyTitle}>
+          <Pressable
+            style={[
+              styles.historyModal,
+              { backgroundColor: theme.colors.surface },
+            ]}
+          >
+            <Text
+              variant="titleMedium"
+              style={[styles.historyTitle, { color: theme.colors.onSurface }]}
+            >
               Chat History
             </Text>
             <FlatList
@@ -1217,14 +1394,23 @@ export default function ElderlyChat() {
               keyExtractor={(item) => item.$id}
               renderItem={({ item }) => (
                 <Card
-                  style={styles.historyCard}
+                  style={[
+                    styles.historyCard,
+                    { backgroundColor: theme.colors.surfaceVariant },
+                  ]}
                   onPress={() => loadChatFromHistory(item)}
                 >
                   <Card.Content style={styles.historyCardContent}>
                     <View style={styles.historyCardRow}>
                       <View style={{ flex: 1 }}>
                         <Text variant="titleSmall">{item.title}</Text>
-                        <Text variant="bodySmall" style={styles.historyMeta}>
+                        <Text
+                          variant="bodySmall"
+                          style={[
+                            styles.historyMeta,
+                            { color: theme.colors.onSurfaceVariant },
+                          ]}
+                        >
                           {new Date(item.$updatedAt).toLocaleString()}
                         </Text>
                       </View>
@@ -1240,7 +1426,14 @@ export default function ElderlyChat() {
                 </Card>
               )}
               ListEmptyComponent={
-                <Text style={styles.historyEmpty}>No previous chats yet.</Text>
+                <Text
+                  style={[
+                    styles.historyEmpty,
+                    { color: theme.colors.onSurfaceVariant },
+                  ]}
+                >
+                  No previous chats yet.
+                </Text>
               }
             />
           </Pressable>

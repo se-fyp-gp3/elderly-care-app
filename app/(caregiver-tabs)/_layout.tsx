@@ -109,6 +109,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="cancelled-medications"
+        options={{
+          href: null,
+          title: "Cancelled Medications",
+        }}
+      />
+      <Tabs.Screen
         name="elderly/[id]"
         options={{
           href: null,

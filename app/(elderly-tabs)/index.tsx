@@ -23,7 +23,7 @@ import {
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { openURL } from "expo-linking";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -33,13 +33,13 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  useColorScheme,
   View,
 } from "react-native";
 import {
   Button,
   Card,
   Chip,
-  List,
   Text,
   TouchableRipple,
   useTheme
@@ -58,6 +58,8 @@ type TodoItem = {
 export default function ElderlyHome() {
   const { user, preferences } = useAuth();
   const theme = useTheme();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const router = useRouter();
   const { t } = useTranslation();
   const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
@@ -104,10 +106,29 @@ export default function ElderlyHome() {
           console.error("Error fetching medication reminders/logs:", err);
         }
 
-        // Fetch schedules for this elderly
+        // Fetch schedules for this elderly (exclude medication type, today+tomorrow only)
         try {
           const schedResponse = await fetchElderlySchedulesForUser(user.$id);
-          setSchedules((schedResponse as Schedule[]).slice(0, 10));
+          const now = new Date();
+          const todayStart = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(),
+          );
+          const tomorrowEnd = new Date(todayStart);
+          tomorrowEnd.setDate(tomorrowEnd.getDate() + 2); // end of tomorrow
+
+          const nonMedSchedules = (schedResponse as Schedule[]).filter((s) => {
+            if (s.type === "medication") return false;
+            if (!s.time) return false;
+            const t = new Date(s.time);
+            return t >= todayStart && t < tomorrowEnd;
+          });
+          // Sort by time ascending
+          nonMedSchedules.sort(
+            (a, b) => new Date(a.time!).getTime() - new Date(b.time!).getTime(),
+          );
+          setSchedules(nonMedSchedules.slice(0, 10));
         } catch {
           console.log("No schedules found");
           setSchedules([]);
@@ -118,10 +139,13 @@ export default function ElderlyHome() {
     }
   }, [user]);
 
-  React.useEffect(() => {
-    fetchElderlyData();
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchElderlyData();
+    }, [fetchElderlyData]),
+  );
 
-    // Refresh when app comes to foreground
+  React.useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       if (nextAppState === "active") {
         fetchElderlyData();
@@ -134,7 +158,9 @@ export default function ElderlyHome() {
   }, [fetchElderlyData]);
 
   // ── Contacts for simplified view ──
-  const [simplifiedContacts, setSimplifiedContacts] = React.useState<Contact[]>([]);
+  const [simplifiedContacts, setSimplifiedContacts] = React.useState<Contact[]>(
+    [],
+  );
 
   React.useEffect(() => {
     if (uiVersion !== UIVersion.Simplified) {
@@ -195,6 +221,23 @@ export default function ElderlyHome() {
           return;
         }
 
+        // Hide if scheduled_at is beyond duration_days
+        if (r.start_date && r.duration_days) {
+          const startDateMs = new Date(r.start_date).getTime();
+          const startHkDate = new Date(startDateMs + hkOffset)
+            .toISOString()
+            .slice(0, 10);
+          const firstCandBase = new Date(startHkDate);
+          firstCandBase.setUTCHours(hours, minutes, 0, 0);
+          const firstCandUtcMs = firstCandBase.getTime() - hkOffset;
+          const startDelay = firstCandUtcMs <= startDateMs ? 1 : 0;
+          const lastValidUtcMs =
+            firstCandUtcMs + (startDelay + r.duration_days - 1) * 86400000;
+          if (scheduledDate.getTime() > lastValidUtcMs) {
+            return;
+          }
+        }
+
         // Find if logged
         const log = todayLogs.find((l) => {
           const logRemId =
@@ -253,7 +296,7 @@ export default function ElderlyHome() {
       );
       await fetchElderlyData();
     } catch (error) {
-      Alert.alert("Error", t('common.failedUpdateStatus'));
+      Alert.alert("Error", t("common.failedUpdateStatus"));
     }
   };
 
@@ -266,23 +309,24 @@ export default function ElderlyHome() {
   const handleEmergencyCall = () => {
     // Assume `elderly` contains the current user's elderly profile with an `emergency_contact` field
     // If no emergency contact is set, inform the user instead of attempting to call a hardcoded number.
-    const emergencyNumber = (elderlyProfile as Elderly | null)?.emergency_contact;
+    const emergencyNumber = (elderlyProfile as Elderly | null)
+      ?.emergency_contact;
 
     if (!emergencyNumber) {
       Alert.alert(
-        t('home.noEmergencyContact'),
-        t('home.noEmergencyContactDesc'),
+        t("home.noEmergencyContact"),
+        t("home.noEmergencyContactDesc"),
       );
       return;
     }
 
     Alert.alert(
-      t('home.emergencyCall'),
-      t('home.emergencyCallConfirm', { number: emergencyNumber }),
+      t("home.emergencyCall"),
+      t("home.emergencyCallConfirm", { number: emergencyNumber }),
       [
-        { text: t('common.cancel'), style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: t('home.callNow'),
+          text: t("home.callNow"),
           style: "destructive",
           onPress: () => openURL(`tel:${emergencyNumber}`),
         },
@@ -316,242 +360,577 @@ export default function ElderlyHome() {
 
   return (
     <View style={{ flex: 1 }}>
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      {/* Greeting */}
-      <View style={styles.greetingSection}>
-        <Text variant="headlineMedium" style={[styles.greetingName, accessibleStyles?.greetingName]}>
-          Hello, {elderlyProfile?.name || user?.name || t('common.there')}!
-        </Text>
-        <Text variant="bodyLarge" style={[styles.greetingSubtitle, accessibleStyles?.greetingSubtitle]}>
-          {t('home.howAreYou')}
-        </Text>
-      </View>
-
-      {/* Emergency Contact */}
-      <Card
-        style={styles.emergencyCard}
-        onPress={handleEmergencyCall}
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        <Card.Content style={styles.emergencyCardContent}>
-          <View style={styles.emergencyIconCircle}>
-            <MaterialCommunityIcons name="phone-in-talk" size={28} color="#D32F2F" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text variant="titleMedium" style={{ fontWeight: "700", color: "#C62828" }}>
-              {t('home.emergencyContact')}
-            </Text>
-            <Text variant="bodyMedium" style={{ color: "#999", marginTop: 2 }}>
-              {t('home.tapToCallEmergency')}
-            </Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={24} color="#E57373" />
-        </Card.Content>
-      </Card>
+        {/* Greeting */}
+        <View style={styles.greetingSection}>
+          <Text
+            variant="headlineMedium"
+            style={[
+              styles.greetingName,
+              { color: theme.colors.onSurface },
+              accessibleStyles?.greetingName,
+            ]}
+          >
+            Hello, {elderlyProfile?.name || user?.name || t("common.there")}!
+          </Text>
+          <Text
+            variant="bodyLarge"
+            style={[
+              styles.greetingSubtitle,
+              { color: theme.colors.onSurfaceVariant },
+              accessibleStyles?.greetingSubtitle,
+            ]}
+          >
+            {t("home.howAreYou")}
+          </Text>
+        </View>
 
-      {/* Today's Medications */}
-      <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>
-        {t('home.todaysMedications')}
-      </Text>
-      {todoList.length > 0 ? (
-        todoList.slice(0, 3).map((item, index) => {
-          const isTaken = item.status === "taken";
-          const isMissing = item.status === "missing";
-          const accentColor = isTaken
-            ? "#4CAF50"
-            : isMissing
-              ? "#E53935"
-              : "#FF8F00";
-
-          return (
+        {/* Emergency Contact */}
+        <Card
+          style={[
+            styles.emergencyCard,
+            {
+              backgroundColor: isDark ? "rgba(211,47,47,0.12)" : "#FFF5F5",
+              borderColor: isDark ? "rgba(211,47,47,0.3)" : "#FFCDD2",
+            },
+          ]}
+          onPress={handleEmergencyCall}
+        >
+          <Card.Content style={styles.emergencyCardContent}>
             <View
-              key={`${item.reminder.$id}-${item.time}-${index}`}
               style={[
-                styles.medCard,
-                { borderLeftColor: accentColor },
+                styles.emergencyIconCircle,
+                {
+                  backgroundColor: isDark ? "rgba(211,47,47,0.15)" : "#FFEBEE",
+                },
               ]}
             >
-              <View style={styles.medCardTop}>
-                <View
-                  style={[
-                    styles.medCardIcon,
-                    { backgroundColor: isTaken ? "#E8F5E9" : "#EDE7F6" },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={isTaken ? "check-circle" : "pill"}
-                    size={26}
-                    color={isTaken ? "#4CAF50" : "#5E35B1"}
-                  />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text variant="titleMedium" style={{ fontWeight: "700" }}>
-                    {item.medicationName}
-                  </Text>
-                  <Text variant="bodyMedium" style={{ color: "#666", marginTop: 2 }}>
-                    {item.dosage}
-                  </Text>
-                </View>
-                <View style={styles.medCardTime}>
-                  <MaterialCommunityIcons name="clock-outline" size={15} color="#888" />
-                  <Text variant="bodyMedium" style={{ color: "#555", marginLeft: 4, fontWeight: "600" }}>
-                    {item.time}
-                  </Text>
-                </View>
-              </View>
-              {isTaken ? (
-                <TouchableRipple
-                  onPress={() => handleTakeMedication(item)}
-                  style={styles.medCardDone}
-                >
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                    <MaterialCommunityIcons name="check-circle" size={18} color="#2E7D32" />
-                    <Text style={{ color: "#2E7D32", fontSize: 14, fontWeight: "600" }}>
-                      {t('home.takenTapToUndo')}
-                    </Text>
-                  </View>
-                </TouchableRipple>
-              ) : (
-                <TouchableRipple
-                  onPress={() => handleTakeMedication(item)}
-                  style={[
-                    styles.medCardAction,
-                    { backgroundColor: isMissing ? "#E53935" : "#4CAF50" },
-                  ]}
-                >
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    <MaterialCommunityIcons name="check-bold" size={20} color="#FFF" />
-                    <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "bold" }}>
-                      {isMissing ? t('home.takeNowMissed') : t('home.markAsTaken')}
-                    </Text>
-                  </View>
-                </TouchableRipple>
-              )}
+              <MaterialCommunityIcons
+                name="phone-in-talk"
+                size={28}
+                color="#D32F2F"
+              />
             </View>
-          );
-        })
-      ) : (
-        <Card style={[styles.listCard, { backgroundColor: theme.colors.surface }]}>
-          <View style={{ alignItems: "center", padding: 28 }}>
-            <MaterialCommunityIcons name="check-circle-outline" size={44} color="#A5D6A7" />
-            <Text variant="bodyLarge" style={{ marginTop: 8, color: "#666" }}>
-              {t('home.noMedsToday')}
-            </Text>
-          </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                variant="titleMedium"
+                style={{
+                  fontWeight: "700",
+                  color: isDark ? "#EF9A9A" : "#C62828",
+                }}
+              >
+                {t("home.emergencyContact")}
+              </Text>
+              <Text
+                variant="bodyMedium"
+                style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}
+              >
+                {t("home.tapToCallEmergency")}
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={24}
+              color="#E57373"
+            />
+          </Card.Content>
         </Card>
-      )}
-      <Button
-        mode="text"
-        onPress={() => router.push("/medication" as never)}
-        style={styles.viewAllButton}
-      >
-        {t('home.viewAllMedications')}
-      </Button>
 
-      {/* Upcoming Schedule */}
-      <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>
-        {t('home.upcomingSchedule')}
-      </Text>
-      <Card
-        style={[styles.listCard, { backgroundColor: theme.colors.surface }]}
-      >
+        {/* Today's Medications */}
+        <Text
+          variant="titleLarge"
+          style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}
+        >
+          {t("home.todaysMedications")}
+        </Text>
+        {todoList.length > 0 ? (
+          todoList.slice(0, 3).map((item, index) => {
+            const isTaken = item.status === "taken";
+            const isMissing = item.status === "missing";
+            const accentColor = isTaken
+              ? "#4CAF50"
+              : isMissing
+                ? "#E53935"
+                : "#FF8F00";
+
+            return (
+              <View
+                key={`${item.reminder.$id}-${item.time}-${index}`}
+                style={[
+                  styles.medCard,
+                  {
+                    borderLeftColor: accentColor,
+                    backgroundColor: theme.colors.surface,
+                  },
+                ]}
+              >
+                <View style={styles.medCardTop}>
+                  <View
+                    style={[
+                      styles.medCardIcon,
+                      {
+                        backgroundColor: isTaken
+                          ? isDark
+                            ? "rgba(76,175,80,0.15)"
+                            : "#E8F5E9"
+                          : isDark
+                            ? "rgba(94,53,177,0.15)"
+                            : "#EDE7F6",
+                      },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={isTaken ? "check-circle" : "pill"}
+                      size={26}
+                      color={isTaken ? "#4CAF50" : "#5E35B1"}
+                    />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text variant="titleMedium" style={{ fontWeight: "700" }}>
+                      {item.medicationName}
+                    </Text>
+                    <Text
+                      variant="bodyMedium"
+                      style={{
+                        color: theme.colors.onSurfaceVariant,
+                        marginTop: 2,
+                      }}
+                    >
+                      {item.dosage}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.medCardTime,
+                      { backgroundColor: theme.colors.surfaceVariant },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="clock-outline"
+                      size={15}
+                      color={theme.colors.onSurfaceVariant}
+                    />
+                    <Text
+                      variant="bodyMedium"
+                      style={{
+                        color: theme.colors.onSurfaceVariant,
+                        marginLeft: 4,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {item.time}
+                    </Text>
+                  </View>
+                </View>
+                {isTaken ? (
+                  <TouchableRipple
+                    onPress={() => handleTakeMedication(item)}
+                    style={[
+                      styles.medCardDone,
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(76,175,80,0.15)"
+                          : "#E8F5E9",
+                      },
+                    ]}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name="check-circle"
+                        size={18}
+                        color={isDark ? "#81C784" : "#2E7D32"}
+                      />
+                      <Text
+                        style={{
+                          color: isDark ? "#81C784" : "#2E7D32",
+                          fontSize: 14,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {t("home.takenTapToUndo")}
+                      </Text>
+                    </View>
+                  </TouchableRipple>
+                ) : (
+                  <TouchableRipple
+                    onPress={() => handleTakeMedication(item)}
+                    style={[
+                      styles.medCardAction,
+                      { backgroundColor: isMissing ? "#E53935" : "#4CAF50" },
+                    ]}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name="check-bold"
+                        size={20}
+                        color="#FFF"
+                      />
+                      <Text
+                        style={{
+                          color: "#FFF",
+                          fontSize: 16,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {isMissing
+                          ? t("home.takeNowMissed")
+                          : t("home.markAsTaken")}
+                      </Text>
+                    </View>
+                  </TouchableRipple>
+                )}
+              </View>
+            );
+          })
+        ) : (
+          <Card
+            style={[styles.listCard, { backgroundColor: theme.colors.surface }]}
+          >
+            <View style={{ alignItems: "center", padding: 28 }}>
+              <MaterialCommunityIcons
+                name="check-circle-outline"
+                size={44}
+                color="#A5D6A7"
+              />
+              <Text
+                variant="bodyLarge"
+                style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}
+              >
+                {t("home.noMedsToday")}
+              </Text>
+            </View>
+          </Card>
+        )}
+        <Button
+          mode="text"
+          onPress={() => router.push("/medication" as never)}
+          style={styles.viewAllButton}
+        >
+          {t("home.viewAllMedications")}
+        </Button>
+
+        {/* Upcoming Schedule (Today & Tomorrow) */}
+        <Text
+          variant="titleLarge"
+          style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}
+        >
+          {t("home.upcomingSchedule")}
+        </Text>
         {schedules.length > 0 ? (
-          schedules.slice(0, 3).map((schedule, index) => (
-            <List.Item
-              key={index}
-              title={schedule.title || t('home.appointment')}
-              description={
-                schedule.description || schedule.time || t('home.noDetails')
+          schedules.slice(0, 3).map((schedule, index) => {
+            const isCompleted = schedule.status === "Completed";
+            const isMissed = schedule.status === "Missed";
+            const accentColor = isCompleted
+              ? "#4CAF50"
+              : isMissed
+                ? "#F44336"
+                : "#2196F3";
+            const typeIcon = (() => {
+              switch (schedule.type) {
+                case "appointment":
+                  return "doctor";
+                case "meal":
+                  return "food-apple";
+                case "checkup":
+                  return "stethoscope";
+                case "activity":
+                  return "run";
+                default:
+                  return "calendar-clock";
               }
-              left={(props) => (
-                <List.Icon {...props} icon="calendar-clock" color="#2196F3" />
-              )}
-              right={() => (
-                <Chip
-                  compact
+            })();
+            const scheduleTime = (() => {
+              if (!schedule.time) return "";
+              try {
+                const d = new Date(schedule.time);
+                return d.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+              } catch {
+                return "";
+              }
+            })();
+            const scheduleDate = (() => {
+              if (!schedule.time) return "";
+              try {
+                const d = new Date(schedule.time);
+                return d.toLocaleDateString([], {
+                  month: "short",
+                  day: "numeric",
+                });
+              } catch {
+                return "";
+              }
+            })();
+
+            return (
+              <View
+                key={`sched-${schedule.$id || index}`}
+                style={[
+                  styles.medCard,
+                  {
+                    borderLeftColor: accentColor,
+                    backgroundColor: theme.colors.surface,
+                  },
+                ]}
+              >
+                <View style={styles.medCardTop}>
+                  <View
+                    style={[
+                      styles.medCardIcon,
+                      {
+                        backgroundColor: isCompleted
+                          ? isDark
+                            ? "rgba(76,175,80,0.15)"
+                            : "#E8F5E9"
+                          : isDark
+                            ? "rgba(33,150,243,0.15)"
+                            : "#E3F2FD",
+                      },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={isCompleted ? "check-circle" : typeIcon}
+                      size={26}
+                      color={isCompleted ? "#4CAF50" : "#1976D2"}
+                    />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text variant="titleMedium" style={{ fontWeight: "700" }}>
+                      {schedule.title || t("home.appointment")}
+                    </Text>
+                    {schedule.description ? (
+                      <Text
+                        variant="bodyMedium"
+                        style={{
+                          color: theme.colors.onSurfaceVariant,
+                          marginTop: 2,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {schedule.description}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {scheduleTime ? (
+                    <View style={{ alignItems: "flex-end" }}>
+                      <View
+                        style={[
+                          styles.medCardTime,
+                          { backgroundColor: theme.colors.surfaceVariant },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="clock-outline"
+                          size={15}
+                          color={theme.colors.onSurfaceVariant}
+                        />
+                        <Text
+                          variant="bodyMedium"
+                          style={{
+                            color: theme.colors.onSurfaceVariant,
+                            marginLeft: 4,
+                            fontWeight: "600",
+                          }}
+                        >
+                          {scheduleTime}
+                        </Text>
+                      </View>
+                      {scheduleDate ? (
+                        <Text
+                          variant="labelSmall"
+                          style={{
+                            color: theme.colors.onSurfaceVariant,
+                            marginTop: 3,
+                          }}
+                        >
+                          {scheduleDate}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
+                <View
                   style={{
-                    backgroundColor:
-                      schedule.status === "Completed"
-                        ? "#4CAF5020"
-                        : "#2196F320",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginTop: 8,
+                    gap: 8,
                   }}
                 >
-                  {schedule.status
-                    ? { Completed: t('common.completed'), Missed: t('common.missed'), Pending: t('common.pending') }[schedule.status] ?? schedule.status
-                    : t('home.upcoming')}
-                </Chip>
-              )}
-            />
-          ))
+                  <Chip
+                    compact
+                    style={{ backgroundColor: `${accentColor}18` }}
+                    textStyle={{ color: accentColor, fontSize: 12 }}
+                  >
+                    {schedule.status || t("common.pending")}
+                  </Chip>
+                  {schedule.type ? (
+                    <Chip
+                      compact
+                      style={{ backgroundColor: theme.colors.surfaceVariant }}
+                      textStyle={{
+                        fontSize: 12,
+                        color: theme.colors.onSurfaceVariant,
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {schedule.type}
+                    </Chip>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })
         ) : (
-          <List.Item
-            title={t('home.noUpcomingEvents')}
-            description={t('home.scheduleIsClear')}
-            left={(props) => <List.Icon {...props} icon="calendar-blank" />}
-          />
+          <Card
+            style={[styles.listCard, { backgroundColor: theme.colors.surface }]}
+          >
+            <View style={{ alignItems: "center", padding: 28 }}>
+              <MaterialCommunityIcons
+                name="calendar-check"
+                size={44}
+                color="#A5D6A7"
+              />
+              <Text
+                variant="bodyLarge"
+                style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}
+              >
+                {t("home.noUpcomingEvents")}
+              </Text>
+            </View>
+          </Card>
         )}
         <Button
           mode="text"
           onPress={() => router.push("/schedule" as never)}
           style={styles.viewAllButton}
         >
-          {t('home.viewFullSchedule')}
+          {t("home.viewFullSchedule")}
         </Button>
-      </Card>
 
-      {/* Today's Steps */}
-      <Text variant="titleLarge" style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}>
-        {t('home.todaysSteps')}
-      </Text>
-      <Card
-        style={[styles.stepCard, { backgroundColor: theme.colors.surface }]}
-        onPress={() => router.push("/health-data" as never)}
-      >
-        <Card.Content>
-          <View style={styles.stepRow}>
-            <View style={styles.stepIconCircle}>
-              <MaterialCommunityIcons name="walk" size={32} color="#9C27B0" />
+        {/* Today's Steps */}
+        <Text
+          variant="titleLarge"
+          style={[styles.sectionTitle, accessibleStyles?.sectionTitle]}
+        >
+          {t("home.todaysSteps")}
+        </Text>
+        <Card
+          style={[styles.stepCard, { backgroundColor: theme.colors.surface }]}
+          onPress={() => router.push("/health-data" as never)}
+        >
+          <Card.Content>
+            <View style={styles.stepRow}>
+              <View
+                style={[
+                  styles.stepIconCircle,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(156,39,176,0.12)"
+                      : "rgba(156,39,176,0.08)",
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons name="walk" size={32} color="#9C27B0" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                {stepsLoading ? (
+                  <ActivityIndicator size="small" color="#9C27B0" />
+                ) : (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "baseline",
+                      gap: 4,
+                    }}
+                  >
+                    <Text
+                      variant="headlineMedium"
+                      style={{ fontWeight: "bold", color: "#9C27B0" }}
+                    >
+                      {todaySteps.toLocaleString()}
+                    </Text>
+                    <Text
+                      variant="bodyMedium"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      {t("home.steps")}
+                    </Text>
+                  </View>
+                )}
+                <Text
+                  variant="labelSmall"
+                  style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}
+                >
+                  {lastSyncTime
+                    ? t("home.updated", {
+                        time: new Date(lastSyncTime).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }),
+                      })
+                    : t("healthData.notSyncedYet")}
+                  {stepSource === "health_connect"
+                    ? " · Health Connect"
+                    : stepSource === "apple_healthkit"
+                      ? " · Apple Health"
+                      : ""}
+                </Text>
+              </View>
+              <TouchableRipple
+                onPress={(e) => {
+                  e.stopPropagation();
+                  manualSync();
+                }}
+                disabled={isSyncing}
+                style={[
+                  styles.stepSyncBtn,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(156,39,176,0.12)"
+                      : "rgba(156,39,176,0.06)",
+                  },
+                ]}
+                rippleColor="#9C27B040"
+              >
+                {isSyncing ? (
+                  <ActivityIndicator size={20} color="#9C27B0" />
+                ) : (
+                  <MaterialCommunityIcons
+                    name="refresh"
+                    size={22}
+                    color="#9C27B0"
+                  />
+                )}
+              </TouchableRipple>
             </View>
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              {stepsLoading ? (
-                <ActivityIndicator size="small" color="#9C27B0" />
-              ) : (
-                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
-                  <Text variant="headlineMedium" style={{ fontWeight: "bold", color: "#9C27B0" }}>
-                    {todaySteps.toLocaleString()}
-                  </Text>
-                  <Text variant="bodyMedium" style={{ color: "#888" }}>{t('home.steps')}</Text>
-                </View>
-              )}
-              <Text variant="labelSmall" style={{ color: "#999", marginTop: 2 }}>
-                {lastSyncTime
-                  ? t('home.updated', { time: new Date(lastSyncTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })
-                  : t('healthData.notSyncedYet')}
-                {stepSource === "health_connect" ? " · Health Connect" : stepSource === "apple_healthkit" ? " · Apple Health" : ""}
-              </Text>
-            </View>
-            <TouchableRipple
-              onPress={(e) => { e.stopPropagation(); manualSync(); }}
-              disabled={isSyncing}
-              style={styles.stepSyncBtn}
-              rippleColor="#9C27B040"
-            >
-              {isSyncing
-                ? <ActivityIndicator size={20} color="#9C27B0" />
-                : <MaterialCommunityIcons name="refresh" size={22} color="#9C27B0" />
-              }
-            </TouchableRipple>
-          </View>
-        </Card.Content>
-      </Card>
+          </Card.Content>
+        </Card>
 
-      <View style={styles.bottomSpacer} />
-    </ScrollView>
-    <VoiceCommandButton />
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
+      <VoiceCommandButton />
     </View>
   );
 }

@@ -2,6 +2,8 @@ import * as FileSystem from "expo-file-system/legacy";
 import { ExecutionMethod } from "react-native-appwrite";
 import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, functions, storage, VOICE_CLONE_FUNCTION_ID } from "./appwrite";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 // ── DashScope config ──
 const DASHSCOPE_API_KEY =
   process.env.EXPO_PUBLIC_DASHSCOPE_API_KEY?.trim() || "";
@@ -333,28 +335,51 @@ async function synthesizeDirect(
   };
   if (language) requestBody.language = language;
 
-  const fnResult = await functions.createExecution({
-    functionId: VOICE_CLONE_FUNCTION_ID,
-    body: JSON.stringify(requestBody),
-    method: ExecutionMethod.POST,
-  });
+  // Use sync execution with retry (async queue is unreliable on self-hosted Appwrite).
+  // First call after cold start may exceed the 30s sync limit, so retry up to 3 times.
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const execution = await functions.createExecution({
+        functionId: VOICE_CLONE_FUNCTION_ID,
+        body: JSON.stringify(requestBody),
+        method: ExecutionMethod.POST,
+        async: false,
+      });
 
-  let payload: any;
-  try {
-    payload = JSON.parse(fnResult.responseBody);
-  } catch {
-    throw new Error(`Appwrite TTS function returned invalid JSON: ${fnResult.responseBody}`);
+      if (execution.status !== "completed" || execution.responseStatusCode !== 200) {
+        throw new Error(
+          `TTS execution failed (status=${execution.status}, code=${execution.responseStatusCode}): ${execution.errors || "unknown"}`
+        );
+      }
+
+      let payload: any;
+      try {
+        payload = JSON.parse(execution.responseBody);
+      } catch {
+        throw new Error(`Appwrite TTS function returned invalid JSON: ${execution.responseBody}`);
+      }
+
+      if (!payload?.success) {
+        throw new Error(payload?.error || "Appwrite TTS function failed");
+      }
+
+      if (payload.audioBase64) {
+        return { audioBase64: payload.audioBase64 };
+      }
+
+      throw new Error("Appwrite TTS function returned no audio");
+    } catch (err: any) {
+      const isTimeout = /timed?\s*out|408|timeout/i.test(err?.message || "");
+      if (isTimeout && attempt < maxAttempts) {
+        console.warn(`[voice] TTS attempt ${attempt}/${maxAttempts} timed out, retrying...`);
+        continue;
+      }
+      throw err;
+    }
   }
 
-  if (!payload?.success) {
-    throw new Error(payload?.error || "Appwrite TTS function failed");
-  }
-
-  if (payload.audioBase64) {
-    return { audioBase64: payload.audioBase64 };
-  }
-
-  throw new Error("Appwrite TTS function returned no audio");
+  throw new Error("TTS failed after all retry attempts");
 }
 
 // ── Zero-shot cloning fallback ──

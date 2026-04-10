@@ -8,6 +8,7 @@ import {
   ELDERLY_TABLE_ID,
   GROUP_MEMBERS_TABLE_ID,
   GROUP_MESSAGES_TABLE_ID,
+  safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
@@ -21,12 +22,29 @@ import {
   rejectCaregiverConnection,
   searchUserByPhone,
 } from "@/lib/contacts";
-import { getGroupUnreadCount, getLastGroupMessage } from "@/lib/group-messaging";
-import { acceptGroupInvitation, getGroupsForUser, getPendingGroupInvitations, rejectGroupInvitation } from "@/lib/groups";
-import { buildConversationId, getLastMessage, getUnreadCountPerConversation } from "@/lib/messaging";
+import {
+  getGroupUnreadCount,
+  getLastGroupMessage,
+} from "@/lib/group-messaging";
+import {
+  acceptGroupInvitation,
+  getGroupsForUser,
+  getPendingGroupInvitations,
+  rejectGroupInvitation,
+} from "@/lib/groups";
+import {
+  buildConversationId,
+  getLastMessage,
+  getUnreadCountPerConversation,
+} from "@/lib/messaging";
 import { isUserOnline } from "@/lib/presence";
 import { Caregiver, Elderly } from "@/types/appwrite";
-import { DirectMessage, Group, GroupMember, GroupMessage } from "@/types/messaging";
+import {
+  DirectMessage,
+  Group,
+  GroupMember,
+  GroupMessage,
+} from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -43,7 +61,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   useWindowDimensions,
-  View
+  View,
 } from "react-native";
 import {
   ActivityIndicator,
@@ -54,15 +72,25 @@ import {
   Searchbar,
   Text,
   TextInput,
-  useTheme
+  useTheme,
 } from "react-native-paper";
 
 import MomentsView from "@/components/MomentsView";
 import { useTranslation } from "react-i18next";
 
 type ChatListItem =
-  | { type: "direct"; contact: Contact; lastMsg: DirectMessage | null; unread: number }
-  | { type: "group"; group: Group; lastMsg: GroupMessage | null; unread: number };
+  | {
+      type: "direct";
+      contact: Contact;
+      lastMsg: DirectMessage | null;
+      unread: number;
+    }
+  | {
+      type: "group";
+      group: Group;
+      lastMsg: GroupMessage | null;
+      unread: number;
+    };
 
 function chatListItemId(item: ChatListItem): string {
   return item.type === "direct" ? item.contact.id : `group_${item.group.$id}`;
@@ -95,10 +123,17 @@ export default function CaregiverMessages() {
 
   // ── Group state ──
   const [groups, setGroups] = useState<Group[]>([]);
-  const [groupLastMessages, setGroupLastMessages] = useState<Record<string, GroupMessage | null>>({});
-  const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
-  const [groupUnreadCounts, setGroupUnreadCounts] = useState<Record<string, number>>({});
-  const pinnedConversations: string[] = (preferences.pinnedConversations as string[]) ?? [];
+  const [groupLastMessages, setGroupLastMessages] = useState<
+    Record<string, GroupMessage | null>
+  >({});
+  const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(
+    new Map(),
+  );
+  const [groupUnreadCounts, setGroupUnreadCounts] = useState<
+    Record<string, number>
+  >({});
+  const pinnedConversations: string[] =
+    (preferences.pinnedConversations as string[]) ?? [];
 
   // ── Action sheet / Create Group ──
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -121,7 +156,9 @@ export default function CaregiverMessages() {
   const [phoneSearch, setPhoneSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [foundUser, setFoundUser] = useState<
-    { role: "elderly"; data: Elderly } | { role: "caregiver"; data: Caregiver } | null
+    | { role: "elderly"; data: Elderly }
+    | { role: "caregiver"; data: Caregiver }
+    | null
   >(null);
   const [addingContact, setAddingContact] = useState(false);
   const [searchDone, setSearchDone] = useState(false);
@@ -139,14 +176,15 @@ export default function CaregiverMessages() {
       }
       setCaregiverProfileId(caregiver.$id);
       setCaregiverName(caregiver.name || user.name || "Me");
-      
-      const [data, requests, userGroups, dmUnreadMap, groupInvites] = await Promise.all([
-        getContactsForCaregiver(caregiver.$id),
-        getPendingCaregiverConnections(caregiver.$id),
-        getGroupsForUser(caregiver.$id),
-        getUnreadCountPerConversation(caregiver.$id),
-        getPendingGroupInvitations(caregiver.$id),
-      ]);
+
+      const [data, requests, userGroups, dmUnreadMap, groupInvites] =
+        await Promise.all([
+          getContactsForCaregiver(caregiver.$id),
+          getPendingCaregiverConnections(caregiver.$id),
+          getGroupsForUser(caregiver.$id),
+          getUnreadCountPerConversation(caregiver.$id),
+          getPendingGroupInvitations(caregiver.$id),
+        ]);
       setPendingRequests(requests);
       setUnreadCounts(dmUnreadMap);
       setGroups(userGroups);
@@ -200,67 +238,88 @@ export default function CaregiverMessages() {
   const handleAcceptRequest = async (connectionId: string, name: string) => {
     try {
       await acceptCaregiverConnection(connectionId);
-      Alert.alert(t('emergency.connected'), t('emergency.connectedWith', { name }));
+      Alert.alert(
+        t("emergency.connected"),
+        t("emergency.connectedWith", { name }),
+      );
       fetchContacts();
     } catch (error) {
-      Alert.alert(t('common.error'), t('emergency.failedToAccept'));
+      Alert.alert(t("common.error"), t("emergency.failedToAccept"));
     }
   };
 
   const handleRejectRequest = async (connectionId: string) => {
     try {
       await rejectCaregiverConnection(connectionId);
-      Alert.alert(t('emergency.rejected'), t('emergency.requestRejected'));
+      Alert.alert(t("emergency.rejected"), t("emergency.requestRejected"));
       fetchContacts();
     } catch (error) {
-      Alert.alert(t('common.error'), t('emergency.failedToReject'));
+      Alert.alert(t("common.error"), t("emergency.failedToReject"));
     }
   };
 
   // ── Accept / Reject group invitation handlers ──
-  const handleAcceptGroupInvite = useCallback(async (invite: { membership: GroupMember; group: Group }) => {
-    if (!caregiverProfileId) return;
-    setAcceptingGroupId(invite.membership.$id);
-    try {
-      await acceptGroupInvitation(
-        invite.membership.$id,
-        invite.group.$id,
-        caregiverName,
-        "caregiver",
-        caregiverProfileId,
-      );
-      Alert.alert(t('chat.acceptedGroupInvite'), invite.group.name);
-      await fetchContacts();
-    } catch (e) {
-      Alert.alert(t('common.error'), t('chat.failedToAcceptInvite'));
-    } finally {
-      setAcceptingGroupId(null);
-    }
-  }, [caregiverProfileId, caregiverName, fetchContacts, t]);
+  const handleAcceptGroupInvite = useCallback(
+    async (invite: { membership: GroupMember; group: Group }) => {
+      if (!caregiverProfileId) return;
+      setAcceptingGroupId(invite.membership.$id);
+      try {
+        await acceptGroupInvitation(
+          invite.membership.$id,
+          invite.group.$id,
+          caregiverName,
+          "caregiver",
+          caregiverProfileId,
+        );
+        Alert.alert(t("chat.acceptedGroupInvite"), invite.group.name);
+        await fetchContacts();
+      } catch (e) {
+        Alert.alert(t("common.error"), t("chat.failedToAcceptInvite"));
+      } finally {
+        setAcceptingGroupId(null);
+      }
+    },
+    [caregiverProfileId, caregiverName, fetchContacts, t],
+  );
 
-  const handleRejectGroupInvite = useCallback((invite: { membership: GroupMember; group: Group }) => {
-    Alert.alert(t('chat.declineGroupInvite'), t('chat.declineGroupConfirm', { name: invite.group.name }), [
-      { text: t('common.cancel'), style: "cancel" },
-      {
-        text: t('emergency.decline'),
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await rejectGroupInvitation(invite.membership.$id);
-            setPendingGroupInvites((prev) => prev.filter((i) => i.membership.$id !== invite.membership.$id));
-          } catch (e) {
-            Alert.alert(t('common.error'), t('chat.failedToDeclineInvite'));
-          }
-        },
-      },
-    ]);
-  }, [t]);
+  const handleRejectGroupInvite = useCallback(
+    (invite: { membership: GroupMember; group: Group }) => {
+      Alert.alert(
+        t("chat.declineGroupInvite"),
+        t("chat.declineGroupConfirm", { name: invite.group.name }),
+        [
+          { text: t("common.cancel"), style: "cancel" },
+          {
+            text: t("emergency.decline"),
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await rejectGroupInvitation(invite.membership.$id);
+                setPendingGroupInvites((prev) =>
+                  prev.filter(
+                    (i) => i.membership.$id !== invite.membership.$id,
+                  ),
+                );
+              } catch (e) {
+                Alert.alert(t("common.error"), t("chat.failedToDeclineInvite"));
+              }
+            },
+          },
+        ],
+      );
+    },
+    [t],
+  );
 
   const navigateToConversation = useCallback(
     (contact: Contact) => {
       // Clear unread for this DM
       const convId = buildConversationId(caregiverProfileId!, contact.id);
-      setUnreadCounts((prev) => { const n = new Map(prev); n.delete(convId); return n; });
+      setUnreadCounts((prev) => {
+        const n = new Map(prev);
+        n.delete(convId);
+        return n;
+      });
       router.push({
         pathname: "/conversation",
         params: {
@@ -312,7 +371,12 @@ export default function CaregiverMessages() {
     const query = searchQuery.toLowerCase();
 
     contacts.forEach((c) => {
-      if (query && !c.name.toLowerCase().includes(query) && !(c.phone && c.phone.includes(query))) return;
+      if (
+        query &&
+        !c.name.toLowerCase().includes(query) &&
+        !(c.phone && c.phone.includes(query))
+      )
+        return;
       const convId = buildConversationId(caregiverProfileId!, c.id);
       items.push({
         type: "direct",
@@ -345,7 +409,17 @@ export default function CaregiverMessages() {
     });
 
     return items;
-  }, [contacts, groups, lastMessages, groupLastMessages, unreadCounts, groupUnreadCounts, pinnedConversations, searchQuery, caregiverProfileId]);
+  }, [
+    contacts,
+    groups,
+    lastMessages,
+    groupLastMessages,
+    unreadCounts,
+    groupUnreadCounts,
+    pinnedConversations,
+    searchQuery,
+    caregiverProfileId,
+  ]);
 
   useEffect(() => {
     fetchContacts();
@@ -356,11 +430,9 @@ export default function CaregiverMessages() {
 
     // Subscribe to Direct Messages table
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+    const unsubscribe = safeSubscribe(channel, (response) => {
       // Check if it's a create event
-      if (
-        response.events.some((event) => event.endsWith(".create"))
-      ) {
+      if (response.events.some((event) => event.endsWith(".create"))) {
         const payload = response.payload as DirectMessage;
 
         // Check if I am the sender or receiver
@@ -416,22 +488,31 @@ export default function CaregiverMessages() {
       if (!response.events.some((e) => e.endsWith(".create"))) return;
       const payload = response.payload as GroupMessage;
       // Update last group message
-      setGroupLastMessages((prev) => ({ ...prev, [payload.group_id]: payload }));
+      setGroupLastMessages((prev) => ({
+        ...prev,
+        [payload.group_id]: payload,
+      }));
       // Increment group unread if not my message
       if (payload.sender_id !== caregiverProfileId) {
-        setGroupUnreadCounts((prev) => ({ ...prev, [payload.group_id]: (prev[payload.group_id] ?? 0) + 1 }));
+        setGroupUnreadCounts((prev) => ({
+          ...prev,
+          [payload.group_id]: (prev[payload.group_id] ?? 0) + 1,
+        }));
       }
     });
 
     // Subscribe to group_members for realtime group discovery
     const groupMembersChannel = `databases.${DATABASE_ID}.collections.${GROUP_MEMBERS_TABLE_ID}.documents`;
-    const unsubMembers = clientReactNative.subscribe(groupMembersChannel, (response) => {
-      if (!response.events.some((e) => e.endsWith(".create"))) return;
-      const payload = response.payload as { user_profile_id?: string };
-      if (payload?.user_profile_id === caregiverProfileId) {
-        fetchContacts();
-      }
-    });
+    const unsubMembers = clientReactNative.subscribe(
+      groupMembersChannel,
+      (response) => {
+        if (!response.events.some((e) => e.endsWith(".create"))) return;
+        const payload = response.payload as { user_profile_id?: string };
+        if (payload?.user_profile_id === caregiverProfileId) {
+          fetchContacts();
+        }
+      },
+    );
 
     return () => {
       unsubscribe();
@@ -451,7 +532,10 @@ export default function CaregiverMessages() {
   useEffect(() => {
     if (!caregiverProfileId) return;
 
-    const handlePresenceUpdate = (response: { events: string[]; payload: any }) => {
+    const handlePresenceUpdate = (response: {
+      events: string[];
+      payload: any;
+    }) => {
       if (!response.events.some((e) => e.endsWith(".update"))) return;
       const payload = response.payload as { $id: string; last_active?: string };
       if (!payload?.$id || !contactIdsRef.current.has(payload.$id)) return;
@@ -467,8 +551,14 @@ export default function CaregiverMessages() {
 
     const elderlyChannel = `databases.${DATABASE_ID}.collections.${ELDERLY_TABLE_ID}.documents`;
     const caregiverChannel = `databases.${DATABASE_ID}.collections.${CAREGIVER_TABLE_ID}.documents`;
-    const unsubElderly = clientReactNative.subscribe(elderlyChannel, handlePresenceUpdate);
-    const unsubCaregiver = clientReactNative.subscribe(caregiverChannel, handlePresenceUpdate);
+    const unsubElderly = clientReactNative.subscribe(
+      elderlyChannel,
+      handlePresenceUpdate,
+    );
+    const unsubCaregiver = clientReactNative.subscribe(
+      caregiverChannel,
+      handlePresenceUpdate,
+    );
 
     return () => {
       unsubElderly();
@@ -485,26 +575,26 @@ export default function CaregiverMessages() {
   const handleCall = useCallback((phone?: string | null) => {
     if (!phone)
       return Alert.alert(
-        t('common.noPhoneNumber'),
-        t('emergency.noPhoneOnFile'),
+        t("common.noPhoneNumber"),
+        t("emergency.noPhoneOnFile"),
       );
     const url = `tel:${phone}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) Linking.openURL(url);
-      else Alert.alert(t('common.cannotCall'));
+      else Alert.alert(t("common.cannotCall"));
     });
   }, []);
 
   const handleSMS = useCallback((phone?: string | null) => {
     if (!phone)
       return Alert.alert(
-        t('common.noPhoneNumber'),
-        t('emergency.noPhoneOnFile'),
+        t("common.noPhoneNumber"),
+        t("emergency.noPhoneOnFile"),
       );
     const url = `sms:${phone}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) Linking.openURL(url);
-      else Alert.alert(t('common.cannotSMS'));
+      else Alert.alert(t("common.cannotSMS"));
     });
   }, []);
 
@@ -544,7 +634,7 @@ export default function CaregiverMessages() {
       }
       setSearchDone(true);
     } catch (error) {
-      Alert.alert(t('common.error'), t('emergency.failedToAdd'));
+      Alert.alert(t("common.error"), t("emergency.failedToAdd"));
     } finally {
       setSearching(false);
     }
@@ -558,8 +648,10 @@ export default function CaregiverMessages() {
       const alreadyExists = contacts.some((c) => c.id === foundUser.data.$id);
       if (alreadyExists) {
         Alert.alert(
-          t('emergency.alreadyAdded'),
-          t('emergency.alreadyInContacts', { name: foundUser.data.name ?? t('common.unknown') }),
+          t("emergency.alreadyAdded"),
+          t("emergency.alreadyInContacts", {
+            name: foundUser.data.name ?? t("common.unknown"),
+          }),
         );
         setAddingContact(false);
         return;
@@ -575,19 +667,25 @@ export default function CaregiverMessages() {
 
       if (success) {
         Alert.alert(
-          t('emergency.invitationSent'),
-          t('emergency.invitationSentDesc', { name: foundUser.data.name ?? t('common.unknown') }) + ' ' + t('emergency.chatOnceAccepted'),
+          t("emergency.invitationSent"),
+          t("emergency.invitationSentDesc", {
+            name: foundUser.data.name ?? t("common.unknown"),
+          }) +
+            " " +
+            t("emergency.chatOnceAccepted"),
         );
         closeAddDialog();
         await fetchContacts();
       } else {
         Alert.alert(
-          t('emergency.alreadyAdded'),
-          t('emergency.alreadyInContactsOrPending', { name: foundUser.data.name ?? t('common.unknown') }),
+          t("emergency.alreadyAdded"),
+          t("emergency.alreadyInContactsOrPending", {
+            name: foundUser.data.name ?? t("common.unknown"),
+          }),
         );
       }
     } catch (error) {
-      Alert.alert(t('common.error'), t('emergency.failedToAdd'));
+      Alert.alert(t("common.error"), t("emergency.failedToAdd"));
     } finally {
       setAddingContact(false);
     }
@@ -607,34 +705,88 @@ export default function CaregiverMessages() {
           activeOpacity={0.7}
           onPress={() => navigateToGroupConversation(group)}
           onLongPress={() => handleLongPress(item)}
-          style={[styles.contactItem, { backgroundColor: isPinned ? theme.colors.surfaceVariant : theme.colors.surface }]}
+          style={[
+            styles.contactItem,
+            {
+              backgroundColor: isPinned
+                ? theme.colors.surfaceVariant
+                : theme.colors.surface,
+            },
+          ]}
         >
           <View style={styles.avatarContainer}>
-            <Avatar.Icon size={52} icon="account-group" style={{ backgroundColor: theme.colors.tertiaryContainer }} />
+            <Avatar.Icon
+              size={52}
+              icon="account-group"
+              style={{ backgroundColor: theme.colors.tertiaryContainer }}
+            />
             {item.unread > 0 && (
-              <Badge size={18} style={styles.unreadBadge}>{item.unread}</Badge>
+              <Badge size={18} style={styles.unreadBadge}>
+                {item.unread}
+              </Badge>
             )}
           </View>
           <View style={styles.contactInfo}>
             <View style={styles.contactHeader}>
-              <View style={{ flex: 1, marginRight: 8, flexDirection: "row", alignItems: "center" }}>
-                {isPinned && <MaterialCommunityIcons name="pin" size={14} color={theme.colors.primary} style={{ marginRight: 4 }} />}
-                <Text variant="titleMedium" style={[styles.contactName, { color: theme.colors.onSurface }]} numberOfLines={1}>
+              <View
+                style={{
+                  flex: 1,
+                  marginRight: 8,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                {isPinned && (
+                  <MaterialCommunityIcons
+                    name="pin"
+                    size={14}
+                    color={theme.colors.primary}
+                    style={{ marginRight: 4 }}
+                  />
+                )}
+                <Text
+                  variant="titleMedium"
+                  style={[
+                    styles.contactName,
+                    { color: theme.colors.onSurface },
+                  ]}
+                  numberOfLines={1}
+                >
                   {group.name}
                 </Text>
               </View>
-              <Text variant="bodySmall" style={[styles.timeText, { color: theme.colors.onSurfaceVariant }]}>
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.timeText,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
                 {formatRelativeTime(time)}
               </Text>
             </View>
             {preview ? (
-              <Text variant="bodySmall" style={[styles.previewText, { color: theme.colors.onSurfaceVariant }]} numberOfLines={1}>
-                {lastMsg?.sender_id === caregiverProfileId ? t('common.you') : `${lastMsg?.sender_name}: `}
-                {lastMsg?.message_type === "voice" ? t('common.voiceMessage') : preview}
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.previewText,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+                numberOfLines={1}
+              >
+                {lastMsg?.sender_id === caregiverProfileId
+                  ? t("common.you")
+                  : `${lastMsg?.sender_name}: `}
+                {lastMsg?.message_type === "voice"
+                  ? t("common.voiceMessage")
+                  : preview}
               </Text>
             ) : (
-              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                {t('emergency.tapToChat')}
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {t("emergency.tapToChat")}
               </Text>
             )}
           </View>
@@ -654,10 +806,22 @@ export default function CaregiverMessages() {
         activeOpacity={0.7}
         onPress={() => navigateToConversation(contact)}
         onLongPress={() => handleLongPress(item)}
-        style={[styles.contactItem, { backgroundColor: isPinned ? theme.colors.surfaceVariant : theme.colors.surface }]}
+        style={[
+          styles.contactItem,
+          {
+            backgroundColor: isPinned
+              ? theme.colors.surfaceVariant
+              : theme.colors.surface,
+          },
+        ]}
       >
         <View style={styles.avatarContainer}>
-          <UserAvatar avatarFileId={contact.avatarFileId} name={contact.name} size={52} role={contact.role} />
+          <UserAvatar
+            avatarFileId={contact.avatarFileId}
+            name={contact.name}
+            size={52}
+            role={contact.role}
+          />
           <View
             style={[
               styles.statusDot,
@@ -668,14 +832,30 @@ export default function CaregiverMessages() {
             ]}
           />
           {item.unread > 0 && (
-            <Badge size={18} style={styles.unreadBadge}>{item.unread}</Badge>
+            <Badge size={18} style={styles.unreadBadge}>
+              {item.unread}
+            </Badge>
           )}
         </View>
 
         <View style={styles.contactInfo}>
           <View style={styles.contactHeader}>
-            <View style={{ flex: 1, marginRight: 8, flexDirection: "row", alignItems: "center" }}>
-              {isPinned && <MaterialCommunityIcons name="pin" size={14} color={theme.colors.primary} style={{ marginRight: 4 }} />}
+            <View
+              style={{
+                flex: 1,
+                marginRight: 8,
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
+              {isPinned && (
+                <MaterialCommunityIcons
+                  name="pin"
+                  size={14}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
+              )}
               <Text
                 variant="titleMedium"
                 style={[styles.contactName, { color: theme.colors.onSurface }]}
@@ -701,7 +881,9 @@ export default function CaregiverMessages() {
                 <MaterialCommunityIcons
                   name={lastMsg.is_read ? "check-all" : "check"}
                   size={14}
-                  color={lastMsg.is_read ? "#4CAF50" : theme.colors.onSurfaceVariant}
+                  color={
+                    lastMsg.is_read ? "#4CAF50" : theme.colors.onSurfaceVariant
+                  }
                   style={{ marginRight: 3 }}
                 />
               )}
@@ -713,15 +895,23 @@ export default function CaregiverMessages() {
                 ]}
                 numberOfLines={1}
               >
-                {lastMsg?.sender_id === caregiverProfileId ? t('common.you') : ""}
-                {lastMsg?.message_type === "voice" ? t('common.voiceMessage') : preview}
+                {lastMsg?.sender_id === caregiverProfileId
+                  ? t("common.you")
+                  : ""}
+                {lastMsg?.message_type === "voice"
+                  ? t("common.voiceMessage")
+                  : preview}
               </Text>
             </View>
           ) : (
             <View style={styles.contactSubInfo}>
               <View style={styles.roleChip}>
                 <MaterialCommunityIcons
-                  name={contact.role === "elderly" ? "account-heart" : "shield-account"}
+                  name={
+                    contact.role === "elderly"
+                      ? "account-heart"
+                      : "shield-account"
+                  }
                   size={14}
                   color={theme.colors.primary}
                 />
@@ -732,14 +922,16 @@ export default function CaregiverMessages() {
                     { color: theme.colors.onSurfaceVariant },
                   ]}
                 >
-                  {contact.role === "elderly" ? t('common.elderly') : t('common.caregiver')}
+                  {contact.role === "elderly"
+                    ? t("common.elderly")
+                    : t("common.caregiver")}
                 </Text>
               </View>
               <Text
                 variant="bodySmall"
                 style={{ color: theme.colors.onSurfaceVariant }}
               >
-                {t('emergency.tapToChat')}
+                {t("emergency.tapToChat")}
               </Text>
             </View>
           )}
@@ -768,7 +960,8 @@ export default function CaregiverMessages() {
   };
 
   const renderPendingRequests = () => {
-    if (pendingRequests.length === 0 && pendingGroupInvites.length === 0) return null;
+    if (pendingRequests.length === 0 && pendingGroupInvites.length === 0)
+      return null;
 
     return (
       <View style={{ marginBottom: 16 }}>
@@ -782,7 +975,7 @@ export default function CaregiverMessages() {
                 color: theme.colors.onSurfaceVariant,
               }}
             >
-              {t('emergency.pendingRequests')}
+              {t("emergency.pendingRequests")}
             </Text>
             {pendingRequests.map((req) => (
               <View
@@ -803,11 +996,19 @@ export default function CaregiverMessages() {
                     }}
                   />
                 </View>
-                <View style={[styles.contactInfo, { flexDirection: "row", alignItems: "center" }]}>
+                <View
+                  style={[
+                    styles.contactInfo,
+                    { flexDirection: "row", alignItems: "center" },
+                  ]}
+                >
                   <View style={{ flex: 1 }}>
                     <Text
                       variant="titleMedium"
-                      style={[styles.contactName, { color: theme.colors.onSurface }]}
+                      style={[
+                        styles.contactName,
+                        { color: theme.colors.onSurface },
+                      ]}
                     >
                       {req.from.name}
                     </Text>
@@ -815,23 +1016,25 @@ export default function CaregiverMessages() {
                       variant="bodySmall"
                       style={{ color: theme.colors.onSurfaceVariant }}
                     >
-                      {t('emergency.wantsToConnect')}
+                      {t("emergency.wantsToConnect")}
                     </Text>
                   </View>
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     <Button
                       mode="contained"
                       compact
-                      onPress={() => handleAcceptRequest(req.connectionId, req.from.name)}
+                      onPress={() =>
+                        handleAcceptRequest(req.connectionId, req.from.name)
+                      }
                     >
-                      {t('emergency.accept')}
+                      {t("emergency.accept")}
                     </Button>
                     <Button
                       mode="outlined"
                       compact
                       onPress={() => handleRejectRequest(req.connectionId)}
                     >
-                      {t('emergency.reject')}
+                      {t("emergency.reject")}
                     </Button>
                   </View>
                 </View>
@@ -842,17 +1045,45 @@ export default function CaregiverMessages() {
 
         {/* Pending Group Invitations */}
         {pendingGroupInvites.length > 0 && (
-          <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-              <MaterialCommunityIcons name="account-group" size={20} color={theme.colors.primary} />
-              <Text variant="titleSmall" style={{ marginLeft: 6, fontWeight: "700", color: theme.colors.primary }}>
-                {t('chat.groupInvitations', { count: pendingGroupInvites.length })}
+          <View
+            style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 8,
+              }}
+            >
+              <MaterialCommunityIcons
+                name="account-group"
+                size={20}
+                color={theme.colors.primary}
+              />
+              <Text
+                variant="titleSmall"
+                style={{
+                  marginLeft: 6,
+                  fontWeight: "700",
+                  color: theme.colors.primary,
+                }}
+              >
+                {t("chat.groupInvitations", {
+                  count: pendingGroupInvites.length,
+                })}
               </Text>
             </View>
             {pendingGroupInvites.map((invite) => (
               <View
                 key={invite.membership.$id}
-                style={{ flexDirection: "row", alignItems: "center", borderRadius: 14, padding: 12, marginBottom: 8, backgroundColor: theme.colors.primaryContainer }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  borderRadius: 14,
+                  padding: 12,
+                  marginBottom: 8,
+                  backgroundColor: theme.colors.primaryContainer,
+                }}
               >
                 <Avatar.Icon
                   size={40}
@@ -863,26 +1094,53 @@ export default function CaregiverMessages() {
                   <Text variant="titleSmall" style={{ fontWeight: "600" }}>
                     {invite.group.name}
                   </Text>
-                  <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                    {t('chat.invitedYouToGroup')}
+                  <Text
+                    variant="bodySmall"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                  >
+                    {t("chat.invitedYouToGroup")}
                   </Text>
                 </View>
                 <TouchableOpacity
                   onPress={() => handleAcceptGroupInvite(invite)}
                   disabled={acceptingGroupId === invite.membership.$id}
-                  style={{ width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center", marginLeft: 8, backgroundColor: "#4CAF50" }}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginLeft: 8,
+                    backgroundColor: "#4CAF50",
+                  }}
                 >
                   {acceptingGroupId === invite.membership.$id ? (
                     <ActivityIndicator size={16} color="#fff" />
                   ) : (
-                    <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                    <MaterialCommunityIcons
+                      name="check"
+                      size={18}
+                      color="#fff"
+                    />
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => handleRejectGroupInvite(invite)}
-                  style={{ width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center", marginLeft: 6, backgroundColor: "#FFCDD2" }}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginLeft: 6,
+                    backgroundColor: "#FFCDD2",
+                  }}
                 >
-                  <MaterialCommunityIcons name="close" size={18} color="#D32F2F" />
+                  <MaterialCommunityIcons
+                    name="close"
+                    size={18}
+                    color="#D32F2F"
+                  />
                 </TouchableOpacity>
               </View>
             ))}
@@ -903,13 +1161,13 @@ export default function CaregiverMessages() {
         variant="headlineSmall"
         style={[styles.emptyTitle, { color: theme.colors.onSurface }]}
       >
-        {t('messages.noContactsYet')}
+        {t("messages.noContactsYet")}
       </Text>
       <Text
         variant="bodyMedium"
         style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant }]}
       >
-        {t('messages.contactsAppearHere')}
+        {t("messages.contactsAppearHere")}
       </Text>
     </View>
   );
@@ -932,7 +1190,7 @@ export default function CaregiverMessages() {
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.searchRow}>
           <Searchbar
-            placeholder={t('messages.searchContacts')}
+            placeholder={t("messages.searchContacts")}
             onChangeText={setSearchQuery}
             value={searchQuery}
             style={[
@@ -948,7 +1206,10 @@ export default function CaregiverMessages() {
             anchor={
               <TouchableOpacity
                 onPress={() => setShowAddMenu(true)}
-                style={[styles.addBtn, { backgroundColor: theme.colors.primary }]}
+                style={[
+                  styles.addBtn,
+                  { backgroundColor: theme.colors.primary },
+                ]}
                 activeOpacity={0.8}
               >
                 <MaterialCommunityIcons
@@ -961,13 +1222,19 @@ export default function CaregiverMessages() {
           >
             <Menu.Item
               leadingIcon="account-plus"
-              title={t('chat.addNewFriend')}
-              onPress={() => { setShowAddMenu(false); openAddDialog(); }}
+              title={t("chat.addNewFriend")}
+              onPress={() => {
+                setShowAddMenu(false);
+                openAddDialog();
+              }}
             />
             <Menu.Item
               leadingIcon="account-group"
-              title={t('chat.createGroupChat')}
-              onPress={() => { setShowAddMenu(false); setShowCreateGroup(true); }}
+              title={t("chat.createGroupChat")}
+              onPress={() => {
+                setShowAddMenu(false);
+                setShowCreateGroup(true);
+              }}
             />
           </Menu>
         </View>
@@ -984,7 +1251,7 @@ export default function CaregiverMessages() {
               { color: theme.colors.onSurfaceVariant },
             ]}
           >
-            {t('messages.loadingContacts')}
+            {t("messages.loadingContacts")}
           </Text>
         </View>
       ) : (
@@ -995,7 +1262,10 @@ export default function CaregiverMessages() {
           ListHeaderComponent={renderPendingRequests}
           contentContainerStyle={[
             styles.listContent,
-            chatList.length === 0 && pendingRequests.length === 0 && pendingGroupInvites.length === 0 && styles.emptyList,
+            chatList.length === 0 &&
+              pendingRequests.length === 0 &&
+              pendingGroupInvites.length === 0 &&
+              styles.emptyList,
           ]}
           ItemSeparatorComponent={() => (
             <View
@@ -1006,11 +1276,23 @@ export default function CaregiverMessages() {
               }}
             />
           )}
-          ListEmptyComponent={pendingRequests.length === 0 && pendingGroupInvites.length === 0 ? renderEmptyState : null}
+          ListEmptyComponent={
+            pendingRequests.length === 0 && pendingGroupInvites.length === 0
+              ? renderEmptyState
+              : null
+          }
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
-          extraData={[lastMessages, groupLastMessages, pendingRequests, pendingGroupInvites, unreadCounts, groupUnreadCounts, pinnedConversations]}
+          extraData={[
+            lastMessages,
+            groupLastMessages,
+            pendingRequests,
+            pendingGroupInvites,
+            unreadCounts,
+            groupUnreadCounts,
+            pinnedConversations,
+          ]}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -1028,40 +1310,52 @@ export default function CaregiverMessages() {
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
       {/* Top Tab Bar */}
-      <View style={{ flexDirection: 'row', backgroundColor: theme.colors.surface, elevation: 1 }}>
-        {[t('emergency.chats'), t('emergency.moments')].map((tab, index) => {
-           const isActive = activeTab === index;
-           return (
-             <TouchableOpacity 
-               key={tab} 
-               style={{ 
-                 flex: 1, 
-                 paddingVertical: 14, 
-                 alignItems: 'center', 
-                 borderBottomWidth: 2, 
-                 borderBottomColor: isActive ? theme.colors.primary : 'transparent' 
-               }}
-               onPress={() => onTabPress(index)}
-               activeOpacity={0.7}
-             >
-               <Text 
-                 variant="labelLarge"
-                 style={{ 
-                   color: isActive ? theme.colors.primary : theme.colors.onSurfaceVariant, 
-                   fontWeight: isActive ? '700' : '500' 
-                 }}
-               >
-                 {tab}
-               </Text>
-             </TouchableOpacity>
-           );
+      <View
+        style={{
+          flexDirection: "row",
+          backgroundColor: theme.colors.surface,
+          elevation: 1,
+        }}
+      >
+        {[t("emergency.chats"), t("emergency.moments")].map((tab, index) => {
+          const isActive = activeTab === index;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={{
+                flex: 1,
+                paddingVertical: 14,
+                alignItems: "center",
+                borderBottomWidth: 2,
+                borderBottomColor: isActive
+                  ? theme.colors.primary
+                  : "transparent",
+              }}
+              onPress={() => onTabPress(index)}
+              activeOpacity={0.7}
+            >
+              <Text
+                variant="labelLarge"
+                style={{
+                  color: isActive
+                    ? theme.colors.primary
+                    : theme.colors.onSurfaceVariant,
+                  fontWeight: isActive ? "700" : "500",
+                }}
+              >
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          );
         })}
       </View>
 
       <FlatList
         ref={pagerRef}
         data={[0, 1]}
-        renderItem={({ item }) => item === 0 ? renderChatPage() : renderMomentsPage()}
+        renderItem={({ item }) =>
+          item === 0 ? renderChatPage() : renderMomentsPage()
+        }
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -1069,9 +1363,11 @@ export default function CaregiverMessages() {
         scrollEventThrottle={16}
         keyExtractor={(item) => item.toString()}
         style={{ flex: 1 }}
-        getItemLayout={(data, index) => (
-          {length: width, offset: width * index, index}
-        )}
+        getItemLayout={(data, index) => ({
+          length: width,
+          offset: width * index,
+          index,
+        })}
       />
 
       {/* ── Add Friend Modal ── */}
@@ -1093,7 +1389,7 @@ export default function CaregiverMessages() {
                 {/* Header */}
                 <View style={styles.modalHeader}>
                   <Text variant="titleLarge" style={{ fontWeight: "700" }}>
-                    {t('emergency.addFriend')}
+                    {t("emergency.addFriend")}
                   </Text>
                   <TouchableOpacity onPress={closeAddDialog}>
                     <MaterialCommunityIcons
@@ -1111,14 +1407,14 @@ export default function CaregiverMessages() {
                     marginBottom: 16,
                   }}
                 >
-                  {t('emergency.searchByPhone')}
+                  {t("emergency.searchByPhone")}
                 </Text>
 
                 {/* Phone input + Search button */}
                 <View style={styles.phoneRow}>
                   <TextInput
                     mode="outlined"
-                    label={t('emergency.phoneNumber')}
+                    label={t("emergency.phoneNumber")}
                     value={phoneSearch}
                     onChangeText={setPhoneSearch}
                     keyboardType="phone-pad"
@@ -1136,7 +1432,7 @@ export default function CaregiverMessages() {
                     style={styles.searchBtn}
                     compact
                   >
-                    {t('common.search')}
+                    {t("common.search")}
                   </Button>
                 </View>
 
@@ -1154,7 +1450,7 @@ export default function CaregiverMessages() {
                         color: theme.colors.onSurfaceVariant,
                       }}
                     >
-                      {t('emergency.searching')}
+                      {t("emergency.searching")}
                     </Text>
                   </View>
                 )}
@@ -1187,10 +1483,7 @@ export default function CaregiverMessages() {
                       }}
                     />
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text
-                        variant="titleMedium"
-                        style={{ fontWeight: "600" }}
-                      >
+                      <Text variant="titleMedium" style={{ fontWeight: "600" }}>
                         {foundUser.data.name ?? "Unknown"}
                       </Text>
                       <View
@@ -1275,7 +1568,7 @@ export default function CaregiverMessages() {
                         color: theme.colors.onSurfaceVariant,
                       }}
                     >
-                      {t('emergency.noUserFound')}
+                      {t("emergency.noUserFound")}
                     </Text>
                   </View>
                 )}
@@ -1308,30 +1601,45 @@ export default function CaregiverMessages() {
       >
         <TouchableWithoutFeedback onPress={() => setShowLongPressMenu(false)}>
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.colors.surface, padding: 16 }]}>
-              {longPressItem && (() => {
-                const itemId = chatListItemId(longPressItem);
-                const isPinned = pinnedConversations.includes(itemId);
-                return (
-                  <TouchableOpacity
-                    style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}
-                    onPress={() => {
-                      handleTogglePin(itemId);
-                      setShowLongPressMenu(false);
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name={isPinned ? "pin-off" : "pin"}
-                      size={22}
-                      color={theme.colors.onSurface}
-                      style={{ marginRight: 12 }}
-                    />
-                    <Text variant="bodyLarge" style={{ color: theme.colors.onSurface }}>
-                      {isPinned ? t('chat.unpinConversation') : t('chat.pinConversation')}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })()}
+            <View
+              style={[
+                styles.modalContent,
+                { backgroundColor: theme.colors.surface, padding: 16 },
+              ]}
+            >
+              {longPressItem &&
+                (() => {
+                  const itemId = chatListItemId(longPressItem);
+                  const isPinned = pinnedConversations.includes(itemId);
+                  return (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingVertical: 14,
+                      }}
+                      onPress={() => {
+                        handleTogglePin(itemId);
+                        setShowLongPressMenu(false);
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name={isPinned ? "pin-off" : "pin"}
+                        size={22}
+                        color={theme.colors.onSurface}
+                        style={{ marginRight: 12 }}
+                      />
+                      <Text
+                        variant="bodyLarge"
+                        style={{ color: theme.colors.onSurface }}
+                      >
+                        {isPinned
+                          ? t("chat.unpinConversation")
+                          : t("chat.pinConversation")}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })()}
             </View>
           </View>
         </TouchableWithoutFeedback>

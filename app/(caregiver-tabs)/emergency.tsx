@@ -1,89 +1,140 @@
+import {
+  DATABASE_ID,
+  EMERGENCY_ALERTS_TABLE_ID,
+  safeSubscribe,
+} from "@/lib/appwrite";
+import { useAuth } from "@/lib/auth-context";
+import {
+  fetchEmergencyAlerts,
+  resolveEmergencyAlert,
+  updateAlertStatus,
+} from "@/lib/emergency";
+import type { EmergencyAlert } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation, useRouter } from "expo-router";
-import React, { useLayoutEffect, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    FlatList,
-    Linking,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Linking,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from "react-native";
 import {
-    Button,
-    Card,
-    Chip,
-    Dialog,
-    Divider,
-    Portal,
-    Surface,
-    Text,
-    useTheme
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  Divider,
+  Menu,
+  Portal,
+  Searchbar,
+  Surface,
+  Text,
+  useTheme,
 } from "react-native-paper";
 
-type EmergencyLog = {
-  id: string;
-  type: "fall" | "sos" | "hr_warning" | "geo_fence";
-  elderlyName: string;
-  location: string;
-  time: string;
-  date: string;
-  status: "active" | "resolved" | "investigating";
-  desc: string;
-};
+/* ── Helpers ────────────────────────────────────────────── */
 
-const EMERGENCY_LOGS: EmergencyLog[] = [
-  {
-    id: "1",
-    type: "sos",
-    elderlyName: "Grandpa Zhang",
-    location: "Bedroom 101",
-    time: "10:15 AM",
-    date: "Today",
-    status: "active",
-    desc: "SOS button pressed manually.",
-  },
-  {
-    id: "2",
-    type: "hr_warning",
-    elderlyName: "Grandma Li",
-    location: "Living Room",
-    time: "09:30 AM",
-    date: "Today",
-    status: "investigating",
-    desc: "Abnormal Heart Rate detected (140 bpm).",
-  },
-  {
-    id: "3",
-    type: "fall",
-    elderlyName: "Grandpa Wang",
-    location: "Bathroom",
-    time: "02:00 AM",
-    date: "Yesterday",
-    status: "resolved",
-    desc: "Fall detected. Staff assisted immediately.",
-  },
-  {
-    id: "4",
-    type: "geo_fence",
-    elderlyName: "Grandma Chen",
-    location: "Garden Gate",
-    time: "04:45 PM",
-    date: "Yesterday",
-    status: "resolved",
-    desc: "Exited safe zone.",
-  },
-];
+function getTypeConfig(type: string) {
+  switch (type) {
+    case "fall":
+      return {
+        icon: "alert-decagram",
+        color: "#D32F2F",
+        label: "Fall Detected",
+      };
+    case "sos":
+      return { icon: "bell-alert", color: "#C62828", label: "SOS Alert" };
+    case "hr_warning":
+      return {
+        icon: "heart-broken",
+        color: "#E64A19",
+        label: "Health Warning",
+      };
+    case "geo_fence":
+      return { icon: "map-marker-alert", color: "#F57C00", label: "Geo-Fence" };
+    default:
+      return { icon: "alert", color: "#757575", label: "Alert" };
+  }
+}
+
+function formatRelativeTime(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "yesterday";
+  return `${days}d ago`;
+}
+
+type FilterStatus = "all" | "active" | "investigating" | "resolved";
+
+/* ── Component ──────────────────────────────────────────── */
 
 export default function EmergencyPage() {
   const theme = useTheme();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const router = useRouter();
   const navigation = useNavigation();
+  const { user } = useAuth();
   const { t } = useTranslation();
-  const [selectedLog, setSelectedLog] = useState<EmergencyLog | null>(null);
 
+  const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(
+    null,
+  );
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
+  const [filterMenuVisible, setFilterMenuVisible] = useState(false);
+
+  /* ── Data fetching ── */
+  const loadAlerts = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await fetchEmergencyAlerts(user.$id);
+      setAlerts(data);
+    } catch (err) {
+      console.error("Failed to load alerts:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadAlerts();
+  }, [loadAlerts]);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!user) return;
+    const channel = `databases.${DATABASE_ID}.collections.${EMERGENCY_ALERTS_TABLE_ID}.documents`;
+    const unsub = safeSubscribe(channel, () => {
+      loadAlerts();
+    });
+    return () => unsub?.();
+  }, [user, loadAlerts]);
+
+  /* ── Header ── */
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: "",
@@ -97,7 +148,9 @@ export default function EmergencyPage() {
             size={28}
             color={theme.colors.onSurface}
           />
-          <Text style={{ marginLeft: 5, fontSize: 16 }}>{t('common.back')}</Text>
+          <Text style={{ marginLeft: 5, fontSize: 16 }}>
+            {t("common.back")}
+          </Text>
         </TouchableOpacity>
       ),
       headerRight: () => (
@@ -108,15 +161,54 @@ export default function EmergencyPage() {
             style={{ borderColor: theme.colors.error }}
             textStyle={{ color: theme.colors.error }}
           >
-            {t('emergency.live')}
+            {t("emergency.live")}
           </Chip>
         </View>
       ),
     });
   }, [navigation, router, theme]);
 
+  /* ── Filtering ── */
+  const filtered = useMemo(() => {
+    let list = alerts;
+    if (filterStatus !== "all") {
+      list = list.filter((a) => a.status === filterStatus);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (a) =>
+          a.elderly_name.toLowerCase().includes(q) ||
+          a.type.toLowerCase().includes(q) ||
+          (a.location_name ?? "").toLowerCase().includes(q) ||
+          (a.description ?? "").toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [alerts, filterStatus, search]);
+
+  const activeCount = useMemo(
+    () =>
+      alerts.filter(
+        (a) => a.status === "active" || a.status === "investigating",
+      ).length,
+    [alerts],
+  );
+
+  /* ── Actions ── */
   const handleCallEmergency = (number: string) => {
     Linking.openURL(`tel:${number}`);
+  };
+
+  const handleResolve = async (alert: EmergencyAlert) => {
+    if (!user) return;
+    try {
+      await resolveEmergencyAlert(alert.$id, user.$id);
+      setSelectedAlert(null);
+      loadAlerts();
+    } catch (err) {
+      Alert.alert("Error", "Failed to resolve alert.");
+    }
   };
 
   const getTypeConfig = (type: string) => {
@@ -125,42 +217,57 @@ export default function EmergencyPage() {
         return {
           icon: "alert-decagram",
           color: "#D32F2F",
-          label: t('emergency.fallDetected'),
+          label: t("emergency.fallDetected"),
         };
       case "sos":
-        return { icon: "bell-alert", color: "#C62828", label: t('emergency.sosAlert') };
+        return {
+          icon: "bell-alert",
+          color: "#C62828",
+          label: t("emergency.sosAlert"),
+        };
       case "hr_warning":
         return {
           icon: "heart-broken",
           color: "#E64A19",
-          label: t('emergency.healthWarning'),
+          label: t("emergency.healthWarning"),
         };
       case "geo_fence":
         return {
           icon: "map-marker-alert",
           color: "#F57C00",
-          label: t('emergency.geoFence'),
+          label: t("emergency.geoFence"),
         };
       default:
-        return { icon: "alert", color: "#757575", label: t('emergency.alert') };
+        return { icon: "alert", color: "#757575", label: t("emergency.alert") };
     }
   };
 
+  const handleInvestigate = async (alert: EmergencyAlert) => {
+    try {
+      await updateAlertStatus(alert.$id, "investigating");
+      setSelectedAlert(null);
+      loadAlerts();
+    } catch (err) {
+      Alert.alert("Error", "Failed to update alert status.");
+    }
+  };
+
+  /* ── Sub-components ── */
   const StatusBadge = ({ status }: { status: string }) => {
     let textColor = theme.colors.primary;
     let bgColor = theme.colors.primaryContainer;
-    let label = t('common.resolved');
+    let label = t("common.resolved");
     let icon = "check-circle";
 
     if (status === "active") {
       textColor = theme.colors.error;
       bgColor = theme.colors.errorContainer;
-      label = t('common.active');
+      label = t("common.active");
       icon = "alert-circle";
     } else if (status === "investigating") {
       textColor = "#FB8C00";
-      bgColor = "#FFF3E0";
-      label = t('emergency.inProgress');
+      bgColor = isDark ? "rgba(251,140,0,0.15)" : "#FFF3E0";
+      label = t("emergency.inProgress");
       icon = "progress-clock";
     }
 
@@ -176,7 +283,7 @@ export default function EmergencyPage() {
     );
   };
 
-  const renderLogItem = ({ item }: { item: EmergencyLog }) => {
+  const renderLogItem = ({ item }: { item: EmergencyAlert }) => {
     const config = getTypeConfig(item.type);
     return (
       <Surface
@@ -184,7 +291,7 @@ export default function EmergencyPage() {
         elevation={1}
       >
         <TouchableOpacity
-          onPress={() => setSelectedLog(item)}
+          onPress={() => setSelectedAlert(item)}
           style={{ flexDirection: "row", alignItems: "center", padding: 12 }}
         >
           <View
@@ -210,7 +317,7 @@ export default function EmergencyPage() {
               <StatusBadge status={item.status} />
             </View>
             <Text variant="bodyMedium" style={{ marginTop: 2 }}>
-              {item.elderlyName}
+              {item.elderly_name}
             </Text>
             <View
               style={{
@@ -222,85 +329,150 @@ export default function EmergencyPage() {
               <MaterialCommunityIcons
                 name="clock-outline"
                 size={14}
-                color="#666"
+                color={theme.colors.onSurfaceVariant}
               />
               <Text
                 variant="bodySmall"
-                style={{ color: "#666", marginLeft: 4, marginRight: 12 }}
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                  marginLeft: 4,
+                  marginRight: 12,
+                }}
               >
-                {item.time}
+                {formatRelativeTime(item.$createdAt)}
               </Text>
-              <MaterialCommunityIcons
-                name="map-marker-outline"
-                size={14}
-                color="#666"
-              />
-              <Text
-                variant="bodySmall"
-                style={{ color: "#666", marginLeft: 4 }}
-              >
-                {item.location}
-              </Text>
+              {item.location_name && (
+                <>
+                  <MaterialCommunityIcons
+                    name="map-marker-outline"
+                    size={14}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <Text
+                    variant="bodySmall"
+                    style={{
+                      color: theme.colors.onSurfaceVariant,
+                      marginLeft: 4,
+                    }}
+                  >
+                    {item.location_name}
+                  </Text>
+                </>
+              )}
             </View>
           </View>
-          <MaterialCommunityIcons name="chevron-right" size={24} color="#ccc" />
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={24}
+            color={theme.colors.onSurfaceVariant}
+          />
         </TouchableOpacity>
       </Surface>
     );
   };
 
+  /* ── Render ── */
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          styles.center,
+          { backgroundColor: theme.colors.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 20 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadAlerts();
+            }}
+          />
+        }
+      >
         {/* Status Banner */}
         <Surface
           style={[
             styles.banner,
-            { backgroundColor: theme.colors.errorContainer },
+            {
+              backgroundColor:
+                activeCount > 0
+                  ? theme.colors.errorContainer
+                  : theme.colors.primaryContainer,
+            },
           ]}
           elevation={2}
         >
           <View style={styles.bannerContent}>
             <MaterialCommunityIcons
-              name="shield-alert"
+              name={activeCount > 0 ? "shield-alert" : "shield-check"}
               size={48}
-              color={theme.colors.error}
+              color={
+                activeCount > 0 ? theme.colors.error : theme.colors.primary
+              }
             />
             <View style={{ marginLeft: 16, flex: 1 }}>
               <Text
                 variant="headlineSmall"
                 style={{
-                  color: theme.colors.onErrorContainer,
+                  color:
+                    activeCount > 0
+                      ? theme.colors.onErrorContainer
+                      : theme.colors.onPrimaryContainer,
                   fontWeight: "bold",
                 }}
               >
-                {t('emergency.alertSystemActive')}
+                {activeCount > 0
+                  ? t("emergency.alertSystemActive")
+                  : "All Clear"}
               </Text>
               <Text
                 variant="bodyMedium"
-                style={{ color: theme.colors.onErrorContainer }}
+                style={{
+                  color:
+                    activeCount > 0
+                      ? theme.colors.onErrorContainer
+                      : theme.colors.onPrimaryContainer,
+                }}
               >
-                {t('emergency.unresolvedAlerts', { count: 2 })}
+                {activeCount > 0
+                  ? t("emergency.unresolvedAlerts", { count: activeCount })
+                  : "No active alerts at this time."}
               </Text>
             </View>
           </View>
-          <Button
-            mode="contained"
-            buttonColor={theme.colors.error}
-            textColor="white"
-            style={{ marginTop: 12 }}
-            onPress={() => setSelectedLog(EMERGENCY_LOGS[0])}
-          >
-            {t('emergency.viewLatestAlert')}
-          </Button>
+          {activeCount > 0 && (
+            <Button
+              mode="contained"
+              buttonColor={theme.colors.error}
+              textColor="white"
+              style={{ marginTop: 12 }}
+              onPress={() => {
+                const first = alerts.find((a) => a.status === "active");
+                if (first) setSelectedAlert(first);
+              }}
+            >
+              {t("emergency.viewLatestAlert")}
+            </Button>
+          )}
         </Surface>
 
         {/* Quick Actions Grid */}
         <View style={styles.sectionHeader}>
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            {t('emergency.emergencyResponse')}
+            {t("emergency.emergencyResponse")}
           </Text>
         </View>
         <View style={styles.grid}>
@@ -315,7 +487,7 @@ export default function EmergencyPage() {
                 color="#D32F2F"
               />
               <Text style={[styles.gridLabel, { color: "#D32F2F" }]}>
-                {t('emergency.call999')}
+                {t("emergency.call999")}
               </Text>
             </Card.Content>
           </Card>
@@ -330,14 +502,17 @@ export default function EmergencyPage() {
                 color="#1976D2"
               />
               <Text style={[styles.gridLabel, { color: "#1976D2" }]}>
-                {t('emergency.police')}
+                {t("emergency.police")}
               </Text>
             </Card.Content>
           </Card>
           <Card
             style={[styles.gridCard, { backgroundColor: "#fff" }]}
             onPress={() =>
-              Alert.alert(t('emergency.broadcast'), t('emergency.broadcastDesc'))
+              Alert.alert(
+                t("emergency.broadcast"),
+                t("emergency.broadcastDesc"),
+              )
             }
           >
             <Card.Content style={styles.gridContent}>
@@ -346,109 +521,221 @@ export default function EmergencyPage() {
                 size={32}
                 color={theme.colors.primary}
               />
-              <Text style={styles.gridLabel}>{t('emergency.broadcast')}</Text>
+              <Text style={styles.gridLabel}>{t("emergency.broadcast")}</Text>
             </Card.Content>
           </Card>
         </View>
 
-        {/* Log List */}
-        <View style={[styles.sectionHeader, { marginTop: 10 }]}>
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            {t('emergency.recentLogs')}
-          </Text>
-          <Button mode="text" compact>
-            {t('emergency.filter')}
-          </Button>
+        {/* Search & Filter */}
+        <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+          <Searchbar
+            placeholder="Search alerts..."
+            value={search}
+            onChangeText={setSearch}
+            style={{ borderRadius: 12, elevation: 1 }}
+          />
         </View>
-        <FlatList
-          data={EMERGENCY_LOGS}
-          renderItem={renderLogItem}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          contentContainerStyle={{ paddingHorizontal: 16 }}
-        />
+        <View style={[styles.sectionHeader, { marginTop: 4 }]}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Alert Logs ({filtered.length})
+          </Text>
+          <Menu
+            visible={filterMenuVisible}
+            onDismiss={() => setFilterMenuVisible(false)}
+            anchor={
+              <Button
+                mode="text"
+                compact
+                onPress={() => setFilterMenuVisible(true)}
+                icon="filter-variant"
+              >
+                {filterStatus === "all"
+                  ? "All"
+                  : filterStatus.charAt(0).toUpperCase() +
+                    filterStatus.slice(1)}
+              </Button>
+            }
+          >
+            <Menu.Item
+              title="All"
+              onPress={() => {
+                setFilterStatus("all");
+                setFilterMenuVisible(false);
+              }}
+            />
+            <Menu.Item
+              title="Active"
+              onPress={() => {
+                setFilterStatus("active");
+                setFilterMenuVisible(false);
+              }}
+            />
+            <Menu.Item
+              title="Investigating"
+              onPress={() => {
+                setFilterStatus("investigating");
+                setFilterMenuVisible(false);
+              }}
+            />
+            <Menu.Item
+              title="Resolved"
+              onPress={() => {
+                setFilterStatus("resolved");
+                setFilterMenuVisible(false);
+              }}
+            />
+          </Menu>
+        </View>
+
+        {filtered.length === 0 ? (
+          <View style={[styles.center, { paddingVertical: 48 }]}>
+            <MaterialCommunityIcons
+              name="shield-check-outline"
+              size={64}
+              color="#ccc"
+            />
+            <Text variant="bodyLarge" style={{ color: "#999", marginTop: 12 }}>
+              No alerts found
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filtered}
+            renderItem={renderLogItem}
+            keyExtractor={(item) => item.$id}
+            scrollEnabled={false}
+            contentContainerStyle={{ paddingHorizontal: 16 }}
+          />
+        )}
       </ScrollView>
 
+      {/* Detail Dialog */}
       <Portal>
         <Dialog
-          visible={!!selectedLog}
-          onDismiss={() => setSelectedLog(null)}
+          visible={!!selectedAlert}
+          onDismiss={() => setSelectedAlert(null)}
           style={{ backgroundColor: theme.colors.background }}
         >
           <Dialog.Title
             style={{ color: theme.colors.error, fontWeight: "bold" }}
           >
-            <MaterialCommunityIcons name="alert" size={24} /> {t('emergency.incidentDetails')}
+            <MaterialCommunityIcons name="alert" size={24} />{" "}
+            {t("emergency.incidentDetails")}
           </Dialog.Title>
           <Dialog.Content>
-            {selectedLog && (
+            {selectedAlert && (
               <View>
                 <Surface style={styles.detailBox} elevation={0}>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>{t('emergency.type')}</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("emergency.type")}
+                    </Text>
                     <Text style={styles.detailValue}>
-                      {selectedLog.type.toUpperCase().replace("_", " ")}
+                      {getTypeConfig(selectedAlert.type).label}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>{t('emergency.elderlyLabel')}</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("emergency.elderlyLabel")}
+                    </Text>
                     <Text style={styles.detailValue}>
-                      {selectedLog.elderlyName}
+                      {selectedAlert.elderly_name}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>{t('emergency.location')}</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("emergency.location")}
+                    </Text>
                     <Text style={styles.detailValue}>
-                      {selectedLog.location}
+                      {selectedAlert.location_name ?? "Unknown"}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>{t('emergency.timeLabel')}</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("emergency.timeLabel")}
+                    </Text>
                     <Text style={styles.detailValue}>
-                      {selectedLog.time}, {selectedLog.date}
+                      {new Date(selectedAlert.$createdAt).toLocaleString()}
                     </Text>
                   </View>
+                  {selectedAlert.latitude != null &&
+                    selectedAlert.longitude != null && (
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>GPS:</Text>
+                        <Text style={styles.detailValue}>
+                          {selectedAlert.latitude.toFixed(5)},{" "}
+                          {selectedAlert.longitude.toFixed(5)}
+                        </Text>
+                      </View>
+                    )}
                 </Surface>
 
                 <Text
                   variant="titleMedium"
                   style={{ marginTop: 16, marginBottom: 4 }}
                 >
-                  {t('emergency.description')}
+                  {t("emergency.description")}
                 </Text>
                 <Text variant="bodyMedium" style={{ lineHeight: 20 }}>
-                  {selectedLog.desc}
+                  {selectedAlert.description ?? "No description available."}
                 </Text>
 
                 <Divider style={{ marginVertical: 16 }} />
                 <Text variant="titleMedium" style={{ marginBottom: 12 }}>
-                  {t('emergency.suggestedActions')}
+                  {t("emergency.suggestedActions")}
                 </Text>
-                <View style={{ flexDirection: "row", gap: 10 }}>
+                <View
+                  style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}
+                >
+                  <Chip icon="phone" onPress={() => handleCallEmergency("999")}>
+                    {t("emergency.call999")}
+                  </Chip>
                   <Chip
                     icon="phone"
                     onPress={() => handleCallEmergency("12345678")}
                   >
-                    {t('emergency.callFamily')}
+                    {t("emergency.callFamily")}
                   </Chip>
                   <Chip icon="video" onPress={() => {}}>
-                    {t('emergency.viewCamera')}
+                    {t("emergency.viewCamera")}
                   </Chip>
+                  {selectedAlert.latitude != null &&
+                    selectedAlert.longitude != null && (
+                      <Chip
+                        icon="map-marker"
+                        onPress={() =>
+                          Linking.openURL(
+                            `https://maps.google.com/?q=${selectedAlert.latitude},${selectedAlert.longitude}`,
+                          )
+                        }
+                      >
+                        Open Map
+                      </Chip>
+                    )}
                 </View>
               </View>
             )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setSelectedLog(null)}>{t('common.close')}</Button>
-            <Button
-              mode="contained"
-              onPress={() => {
-                Alert.alert(t('common.resolved'), t('emergency.markResolved'));
-                setSelectedLog(null);
-              }}
-            >
-              {t('emergency.markResolved')}
+            <Button onPress={() => setSelectedAlert(null)}>
+              {t("common.close")}
             </Button>
+            {selectedAlert?.status === "active" && (
+              <Button
+                mode="outlined"
+                onPress={() => handleInvestigate(selectedAlert!)}
+              >
+                Investigating
+              </Button>
+            )}
+            {selectedAlert?.status !== "resolved" && (
+              <Button
+                mode="contained"
+                onPress={() => handleResolve(selectedAlert!)}
+              >
+                {t("emergency.markResolved")}
+              </Button>
+            )}
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -458,6 +745,7 @@ export default function EmergencyPage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  center: { justifyContent: "center", alignItems: "center" },
   banner: {
     margin: 16,
     padding: 20,

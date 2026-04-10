@@ -1,7 +1,17 @@
-import { clientReactNative, DATABASE_ID, DIRECT_MESSAGES_TABLE_ID, MOMENTS_COMMENTS_TABLE_ID } from "@/lib/appwrite";
+import {
+  DATABASE_ID,
+  DIRECT_MESSAGES_TABLE_ID,
+  MOMENTS_COMMENTS_TABLE_ID,
+  safeSubscribe
+} from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
+import { getCaregiverByUserId } from "@/lib/caregiver";
+import { getElderlyByUserId } from "@/lib/elderly";
 import { FontSizeProvider, useFontSize } from "@/lib/font-size-context";
-import { UnreadBadgeProvider, useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
+import {
+  UnreadBadgeProvider,
+  useUnreadBadge,
+} from "@/lib/hooks/useUnreadBadge";
 import "@/lib/i18n"; // side-effect: initializes i18next
 import { LanguageProvider } from "@/lib/language-context";
 import { getUserMomentIds } from "@/lib/moments";
@@ -15,7 +25,12 @@ import { Role } from "@/types/user";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, AppState, useColorScheme, View } from "react-native";
+import {
+  ActivityIndicator,
+  AppState,
+  useColorScheme,
+  View,
+} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   configureFonts,
@@ -73,7 +88,8 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   } = useAuth();
   const segments = useSegments();
   const [appReady, setAppReady] = useState(SKIP_SPLASH);
-  
+  const isDark = useColorScheme() === "dark";
+
   // Ensure notifications show even when app is open
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -96,95 +112,130 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     // Initial chat unread count
     refreshChatUnread(user.$id);
 
-    // Subscribe to ALL new messages in the collection
-    const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = clientReactNative.subscribe(channel, async (response) => {
-      // Only process creation events
-      if (!response.events.some((e) => e.endsWith(".create"))) return;
+    let unsubscribeRealtime: (() => void) | null = null;
+    let unsubscribeComments: (() => void) | null = null;
 
-      const payload = response.payload as DirectMessage;
-      
-      // We only care if:
-      // 1. The message is intended for the CURRENT logged-in user
-      // 2. The sender is NOT the current user (sanity check)
-      if (payload.receiver_id === user.$id && payload.sender_id !== user.$id) {
-        
-        // Show notification regardless of app state (Foreground/Background)
-        // because setNotificationHandler is configured to show alerts in foreground
-        await sendImmediateNotification(
-          payload.sender_name || "New Message",
-          payload.message_type === "voice" ? "Sent a voice message" : (payload.body || "Sent a message"),
-          {
-            type: "direct_message",
-            contactId: payload.sender_id,
-            contactName: payload.sender_name,
-            contactRole: payload.sender_role,
-          }
-        );
-        refreshChatUnread(user.$id);
+    // Resolve profile ID first, then subscribe
+    const setup = async () => {
+      let myProfileId: string | null = null;
+      try {
+        if (role === "caregiver") {
+          const profile = await getCaregiverByUserId(user.$id);
+          if (profile) myProfileId = profile.$id;
+        } else {
+          const profile = await getElderlyByUserId(user.$id);
+          if (profile) myProfileId = profile.$id;
+        }
+      } catch {
+        // Profile not found yet
       }
-    });
 
-    // Subscribe to moments comments for notifications
-    const commentsChannel = `databases.${DATABASE_ID}.collections.${MOMENTS_COMMENTS_TABLE_ID}.documents`;
-    let myMomentIds: string[] = [];
-    getUserMomentIds(user.$id).then((ids) => { myMomentIds = ids; }).catch(() => {});
+      if (!myProfileId) return;
 
-    const unsubscribeComments = clientReactNative.subscribe(commentsChannel, async (response) => {
-      if (!response.events.some((e) => e.endsWith(".create"))) return;
+      // Subscribe to direct messages for notifications
+      const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
+      unsubscribeRealtime = safeSubscribe(channel, async (response) => {
+        if (!response.events.some((e) => e.endsWith(".create"))) return;
 
-      const payload = response.payload as MomentComment;
-      // Skip own comments
-      if (payload.author_id === user.$id) return;
+        const payload = response.payload as DirectMessage;
 
-      // Notify if: comment on my moment OR reply to me
-      const isOnMyMoment = payload.moment_author_id === user.$id || myMomentIds.includes(payload.moment_id);
-      const isReplyToMe = payload.reply_to_user_id === user.$id;
+        if (
+          payload.receiver_id === myProfileId &&
+          payload.sender_id !== myProfileId
+        ) {
+          await sendImmediateNotification(
+            payload.sender_name || "New Message",
+            payload.message_type === "voice"
+              ? "Sent a voice message"
+              : payload.body || "Sent a message",
+            {
+              type: "direct_message",
+              contactId: payload.sender_id,
+              contactName: payload.sender_name,
+              contactRole: payload.sender_role,
+            },
+          );
+          refreshChatUnread(user!.$id);
+        }
+      });
 
-      if (isOnMyMoment || isReplyToMe) {
-        const title = payload.author_name || "New Comment";
-        const body = isReplyToMe
-          ? `Replied to your comment: ${(payload.content || "").substring(0, 80)}`
-          : `Commented on your post: ${(payload.content || "").substring(0, 80)}`;
+      // Subscribe to moments comments for notifications
+      const commentsChannel = `databases.${DATABASE_ID}.collections.${MOMENTS_COMMENTS_TABLE_ID}.documents`;
+      let myMomentIds: string[] = [];
+      getUserMomentIds(user!.$id)
+        .then((ids) => {
+          myMomentIds = ids;
+        })
+        .catch(() => {});
 
-        await sendImmediateNotification(title, body, {
-          type: "moment_comment",
-          momentId: payload.moment_id,
-        });
-        incrementMomentUnread();
-      }
-    });
+      unsubscribeComments = safeSubscribe(commentsChannel, async (response) => {
+        if (!response.events.some((e) => e.endsWith(".create"))) return;
+
+        const payload = response.payload as MomentComment;
+        // Skip own comments
+        if (payload.author_id === user!.$id) return;
+
+        // Notify if: comment on my moment OR reply to me
+        const isOnMyMoment =
+          payload.moment_author_id === user!.$id ||
+          myMomentIds.includes(payload.moment_id);
+        const isReplyToMe = payload.reply_to_user_id === user!.$id;
+
+        if (isOnMyMoment || isReplyToMe) {
+          const title = payload.author_name || "New Comment";
+          const body = isReplyToMe
+            ? `Replied to your comment: ${(payload.content || "").substring(0, 80)}`
+            : `Commented on your post: ${(payload.content || "").substring(0, 80)}`;
+
+          await sendImmediateNotification(title, body, {
+            type: "moment_comment",
+            momentId: payload.moment_id,
+          });
+          incrementMomentUnread();
+        }
+      });
+    };
+
+    setup();
 
     // Handle notification tap
-    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      const rawData = response.notification.request.content.data as any;
-      
-      if (rawData && rawData.type === "direct_message") {
-        const contactId = rawData.contactId as string;
-        const contactName = rawData.contactName as string;
-        const contactRole = rawData.contactRole as string;
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const rawData = response.notification.request.content.data as any;
 
-        const targetPath = role === "elderly" ? "/(elderly-tabs)/conversation" : "/(caregiver-tabs)/conversation";
+        if (rawData && rawData.type === "direct_message") {
+          const contactId = rawData.contactId as string;
+          const contactName = rawData.contactName as string;
+          const contactRole = rawData.contactRole as string;
 
-        router.push({
-          pathname: targetPath,
-          params: {
-            contactId,
-            contactName,
-            contactRole,
-          },
-        });
-      } else if (rawData && rawData.type === "moment_comment") {
-        // Navigate to community / emergency tab (where moments are shown)
-        const targetPath = role === "elderly" ? "/(elderly-tabs)/emergency" : "/(caregiver-tabs)/caregiver";
-        router.push(targetPath);
-      }
-    });
+          const targetPath =
+            role === "elderly"
+              ? "/(elderly-tabs)/conversation"
+              : "/(caregiver-tabs)/conversation";
+
+          router.push({
+            pathname: targetPath,
+            params: {
+              contactId,
+              contactName,
+              contactRole,
+            },
+          });
+        } else if (rawData && rawData.type === "moment_comment") {
+          // Navigate to community / emergency tab (where moments are shown)
+          const targetPath =
+            role === "elderly"
+              ? "/(elderly-tabs)/emergency"
+              : "/(caregiver-tabs)/caregiver";
+          router.push(targetPath);
+        }
+      },
+    );
 
     return () => {
       // Cleanup subscription
-      unsubscribe();
-      unsubscribeComments();
+      unsubscribeRealtime?.();
+      unsubscribeComments?.();
       subscription.remove();
     };
   }, [user?.$id, router, role, incrementMomentUnread, refreshChatUnread]);
@@ -260,7 +311,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
             bottom: 0,
             justifyContent: "center",
             alignItems: "center",
-            backgroundColor: "#ffffff",
+            backgroundColor: isDark ? "#121212" : "#ffffff",
           }}
         >
           <ActivityIndicator size="large" />
@@ -302,32 +353,38 @@ function ThemedApp() {
       >
         <AuthProvider>
           <UnreadBadgeProvider>
-          <SafeAreaProvider>
-            <RouteGuard>
-              <Stack>
-                <Stack.Screen
-                  name="(caregiver-tabs)"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="(elderly-tabs)"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen name="start" options={{ headerShown: false }} />
-                <Stack.Screen name="signup" options={{ headerShown: false }} />
-                <Stack.Screen name="auth" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="profile-setup"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="qr-register"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen name="reauth" options={{ headerShown: false }} />
-              </Stack>
-            </RouteGuard>
-          </SafeAreaProvider>
+            <SafeAreaProvider>
+              <RouteGuard>
+                <Stack>
+                  <Stack.Screen
+                    name="(caregiver-tabs)"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="(elderly-tabs)"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen name="start" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="signup"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen name="auth" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="profile-setup"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="qr-register"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="reauth"
+                    options={{ headerShown: false }}
+                  />
+                </Stack>
+              </RouteGuard>
+            </SafeAreaProvider>
           </UnreadBadgeProvider>
         </AuthProvider>
       </GestureHandlerRootView>

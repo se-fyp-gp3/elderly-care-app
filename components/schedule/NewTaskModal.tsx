@@ -1,12 +1,7 @@
 import { Elderly, ScheduleCategory, ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
-import {
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View
-} from "react-native";
+import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import {
     Avatar,
     Button,
@@ -134,10 +129,7 @@ export default function NewTaskModal({
                 />
               </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={onOpenTimePicker}
-                style={{ flex: 1 }}
-              >
+              <TouchableOpacity onPress={onOpenTimePicker} style={{ flex: 1 }}>
                 <TextInput
                   mode="outlined"
                   label="Time"
@@ -145,18 +137,13 @@ export default function NewTaskModal({
                   editable={false}
                   style={styles.input}
                   right={
-                    <TextInput.Icon
-                      icon="clock"
-                      onPress={onOpenTimePicker}
-                    />
+                    <TextInput.Icon icon="clock" onPress={onOpenTimePicker} />
                   }
                 />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              onPress={() => onSelectionModeChange("elderly")}
-            >
+            <TouchableOpacity onPress={() => onSelectionModeChange("elderly")}>
               <TextInput
                 mode="outlined"
                 label="Who is this for?"
@@ -212,9 +199,7 @@ export default function NewTaskModal({
                 onPress={() => onSelectionModeChange("form")}
               />
               <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-                {selectionMode === "elderly"
-                  ? "Select Elderly"
-                  : "Select Type"}
+                {selectionMode === "elderly" ? "Select Elderly" : "Select Type"}
               </Text>
             </View>
             <Divider />
@@ -236,15 +221,14 @@ export default function NewTaskModal({
               {selectionMode === "elderly" ? (
                 linkedElderly
                   .filter((e) =>
-                    e.name
-                      .toLowerCase()
-                      .includes(searchQuery.toLowerCase()),
+                    e.name.toLowerCase().includes(searchQuery.toLowerCase()),
                   )
                   .map((item) => (
                     <TouchableOpacity
                       key={item.$id}
                       style={[
                         styles.selectionRow,
+                        { borderBottomColor: theme.colors.outlineVariant },
                         {
                           backgroundColor:
                             newTask.elderlyId === item.$id
@@ -286,6 +270,7 @@ export default function NewTaskModal({
                     key={cat.$id}
                     style={[
                       styles.selectionRow,
+                      { borderBottomColor: theme.colors.outlineVariant },
                       {
                         backgroundColor:
                           newTask.typeId === cat.$id

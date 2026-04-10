@@ -3,6 +3,7 @@ import { ElderlyStatus, HealthData } from "@/types/appwrite";
 import { Query } from "react-native-appwrite";
 import {
     DATABASE_ID,
+    ELDERLY_DAILY_STEPS_TABLE_ID,
     ELDERLY_MEDICATION_REMINDER_TABLE_ID,
     ELDERLY_MEDICATION_TABLE_ID,
     HEALTH_DATA_TABLE_ID,
@@ -18,6 +19,12 @@ export interface ElderlyStatusInfo {
   missedMedCount: number;
   nextAppointment: string | null;
   medicationSummary: string;
+  /** Today's step count, null if no record */
+  todaySteps: number | null;
+  /** ISO timestamp of the most recent step data update */
+  lastActiveTime: string | null;
+  /** Whether the elderly has shown recent activity (steps > 0 today or yesterday) */
+  isActive: boolean;
 }
 
 /**
@@ -54,6 +61,9 @@ export async function computeElderlyStatus(
   let missedMedCount = 0;
   let nextAppointment: string | null = null;
   let medicationSummary = i18n.t('medication.upToDate');
+  let todaySteps: number | null = null;
+  let lastActiveTime: string | null = null;
+  let isActive = false;
 
   try {
     // ── 1. Latest health data ───────────────────────────────────────────
@@ -146,25 +156,42 @@ export async function computeElderlyStatus(
       if (prescriptions.length === 0) {
         medicationSummary = i18n.t('medication.noSchedule');
       } else {
-        // 2b. Fetch reminders to link prescriptions -> logs
+        // 2b. Fetch reminders to link prescriptions -> logs (only active)
         const remindersRes = await tablesDB.listRows<any>({
           databaseId: DATABASE_ID,
           tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
           queries: [
             Query.equal("elderly", elderlyId),
+            Query.equal("active", true),
             Query.limit(200),
           ],
         });
 
-        // Map prescription ID -> reminder ID
-        const prescriptionToReminder = new Map<string, string>();
+        // Map prescription ID -> reminder object (active reminders only)
+        const prescriptionToReminder = new Map<string, any>();
         remindersRes.rows.forEach((rem: any) => {
           const pId = resolveRelationId(rem.elderly_medication);
-          if (pId) prescriptionToReminder.set(pId, rem.$id);
+          if (pId) prescriptionToReminder.set(pId, rem);
+        });
+
+        // Fetch inactive reminders to exclude cancelled prescriptions
+        const inactiveRemindersRes = await tablesDB.listRows<any>({
+          databaseId: DATABASE_ID,
+          tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+          queries: [
+            Query.equal("elderly", elderlyId),
+            Query.equal("active", false),
+            Query.limit(200),
+          ],
+        });
+        const cancelledPrescriptionIds = new Set<string>();
+        inactiveRemindersRes.rows.forEach((rem: any) => {
+          const pId = resolveRelationId(rem.elderly_medication);
+          if (pId) cancelledPrescriptionIds.add(pId);
         });
 
         // Collect all reminder IDs
-        const reminderIds = Array.from(prescriptionToReminder.values());
+        const reminderIds = Array.from(prescriptionToReminder.values()).map((r: any) => r.$id);
 
         // 2c. Fetch today's logs for these reminders
         const todayStart = new Date();
@@ -198,16 +225,50 @@ export async function computeElderlyStatus(
         let missedSlots = 0;
         let pendingSlots = 0;
 
-        prescriptions.forEach((prescription: any) => {
-          const times: string[] = prescription.approx_times || [];
+        // Filter out cancelled prescriptions (active=false) and orphaned ones without active reminder
+        const activePrescriptions = prescriptions.filter(
+          (p: any) => !cancelledPrescriptionIds.has(p.$id) && prescriptionToReminder.has(p.$id),
+        );
+
+        activePrescriptions.forEach((prescription: any) => {
+          const reminder = prescriptionToReminder.get(prescription.$id);
+          const times: string[] = reminder?.reminder_times || prescription.approx_times || [];
+
+          // ── start_date filter ──
+          const startDate = reminder?.start_date ? new Date(reminder.start_date) : null;
+
+          // ── duration_days end boundary helpers ──
+          const hkOffset = 8 * 60 * 60 * 1000;
+          const durationDays = typeof reminder?.duration_days === "number" ? reminder.duration_days : null;
+
           times.forEach((tStr: string) => {
             const scheduled = new Date();
+            let slotH = 0;
+            let slotM = 0;
             if (tStr.includes("T")) {
               const d = new Date(tStr);
-              scheduled.setHours(d.getHours(), d.getMinutes(), 0, 0);
+              slotH = d.getHours();
+              slotM = d.getMinutes();
             } else if (tStr.includes(":")) {
               const parts = tStr.split(":");
-              scheduled.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+              slotH = parseInt(parts[0]);
+              slotM = parseInt(parts[1]);
+            }
+            scheduled.setHours(slotH, slotM, 0, 0);
+
+            const scheduledUtcMs = scheduled.getTime();
+
+            // Skip slots before medication start_date
+            if (startDate && scheduledUtcMs < startDate.getTime()) return;
+
+            // Skip slots beyond duration_days end boundary
+            if (startDate && durationDays !== null && durationDays > 0) {
+              const startDateHkMs = startDate.getTime() + hkOffset;
+              const startDayHkMs = startDateHkMs - (startDateHkMs % 86400000);
+              const firstCandidateUtcMs = startDayHkMs + slotH * 3600000 + slotM * 60000 - hkOffset;
+              const startDelay = firstCandidateUtcMs <= startDate.getTime() ? 1 : 0;
+              const lastValidUtcMs = firstCandidateUtcMs + (startDelay + durationDays - 1) * 86400000;
+              if (scheduledUtcMs > lastValidUtcMs) return;
             }
 
             totalSlots++;
@@ -282,6 +343,62 @@ export async function computeElderlyStatus(
     } catch {
       // Schedule query may fail; ignore
     }
+    // ── 4. Activity / liveness check (step data) ─────────────────────
+    try {
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10); // YYYY-MM-DD
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+      const stepsRes = await tablesDB.listRows<any>({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_DAILY_STEPS_TABLE_ID,
+        queries: [
+          Query.equal("elderlyId", elderlyId),
+          Query.orderDesc("date"),
+          Query.limit(3),
+        ],
+      });
+
+      const stepRecords = stepsRes.rows as any[];
+      const todayRecord = stepRecords.find((r: any) => r.date === todayStr);
+      const yesterdayRecord = stepRecords.find(
+        (r: any) => r.date === yesterdayStr,
+      );
+
+      if (todayRecord) {
+        todaySteps = todayRecord.steps ?? 0;
+        lastActiveTime = todayRecord.lastUpdated ?? null;
+        if (todaySteps !== null && todaySteps > 0) {
+          isActive = true;
+        }
+      }
+
+      if (!isActive && yesterdayRecord) {
+        const ySteps = yesterdayRecord.steps ?? 0;
+        if (ySteps > 0) {
+          isActive = true;
+          if (!lastActiveTime) {
+            lastActiveTime = yesterdayRecord.lastUpdated ?? null;
+          }
+        }
+      }
+
+      // Flag inactivity: no steps today AND no steps yesterday
+      if (!isActive && stepRecords.length > 0) {
+        // Has step tracking set up but no recent movement
+        if (status === ElderlyStatus.NORMAL) {
+          status = ElderlyStatus.WARNING;
+        }
+        reasons.push("No activity detected (0 steps)");
+      } else if (stepRecords.length === 0) {
+        // No step data at all — don't flag, tracking may not be enabled
+      }
+    } catch {
+      // Step query may fail; ignore
+    }
+
   } catch (err) {
     console.error("Error computing elderly status:", err);
   }
@@ -293,6 +410,9 @@ export async function computeElderlyStatus(
     missedMedCount,
     nextAppointment,
     medicationSummary,
+    todaySteps,
+    lastActiveTime,
+    isActive,
   };
 }
 

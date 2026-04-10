@@ -1,7 +1,14 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Linking, ScrollView, StyleSheet, View } from "react-native";
+import {
+    Alert,
+    Linking,
+    ScrollView,
+    StyleSheet,
+    useColorScheme,
+    View,
+} from "react-native";
 import {
     Avatar,
     Card,
@@ -43,6 +50,8 @@ export default function ElderlyDetailView({
   onHealthData,
 }: ElderlyDetailViewProps) {
   const theme = useTheme();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const { t } = useTranslation();
   const handleCall = (phone?: string) => {
     if (onCall && phone) {
@@ -50,12 +59,12 @@ export default function ElderlyDetailView({
       return;
     }
     if (!phone) {
-      Alert.alert(t('common.noPhoneNumber'));
+      Alert.alert(t("common.noPhoneNumber"));
       return;
     }
     const url = `tel:${phone}`;
     Linking.canOpenURL(url).then((s) =>
-      s ? Linking.openURL(url) : Alert.alert(t('common.cannotCall')),
+      s ? Linking.openURL(url) : Alert.alert(t("common.cannotCall")),
     );
   };
 
@@ -76,7 +85,7 @@ export default function ElderlyDetailView({
           />
           <View style={styles.headerInfo}>
             <Text variant="headlineSmall" style={{ fontWeight: "bold" }}>
-              {data.name || t('common.unknown')}
+              {data.name || t("common.unknown")}
             </Text>
             <View style={styles.badgeRow}>
               <Chip icon="identifier" style={styles.chip} compact>
@@ -84,11 +93,18 @@ export default function ElderlyDetailView({
               </Chip>
               <Chip
                 icon="heart-pulse"
-                style={[styles.chip, { backgroundColor: "#E8F5E9" }]}
-                textStyle={{ color: "#2E7D32" }}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(46,125,50,0.15)"
+                      : "#E8F5E9",
+                  },
+                ]}
+                textStyle={{ color: isDark ? "#81C784" : "#2E7D32" }}
                 compact
               >
-                {data.status || t('caregiverPanel.normal')}
+                {data.status || t("caregiverPanel.normal")}
               </Chip>
             </View>
           </View>
@@ -107,7 +123,7 @@ export default function ElderlyDetailView({
               size={28}
               color={theme.colors.primary}
             />
-            <Text style={styles.actionLabel}>{t('caregiverPanel.call')}</Text>
+            <Text style={styles.actionLabel}>{t("caregiverPanel.call")}</Text>
           </Card.Content>
         </Card>
         <Card
@@ -120,7 +136,9 @@ export default function ElderlyDetailView({
               size={28}
               color={theme.colors.error}
             />
-            <Text style={styles.actionLabel}>{t('caregiverPanel.healthData')}</Text>
+            <Text style={styles.actionLabel}>
+              {t("caregiverPanel.healthData")}
+            </Text>
           </Card.Content>
         </Card>
       </View>
@@ -128,7 +146,7 @@ export default function ElderlyDetailView({
       {/* Vitals Snapshot */}
       <Card style={styles.sectionCard}>
         <Card.Title
-          title={t('healthData.latestVitals')}
+          title={t("healthData.latestVitals")}
           left={(props) => (
             <MaterialCommunityIcons
               {...props}
@@ -144,31 +162,39 @@ export default function ElderlyDetailView({
                 variant="labelMedium"
                 style={{ color: theme.colors.secondary }}
               >
-                {t('healthData.bloodPressure')}
+                {t("healthData.bloodPressure")}
               </Text>
               <Text variant="titleLarge">{data.lastVitals?.bp || "N/A"}</Text>
             </View>
-            <View style={styles.vitalDivider} />
+            <View
+              style={[
+                styles.vitalDivider,
+                { backgroundColor: theme.colors.outlineVariant },
+              ]}
+            />
             <View style={styles.vitalItem}>
               <Text
                 variant="labelMedium"
                 style={{ color: theme.colors.secondary }}
               >
-                {t('healthData.heartRate')}
+                {t("healthData.heartRate")}
               </Text>
               <Text variant="titleLarge">{data.lastVitals?.hr || "N/A"}</Text>
             </View>
-            <View style={styles.vitalDivider} />
+            <View
+              style={[
+                styles.vitalDivider,
+                { backgroundColor: theme.colors.outlineVariant },
+              ]}
+            />
             <View style={styles.vitalItem}>
               <Text
                 variant="labelMedium"
                 style={{ color: theme.colors.secondary }}
               >
-                {t('healthData.temp')}
+                {t("healthData.temp")}
               </Text>
-              <Text variant="titleLarge">
-                {data.lastVitals?.temp || "N/A"}
-              </Text>
+              <Text variant="titleLarge">{data.lastVitals?.temp || "N/A"}</Text>
             </View>
           </View>
         </Card.Content>
@@ -177,7 +203,7 @@ export default function ElderlyDetailView({
       {/* Basic Information */}
       <Card style={[styles.sectionCard, { marginBottom: 30 }]}>
         <Card.Title
-          title={t('healthData.basicInfo')}
+          title={t("healthData.basicInfo")}
           left={(props) => (
             <MaterialCommunityIcons
               {...props}
@@ -188,21 +214,21 @@ export default function ElderlyDetailView({
         />
         <Card.Content style={{ padding: 0 }}>
           <List.Item
-            title={t('healthData.ageGender')}
+            title={t("healthData.ageGender")}
             description={`${
               data.age !== undefined
-                ? t('healthData.yearsOld', { age: data.age })
+                ? t("healthData.yearsOld", { age: data.age })
                 : data.birth
                   ? new Date(data.birth).toLocaleDateString()
-                  : t('common.unknown')
-            } / ${data.gender || t('common.unknown')}`}
+                  : t("common.unknown")
+            } / ${data.gender || t("common.unknown")}`}
             left={(props) => <List.Icon {...props} icon="calendar-account" />}
           />
           <Divider />
           {data.birth && (
             <>
               <List.Item
-                title={t('healthData.dateOfBirth')}
+                title={t("healthData.dateOfBirth")}
                 description={new Date(data.birth).toLocaleDateString("en-GB", {
                   year: "numeric",
                   month: "long",
@@ -215,14 +241,14 @@ export default function ElderlyDetailView({
           )}
           <Divider />
           <List.Item
-            title={t('healthData.bloodType')}
-            description={data.bloodType || t('common.unknown')}
+            title={t("healthData.bloodType")}
+            description={data.bloodType || t("common.unknown")}
             left={(props) => <List.Icon {...props} icon="water" />}
           />
           <Divider />
           <List.Item
-            title={t('healthData.phone')}
-            description={data.phone || t('common.notSet')}
+            title={t("healthData.phone")}
+            description={data.phone || t("common.notSet")}
             left={(props) => <List.Icon {...props} icon="phone" />}
             right={(props) =>
               data.phone ? (
@@ -236,8 +262,8 @@ export default function ElderlyDetailView({
           />
           <Divider />
           <List.Item
-            title={t('home.emergencyContact')}
-            description={data.emergencyContact || t('common.notSet')}
+            title={t("home.emergencyContact")}
+            description={data.emergencyContact || t("common.notSet")}
             descriptionNumberOfLines={2}
             left={(props) => (
               <List.Icon {...props} icon="alert-circle-outline" />

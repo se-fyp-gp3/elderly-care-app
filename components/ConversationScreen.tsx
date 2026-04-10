@@ -1,8 +1,4 @@
-import {
-    ID,
-    storage,
-    VOICE_MESSAGES_BUCKET_ID,
-} from "@/lib/appwrite";
+import { ID, storage, VOICE_MESSAGES_BUCKET_ID } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
     buildConversationId,
@@ -82,7 +78,8 @@ function VoiceMessageBubble({
 
   // Parse "duration|fileId"
   const pipeIdx = body.indexOf("|");
-  const duration = pipeIdx > 0 ? parseInt(body.substring(0, pipeIdx), 10) || 0 : 0;
+  const duration =
+    pipeIdx > 0 ? parseInt(body.substring(0, pipeIdx), 10) || 0 : 0;
   const fileId = pipeIdx > 0 ? body.substring(pipeIdx + 1) : body;
 
   const fmtDur = (s: number) => {
@@ -109,12 +106,17 @@ function VoiceMessageBubble({
       await setAudioModeAsync({
         playsInSilentMode: true,
       });
-      // Download voice file from Appwrite Storage
+      // Download voice file to local cache for reliable playback (fixes Android)
       const downloadUrl = storage.getFileDownloadURL(
         VOICE_MESSAGES_BUCKET_ID,
         fileId,
       );
-      const player = createAudioPlayer(downloadUrl.toString());
+      const localUri = `${FileSystem.cacheDirectory}voice_${fileId}.m4a`;
+      const fileInfo = await FileSystem.getInfoAsync(localUri);
+      if (!fileInfo.exists) {
+        await FileSystem.downloadAsync(downloadUrl.toString(), localUri);
+      }
+      const player = createAudioPlayer(localUri);
       playerRef.current = player;
       player.addListener("playbackStatusUpdate", (status) => {
         if (status.didJustFinish) {
@@ -206,7 +208,9 @@ export default function ConversationScreen({
   const flatListRef = useRef<FlatList>(null);
 
   // Quote / reply
-  const [quotedMessage, setQuotedMessage] = useState<DirectMessage | null>(null);
+  const [quotedMessage, setQuotedMessage] = useState<DirectMessage | null>(
+    null,
+  );
   // Long-press context menu
   const [longPressMsg, setLongPressMsg] = useState<DirectMessage | null>(null);
 
@@ -310,7 +314,7 @@ export default function ConversationScreen({
     try {
       const { status } = await requestRecordingPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(t('common.permissionNeeded'), t('chat.micPermission'));
+        Alert.alert(t("common.permissionNeeded"), t("chat.micPermission"));
         return;
       }
       await setAudioModeAsync({
@@ -326,7 +330,7 @@ export default function ConversationScreen({
       }, 1000);
     } catch (err) {
       console.error("Failed to start recording:", err);
-      Alert.alert(t('common.error'), t('chat.couldNotStartRecording'));
+      Alert.alert(t("common.error"), t("chat.couldNotStartRecording"));
     }
   };
 
@@ -337,7 +341,9 @@ export default function ConversationScreen({
     if (recorder.isRecording) {
       try {
         await recorder.stop();
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   };
 
@@ -388,7 +394,7 @@ export default function ConversationScreen({
       setRecordingDuration(0);
     } catch (error) {
       console.error("Error sending voice message:", error);
-      Alert.alert(t('common.error'), t('chat.failedToSendVoice'));
+      Alert.alert(t("common.error"), t("chat.failedToSendVoice"));
     } finally {
       setSending(false);
     }
@@ -419,8 +425,10 @@ export default function ConversationScreen({
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
 
-      if (date.toDateString() === today.toDateString()) return t('common.today');
-      if (date.toDateString() === yesterday.toDateString()) return t('common.yesterday');
+      if (date.toDateString() === today.toDateString())
+        return t("common.today");
+      if (date.toDateString() === yesterday.toDateString())
+        return t("common.yesterday");
 
       return date.toLocaleDateString(undefined, {
         weekday: "short",
@@ -523,10 +531,24 @@ export default function ConversationScreen({
             >
               {/* Quoted message preview */}
               {item.quoted_message_id ? (
-                <View style={[styles.quoteBubble, { borderLeftColor: isMe ? theme.colors.onPrimary : theme.colors.primary }]}>
+                <View
+                  style={[
+                    styles.quoteBubble,
+                    {
+                      borderLeftColor: isMe
+                        ? theme.colors.onPrimary
+                        : theme.colors.primary,
+                    },
+                  ]}
+                >
                   <Text
                     variant="labelSmall"
-                    style={{ fontWeight: "700", color: isMe ? theme.colors.onPrimary : theme.colors.primary }}
+                    style={{
+                      fontWeight: "700",
+                      color: isMe
+                        ? theme.colors.onPrimary
+                        : theme.colors.primary,
+                    }}
                     numberOfLines={1}
                   >
                     {item.quoted_sender_name}
@@ -534,20 +556,31 @@ export default function ConversationScreen({
                   <Text
                     variant="bodySmall"
                     numberOfLines={2}
-                    style={{ color: isMe ? theme.colors.onPrimary : theme.colors.onSurfaceVariant, opacity: 0.8 }}
+                    style={{
+                      color: isMe
+                        ? theme.colors.onPrimary
+                        : theme.colors.onSurfaceVariant,
+                      opacity: 0.8,
+                    }}
                   >
                     {item.quoted_body}
                   </Text>
                 </View>
               ) : null}
               {item.message_type === "voice" ? (
-                <VoiceMessageBubble body={item.body} isMe={isMe} theme={theme} />
+                <VoiceMessageBubble
+                  body={item.body}
+                  isMe={isMe}
+                  theme={theme}
+                />
               ) : (
                 <Text
                   style={[
                     styles.messageText,
                     {
-                      color: isMe ? theme.colors.onPrimary : theme.colors.onSurface,
+                      color: isMe
+                        ? theme.colors.onPrimary
+                        : theme.colors.onSurface,
                     },
                   ]}
                 >
@@ -611,13 +644,13 @@ export default function ConversationScreen({
         variant="titleMedium"
         style={[styles.emptyTitle, { color: theme.colors.onSurface }]}
       >
-        {t('chat.startConversation')}
+        {t("chat.startConversation")}
       </Text>
       <Text
         variant="bodyMedium"
         style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant }]}
       >
-        {t('chat.sendMessageTo', { name: contactName })}
+        {t("chat.sendMessageTo", { name: contactName })}
       </Text>
     </View>
   );
@@ -679,7 +712,9 @@ export default function ConversationScreen({
                 variant="bodySmall"
                 style={{ color: theme.colors.onSurfaceVariant }}
               >
-                {contactRole === "caregiver" ? t('common.caregiver') : t('common.elderly')}
+                {contactRole === "caregiver"
+                  ? t("common.caregiver")
+                  : t("common.elderly")}
               </Text>
             </View>
           </View>
@@ -710,40 +745,85 @@ export default function ConversationScreen({
 
         {/* Quote preview bar */}
         {quotedMessage && (
-          <View style={[styles.quotePreviewBar, { backgroundColor: theme.colors.surfaceVariant }]}>
-            <View style={[styles.quotePreviewLeft, { borderLeftColor: theme.colors.primary }]}>
-              <Text variant="labelSmall" style={{ fontWeight: "700", color: theme.colors.primary }} numberOfLines={1}>
+          <View
+            style={[
+              styles.quotePreviewBar,
+              { backgroundColor: theme.colors.surfaceVariant },
+            ]}
+          >
+            <View
+              style={[
+                styles.quotePreviewLeft,
+                { borderLeftColor: theme.colors.primary },
+              ]}
+            >
+              <Text
+                variant="labelSmall"
+                style={{ fontWeight: "700", color: theme.colors.primary }}
+                numberOfLines={1}
+              >
                 {quotedMessage.sender_name}
               </Text>
-              <Text variant="bodySmall" numberOfLines={1} style={{ color: theme.colors.onSurfaceVariant }}>
-                {quotedMessage.message_type === "voice" ? `🎤 ${t("chat.voiceMessage")}` : quotedMessage.body}
+              <Text
+                variant="bodySmall"
+                numberOfLines={1}
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {quotedMessage.message_type === "voice"
+                  ? `🎤 ${t("chat.voiceMessage")}`
+                  : quotedMessage.body}
               </Text>
             </View>
-            <IconButton icon="close" size={18} onPress={() => setQuotedMessage(null)} />
+            <IconButton
+              icon="close"
+              size={18}
+              onPress={() => setQuotedMessage(null)}
+            />
           </View>
         )}
 
         {/* Input Bar */}
         {isRecording ? (
-          <View style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}>
+          <View
+            style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}
+          >
             <View style={styles.recordingBar}>
-              <TouchableOpacity onPress={cancelRecording} style={styles.cancelRecordBtn}>
-                <MaterialCommunityIcons name="close" size={22} color={theme.colors.error} />
+              <TouchableOpacity
+                onPress={cancelRecording}
+                style={styles.cancelRecordBtn}
+              >
+                <MaterialCommunityIcons
+                  name="close"
+                  size={22}
+                  color={theme.colors.error}
+                />
               </TouchableOpacity>
               <View style={styles.recordingIndicator}>
-                <View style={[styles.recordingDot, { backgroundColor: "#D32F2F" }]} />
-                <Text variant="bodyMedium" style={{ color: theme.colors.onSurface, fontWeight: "600" }}>
+                <View
+                  style={[styles.recordingDot, { backgroundColor: "#D32F2F" }]}
+                />
+                <Text
+                  variant="bodyMedium"
+                  style={{ color: theme.colors.onSurface, fontWeight: "600" }}
+                >
                   {formatDuration(recordingDuration)}
                 </Text>
               </View>
               <TouchableOpacity
                 onPress={sendVoiceMessage}
-                style={[styles.sendVoiceBtn, { backgroundColor: theme.colors.primary }]}
+                style={[
+                  styles.sendVoiceBtn,
+                  { backgroundColor: theme.colors.primary },
+                ]}
               >
                 {sending ? (
                   <ActivityIndicator size={20} color={theme.colors.onPrimary} />
                 ) : (
-                  <MaterialCommunityIcons name="send" size={20} color={theme.colors.onPrimary} />
+                  <MaterialCommunityIcons
+                    name="send"
+                    size={20}
+                    color={theme.colors.onPrimary}
+                  />
                 )}
               </TouchableOpacity>
             </View>
@@ -754,7 +834,7 @@ export default function ConversationScreen({
           >
             <TextInput
               mode="outlined"
-              placeholder={t('chat.typeMessage')}
+              placeholder={t("chat.typeMessage")}
               value={inputText}
               onChangeText={setInputText}
               style={styles.textInput}
@@ -793,7 +873,14 @@ export default function ConversationScreen({
 
       {/* Long-press context menu */}
       <Portal>
-        <Modal visible={!!longPressMsg} onDismiss={() => setLongPressMsg(null)} contentContainerStyle={[styles.menuModal, { backgroundColor: theme.colors.surface }]}>
+        <Modal
+          visible={!!longPressMsg}
+          onDismiss={() => setLongPressMsg(null)}
+          contentContainerStyle={[
+            styles.menuModal,
+            { backgroundColor: theme.colors.surface },
+          ]}
+        >
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => {
@@ -801,7 +888,11 @@ export default function ConversationScreen({
               setLongPressMsg(null);
             }}
           >
-            <MaterialCommunityIcons name="reply" size={20} color={theme.colors.onSurface} />
+            <MaterialCommunityIcons
+              name="reply"
+              size={20}
+              color={theme.colors.onSurface}
+            />
             <Text style={{ marginLeft: 12 }}>{t("chat.reply")}</Text>
           </TouchableOpacity>
           <Divider />
@@ -814,7 +905,11 @@ export default function ConversationScreen({
               setLongPressMsg(null);
             }}
           >
-            <MaterialCommunityIcons name="content-copy" size={20} color={theme.colors.onSurface} />
+            <MaterialCommunityIcons
+              name="content-copy"
+              size={20}
+              color={theme.colors.onSurface}
+            />
             <Text style={{ marginLeft: 12 }}>{t("chat.copy")}</Text>
           </TouchableOpacity>
         </Modal>

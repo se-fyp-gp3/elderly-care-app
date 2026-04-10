@@ -1,23 +1,35 @@
 import { formatRelativeTime } from "@/lib/contacts";
-import { addComment, getComments, likeComment } from "@/lib/moments";
+import {
+    addComment,
+    deleteComment,
+    getComments,
+    likeComment,
+} from "@/lib/moments";
 import { MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  TextInput as RNTextInput,
-  StyleSheet,
-  View,
+    Alert,
+    Animated,
+    Dimensions,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    TextInput as RNTextInput,
+    StyleSheet,
+    View,
 } from "react-native";
-import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
+import {
+    ActivityIndicator,
+    Avatar,
+    Divider,
+    Text,
+    useTheme,
+} from "react-native-paper";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.7;
@@ -40,12 +52,14 @@ function CommentItem({
   allComments,
   onReply,
   onLike,
+  onDelete,
 }: {
   comment: MomentComment;
   currentUserId: string;
   allComments: MomentComment[];
   onReply: (comment: MomentComment) => void;
   onLike: (comment: MomentComment) => void;
+  onDelete: (commentId: string) => void;
 }) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -53,9 +67,25 @@ function CommentItem({
   const likes = comment.likes || [];
   const isLiked = likes.includes(currentUserId);
   const longText = (comment.content?.length || 0) > 200;
+  const isOwn = comment.author_id === currentUserId;
   const parentComment = comment.reply_to_comment_id
     ? allComments.find((c) => c.$id === comment.reply_to_comment_id)
     : null;
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete Comment",
+      "Are you sure you want to delete this comment?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => onDelete(comment.$id),
+        },
+      ],
+    );
+  };
 
   return (
     <View style={styles.commentItem}>
@@ -76,17 +106,50 @@ function CommentItem({
       />
       <View style={styles.commentBody}>
         <View style={styles.commentBubble}>
-          <Text variant="labelMedium" style={{ fontWeight: "bold" }}>
-            {comment.author_name}
-            {comment.author_role === "ai" && (
-              <Text style={{ color: theme.colors.tertiary, fontWeight: "normal" }}> • AI</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text variant="labelMedium" style={{ fontWeight: "bold", flex: 1 }}>
+              {comment.author_name}
+              {comment.author_role === "ai" && (
+                <Text
+                  style={{ color: theme.colors.tertiary, fontWeight: "normal" }}
+                >
+                  {" "}
+                  • AI
+                </Text>
+              )}
+            </Text>
+            {isOwn && (
+              <Pressable onPress={handleDelete} hitSlop={10}>
+                <MaterialCommunityIcons
+                  name="delete-outline"
+                  size={18}
+                  color={theme.colors.error}
+                />
+              </Pressable>
             )}
-          </Text>
+          </View>
 
           {/* Reply indicator with quoted parent */}
           {!!comment.reply_to_user_name && (
-            <View style={[styles.replyQuote, { borderLeftColor: theme.colors.outlineVariant, backgroundColor: theme.colors.surfaceVariant }]}>
-              <Text variant="labelSmall" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
+            <View
+              style={[
+                styles.replyQuote,
+                {
+                  borderLeftColor: theme.colors.outlineVariant,
+                  backgroundColor: theme.colors.surfaceVariant,
+                },
+              ]}
+            >
+              <Text
+                variant="labelSmall"
+                style={{ color: theme.colors.primary, fontWeight: "bold" }}
+              >
                 ↳ @{comment.reply_to_user_name}
               </Text>
               {parentComment ? (
@@ -110,8 +173,11 @@ function CommentItem({
           </Text>
           {longText && (
             <Pressable onPress={() => setExpanded(!expanded)}>
-              <Text variant="labelSmall" style={{ color: theme.colors.primary, marginTop: 2 }}>
-                {expanded ? t('moments.collapse') : t('moments.showMore')}
+              <Text
+                variant="labelSmall"
+                style={{ color: theme.colors.primary, marginTop: 2 }}
+              >
+                {expanded ? t("moments.collapse") : t("moments.showMore")}
               </Text>
             </Pressable>
           )}
@@ -119,24 +185,43 @@ function CommentItem({
 
         {/* Footer row: time + reply + like */}
         <View style={styles.commentFooter}>
-          <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+          <Text
+            variant="labelSmall"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
             {formatRelativeTime(comment.$createdAt)}
           </Text>
           {comment.author_role !== "ai" && (
-            <Pressable onPress={() => onReply(comment)} hitSlop={8} style={styles.footerBtn}>
-              <Text variant="labelSmall" style={{ color: theme.colors.primary }}>
-                {t('moments.reply')}
+            <Pressable
+              onPress={() => onReply(comment)}
+              hitSlop={8}
+              style={styles.footerBtn}
+            >
+              <Text
+                variant="labelSmall"
+                style={{ color: theme.colors.primary }}
+              >
+                {t("moments.reply")}
               </Text>
             </Pressable>
           )}
-          <Pressable onPress={() => onLike(comment)} hitSlop={8} style={styles.footerBtn}>
+          <Pressable
+            onPress={() => onLike(comment)}
+            hitSlop={8}
+            style={styles.footerBtn}
+          >
             <MaterialCommunityIcons
               name={isLiked ? "heart" : "heart-outline"}
               size={14}
-              color={isLiked ? theme.colors.error : theme.colors.onSurfaceVariant}
+              color={
+                isLiked ? theme.colors.error : theme.colors.onSurfaceVariant
+              }
             />
             {likes.length > 0 && (
-              <Text variant="labelSmall" style={{ marginLeft: 2, color: theme.colors.onSurfaceVariant }}>
+              <Text
+                variant="labelSmall"
+                style={{ marginLeft: 2, color: theme.colors.onSurfaceVariant }}
+              >
                 {likes.length}
               </Text>
             )}
@@ -219,17 +304,27 @@ export default function CommentSheet({
       ? currentLikes.filter((id) => id !== currentUserId)
       : [...currentLikes, currentUserId];
     setComments((prev) =>
-      prev.map((c) => (c.$id === comment.$id ? { ...c, likes: optimisticLikes } : c))
+      prev.map((c) =>
+        c.$id === comment.$id ? { ...c, likes: optimisticLikes } : c,
+      ),
     );
     try {
-      const serverLikes = await likeComment(comment.$id, currentUserId, currentLikes);
+      const serverLikes = await likeComment(
+        comment.$id,
+        currentUserId,
+        currentLikes,
+      );
       setComments((prev) =>
-        prev.map((c) => (c.$id === comment.$id ? { ...c, likes: serverLikes } : c))
+        prev.map((c) =>
+          c.$id === comment.$id ? { ...c, likes: serverLikes } : c,
+        ),
       );
     } catch (e) {
       // Revert on error
       setComments((prev) =>
-        prev.map((c) => (c.$id === comment.$id ? { ...c, likes: currentLikes } : c))
+        prev.map((c) =>
+          c.$id === comment.$id ? { ...c, likes: currentLikes } : c,
+        ),
       );
       console.error(e);
     }
@@ -255,7 +350,7 @@ export default function CommentSheet({
         currentUserId,
         currentUserName,
         currentUserRole,
-        replyOptions
+        replyOptions,
       );
       setComments((prev) => [newComment, ...prev]);
       setText("");
@@ -268,10 +363,25 @@ export default function CommentSheet({
     }
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      await deleteComment(commentId, momentId);
+      setComments((prev) => prev.filter((c) => c.$id !== commentId));
+      onCommentAdded?.();
+    } catch (e) {
+      console.error("Error deleting comment:", e);
+    }
+  };
+
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={handleClose}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -291,16 +401,25 @@ export default function CommentSheet({
         >
           {/* Drag handle */}
           <View style={styles.handleRow}>
-            <View style={[styles.handle, { backgroundColor: theme.colors.outlineVariant }]} />
+            <View
+              style={[
+                styles.handle,
+                { backgroundColor: theme.colors.outlineVariant },
+              ]}
+            />
           </View>
 
           {/* Header */}
           <View style={styles.headerRow}>
             <Text variant="titleMedium" style={{ fontWeight: "bold" }}>
-              {t('moments.comments')}
+              {t("moments.comments")}
             </Text>
             <Pressable onPress={handleClose} hitSlop={12}>
-              <MaterialCommunityIcons name="close" size={22} color={theme.colors.onSurface} />
+              <MaterialCommunityIcons
+                name="close"
+                size={22}
+                color={theme.colors.onSurface}
+              />
             </Pressable>
           </View>
 
@@ -322,6 +441,7 @@ export default function CommentSheet({
                   allComments={comments}
                   onReply={handleReply}
                   onLike={handleLikeComment}
+                  onDelete={handleDeleteComment}
                 />
               )}
               contentContainerStyle={styles.listContent}
@@ -335,9 +455,12 @@ export default function CommentSheet({
                   />
                   <Text
                     variant="bodyMedium"
-                    style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}
+                    style={{
+                      color: theme.colors.onSurfaceVariant,
+                      marginTop: 8,
+                    }}
                   >
-                    {t('moments.noCommentsYet')}
+                    {t("moments.noCommentsYet")}
                   </Text>
                 </View>
               }
@@ -346,19 +469,34 @@ export default function CommentSheet({
 
           {/* Reply indicator bar */}
           {replyTarget && (
-            <View style={[styles.replyBar, { backgroundColor: theme.colors.surfaceVariant }]}>
-              <Text variant="labelSmall" numberOfLines={1} style={{ flex: 1, color: theme.colors.onSurfaceVariant }}>
-                {t('moments.replyToComment', { name: replyTarget.author_name })}
+            <View
+              style={[
+                styles.replyBar,
+                { backgroundColor: theme.colors.surfaceVariant },
+              ]}
+            >
+              <Text
+                variant="labelSmall"
+                numberOfLines={1}
+                style={{ flex: 1, color: theme.colors.onSurfaceVariant }}
+              >
+                {t("moments.replyToComment", { name: replyTarget.author_name })}
               </Text>
               <Pressable onPress={() => setReplyTarget(null)} hitSlop={8}>
-                <MaterialCommunityIcons name="close" size={16} color={theme.colors.onSurfaceVariant} />
+                <MaterialCommunityIcons
+                  name="close"
+                  size={16}
+                  color={theme.colors.onSurfaceVariant}
+                />
               </Pressable>
             </View>
           )}
 
           {/* Input bar */}
           <Divider />
-          <View style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}>
+          <View
+            style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}
+          >
             <Avatar.Text
               size={28}
               label={currentUserName.substring(0, 1).toUpperCase()}
@@ -376,8 +514,10 @@ export default function CommentSheet({
               ]}
               placeholder={
                 replyTarget
-                  ? t('moments.replyPlaceholder', { name: replyTarget.author_name })
-                  : t('moments.addComment')
+                  ? t("moments.replyPlaceholder", {
+                      name: replyTarget.author_name,
+                    })
+                  : t("moments.addComment")
               }
               placeholderTextColor={theme.colors.onSurfaceVariant}
               value={text}
@@ -395,7 +535,11 @@ export default function CommentSheet({
               {posting ? (
                 <ActivityIndicator size={20} color={theme.colors.primary} />
               ) : (
-                <MaterialCommunityIcons name="send" size={24} color={theme.colors.primary} />
+                <MaterialCommunityIcons
+                  name="send"
+                  size={24}
+                  color={theme.colors.primary}
+                />
               )}
             </Pressable>
           </View>
