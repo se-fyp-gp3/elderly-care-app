@@ -46,7 +46,7 @@ import {
   GroupMessage,
 } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -421,9 +421,11 @@ export default function CaregiverMessages() {
     caregiverProfileId,
   ]);
 
-  useEffect(() => {
-    fetchContacts();
-  }, [fetchContacts]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchContacts();
+    }, [fetchContacts]),
+  );
 
   useEffect(() => {
     if (!caregiverProfileId) return;

@@ -19,6 +19,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useFocusEffect } from "expo-router";
 import {
     Alert,
     FlatList,
@@ -120,9 +121,11 @@ export default function MomentsView() {
     }
   }, [preferences.role, user]);
 
-  useEffect(() => {
-    loadMoments();
-  }, [loadMoments]);
+  useFocusEffect(
+    useCallback(() => {
+      loadMoments();
+    }, [loadMoments]),
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);

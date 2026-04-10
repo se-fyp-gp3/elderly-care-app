@@ -22,6 +22,7 @@ import {
 } from "expo-audio";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
+import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -147,9 +148,11 @@ export default function Settings() {
     }
   }, [user?.$id]);
 
-  useEffect(() => {
-    loadVoiceSetupData();
-  }, [loadVoiceSetupData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadVoiceSetupData();
+    }, [loadVoiceSetupData]),
+  );
 
   // Clean up sample player on unmount
   useEffect(() => {

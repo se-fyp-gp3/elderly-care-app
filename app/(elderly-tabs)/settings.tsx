@@ -13,7 +13,7 @@ import { Caregiver, CustomVoice, Elderly } from "@/types/appwrite";
 import { FontSize, UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -131,9 +131,11 @@ export default function ElderlySettings() {
     }
   }, [user]);
 
-  useEffect(() => {
-    loadEmergencyData();
-  }, [loadEmergencyData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadEmergencyData();
+    }, [loadEmergencyData]),
+  );
 
   useEffect(() => {
     setAiVoiceEnabled(preferences.aiVoiceEnabled ?? false);
