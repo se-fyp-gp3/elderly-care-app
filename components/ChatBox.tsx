@@ -11,6 +11,7 @@ import {
     Platform,
     StyleSheet,
     TouchableOpacity,
+    useColorScheme,
     View,
 } from "react-native";
 import {
@@ -46,6 +47,8 @@ export default function ChatBox() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const theme = useTheme();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const { t } = useTranslation();
 
   const DEEPSEEK_API_KEY = process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY?.trim();
@@ -55,7 +58,7 @@ export default function ChatBox() {
   useEffect(() => {
     const welcomeMessage: Message = {
       id: "1",
-      text: t('chat.welcomeMessage'),
+      text: t("chat.welcomeMessage"),
       isUser: false,
       timestamp: new Date(),
     };
@@ -67,8 +70,8 @@ export default function ChatBox() {
           await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
           Alert.alert(
-            t('common.permissionNeeded'),
-            t('chat.cameraRollPermission'),
+            t("common.permissionNeeded"),
+            t("chat.cameraRollPermission"),
           );
         }
       }
@@ -156,19 +159,19 @@ export default function ChatBox() {
       }
     } else {
       Alert.alert(
-        t('chat.addPhoto'),
-        t('chat.chooseOption'),
+        t("chat.addPhoto"),
+        t("chat.chooseOption"),
         [
           {
-            text: t('chat.takePhoto'),
+            text: t("chat.takePhoto"),
             onPress: () => takePhoto(),
           },
           {
-            text: t('chat.chooseFromGallery'),
+            text: t("chat.chooseFromGallery"),
             onPress: () => pickImage(),
           },
           {
-            text: t('common.cancel'),
+            text: t("common.cancel"),
             style: "cancel",
           },
         ],
@@ -194,7 +197,7 @@ export default function ChatBox() {
       if (Platform.OS === "web") {
         alert("Failed to pick image. Please try again.");
       } else {
-        Alert.alert(t('common.error'), t('chat.failedToPickImage'));
+        Alert.alert(t("common.error"), t("chat.failedToPickImage"));
       }
     }
   };
@@ -208,8 +211,8 @@ export default function ChatBox() {
           alert("Camera permission is required to take photos.");
         } else {
           Alert.alert(
-            t('common.permissionNeeded'),
-            t('chat.cameraPermissionRequired'),
+            t("common.permissionNeeded"),
+            t("chat.cameraPermissionRequired"),
           );
         }
         return;
@@ -229,7 +232,7 @@ export default function ChatBox() {
       if (Platform.OS === "web") {
         alert("Failed to take photo. Please try again.");
       } else {
-        Alert.alert(t('common.error'), t('chat.failedToTakePhoto'));
+        Alert.alert(t("common.error"), t("chat.failedToTakePhoto"));
       }
     }
   };
@@ -296,14 +299,26 @@ export default function ChatBox() {
       ]}
     >
       {!item.isUser && (
-        <Avatar.Icon size={36} icon="robot" style={styles.avatarAI} />
+        <Avatar.Icon
+          size={36}
+          icon="robot"
+          style={[
+            styles.avatarAI,
+            { backgroundColor: isDark ? "rgba(33,150,243,0.15)" : "#E3F2FD" },
+          ]}
+        />
       )}
 
       <View style={styles.messageBubbleContainer}>
         <Card
           style={[
             styles.messageCard,
-            item.isUser ? styles.userMessage : styles.aiMessage,
+            item.isUser
+              ? styles.userMessage
+              : [
+                  styles.aiMessage,
+                  { backgroundColor: theme.colors.surfaceVariant },
+                ],
           ]}
         >
           <Card.Content style={styles.messageContent}>
@@ -327,7 +342,7 @@ export default function ChatBox() {
             <Text
               style={[
                 styles.messageText,
-                { color: item.isUser ? "#FFFFFF" : "#000000" },
+                { color: item.isUser ? "#FFFFFF" : theme.colors.onSurface },
               ]}
             >
               {item.text}
@@ -338,7 +353,7 @@ export default function ChatBox() {
                 {
                   color: item.isUser
                     ? "rgba(255,255,255,0.8)"
-                    : "rgba(0,0,0,0.5)",
+                    : theme.colors.onSurfaceVariant,
                 },
               ]}
             >
@@ -382,7 +397,7 @@ export default function ChatBox() {
         {isLoading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator animating={true} color={theme.colors.primary} />
-            <Text style={styles.loadingText}>{t('chat.aiThinking')}</Text>
+            <Text style={styles.loadingText}>{t("chat.aiThinking")}</Text>
           </View>
         )}
       </View>
@@ -390,7 +405,10 @@ export default function ChatBox() {
       <View
         style={[
           styles.inputContainer,
-          { backgroundColor: theme.colors.surface },
+          {
+            backgroundColor: theme.colors.surface,
+            borderTopColor: theme.colors.outlineVariant,
+          },
         ]}
       >
         {selectedImage && (
@@ -421,7 +439,7 @@ export default function ChatBox() {
           <TextInput
             value={inputText}
             onChangeText={setInputText}
-            placeholder={t('chat.typeMessage')}
+            placeholder={t("chat.typeMessage")}
             mode="outlined"
             style={styles.textInput}
             contentStyle={styles.textInputContent}

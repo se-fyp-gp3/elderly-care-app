@@ -3,11 +3,7 @@ import { ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import {
-    StyleSheet,
-    TouchableOpacity,
-    View,
-} from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import {
     Avatar,
     Button,
@@ -40,7 +36,11 @@ export default function ScheduleSingleEventCard({
   return (
     <View style={styles.timelineRow}>
       <View style={styles.timeColumn}>
-        <Text style={styles.timeText}>{item.time}</Text>
+        <Text
+          style={[styles.timeText, { color: theme.colors.onSurfaceVariant }]}
+        >
+          {item.time}
+        </Text>
         {(item.status === ScheduleStatus.COMPLETED ||
           item.status === ("completed" as any)) && (
           <MaterialCommunityIcons
@@ -131,7 +131,15 @@ export default function ScheduleSingleEventCard({
 
           {(item.status === ScheduleStatus.PENDING ||
             item.status === ScheduleStatus.MISSED) && (
-            <View style={{ flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginTop: 12, gap: 8 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                marginTop: 12,
+                gap: 8,
+              }}
+            >
               {onRemind && (
                 <TouchableOpacity
                   onPress={() => onRemind(item)}
@@ -161,13 +169,12 @@ export default function ScheduleSingleEventCard({
                 uppercase={false}
                 onPress={() => onMarkDone(item.id)}
               >
-                {t('schedule.markDone')}
+                {t("schedule.markDone")}
               </Button>
             </View>
           )}
 
-          {isCompleted &&
-            onUndoTask && (
+          {isCompleted && onUndoTask && (
             <View style={{ alignItems: "flex-end", marginTop: 12 }}>
               <Button
                 mode="outlined"
@@ -176,7 +183,7 @@ export default function ScheduleSingleEventCard({
                 icon="undo"
                 onPress={() => onUndoTask(item.id)}
               >
-                {t('schedule.undo')}
+                {t("schedule.undo")}
               </Button>
             </View>
           )}

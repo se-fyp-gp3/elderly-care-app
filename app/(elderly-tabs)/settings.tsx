@@ -2,9 +2,9 @@ import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 import { useAuth } from "@/lib/auth-context";
 import { getCustomVoicesForElderly } from "@/lib/custom-voice";
 import {
-  getElderlyByUserId,
-  getLinkedCaregivers,
-  updateElderlyEmergencyContact,
+    getElderlyByUserId,
+    getLinkedCaregivers,
+    updateElderlyEmergencyContact,
 } from "@/lib/elderly";
 import { useFontSize } from "@/lib/font-size-context";
 import { useLanguage } from "@/lib/language-context";
@@ -15,31 +15,34 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    Alert,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    useColorScheme,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Button,
-  Card,
-  Chip,
-  List,
-  SegmentedButtons,
-  Switch,
-  Text,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Button,
+    Card,
+    Chip,
+    List,
+    SegmentedButtons,
+    Switch,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 export default function ElderlySettings() {
   const { user, preferences, updatePreferences, setPreference, signOut } =
     useAuth();
   const theme = useTheme();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const { t } = useTranslation();
   const { fontSize, setFontSize } = useFontSize();
   const { language, setLanguage } = useLanguage();
@@ -236,9 +239,9 @@ export default function ElderlySettings() {
   };
 
   const LANG_OPTIONS = [
-    { key: "cantonese", label: t('settings.cantonese') },
-    { key: "mandarin", label: t('settings.mandarin') },
-    { key: "english", label: t('settings.english') },
+    { key: "cantonese", label: t("settings.cantonese") },
+    { key: "mandarin", label: t("settings.mandarin") },
+    { key: "english", label: t("settings.english") },
   ] as const;
 
   return (
@@ -249,25 +252,25 @@ export default function ElderlySettings() {
         {/* Header */}
         <View style={styles.header}>
           <Text variant="headlineMedium" style={styles.title}>
-            {t('settings.title')}
+            {t("settings.title")}
           </Text>
           <Text
             variant="bodyLarge"
             style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}
           >
-            {t('settings.customizeExperience')}
+            {t("settings.customizeExperience")}
           </Text>
         </View>
 
         {/* Notifications */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
-          {t('settings.notifications')}
+          {t("settings.notifications")}
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <List.Item
-            title={t('settings.pushNotifications')}
+            title={t("settings.pushNotifications")}
             titleStyle={styles.listTitle}
-            description={t('settings.pushNotificationsDesc')}
+            description={t("settings.pushNotificationsDesc")}
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>
@@ -292,21 +295,28 @@ export default function ElderlySettings() {
 
         {/* Emergency Contact */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
-          {t('settings.emergencyContact')}
+          {t("settings.emergencyContact")}
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <List.Item
-            title={t('settings.emergencyContact')}
+            title={t("settings.emergencyContact")}
             titleStyle={styles.listTitle}
             description={
               emergencyContact
-                ? `${selectedCaregiverName ?? t('common.caregiver')} (${emergencyContact})`
-                : t('settings.emergencyContactNotSet')
+                ? `${selectedCaregiverName ?? t("common.caregiver")} (${emergencyContact})`
+                : t("settings.emergencyContactNotSet")
             }
             descriptionStyle={styles.listDescription}
             left={() => (
               <View
-                style={[styles.iconContainer, { backgroundColor: "#FFEBEE" }]}
+                style={[
+                  styles.iconContainer,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(211,47,47,0.12)"
+                      : "#FFEBEE",
+                  },
+                ]}
               >
                 <MaterialCommunityIcons
                   name="phone-alert"
@@ -336,13 +346,17 @@ export default function ElderlySettings() {
                 ]}
               />
               <List.Item
-                title={t('settings.clearEmergencyContact')}
+                title={t("settings.clearEmergencyContact")}
                 titleStyle={[styles.listTitle, { color: theme.colors.error }]}
                 left={() => (
                   <View
                     style={[
                       styles.iconContainer,
-                      { backgroundColor: "#FFEBEE" },
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(211,47,47,0.12)"
+                          : "#FFEBEE",
+                      },
                     ]}
                   >
                     <MaterialCommunityIcons
@@ -361,11 +375,11 @@ export default function ElderlySettings() {
 
         {/* Display */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
-          {t('settings.display')}
+          {t("settings.display")}
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <List.Item
-            title={t('settings.fontSize')}
+            title={t("settings.fontSize")}
             titleStyle={styles.listTitle}
             description={fontSize}
             descriptionStyle={styles.listDescription}
@@ -388,9 +402,9 @@ export default function ElderlySettings() {
                 setPreference("fontSize", value);
               }}
               buttons={[
-                { value: FontSize.Small, label: t('settings.fontSizeSmall') },
-                { value: FontSize.Medium, label: t('settings.fontSizeMedium') },
-                { value: FontSize.Large, label: t('settings.fontSizeLarge') },
+                { value: FontSize.Small, label: t("settings.fontSizeSmall") },
+                { value: FontSize.Medium, label: t("settings.fontSizeMedium") },
+                { value: FontSize.Large, label: t("settings.fontSizeLarge") },
               ]}
               style={styles.segmentedButtons}
               density="regular"
@@ -404,9 +418,9 @@ export default function ElderlySettings() {
           />
           {/* ── Interface Language ── */}
           <List.Item
-            title={t('settings.interfaceLanguage')}
+            title={t("settings.interfaceLanguage")}
             titleStyle={styles.listTitle}
-            description={t('settings.interfaceLanguageDesc')}
+            description={t("settings.interfaceLanguageDesc")}
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>
@@ -420,11 +434,14 @@ export default function ElderlySettings() {
             style={styles.listItem}
           />
           <View style={styles.langChipRow}>
-            {([
-              { key: "zh" as const, label: t('settings.languageChinese') },
-              { key: "zh-Hant" as const, label: t('settings.languageTraditionalChinese') },
-              { key: "en" as const, label: t('settings.languageEnglish') },
-            ]).map((opt) => (
+            {[
+              { key: "zh" as const, label: t("settings.languageChinese") },
+              {
+                key: "zh-Hant" as const,
+                label: t("settings.languageTraditionalChinese"),
+              },
+              { key: "en" as const, label: t("settings.languageEnglish") },
+            ].map((opt) => (
               <Chip
                 key={opt.key}
                 selected={language === opt.key}
@@ -437,7 +454,10 @@ export default function ElderlySettings() {
                 ]}
                 textStyle={
                   language === opt.key
-                    ? { color: theme.colors.onPrimaryContainer, fontWeight: "600" }
+                    ? {
+                        color: theme.colors.onPrimaryContainer,
+                        fontWeight: "600",
+                      }
                     : undefined
                 }
                 showSelectedOverlay
@@ -453,9 +473,9 @@ export default function ElderlySettings() {
             ]}
           />
           <List.Item
-            title={t('settings.aiVoiceIntonation')}
+            title={t("settings.aiVoiceIntonation")}
             titleStyle={styles.listTitle}
-            description={preferences.voiceTone || t('settings.friendly')}
+            description={preferences.voiceTone || t("settings.friendly")}
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>
@@ -484,9 +504,11 @@ export default function ElderlySettings() {
             ]}
           />
           <List.Item
-            title={t('settings.aiChatVoicePlayback')}
+            title={t("settings.aiChatVoicePlayback")}
             titleStyle={styles.listTitle}
-            description={aiVoiceEnabled ? t('settings.enabled') : t('settings.disabled')}
+            description={
+              aiVoiceEnabled ? t("settings.enabled") : t("settings.disabled")
+            }
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>
@@ -515,12 +537,12 @@ export default function ElderlySettings() {
             ]}
           />
           <List.Item
-            title={t('settings.caregiverVoice')}
+            title={t("settings.caregiverVoice")}
             titleStyle={styles.listTitle}
             description={
               selectedVoice
                 ? `${selectedVoice.caregiver_name} (${selectedVoice.voice_id})`
-                : t('settings.voiceNotSelected')
+                : t("settings.voiceNotSelected")
             }
             descriptionStyle={styles.listDescription}
             left={() => (
@@ -553,13 +575,17 @@ export default function ElderlySettings() {
                 ]}
               />
               <List.Item
-                title={t('settings.clearAiVoice')}
+                title={t("settings.clearAiVoice")}
                 titleStyle={[styles.listTitle, { color: theme.colors.error }]}
                 left={() => (
                   <View
                     style={[
                       styles.iconContainer,
-                      { backgroundColor: "#FFEBEE" },
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(211,47,47,0.12)"
+                          : "#FFEBEE",
+                      },
                     ]}
                   >
                     <MaterialCommunityIcons
@@ -583,9 +609,9 @@ export default function ElderlySettings() {
                 ]}
               />
               <List.Item
-                title={t('settings.voiceReplyLanguage')}
+                title={t("settings.voiceReplyLanguage")}
                 titleStyle={styles.listTitle}
-                description={t('settings.replyLanguageDesc')}
+                description={t("settings.replyLanguageDesc")}
                 descriptionStyle={styles.listDescription}
                 left={() => (
                   <View style={styles.iconContainer}>
@@ -630,13 +656,13 @@ export default function ElderlySettings() {
 
         {/* Account */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
-          {t('settings.account')}
+          {t("settings.account")}
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <List.Item
-            title={t('settings.role')}
+            title={t("settings.role")}
             titleStyle={styles.listTitle}
-            description={t('settings.roleElderly')}
+            description={t("settings.roleElderly")}
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>
@@ -655,21 +681,25 @@ export default function ElderlySettings() {
         {linkedCaregivers.length === 0 && elderlyProfile && (
           <>
             <Text variant="titleLarge" style={styles.sectionTitle}>
-              {t('common.caregiver')}
+              {t("common.caregiver")}
             </Text>
             <Card
               style={[styles.card, { backgroundColor: theme.colors.surface }]}
             >
               <List.Item
-                title={t('settings.connectCaregiver')}
+                title={t("settings.connectCaregiver")}
                 titleStyle={styles.listTitle}
-                description={t('settings.connectCaregiverDesc')}
+                description={t("settings.connectCaregiverDesc")}
                 descriptionStyle={styles.listDescription}
                 left={() => (
                   <View
                     style={[
                       styles.iconContainer,
-                      { backgroundColor: "#E3F2FD" },
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(33,150,243,0.15)"
+                          : "#E3F2FD",
+                      },
                     ]}
                   >
                     <MaterialCommunityIcons
@@ -699,18 +729,18 @@ export default function ElderlySettings() {
 
         {/* Interface Style */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
-          {t('settings.interfaceStyle')}
+          {t("settings.interfaceStyle")}
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <List.Item
-            title={t('settings.uiVersion')}
+            title={t("settings.uiVersion")}
             titleStyle={styles.listTitle}
             description={
               currentVersion === UIVersion.Simplified
-                ? t('settings.uiSimplified')
+                ? t("settings.uiSimplified")
                 : currentVersion === UIVersion.Accessible
-                  ? t('settings.uiAccessible')
-                  : t('settings.uiDefault')
+                  ? t("settings.uiAccessible")
+                  : t("settings.uiDefault")
             }
             descriptionStyle={styles.listDescription}
             left={() => (
@@ -758,7 +788,7 @@ export default function ElderlySettings() {
                   fontWeight: "bold",
                 }}
               >
-                {t('settings.needHelp')}
+                {t("settings.needHelp")}
               </Text>
             </View>
             <Text
@@ -769,7 +799,7 @@ export default function ElderlySettings() {
                 lineHeight: 26,
               }}
             >
-              {t('settings.needHelpDesc')}
+              {t("settings.needHelpDesc")}
             </Text>
           </Card.Content>
         </Card>
@@ -777,9 +807,9 @@ export default function ElderlySettings() {
         {/* About App */}
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <List.Item
-            title={t('settings.aboutApp')}
+            title={t("settings.aboutApp")}
             titleStyle={styles.listTitle}
-            description={t('settings.version')}
+            description={t("settings.version")}
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>
@@ -803,7 +833,7 @@ export default function ElderlySettings() {
           icon="logout"
           buttonColor={theme.colors.error}
         >
-          {t('common.signOut')}
+          {t("common.signOut")}
         </Button>
 
         <View style={styles.bottomSpacer} />
@@ -827,7 +857,7 @@ export default function ElderlySettings() {
               >
                 <View style={styles.modalHeader}>
                   <Text variant="titleLarge" style={{ fontWeight: "700" }}>
-                    {t('settings.selectEmergencyContact')}
+                    {t("settings.selectEmergencyContact")}
                   </Text>
                   <TouchableOpacity onPress={() => setPickerVisible(false)}>
                     <MaterialCommunityIcons
@@ -863,7 +893,7 @@ export default function ElderlySettings() {
                         textAlign: "center",
                       }}
                     >
-                      {t('settings.noLinkedCaregivers')}
+                      {t("settings.noLinkedCaregivers")}
                     </Text>
                   </View>
                 ) : (
@@ -902,7 +932,7 @@ export default function ElderlySettings() {
                             variant="titleMedium"
                             style={{ fontWeight: "600" }}
                           >
-                            {cg.name ?? t('common.unknown')}
+                            {cg.name ?? t("common.unknown")}
                           </Text>
                           <Text
                             variant="bodySmall"
@@ -911,7 +941,7 @@ export default function ElderlySettings() {
                               marginTop: 2,
                             }}
                           >
-                            {cg.phone ?? t('common.noPhoneNumber')}
+                            {cg.phone ?? t("common.noPhoneNumber")}
                           </Text>
                         </View>
                         {isSelected && (
@@ -957,7 +987,7 @@ export default function ElderlySettings() {
               >
                 <View style={styles.modalHeader}>
                   <Text variant="titleLarge" style={{ fontWeight: "700" }}>
-                    {t('settings.chooseInterfaceStyle')}
+                    {t("settings.chooseInterfaceStyle")}
                   </Text>
                   <TouchableOpacity
                     onPress={() => setVersionPickerVisible(false)}
@@ -977,7 +1007,7 @@ export default function ElderlySettings() {
                     marginBottom: 16,
                   }}
                 >
-                  {t('settings.selectLayoutDesc')}
+                  {t("settings.selectLayoutDesc")}
                 </Text>
 
                 {VERSION_OPTIONS.map((option) => {
@@ -1002,7 +1032,9 @@ export default function ElderlySettings() {
                           {
                             backgroundColor: isSelected
                               ? theme.colors.primary + "20"
-                              : "#E8F0FE",
+                              : isDark
+                                ? "rgba(33,150,243,0.12)"
+                                : "#E8F0FE",
                           },
                         ]}
                       >
@@ -1063,7 +1095,7 @@ export default function ElderlySettings() {
               >
                 <View style={styles.modalHeader}>
                   <Text variant="titleLarge" style={{ fontWeight: "700" }}>
-                    {t('settings.selectCaregiverVoice')}
+                    {t("settings.selectCaregiverVoice")}
                   </Text>
                   <TouchableOpacity
                     onPress={() => setVoicePickerVisible(false)}
@@ -1083,7 +1115,7 @@ export default function ElderlySettings() {
                     marginBottom: 16,
                   }}
                 >
-                  {t('settings.chooseFromVoices')}
+                  {t("settings.chooseFromVoices")}
                 </Text>
 
                 {dedupedVoiceOptions.length === 0 ? (
@@ -1101,7 +1133,7 @@ export default function ElderlySettings() {
                         textAlign: "center",
                       }}
                     >
-                      {t('settings.noCaregiverVoice')}
+                      {t("settings.noCaregiverVoice")}
                     </Text>
                   </View>
                 ) : (
@@ -1140,7 +1172,7 @@ export default function ElderlySettings() {
                             variant="titleMedium"
                             style={{ fontWeight: "600" }}
                           >
-                            {voice.caregiver_name ?? t('common.caregiver')}
+                            {voice.caregiver_name ?? t("common.caregiver")}
                           </Text>
                           <Text
                             variant="bodySmall"
