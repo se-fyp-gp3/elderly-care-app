@@ -1711,6 +1711,24 @@
           "min": 0,
           "max": 7200000,
           "default": null
+        },
+        {
+          "key": "media_items",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 10000,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "media_thumbnail_file_id",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
         }
       ],
       "indexes": [
@@ -1780,6 +1798,51 @@
           "required": true,
           "array": false,
           "size": 20,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "likes",
+          "type": "string",
+          "required": false,
+          "array": true,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "reply_to_comment_id",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "reply_to_user_id",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "reply_to_user_name",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 255,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "moment_author_id",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 64,
           "default": null,
           "encrypt": false
         }

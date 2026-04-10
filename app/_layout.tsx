@@ -1,19 +1,26 @@
 import {
   DATABASE_ID,
   DIRECT_MESSAGES_TABLE_ID,
-  safeSubscribe,
+  MOMENTS_COMMENTS_TABLE_ID,
+  safeSubscribe
 } from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { FontSizeProvider, useFontSize } from "@/lib/font-size-context";
+import {
+  UnreadBadgeProvider,
+  useUnreadBadge,
+} from "@/lib/hooks/useUnreadBadge";
 import "@/lib/i18n"; // side-effect: initializes i18next
 import { LanguageProvider } from "@/lib/language-context";
+import { getUserMomentIds } from "@/lib/moments";
 import {
   registerForPushNotificationsAsync,
   sendImmediateNotification,
 } from "@/lib/notifications";
 import { DirectMessage } from "@/types/messaging";
+import { MomentComment } from "@/types/moments";
 import { Role } from "@/types/user";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
@@ -96,13 +103,17 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   const appState = useRef(AppState.currentState);
 
   // Global Notification Listener for Direct Messages
+  const { incrementMomentUnread, refreshChatUnread } = useUnreadBadge();
   useEffect(() => {
     if (!user?.$id) return;
 
     // Register for permissions on mount
     registerForPushNotificationsAsync();
+    // Initial chat unread count
+    refreshChatUnread(user.$id);
 
     let unsubscribeRealtime: (() => void) | null = null;
+    let unsubscribeComments: (() => void) | null = null;
 
     // Resolve profile ID first, then subscribe
     const setup = async () => {
@@ -121,6 +132,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
       if (!myProfileId) return;
 
+      // Subscribe to direct messages for notifications
       const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
       unsubscribeRealtime = safeSubscribe(channel, async (response) => {
         if (!response.events.some((e) => e.endsWith(".create"))) return;
@@ -143,6 +155,43 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
               contactRole: payload.sender_role,
             },
           );
+          refreshChatUnread(user!.$id);
+        }
+      });
+
+      // Subscribe to moments comments for notifications
+      const commentsChannel = `databases.${DATABASE_ID}.collections.${MOMENTS_COMMENTS_TABLE_ID}.documents`;
+      let myMomentIds: string[] = [];
+      getUserMomentIds(user!.$id)
+        .then((ids) => {
+          myMomentIds = ids;
+        })
+        .catch(() => {});
+
+      unsubscribeComments = safeSubscribe(commentsChannel, async (response) => {
+        if (!response.events.some((e) => e.endsWith(".create"))) return;
+
+        const payload = response.payload as MomentComment;
+        // Skip own comments
+        if (payload.author_id === user!.$id) return;
+
+        // Notify if: comment on my moment OR reply to me
+        const isOnMyMoment =
+          payload.moment_author_id === user!.$id ||
+          myMomentIds.includes(payload.moment_id);
+        const isReplyToMe = payload.reply_to_user_id === user!.$id;
+
+        if (isOnMyMoment || isReplyToMe) {
+          const title = payload.author_name || "New Comment";
+          const body = isReplyToMe
+            ? `Replied to your comment: ${(payload.content || "").substring(0, 80)}`
+            : `Commented on your post: ${(payload.content || "").substring(0, 80)}`;
+
+          await sendImmediateNotification(title, body, {
+            type: "moment_comment",
+            momentId: payload.moment_id,
+          });
+          incrementMomentUnread();
         }
       });
     };
@@ -154,7 +203,6 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
       (response) => {
         const rawData = response.notification.request.content.data as any;
 
-        // Safe cast or property access
         if (rawData && rawData.type === "direct_message") {
           const contactId = rawData.contactId as string;
           const contactName = rawData.contactName as string;
@@ -173,6 +221,13 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
               contactRole,
             },
           });
+        } else if (rawData && rawData.type === "moment_comment") {
+          // Navigate to community / emergency tab (where moments are shown)
+          const targetPath =
+            role === "elderly"
+              ? "/(elderly-tabs)/emergency"
+              : "/(caregiver-tabs)/caregiver";
+          router.push(targetPath);
         }
       },
     );
@@ -180,9 +235,10 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     return () => {
       // Cleanup subscription
       unsubscribeRealtime?.();
+      unsubscribeComments?.();
       subscription.remove();
     };
-  }, [user?.$id, router, role]);
+  }, [user?.$id, router, role, incrementMomentUnread, refreshChatUnread]);
 
   useEffect(() => {
     const currentRoute = segments[0];
@@ -296,32 +352,40 @@ function ThemedApp() {
         style={{ flex: 1, backgroundColor: theme.colors.background }}
       >
         <AuthProvider>
-          <SafeAreaProvider>
-            <RouteGuard>
-              <Stack>
-                <Stack.Screen
-                  name="(caregiver-tabs)"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="(elderly-tabs)"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen name="start" options={{ headerShown: false }} />
-                <Stack.Screen name="signup" options={{ headerShown: false }} />
-                <Stack.Screen name="auth" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="profile-setup"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="qr-register"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen name="reauth" options={{ headerShown: false }} />
-              </Stack>
-            </RouteGuard>
-          </SafeAreaProvider>
+          <UnreadBadgeProvider>
+            <SafeAreaProvider>
+              <RouteGuard>
+                <Stack>
+                  <Stack.Screen
+                    name="(caregiver-tabs)"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="(elderly-tabs)"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen name="start" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="signup"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen name="auth" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="profile-setup"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="qr-register"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="reauth"
+                    options={{ headerShown: false }}
+                  />
+                </Stack>
+              </RouteGuard>
+            </SafeAreaProvider>
+          </UnreadBadgeProvider>
         </AuthProvider>
       </GestureHandlerRootView>
     </PaperProvider>

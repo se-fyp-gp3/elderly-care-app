@@ -3,6 +3,7 @@ import MiniSettingsGearButton from "@/components/MiniSettingsGearButton";
 import { useAuth } from "@/lib/auth-context";
 import { startFallDetection, stopFallDetection } from "@/lib/fall-detection";
 import { usePresence } from "@/lib/hooks/usePresence";
+import { useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
@@ -35,6 +36,7 @@ export default function ElderlyTabsLayout() {
   const { t } = useTranslation();
   const { preferences } = useAuth();
   usePresence();
+  const { totalUnread } = useUnreadBadge();
   const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
   const visible = getVisibleTabs(uiVersion);
 
@@ -131,6 +133,7 @@ export default function ElderlyTabsLayout() {
           title: t('tabs.community'),
           href: visible.emergency ? undefined : null,
           headerRight: isAccessible ? () => <MiniSettingsGearButton /> : undefined,
+          tabBarBadge: totalUnread > 0 ? totalUnread : undefined,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="account-group"
@@ -179,6 +182,22 @@ export default function ElderlyTabsLayout() {
         options={{
           href: null,
           title: t('settings.connectCaregiver'),
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="group-conversation"
+        options={{
+          href: null,
+          title: t('tabs.conversation'),
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="group-settings"
+        options={{
+          href: null,
+          title: t('chat.groupSettings'),
           headerShown: false,
         }}
       />
