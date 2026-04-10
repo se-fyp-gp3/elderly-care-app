@@ -46,7 +46,7 @@ import {
   useTheme,
 } from "react-native-paper";
 
-/* ???? Helpers ???????????????????????????????????????????????????????????????????????????????????????????? */
+/* ── Helpers ────────────────────────────────────────────── */
 
 function getTypeConfig(type: string) {
   switch (type) {
@@ -85,7 +85,7 @@ function formatRelativeTime(isoDate: string): string {
 
 type FilterStatus = "all" | "active" | "investigating" | "resolved";
 
-/* ???? Component ???????????????????????????????????????????????????????????????????????????????????????? */
+/* ── Component ──────────────────────────────────────────── */
 
 export default function EmergencyPage() {
   const theme = useTheme();
@@ -94,6 +94,7 @@ export default function EmergencyPage() {
   const router = useRouter();
   const navigation = useNavigation();
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,7 +106,7 @@ export default function EmergencyPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
 
-  /* ???? Data fetching ???? */
+  /* ── Data fetching ── */
   const loadAlerts = useCallback(async () => {
     if (!user) return;
     try {
@@ -133,7 +134,7 @@ export default function EmergencyPage() {
     return () => unsub?.();
   }, [user, loadAlerts]);
 
-  /* ???? Header ???? */
+  /* ── Header ── */
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: "",
@@ -167,7 +168,7 @@ export default function EmergencyPage() {
     });
   }, [navigation, router, theme]);
 
-  /* ???? Filtering ???? */
+  /* ── Filtering ── */
   const filtered = useMemo(() => {
     let list = alerts;
     if (filterStatus !== "all") {
@@ -194,7 +195,7 @@ export default function EmergencyPage() {
     [alerts],
   );
 
-  /* ???? Actions ???? */
+  /* ── Actions ── */
   const handleCallEmergency = (number: string) => {
     Linking.openURL(`tel:${number}`);
   };
@@ -210,6 +211,229 @@ export default function EmergencyPage() {
     }
   };
 
+  const getTypeConfig = (type: string) => {
+    switch (type) {
+      case "fall":
+        return {
+          icon: "alert-decagram",
+          color: "#D32F2F",
+          label: t("emergency.fallDetected"),
+        };
+      case "sos":
+        return {
+          icon: "bell-alert",
+          color: "#C62828",
+          label: t("emergency.sosAlert"),
+        };
+      case "hr_warning":
+        return {
+          icon: "heart-broken",
+          color: "#E64A19",
+          label: t("emergency.healthWarning"),
+        };
+      case "geo_fence":
+        return {
+          icon: "map-marker-alert",
+          color: "#F57C00",
+          label: t("emergency.geoFence"),
+        };
+      default:
+        return { icon: "alert", color: "#757575", label: t("emergency.alert") };
+    }
+  };
+
+  const handleInvestigate = async (alert: EmergencyAlert) => {
+    try {
+      await updateAlertStatus(alert.$id, "investigating");
+      setSelectedAlert(null);
+      loadAlerts();
+    } catch (err) {
+      Alert.alert("Error", "Failed to update alert status.");
+    }
+  };
+
+  /* ── Sub-components ── */
+  const StatusBadge = ({ status }: { status: string }) => {
+    let textColor = theme.colors.primary;
+    let bgColor = theme.colors.primaryContainer;
+    let label = t("common.resolved");
+    let icon = "check-circle";
+
+    if (status === "active") {
+      textColor = theme.colors.error;
+      bgColor = theme.colors.errorContainer;
+      label = t("common.active");
+      icon = "alert-circle";
+    } else if (status === "investigating") {
+      textColor = "#FB8C00";
+      bgColor = isDark ? "rgba(251,140,0,0.15)" : "#FFF3E0";
+      label = t("emergency.inProgress");
+      icon = "progress-clock";
+    }
+
+    return (
+      <Chip
+        icon={icon}
+        style={{ backgroundColor: bgColor }}
+        textStyle={{ color: textColor, fontSize: 12 }}
+        compact
+      >
+        {label}
+      </Chip>
+    );
+  };
+
+  const renderLogItem = ({ item }: { item: EmergencyAlert }) => {
+    const config = getTypeConfig(item.type);
+    return (
+      <Surface
+        style={[styles.logCard, { borderLeftColor: config.color }]}
+        elevation={1}
+      >
+        <TouchableOpacity
+          onPress={() => setSelectedAlert(item)}
+          style={{ flexDirection: "row", alignItems: "center", padding: 12 }}
+        >
+          <View
+            style={[styles.iconBox, { backgroundColor: config.color + "15" }]}
+          >
+            <MaterialCommunityIcons
+              name={config.icon as any}
+              size={28}
+              color={config.color}
+            />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text variant="titleMedium" style={{ fontWeight: "bold" }}>
+                {config.label}
+              </Text>
+              <StatusBadge status={item.status} />
+            </View>
+            <Text variant="bodyMedium" style={{ marginTop: 2 }}>
+              {item.elderly_name}
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginTop: 4,
+              }}
+            >
+              <MaterialCommunityIcons
+                name="clock-outline"
+                size={14}
+                color={theme.colors.onSurfaceVariant}
+              />
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                  marginLeft: 4,
+                  marginRight: 12,
+                }}
+              >
+                {formatRelativeTime(item.$createdAt)}
+              </Text>
+              {item.location_name && (
+                <>
+                  <MaterialCommunityIcons
+                    name="map-marker-outline"
+                    size={14}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <Text
+                    variant="bodySmall"
+                    style={{
+                      color: theme.colors.onSurfaceVariant,
+                      marginLeft: 4,
+                    }}
+                  >
+                    {item.location_name}
+                  </Text>
+                </>
+              )}
+            </View>
+          </View>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={24}
+            color={theme.colors.onSurfaceVariant}
+          />
+        </TouchableOpacity>
+      </Surface>
+    );
+  };
+
+  /* ── Render ── */
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          styles.center,
+          { backgroundColor: theme.colors.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 20 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadAlerts();
+            }}
+          />
+        }
+      >
+        {/* Status Banner */}
+        <Surface
+          style={[
+            styles.banner,
+            {
+              backgroundColor:
+                activeCount > 0
+                  ? theme.colors.errorContainer
+                  : theme.colors.primaryContainer,
+            },
+          ]}
+          elevation={2}
+        >
+          <View style={styles.bannerContent}>
+            <MaterialCommunityIcons
+              name={activeCount > 0 ? "shield-alert" : "shield-check"}
+              size={48}
+              color={
+                activeCount > 0 ? theme.colors.error : theme.colors.primary
+              }
+            />
+            <View style={{ marginLeft: 16, flex: 1 }}>
+              <Text
+                variant="headlineSmall"
+                style={{
+                  color:
+                    activeCount > 0
+                      ? theme.colors.onErrorContainer
+                      : theme.colors.onPrimaryContainer,
+                  fontWeight: "bold",
+                }}
+              >
                 {activeCount > 0
                   ? t("emergency.alertSystemActive")
                   : "All Clear"}
