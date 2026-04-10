@@ -1,9 +1,10 @@
 import CreateGroupModal from "@/components/CreateGroupModal";
 import UserAvatar from "@/components/UserAvatar";
 import {
-    DATABASE_ID,
-    DIRECT_MESSAGES_TABLE_ID,
-    safeSubscribe,
+  DATABASE_ID,
+  DIRECT_MESSAGES_TABLE_ID,
+  GROUP_MESSAGES_TABLE_ID,
+  safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
