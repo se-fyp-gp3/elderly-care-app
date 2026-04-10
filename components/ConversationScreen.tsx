@@ -1,8 +1,4 @@
-import {
-  ID,
-  storage,
-  VOICE_MESSAGES_BUCKET_ID,
-} from "@/lib/appwrite";
+import { ID, storage, VOICE_MESSAGES_BUCKET_ID } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
   buildConversationId,
@@ -33,6 +29,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -40,7 +37,10 @@ import {
 import {
   ActivityIndicator,
   Avatar,
+  Divider,
   IconButton,
+  Modal,
+  Portal,
   Text,
   TextInput,
   useTheme,
