@@ -195,37 +195,6 @@ export default function ElderlyCard({
             </Text>
           </View>
           <View style={styles.statRow}>
-            <MaterialCommunityIcons
-              name="walk"
-              size={16}
-              color={
-                elderly.statusInfo?.isActive
-                  ? '#4CAF50'
-                  : elderly.statusInfo?.todaySteps !== null
-                    ? '#E65100'
-                    : undefined
-              }
-            />
-            <Text
-              variant="bodySmall"
-              style={
-                !elderly.statusInfo?.isActive &&
-                elderly.statusInfo?.todaySteps !== null
-                  ? { color: '#E65100', fontWeight: 'bold' }
-                  : elderly.statusInfo?.isActive
-                    ? { color: '#4CAF50' }
-                    : undefined
-              }
-            >
-              {' '}Activity:{' '}
-              {elderly.statusInfo?.todaySteps !== null &&
-              elderly.statusInfo?.todaySteps !== undefined
-                ? `${elderly.statusInfo.todaySteps.toLocaleString()} steps today`
-                : 'No data'}
-              {elderly.statusInfo?.isActive ? ' ● Active' : ''}
-            </Text>
-          </View>
-          <View style={styles.statRow}>
             <MaterialCommunityIcons name="calendar" size={16} />
             <Text variant="bodySmall">
               {" "}
