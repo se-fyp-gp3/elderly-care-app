@@ -275,7 +275,7 @@ export default function MomentsView() {
         ...prev,
         {
           uri: asset.uri,
-          type: "image",
+          type: "image" as const,
           mimeType: asset.mimeType,
           fileName: asset.fileName ?? undefined,
           fileSize: asset.fileSize,
@@ -435,7 +435,10 @@ export default function MomentsView() {
                             style={[
                               styles.previewThumb,
                               styles.videoThumbPlaceholder,
-                              { borderColor: theme.colors.outline },
+                              {
+                                borderColor: theme.colors.outline,
+                                backgroundColor: theme.colors.surfaceVariant,
+                              },
                             ]}
                           >
                             <MaterialCommunityIcons
