@@ -6,7 +6,7 @@ import { getLatestMetrics } from "@/lib/health-data";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { ActivityIndicator, TouchableOpacity, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 

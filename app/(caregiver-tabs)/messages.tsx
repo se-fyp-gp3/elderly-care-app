@@ -1,78 +1,78 @@
 import CreateGroupModal from "@/components/CreateGroupModal";
 import UserAvatar from "@/components/UserAvatar";
 import {
-  CAREGIVER_TABLE_ID,
-  clientReactNative,
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
-  ELDERLY_TABLE_ID,
-  GROUP_MEMBERS_TABLE_ID,
-  GROUP_MESSAGES_TABLE_ID,
-  safeSubscribe,
+    CAREGIVER_TABLE_ID,
+    clientReactNative,
+    DATABASE_ID,
+    DIRECT_MESSAGES_TABLE_ID,
+    ELDERLY_TABLE_ID,
+    GROUP_MEMBERS_TABLE_ID,
+    GROUP_MESSAGES_TABLE_ID,
+    safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
-  acceptCaregiverConnection,
-  addCaregiverConnection,
-  Contact,
-  formatRelativeTime,
-  getContactsForCaregiver,
-  getPendingCaregiverConnections,
-  rejectCaregiverConnection,
-  searchUserByPhone,
+    acceptCaregiverConnection,
+    addCaregiverConnection,
+    Contact,
+    formatRelativeTime,
+    getContactsForCaregiver,
+    getPendingCaregiverConnections,
+    rejectCaregiverConnection,
+    searchUserByPhone,
 } from "@/lib/contacts";
 import {
-  getGroupUnreadCount,
-  getLastGroupMessage,
+    getGroupUnreadCount,
+    getLastGroupMessage,
 } from "@/lib/group-messaging";
 import {
-  acceptGroupInvitation,
-  getGroupsForUser,
-  getPendingGroupInvitations,
-  rejectGroupInvitation,
+    acceptGroupInvitation,
+    getGroupsForUser,
+    getPendingGroupInvitations,
+    rejectGroupInvitation,
 } from "@/lib/groups";
 import {
-  buildConversationId,
-  getLastMessage,
-  getUnreadCountPerConversation,
+    buildConversationId,
+    getLastMessage,
+    getUnreadCountPerConversation,
 } from "@/lib/messaging";
 import { isUserOnline } from "@/lib/presence";
 import { Caregiver, Elderly } from "@/types/appwrite";
 import {
-  DirectMessage,
-  Group,
-  GroupMember,
-  GroupMessage,
+    DirectMessage,
+    Group,
+    GroupMember,
+    GroupMessage,
 } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Keyboard,
-  Linking,
-  Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  useWindowDimensions,
-  View,
+    Alert,
+    FlatList,
+    Keyboard,
+    Linking,
+    Modal,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Badge,
-  Button,
-  Menu,
-  Searchbar,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Badge,
+    Button,
+    Menu,
+    Searchbar,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 import MomentsView from "@/components/MomentsView";
