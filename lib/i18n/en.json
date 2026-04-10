@@ -671,7 +671,23 @@
     "info": "Info",
     "health": "Health",
     "danger": "Danger",
-    "normal": "Normal"
+    "normal": "Normal",
+    "inactive": "Inactive",
+    "activity": "Activity:",
+    "stepsToday": "{{count}} steps today",
+    "noData": "No data",
+    "active": "Active"
+  },
+  "caregiverAI": {
+    "careAssistant": "Care Assistant",
+    "careAssistantDesc": "Ask me about today's tasks, medications, or schedules for your elderly patients.",
+    "suggestion1": "What are today's tasks for my elderly?",
+    "suggestion2": "Which medications are still pending?",
+    "suggestion3": "Any missed events today?",
+    "suggestion4": "Give me an overall health summary",
+    "chatPlaceholder": "Ask about your elderly's tasks...",
+    "thinking": "Thinking...",
+    "aiNotConfigured": "AI service is not configured. Please set the DashScope API key."
   },
   "scanQR": {
     "loadingCamera": "Loading camera...",
@@ -823,7 +839,13 @@
     "repliedToYourComment": "Replied to your comment",
     "mediaOf": "{{current}} / {{total}}",
     "videoLoadError": "Failed to load video",
-    "tapToRetry": "Tap to retry"
+    "tapToRetry": "Tap to retry",
+    "deletePost": "Delete Post",
+    "confirmDeletePost": "Are you sure you want to delete this post?",
+    "aiAssistant": "AI Assistant",
+    "roleCaregiverLabel": "Caregiver",
+    "roleElderlyLabel": "Elderly",
+    "roleAiLabel": "AI"
   },
   "qrPairing": {
     "settingUp": "Setting up...",

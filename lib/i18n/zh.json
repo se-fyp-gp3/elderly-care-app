@@ -660,7 +660,23 @@
     "info": "信息",
     "health": "健康",
     "danger": "危险",
-    "normal": "正常"
+    "normal": "正常",
+    "inactive": "不活跃",
+    "activity": "活动：",
+    "stepsToday": "{{count}} 步（今天）",
+    "noData": "无数据",
+    "active": "活跃"
+  },
+  "caregiverAI": {
+    "careAssistant": "照护助手",
+    "careAssistantDesc": "了解今天的任务、用药或长者的日程安排。",
+    "suggestion1": "我的长者今天有哪些任务？",
+    "suggestion2": "还有哪些药物未服用？",
+    "suggestion3": "今天有遗漏的事项吗？",
+    "suggestion4": "给我一个整体健康摘要",
+    "chatPlaceholder": "询问您长者的任务...",
+    "thinking": "思考中...",
+    "aiNotConfigured": "AI 服务尚未设定。请设定 DashScope API 密钥。"
   },
   "scanQR": {
     "loadingCamera": "加载摄像头...",
@@ -812,7 +828,13 @@
     "repliedToYourComment": "回复了你的评论",
     "mediaOf": "{{current}} / {{total}}",
     "videoLoadError": "视频加载失败",
-    "tapToRetry": "点击重试"
+    "tapToRetry": "点击重试",
+    "deletePost": "删除帖文",
+    "confirmDeletePost": "确定要删除这则帖文吗？",
+    "aiAssistant": "AI 助手",
+    "roleCaregiverLabel": "照护者",
+    "roleElderlyLabel": "长者",
+    "roleAiLabel": "AI"
   },
   "qrPairing": {
     "settingUp": "正在设置...",

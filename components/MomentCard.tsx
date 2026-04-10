@@ -608,7 +608,14 @@ export default function MomentCard({
             variant="bodySmall"
             style={{ color: theme.colors.onSurfaceVariant }}
           >
-            {moment.author_role} • {formatRelativeTime(moment.$createdAt)}
+            {moment.author_role === "caregiver"
+              ? t("moments.roleCaregiverLabel")
+              : moment.author_role === "elderly"
+                ? t("moments.roleElderlyLabel")
+                : moment.author_role === "ai"
+                  ? t("moments.roleAiLabel")
+                  : moment.author_role}{" "}
+            • {formatRelativeTime(moment.$createdAt)}
           </Text>
         </View>
         {moment.author_id === currentUserId && onDelete && (
@@ -616,12 +623,12 @@ export default function MomentCard({
             style={{ marginLeft: "auto", padding: 4 }}
             onPress={() => {
               Alert.alert(
-                "Delete Post",
-                "Are you sure you want to delete this post?",
+                t("moments.deletePost"),
+                t("moments.confirmDeletePost"),
                 [
-                  { text: "Cancel", style: "cancel" },
+                  { text: t("common.cancel"), style: "cancel" },
                   {
-                    text: "Delete",
+                    text: t("moments.deletePost"),
                     style: "destructive",
                     onPress: () => onDelete(moment.$id),
                   },

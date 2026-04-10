@@ -1,4 +1,5 @@
 import { generateAIResponse } from "@/lib/ai";
+import i18n from "@/lib/i18n";
 import {
   clientReactNative,
   DATABASE_ID,
@@ -531,7 +532,7 @@ export async function addAIResponse(
         moment_id: momentId,
         content: aiContent,
         author_id: "ai-assistant",
-        author_name: "AI Assistant",
+        author_name: i18n.t("moments.aiAssistant"),
         author_role: "ai",
       },
     );

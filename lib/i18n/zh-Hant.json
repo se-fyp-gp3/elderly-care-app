@@ -671,7 +671,23 @@
     "info": "資訊",
     "health": "健康",
     "danger": "危險",
-    "normal": "正常"
+    "normal": "正常",
+    "inactive": "不活躍",
+    "activity": "活動：",
+    "stepsToday": "{{count}} 步（今天）",
+    "noData": "無資料",
+    "active": "活躍"
+  },
+  "caregiverAI": {
+    "careAssistant": "照護助手",
+    "careAssistantDesc": "了解今天的任務、用藥或長者的日程安排。",
+    "suggestion1": "我的長者今天有哪些任務？",
+    "suggestion2": "還有哪些藥物未服用？",
+    "suggestion3": "今天有遺漏的事項嗎？",
+    "suggestion4": "給我一個整體健康摘要",
+    "chatPlaceholder": "詢問您長者的任務...",
+    "thinking": "思考中...",
+    "aiNotConfigured": "AI 服務尚未設定。請設定 DashScope API 金鑰。"
   },
   "scanQR": {
     "loadingCamera": "載入攝影機...",
@@ -823,7 +839,13 @@
     "repliedToYourComment": "回覆了你的評論",
     "mediaOf": "{{current}} / {{total}}",
     "videoLoadError": "影片載入失敗",
-    "tapToRetry": "點擊重試"
+    "tapToRetry": "點擊重試",
+    "deletePost": "刪除帖文",
+    "confirmDeletePost": "確定要刪除這則帖文嗎？",
+    "aiAssistant": "AI 助手",
+    "roleCaregiverLabel": "照護者",
+    "roleElderlyLabel": "長者",
+    "roleAiLabel": "AI"
   },
   "qrPairing": {
     "settingUp": "正在設定...",
