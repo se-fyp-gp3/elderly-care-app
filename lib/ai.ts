@@ -1,3 +1,5 @@
+import i18n from "@/lib/i18n";
+
 const DASHSCOPE_API_KEY = process.env.EXPO_PUBLIC_DASHSCOPE_API_KEY?.trim();
 const DASHSCOPE_API_URL = process.env.EXPO_PUBLIC_DASHSCOPE_API_URL?.trim();
 const DASHSCOPE_TEXT_MODEL =
@@ -16,7 +18,7 @@ export async function generateAIResponse(
   imageUrl?: string,
 ): Promise<string> {
   if (!DASHSCOPE_API_KEY || !DASHSCOPE_API_URL) {
-    return "AI service is not configured. Please set the DashScope API key.";
+    return i18n.t("caregiverAI.aiNotConfigured");
   }
 
   const hasImage = !!imageUrl;

@@ -186,12 +186,12 @@ export default function ElderlyCard({
               }
             >
               {" "}
-              Activity:{" "}
+              {t("caregiverPanel.activity")}{" "}
               {elderly.statusInfo?.todaySteps !== null &&
               elderly.statusInfo?.todaySteps !== undefined
-                ? `${elderly.statusInfo.todaySteps.toLocaleString()} steps today`
-                : "No data"}
-              {elderly.statusInfo?.isActive ? " ● Active" : ""}
+                ? t("caregiverPanel.stepsToday", { count: elderly.statusInfo.todaySteps.toLocaleString() })
+                : t("caregiverPanel.noData")}
+              {elderly.statusInfo?.isActive ? ` ● ${t("caregiverPanel.active")}` : ""}
             </Text>
           </View>
           <View style={styles.statRow}>

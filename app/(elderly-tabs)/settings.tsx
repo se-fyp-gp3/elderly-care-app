@@ -2,9 +2,9 @@ import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 import { useAuth } from "@/lib/auth-context";
 import { getCustomVoicesForElderly } from "@/lib/custom-voice";
 import {
-  getElderlyByUserId,
-  getLinkedCaregivers,
-  updateElderlyEmergencyContact,
+    getElderlyByUserId,
+    getLinkedCaregivers,
+    updateElderlyEmergencyContact,
 } from "@/lib/elderly";
 import { useFontSize } from "@/lib/font-size-context";
 import { useLanguage } from "@/lib/language-context";
@@ -13,31 +13,31 @@ import { Caregiver, CustomVoice, Elderly } from "@/types/appwrite";
 import { FontSize, UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  useColorScheme,
-  View,
+    Alert,
+    Image,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    useColorScheme,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Button,
-  Card,
-  Chip,
-  List,
-  SegmentedButtons,
-  Switch,
-  Text,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Button,
+    Card,
+    Chip,
+    List,
+    SegmentedButtons,
+    Switch,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 export default function ElderlySettings() {
@@ -131,9 +131,11 @@ export default function ElderlySettings() {
     }
   }, [user]);
 
-  useEffect(() => {
-    loadEmergencyData();
-  }, [loadEmergencyData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadEmergencyData();
+    }, [loadEmergencyData]),
+  );
 
   useEffect(() => {
     setAiVoiceEnabled(preferences.aiVoiceEnabled ?? false);

@@ -45,7 +45,7 @@ import {
   GroupMessage,
 } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -242,9 +242,11 @@ export default function ElderlyEmergency() {
     }
   }, [user]);
 
-  useEffect(() => {
-    fetchContacts();
-  }, [fetchContacts]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchContacts();
+    }, [fetchContacts]),
+  );
 
   // ── Realtime message subscription ──
   useEffect(() => {

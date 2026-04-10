@@ -1,20 +1,20 @@
 import CreateGroupModal from "@/components/CreateGroupModal";
 import UserAvatar from "@/components/UserAvatar";
 import {
-  CAREGIVER_TABLE_ID,
-  clientReactNative,
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
-  GROUP_MEMBERS_TABLE_ID,
-  GROUP_MESSAGES_TABLE_ID,
+    CAREGIVER_TABLE_ID,
+    clientReactNative,
+    DATABASE_ID,
+    DIRECT_MESSAGES_TABLE_ID,
+    GROUP_MEMBERS_TABLE_ID,
+    GROUP_MESSAGES_TABLE_ID,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-  addElderlyConnection,
-  Contact,
-  formatRelativeTime,
-  getContactsForElderly,
-  searchUserByPhone,
+    addElderlyConnection,
+    Contact,
+    formatRelativeTime,
+    getContactsForElderly,
+    searchUserByPhone,
 } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { getGroupUnreadCount, getLastGroupMessage } from "@/lib/group-messaging";
@@ -24,34 +24,34 @@ import { isUserOnline } from "@/lib/presence";
 import { Caregiver, Elderly } from "@/types/appwrite";
 import { DirectMessage, Group, GroupMember, GroupMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  FlatList,
-  Keyboard,
-  Linking,
-  Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  useWindowDimensions,
-  View,
+    Alert,
+    FlatList,
+    Keyboard,
+    Linking,
+    Modal,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Badge,
-  Button,
-  Menu,
-  Searchbar,
-  Text,
-  TextInput,
-  useTheme
+    ActivityIndicator,
+    Avatar,
+    Badge,
+    Button,
+    Menu,
+    Searchbar,
+    Text,
+    TextInput,
+    useTheme
 } from "react-native-paper";
 
 import MomentsView from "@/components/MomentsView";
@@ -383,9 +383,11 @@ export default function ElderlyMessages() {
     return items;
   }, [contacts, groups, lastMessages, groupLastMessages, unreadCounts, groupUnreadCounts, pinnedConversations, searchQuery, elderlyProfileId]);
 
-  useEffect(() => {
-    fetchContacts();
-  }, [fetchContacts]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchContacts();
+    }, [fetchContacts]),
+  );
 
   useEffect(() => {
     if (!elderlyProfileId) return;

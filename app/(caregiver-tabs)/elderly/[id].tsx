@@ -5,8 +5,8 @@ import { DATABASE_ID, ELDERLY_TABLE_ID, tablesDB } from "@/lib/appwrite";
 import { getLatestMetrics } from "@/lib/health-data";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import { ActivityIndicator, TouchableOpacity, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 
@@ -23,82 +23,80 @@ export default function ElderlyDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!docId) return;
+  useFocusEffect(
+    useCallback(() => {
+      if (!docId) return;
 
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        // Fetch elderly document and latest vitals in parallel
-        const [doc, vitals] = await Promise.all([
-          tablesDB.getRow({
-            databaseId: DATABASE_ID,
-            tableId: ELDERLY_TABLE_ID,
-            rowId: docId,
-          }),
-          getLatestMetrics(docId),
-        ]);
+      const fetchData = async () => {
+        try {
+          setLoading(true);
+          // Fetch elderly document and latest vitals in parallel
+          const [doc, vitals] = await Promise.all([
+            tablesDB.getRow({
+              databaseId: DATABASE_ID,
+              tableId: ELDERLY_TABLE_ID,
+              rowId: docId,
+            }),
+            getLatestMetrics(docId),
+          ]);
 
-        // Calculate age from birth date
-        const birthDate = doc.birth ? new Date(doc.birth) : null;
-        const age = birthDate
-          ? Math.floor(
-              (Date.now() - birthDate.getTime()) /
-                (1000 * 60 * 60 * 24 * 365.25),
-            )
-          : undefined;
+          // Calculate age from birth date
+          const birthDate = doc.birth ? new Date(doc.birth) : null;
+          const age = birthDate
+            ? Math.floor(
+                (Date.now() - birthDate.getTime()) /
+                  (1000 * 60 * 60 * 24 * 365.25),
+              )
+            : undefined;
 
-        // Map latest vitals from health data
-        const bpData = vitals["Blood Pressure"];
-        const hrData = vitals["Heart Rate"];
-        const tempData = vitals["Temperature"];
+          // Map latest vitals from health data
+          const bpData = vitals["Blood Pressure"];
+          const hrData = vitals["Heart Rate"];
+          const tempData = vitals["Temperature"];
 
-        const bp = bpData
-          ? bpData.numeric_value && bpData.second_value
-            ? `${bpData.numeric_value}/${bpData.second_value} mmHg`
-            : bpData.value || undefined
-          : undefined;
-        const hr = hrData
-          ? `${hrData.numeric_value ?? hrData.value} ${hrData.unit || "bpm"}`
-          : undefined;
-        const temp = tempData
-          ? `${tempData.numeric_value ?? tempData.value} ${tempData.unit || "°C"}`
-          : undefined;
+          const bp = bpData
+            ? bpData.numeric_value && bpData.second_value
+              ? `${bpData.numeric_value}/${bpData.second_value} mmHg`
+              : bpData.value || undefined
+            : undefined;
+          const hr = hrData
+            ? `${hrData.numeric_value ?? hrData.value} ${hrData.unit || "bpm"}`
+            : undefined;
+          const temp = tempData
+            ? `${tempData.numeric_value ?? tempData.value} ${tempData.unit || "°C"}`
+            : undefined;
 
-        // Map Appwrite document to our component data structure
-        const mappedData: ElderlyDetailData = {
-          id: doc.$id,
-          name: doc.name || "Unknown",
-          age,
-          birth: doc.birth || undefined,
-          gender: doc.gender || undefined,
-          bloodType: doc.blood_type || undefined,
-          phone: doc.phone || undefined,
-          emergencyContact: doc.emergency_contact || undefined,
-          status: doc.status || "Normal",
-          lastVitals: { bp, hr, temp },
-        };
+          // Map Appwrite document to our component data structure
+          const mappedData: ElderlyDetailData = {
+            id: doc.$id,
+            name: doc.name || "Unknown",
+            age,
+            birth: doc.birth || undefined,
+            gender: doc.gender || undefined,
+            bloodType: doc.blood_type || undefined,
+            phone: doc.phone || undefined,
+            emergencyContact: doc.emergency_contact || undefined,
+            status: doc.status || "Normal",
+            lastVitals: { bp, hr, temp },
+          };
 
-        setData(mappedData);
+          setData(mappedData);
+        } catch (err: any) {
+          console.error("Error fetching elderly details:", err);
+          setError("Failed to load data");
+          setData({
+            id: docId,
+            name: `Elderly #${docId}`,
+            status: "Error loading",
+          });
+        } finally {
+          setLoading(false);
+        }
+      };
 
-        // Title is handled in useLayoutEffect now specifically to be a Back button
-        // navigation.setOptions?.({ title: mappedData.name });
-      } catch (err: any) {
-        console.error("Error fetching elderly details:", err);
-        setError("Failed to load data");
-        // Use fallback/sample data on error so UI doesn't look broken during demo
-        setData({
-          id: docId,
-          name: `Elderly #${docId}`, // Fallback name
-          status: "Error loading",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [docId, navigation]);
+      fetchData();
+    }, [docId]),
+  );
 
   React.useLayoutEffect(() => {
     navigation.setOptions({

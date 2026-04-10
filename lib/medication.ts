@@ -278,8 +278,10 @@ export async function fetchCaregiverMedicationData(
               const scheduledUtcMs = baseDate.getTime() - hkOffset;
               const startDateMs = new Date(reminder.start_date).getTime();
 
-              // Skip slots before start_date
-              if (scheduledUtcMs < startDateMs) {
+              // Skip slots before start_date (compare by HK calendar date, not exact timestamp)
+              const scheduledHkDateStr = new Date(scheduledUtcMs + hkOffset).toISOString().slice(0, 10);
+              const startHkDateStr = new Date(startDateMs + hkOffset).toISOString().slice(0, 10);
+              if (scheduledHkDateStr < startHkDateStr) {
                 return;
               }
 
