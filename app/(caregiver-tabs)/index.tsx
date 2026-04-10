@@ -1,55 +1,55 @@
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
-  createChatSession,
-  deleteChatSession,
-  listChatSessionsForUser,
-  updateChatSession,
+    createChatSession,
+    deleteChatSession,
+    listChatSessionsForUser,
+    updateChatSession,
 } from "@/lib/chat";
 import {
-  fetchDayMedicationEvents,
-  fetchDayScheduleEvents,
-  fetchScheduleCategories,
+    fetchDayMedicationEvents,
+    fetchDayScheduleEvents,
+    fetchScheduleCategories,
 } from "@/lib/schedule";
 import type {
-  ChatSession as AppwriteChatSession,
-  Elderly,
+    ChatSession as AppwriteChatSession,
+    Elderly,
 } from "@/types/appwrite";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  FlatList,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    TouchableOpacity,
+    useColorScheme,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Card,
-  IconButton,
-  Menu,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Card,
+    IconButton,
+    Menu,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
-import { useTranslation } from "react-i18next";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 interface Message {
