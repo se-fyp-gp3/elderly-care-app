@@ -1,5 +1,10 @@
 import { formatRelativeTime } from "@/lib/contacts";
-import { addComment, deleteComment, getComments } from "@/lib/moments";
+import {
+    addComment,
+    deleteComment,
+    getComments,
+    likeComment,
+} from "@/lib/moments";
 import { MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -44,26 +49,42 @@ interface CommentSheetProps {
 function CommentItem({
   comment,
   currentUserId,
-  momentId,
+  allComments,
+  onReply,
+  onLike,
   onDelete,
 }: {
   comment: MomentComment;
   currentUserId: string;
-  momentId: string;
+  allComments: MomentComment[];
+  onReply: (comment: MomentComment) => void;
+  onLike: (comment: MomentComment) => void;
   onDelete: (commentId: string) => void;
 }) {
   const theme = useTheme();
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const likes = comment.likes || [];
+  const isLiked = likes.includes(currentUserId);
+  const longText = (comment.content?.length || 0) > 200;
   const isOwn = comment.author_id === currentUserId;
+  const parentComment = comment.reply_to_comment_id
+    ? allComments.find((c) => c.$id === comment.reply_to_comment_id)
+    : null;
 
   const handleDelete = () => {
-    Alert.alert("Delete Comment", "Are you sure you want to delete this comment?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => onDelete(comment.$id),
-      },
-    ]);
+    Alert.alert(
+      "Delete Comment",
+      "Are you sure you want to delete this comment?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => onDelete(comment.$id),
+        },
+      ],
+    );
   };
 
   return (
@@ -85,20 +106,69 @@ function CommentItem({
       />
       <View style={styles.commentBody}>
         <View style={styles.commentBubble}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
             <Text variant="labelMedium" style={{ fontWeight: "bold", flex: 1 }}>
               {comment.author_name}
               {comment.author_role === "ai" && (
-                <Text style={{ color: theme.colors.tertiary, fontWeight: "normal" }}> • AI</Text>
+                <Text
+                  style={{ color: theme.colors.tertiary, fontWeight: "normal" }}
+                >
+                  {" "}
+                  ??AI
+                </Text>
               )}
             </Text>
             {isOwn && (
               <Pressable onPress={handleDelete} hitSlop={10}>
-                <MaterialCommunityIcons name="delete-outline" size={18} color={theme.colors.error} />
+                <MaterialCommunityIcons
+                  name="delete-outline"
+                  size={18}
+                  color={theme.colors.error}
+                />
               </Pressable>
             )}
           </View>
-          <Text variant="bodyMedium" style={{ marginTop: 2, lineHeight: 20 }}>
+
+          {/* Reply indicator with quoted parent */}
+          {!!comment.reply_to_user_name && (
+            <View
+              style={[
+                styles.replyQuote,
+                {
+                  borderLeftColor: theme.colors.outlineVariant,
+                  backgroundColor: theme.colors.surfaceVariant,
+                },
+              ]}
+            >
+              <Text
+                variant="labelSmall"
+                style={{ color: theme.colors.primary, fontWeight: "bold" }}
+              >
+                ??@{comment.reply_to_user_name}
+              </Text>
+              {parentComment ? (
+                <Text
+                  variant="labelSmall"
+                  numberOfLines={2}
+                  style={{ color: theme.colors.onSurfaceVariant, marginTop: 1 }}
+                >
+                  {parentComment.content}
+                </Text>
+              ) : null}
+            </View>
+          )}
+
+          <Text
+            variant="bodyMedium"
+            numberOfLines={expanded || !longText ? undefined : 4}
+            style={{ marginTop: 2, lineHeight: 20 }}
+          >
             {comment.content}
           </Text>
           {longText && (
@@ -368,7 +438,9 @@ export default function CommentSheet({
                 <CommentItem
                   comment={item}
                   currentUserId={currentUserId}
-                  momentId={momentId}
+                  allComments={comments}
+                  onReply={handleReply}
+                  onLike={handleLikeComment}
                   onDelete={handleDeleteComment}
                 />
               )}

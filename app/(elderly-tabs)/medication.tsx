@@ -1,33 +1,33 @@
 import {
-    DATABASE_ID,
-    MEDICATION_LOGS_TABLE_ID,
-    safeSubscribe,
+  DATABASE_ID,
+  MEDICATION_LOGS_TABLE_ID,
+  safeSubscribe
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-    createElderlyMedicationWithReminder,
-    fetchCaregiversForElderly,
+  createElderlyMedicationWithReminder,
+  fetchCaregiversForElderly,
 } from "@/lib/elderly";
 import {
-    checkAndMarkSkippedMedications,
-    deactivateMedicationReminder,
-    fetchActiveMedicationReminders,
-    fetchDailyMedicationLogs,
-    fetchFinishedMedicationReminders,
-    logMedicationAction,
-    markPreviousDaysPendingAsMissing,
+  checkAndMarkSkippedMedications,
+  deactivateMedicationReminder,
+  fetchActiveMedicationReminders,
+  fetchDailyMedicationLogs,
+  fetchFinishedMedicationReminders,
+  logMedicationAction,
+  markPreviousDaysPendingAsMissing,
 } from "@/lib/medication_tracking";
 import {
-    cancelAllNotifications,
-    registerForPushNotificationsAsync,
-    scheduleMedicationNotification,
-    sendImmediateNotification,
+  cancelAllNotifications,
+  registerForPushNotificationsAsync,
+  scheduleMedicationNotification,
+  sendImmediateNotification,
 } from "@/lib/notifications";
 import { translateUnit } from "@/lib/schedule";
 import {
-    Caregiver,
-    ElderlyMedicationReminder,
-    MedicationLogs,
+  Caregiver,
+  ElderlyMedicationReminder,
+  MedicationLogs,
 } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system";
@@ -36,29 +36,30 @@ import * as ImagePicker from "expo-image-picker";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    Animated,
-    AppState,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  Animated,
+  AppState,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
 import {
-    Button,
-    Card,
-    Divider,
-    FAB,
-    IconButton,
-    Modal,
-    Portal,
-    Switch,
-    Text,
-    TextInput,
-    useTheme
+  Button,
+  Card,
+  Divider,
+  FAB,
+  IconButton,
+  Modal,
+  Portal,
+  Switch,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 // --- AI / Scan Configuration ---
@@ -231,12 +232,15 @@ export default function ElderlyMedicationScreen() {
         // Hide if scheduled_at is beyond duration_days
         if (r.start_date && r.duration_days) {
           const startDateMs = new Date(r.start_date).getTime();
-          const startHkDate = new Date(startDateMs + hkOffset).toISOString().slice(0, 10);
+          const startHkDate = new Date(startDateMs + hkOffset)
+            .toISOString()
+            .slice(0, 10);
           const firstCandBase = new Date(startHkDate);
           firstCandBase.setUTCHours(hours, minutes, 0, 0);
           const firstCandUtcMs = firstCandBase.getTime() - hkOffset;
           const startDelay = firstCandUtcMs <= startDateMs ? 1 : 0;
-          const lastValidUtcMs = firstCandUtcMs + (startDelay + r.duration_days - 1) * 86400000;
+          const lastValidUtcMs =
+            firstCandUtcMs + (startDelay + r.duration_days - 1) * 86400000;
           if (scheduledDate.getTime() > lastValidUtcMs) {
             return;
           }
@@ -1078,11 +1082,23 @@ export default function ElderlyMedicationScreen() {
         {(() => {
           if (finishedReminders.length === 0) {
             return (
-              <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+              <Card
+                style={[styles.card, { backgroundColor: theme.colors.surface }]}
+              >
                 <View style={styles.emptyState}>
-                  <MaterialCommunityIcons name="history" size={48} color="#BDBDBD" />
-                  <Text variant="bodyLarge" style={{ marginTop: 8, color: "#666" }}>
-                    No finished medications yet.
+                  <MaterialCommunityIcons
+                    name="history"
+                    size={48}
+                    color="#BDBDBD"
+                  />
+                  <Text
+                    variant="bodyLarge"
+                    style={{
+                      marginTop: 8,
+                      color: theme.colors.onSurfaceVariant,
+                    }}
+                  >
+                    {t("medication.noFinishedMeds")}
                   </Text>
                 </View>
               </Card>
@@ -1090,7 +1106,11 @@ export default function ElderlyMedicationScreen() {
           }
 
           const now = new Date();
-          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const todayStart = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(),
+          );
           const weekStart = new Date(todayStart);
           weekStart.setDate(weekStart.getDate() - 7);
           const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1103,8 +1123,15 @@ export default function ElderlyMedicationScreen() {
           ];
 
           for (const r of finishedReminders) {
-            const d = r.end_date ? new Date(r.end_date) : (r.$updatedAt ? new Date(r.$updatedAt) : null);
-            if (!d) { groups[3].items.push(r); continue; }
+            const d = r.end_date
+              ? new Date(r.end_date)
+              : r.$updatedAt
+                ? new Date(r.$updatedAt)
+                : null;
+            if (!d) {
+              groups[3].items.push(r);
+              continue;
+            }
             if (d >= todayStart) groups[0].items.push(r);
             else if (d >= weekStart) groups[1].items.push(r);
             else if (d >= monthStart) groups[2].items.push(r);
@@ -1116,7 +1143,9 @@ export default function ElderlyMedicationScreen() {
           return nonEmptyGroups.map((group) => (
             <View key={`fg-${group.label}`}>
               <Text style={styles.finishedGroupLabel}>{group.label}</Text>
-              <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+              <Card
+                style={[styles.card, { backgroundColor: theme.colors.surface }]}
+              >
                 {group.items.map((r) => {
                   // @ts-ignore
                   const meds = Array.isArray(r.elderly_medication?.medication)
@@ -1134,7 +1163,7 @@ export default function ElderlyMedicationScreen() {
                         month: "short",
                         year: "numeric",
                       })
-                    : "—";
+                    : "??;
 
                   const startDateStr = r.start_date
                     ? new Date(r.start_date).toLocaleDateString("en-GB", {
@@ -1142,39 +1171,82 @@ export default function ElderlyMedicationScreen() {
                         month: "short",
                         year: "numeric",
                       })
-                    : "—";
+                    : "??;
 
                   return (
-                    <View key={r.$id} style={styles.finishedItem}>
-                      <View style={styles.finishedIconContainer}>
+                    <View
+                      key={r.$id}
+                      style={[
+                        styles.finishedItem,
+                        { borderBottomColor: theme.colors.outlineVariant },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.finishedIconContainer,
+                          {
+                            backgroundColor: isDark
+                              ? "rgba(96,125,139,0.15)"
+                              : "#ECEFF1",
+                          },
+                        ]}
+                      >
                         <MaterialCommunityIcons
                           name="check-decagram"
                           size={26}
-                          color="#78909C"
+                          color={isDark ? "#B0BEC5" : "#78909C"}
                         />
                       </View>
                       <View style={{ flex: 1, marginLeft: 14 }}>
                         <Text
                           variant="titleMedium"
-                          style={{ fontWeight: "700", color: "#546E7A" }}
+                          style={{
+                            fontWeight: "700",
+                            color: isDark ? "#B0BEC5" : "#546E7A",
+                          }}
                         >
                           {name}
                         </Text>
                         <Text
                           variant="bodySmall"
-                          style={{ color: "#90A4AE", marginTop: 2 }}
+                          style={{
+                            color: theme.colors.onSurfaceVariant,
+                            marginTop: 2,
+                          }}
                         >
-                          {dosageStr} · {r.reminder_times.length}x daily
+                          {dosageStr} ?爸" "}
+                          {t("medication.timesDaily", {
+                            times: r.reminder_times.length,
+                          })}
                         </Text>
                         <Text
                           variant="bodySmall"
-                          style={{ color: "#90A4AE", marginTop: 2 }}
+                          style={{
+                            color: theme.colors.onSurfaceVariant,
+                            marginTop: 2,
+                          }}
                         >
-                          {startDateStr} → {endDateStr}
+                          {startDateStr} ??{endDateStr}
                         </Text>
                       </View>
-                      <View style={styles.finishedBadge}>
-                        <Text style={styles.finishedBadgeText}>Completed</Text>
+                      <View
+                        style={[
+                          styles.finishedBadge,
+                          {
+                            backgroundColor: isDark
+                              ? "rgba(0,105,92,0.15)"
+                              : "#E0F2F1",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.finishedBadgeText,
+                            { color: isDark ? "#80CBC4" : "#00695C" },
+                          ]}
+                        >
+                          {t("common.completed")}
+                        </Text>
                       </View>
                     </View>
                   );
