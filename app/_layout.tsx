@@ -3,6 +3,7 @@ import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { FontSizeProvider } from "@/lib/font-size-context";
+import { LanguageProvider } from "@/lib/language-context";
 import {
     registerForPushNotificationsAsync,
     sendImmediateNotification,
