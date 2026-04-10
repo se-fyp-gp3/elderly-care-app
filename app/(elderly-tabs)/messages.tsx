@@ -4,6 +4,7 @@ import {
   DATABASE_ID,
   DIRECT_MESSAGES_TABLE_ID,
   GROUP_MESSAGES_TABLE_ID,
+  clientReactNative,
   safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
