@@ -5,9 +5,9 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo run:android",
+    "android": "expo start --android",
     "build-android": "expo run:android",
-    "ios": "expo run:ios",
+    "ios": "expo start --ios",
     "build-ios": "expo run:ios",
     "go": "expo start --go",
     "go-android": "expo start --android --go",
