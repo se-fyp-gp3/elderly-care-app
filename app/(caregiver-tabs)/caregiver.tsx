@@ -270,7 +270,7 @@ export default function CaregiverDashboard() {
                     ).length
                   }
                 </Text>
-                <Text variant="bodyMedium">Inactive</Text>
+                <Text variant="bodyMedium">{t('caregiverPanel.inactive')}</Text>
               </View>
               <View style={styles.statItem}>
                 <Text

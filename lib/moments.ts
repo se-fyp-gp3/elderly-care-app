@@ -7,6 +7,7 @@ import {
   MOMENTS_TABLE_ID,
   storage,
 } from "@/lib/appwrite";
+import i18n from "@/lib/i18n";
 import {
   MediaItem,
   Moment,
@@ -441,34 +442,42 @@ export async function addComment(
   return comment as unknown as MomentComment;
 }
 
-export async function addAIResponse(momentId: string, content: string, imageUrl?: string): Promise<MomentComment> {
+export async function addAIResponse(
+  momentId: string,
+  content: string,
+  imageUrl?: string,
+): Promise<MomentComment> {
   const aiContent = await generateAIResponse(content, imageUrl);
-  
+
   try {
-     const doc = await databases.createDocument(
+    const doc = await databases.createDocument(
+      DATABASE_ID,
+      MOMENTS_COMMENTS_TABLE_ID,
+      ID.unique(),
+      {
+        moment_id: momentId,
+        content: aiContent,
+        author_id: "ai-assistant",
+        author_name: i18n.t("moments.aiAssistant"),
+        author_role: "ai",
+      },
+    );
+
+    // Increment comments_count on the moment
+    try {
+      const moment = await databases.getDocument(
         DATABASE_ID,
-        MOMENTS_COMMENTS_TABLE_ID,
-        ID.unique(),
-        {
-            moment_id: momentId,
-            content: aiContent,
-            author_id: "ai-assistant",
-            author_name: "AI Assistant",
-            author_role: "ai"
-        }
-     );
+        MOMENTS_TABLE_ID,
+        momentId,
+      );
+      await databases.updateDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId, {
+        comments_count: (moment.comments_count || 0) + 1,
+      });
+    } catch {
+      // Non-critical
+    }
 
-     // Increment comments_count on the moment
-     try {
-       const moment = await databases.getDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId);
-       await databases.updateDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId, {
-         comments_count: (moment.comments_count || 0) + 1,
-       });
-     } catch {
-       // Non-critical
-     }
-
-     return doc as unknown as MomentComment;
+    return doc as unknown as MomentComment;
   } catch (error) {
     console.error("Error generating AI response:", error);
     throw error;
@@ -529,9 +538,14 @@ export async function likeComment(
   const newLikes = isLiked
     ? currentLikes.filter((id) => id !== userId)
     : [...currentLikes, userId];
-  await databases.updateDocument(DATABASE_ID, MOMENTS_COMMENTS_TABLE_ID, commentId, {
-    likes: newLikes,
-  });
+  await databases.updateDocument(
+    DATABASE_ID,
+    MOMENTS_COMMENTS_TABLE_ID,
+    commentId,
+    {
+      likes: newLikes,
+    },
+  );
   return newLikes;
 }
 
@@ -549,7 +563,11 @@ export async function getLatestComments(
     if (allowedAuthorIds && allowedAuthorIds.length > 0) {
       queries.push(Query.equal("author_id", allowedAuthorIds));
     }
-    const res = await databases.listDocuments(DATABASE_ID, MOMENTS_COMMENTS_TABLE_ID, queries);
+    const res = await databases.listDocuments(
+      DATABASE_ID,
+      MOMENTS_COMMENTS_TABLE_ID,
+      queries,
+    );
     return res.documents as unknown as MomentComment[];
   } catch {
     return [];

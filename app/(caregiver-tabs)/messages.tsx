@@ -1,23 +1,26 @@
 import CreateGroupModal from "@/components/CreateGroupModal";
 import UserAvatar from "@/components/UserAvatar";
 import {
+  CAREGIVER_TABLE_ID,
+  clientReactNative,
   DATABASE_ID,
   DIRECT_MESSAGES_TABLE_ID,
+  ELDERLY_TABLE_ID,
+  GROUP_MEMBERS_TABLE_ID,
   GROUP_MESSAGES_TABLE_ID,
-  clientReactNative,
   safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
-    acceptCaregiverConnection,
-    addCaregiverConnection,
-    Contact,
-    formatRelativeTime,
-    getContactsForCaregiver,
-    getPendingCaregiverConnections,
-    rejectCaregiverConnection,
-    searchUserByPhone,
+  acceptCaregiverConnection,
+  addCaregiverConnection,
+  Contact,
+  formatRelativeTime,
+  getContactsForCaregiver,
+  getPendingCaregiverConnections,
+  rejectCaregiverConnection,
+  searchUserByPhone,
 } from "@/lib/contacts";
 import {
   getGroupUnreadCount,
@@ -43,32 +46,33 @@ import {
   GroupMessage,
 } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Keyboard,
-    Linking,
-    Modal,
-    NativeScrollEvent,
-    NativeSyntheticEvent,
-    RefreshControl,
-    StyleSheet,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    useWindowDimensions,
-    View,
+  Alert,
+  FlatList,
+  Keyboard,
+  Linking,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Button,
-    Searchbar,
-    Text,
-    TextInput,
+  ActivityIndicator,
+  Avatar,
+  Badge,
+  Button,
   Menu,
-  useTheme
+  Searchbar,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 import MomentsView from "@/components/MomentsView";
@@ -417,9 +421,11 @@ export default function CaregiverMessages() {
     caregiverProfileId,
   ]);
 
-  useEffect(() => {
-    fetchContacts();
-  }, [fetchContacts]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchContacts();
+    }, [fetchContacts]),
+  );
 
   useEffect(() => {
     if (!caregiverProfileId) return;

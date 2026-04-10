@@ -2,45 +2,46 @@ import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 import { useAuth } from "@/lib/auth-context";
 import { getCustomVoicesForElderly } from "@/lib/custom-voice";
 import {
-    getElderlyByUserId,
-    getLinkedCaregivers,
-    updateElderlyEmergencyContact,
+  getElderlyByUserId,
+  getLinkedCaregivers,
+  updateElderlyEmergencyContact,
 } from "@/lib/elderly";
 import {
-    getFallDetectionDiagnostics,
-    triggerFallDetectionTest,
+  getFallDetectionDiagnostics,
+  triggerFallDetectionTest,
 } from "@/lib/fall-detection";
+import { useFontSize } from "@/lib/font-size-context";
+import { useLanguage } from "@/lib/language-context";
 import { Caregiver, CustomVoice, Elderly } from "@/types/appwrite";
 import { FontSize, UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useFontSize } from "@/lib/font-size-context";
-import { useLanguage } from "@/lib/language-context";
 import {
   Alert,
+  Image,
   Linking,
   Modal,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View,
   useColorScheme,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Button,
-    Card,
-    Chip,
-    List,
-    Switch,
-    SegmentedButtons,
-    Text,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  Button,
+  Card,
+  Chip,
+  List,
+  SegmentedButtons,
+  Switch,
+  Text,
+  useTheme,
 } from "react-native-paper";
 
 export default function ElderlySettings() {
@@ -135,9 +136,11 @@ export default function ElderlySettings() {
     }
   }, [user]);
 
-  useEffect(() => {
-    loadEmergencyData();
-  }, [loadEmergencyData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadEmergencyData();
+    }, [loadEmergencyData]),
+  );
 
   useEffect(() => {
     setAiVoiceEnabled(preferences.aiVoiceEnabled ?? false);
@@ -209,16 +212,24 @@ export default function ElderlySettings() {
     const notes: string[] = [];
 
     if (!diagnostics.accelerometerAvailable) {
-      notes.push("This phone does not provide an accelerometer, so fall detection cannot run.");
+      notes.push(
+        "This phone does not provide an accelerometer, so fall detection cannot run.",
+      );
     }
     if (!diagnostics.gyroscopeAvailable) {
-      notes.push("This phone does not provide a gyroscope. The app has switched to an accelerometer-only fallback, so shake-style tests may be less reliable.");
+      notes.push(
+        "This phone does not provide a gyroscope. The app has switched to an accelerometer-only fallback, so shake-style tests may be less reliable.",
+      );
     }
     if (!diagnostics.backgroundServiceRunning) {
-      notes.push("Background service is not running. On MIUI, battery saver or background restrictions may be stopping fall detection even when sensors are available.");
+      notes.push(
+        "Background service is not running. On MIUI, battery saver or background restrictions may be stopping fall detection even when sensors are available.",
+      );
     }
     if (!notes.length) {
-      notes.push("Sensors look available on this phone. If the test alert opens, the emergency overlay path is working.");
+      notes.push(
+        "Sensors look available on this phone. If the test alert opens, the emergency overlay path is working.",
+      );
     }
 
     Alert.alert(
@@ -229,7 +240,10 @@ export default function ElderlySettings() {
 
   const handleTestFallAlert = useCallback(() => {
     if (!fallDetectionEnabled) {
-      Alert.alert("Fall Detection Off", "Turn on fall detection first, then try the test alert again.");
+      Alert.alert(
+        "Fall Detection Off",
+        "Turn on fall detection first, then try the test alert again.",
+      );
       return;
     }
 
@@ -246,7 +260,10 @@ export default function ElderlySettings() {
           text: "Open Settings",
           onPress: () => {
             Linking.openSettings().catch(() => {
-              Alert.alert("Unable to open settings", "Please open Settings manually and search for this app.");
+              Alert.alert(
+                "Unable to open settings",
+                "Please open Settings manually and search for this app.",
+              );
             });
           },
         },
@@ -502,7 +519,9 @@ export default function ElderlySettings() {
             left={() => (
               <View style={styles.iconContainer}>
                 <MaterialCommunityIcons
-                  name={fallDetectionEnabled ? "motion-sensor" : "motion-sensor-off"}
+                  name={
+                    fallDetectionEnabled ? "motion-sensor" : "motion-sensor-off"
+                  }
                   size={26}
                   color={theme.colors.primary}
                 />
@@ -541,13 +560,25 @@ export default function ElderlySettings() {
             style={styles.listItem}
           />
           <View style={styles.emergencyToolsRow}>
-            <Button mode="outlined" onPress={handleCheckFallSensors} icon="cellphone-cog">
+            <Button
+              mode="outlined"
+              onPress={handleCheckFallSensors}
+              icon="cellphone-cog"
+            >
               Check sensors
             </Button>
-            <Button mode="contained" onPress={handleTestFallAlert} icon="alert-decagram">
+            <Button
+              mode="contained"
+              onPress={handleTestFallAlert}
+              icon="alert-decagram"
+            >
               Test alert
             </Button>
-            <Button mode="text" onPress={handleOpenMiuiGuide} icon="cog-outline">
+            <Button
+              mode="text"
+              onPress={handleOpenMiuiGuide}
+              icon="cog-outline"
+            >
               MIUI setup
             </Button>
           </View>

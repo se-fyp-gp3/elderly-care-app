@@ -4,15 +4,39 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoPlayer, VideoView } from "expo-video";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Dimensions, Image, Modal, Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
-import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
+import {
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import {
+  ActivityIndicator,
+  Avatar,
+  Divider,
+  Text,
+  useTheme,
+} from "react-native-paper";
 
 interface MomentCardProps {
   moment: Moment;
   currentUserId: string;
   onLike: (id: string) => void;
   onComment: (id: string) => void;
-  onAIRequest: (id: string, content: string, imageUrl?: string) => Promise<MomentComment>;
+  onAIRequest: (
+    id: string,
+    content: string,
+    imageUrl?: string,
+  ) => Promise<MomentComment>;
   onDelete?: (id: string) => void;
   latestComments?: MomentComment[];
 }
@@ -475,7 +499,8 @@ export default function MomentCard({
     if (loadingAI || aiComment) return;
     setLoadingAI(true);
     try {
-      const imageUrl = moment.media_type === "image" ? moment.media_url : undefined;
+      const imageUrl =
+        moment.media_type === "image" ? moment.media_url : undefined;
       const comment = await onAIRequest(moment.$id, moment.content, imageUrl);
       setAIComment(comment);
     } catch (error) {
@@ -514,20 +539,39 @@ export default function MomentCard({
             variant="bodySmall"
             style={{ color: theme.colors.onSurfaceVariant }}
           >
-            {moment.author_role} • {formatRelativeTime(moment.$createdAt)}
+            {moment.author_role === "caregiver"
+              ? t("moments.roleCaregiverLabel")
+              : moment.author_role === "elderly"
+                ? t("moments.roleElderlyLabel")
+                : moment.author_role === "ai"
+                  ? t("moments.roleAiLabel")
+                  : moment.author_role}{" "}
+            • {formatRelativeTime(moment.$createdAt)}
           </Text>
         </View>
         {moment.author_id === currentUserId && onDelete && (
           <TouchableOpacity
             style={{ marginLeft: "auto", padding: 4 }}
             onPress={() => {
-              Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
-                { text: "Cancel", style: "cancel" },
-                { text: "Delete", style: "destructive", onPress: () => onDelete(moment.$id) },
-              ]);
+              Alert.alert(
+                t("moments.deletePost"),
+                t("moments.confirmDeletePost"),
+                [
+                  { text: t("common.cancel"), style: "cancel" },
+                  {
+                    text: t("moments.deletePost"),
+                    style: "destructive",
+                    onPress: () => onDelete(moment.$id),
+                  },
+                ],
+              );
             }}
           >
-            <MaterialCommunityIcons name="delete-outline" size={22} color={theme.colors.error} />
+            <MaterialCommunityIcons
+              name="delete-outline"
+              size={22}
+              color={theme.colors.error}
+            />
           </TouchableOpacity>
         )}
       </View>

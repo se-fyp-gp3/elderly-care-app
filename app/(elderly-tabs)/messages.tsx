@@ -1,54 +1,92 @@
 import CreateGroupModal from "@/components/CreateGroupModal";
 import UserAvatar from "@/components/UserAvatar";
 import {
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
-  GROUP_MESSAGES_TABLE_ID,
-  clientReactNative,
-  safeSubscribe,
+    CAREGIVER_TABLE_ID,
+    clientReactNative,
+    DATABASE_ID,
+    DIRECT_MESSAGES_TABLE_ID,
+    GROUP_MEMBERS_TABLE_ID,
+    GROUP_MESSAGES_TABLE_ID,
+    safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
+    addElderlyConnection,
     Contact,
     formatRelativeTime,
     getContactsForElderly,
+    searchUserByPhone,
 } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
-import { getGroupUnreadCount, getLastGroupMessage } from "@/lib/group-messaging";
-import { acceptGroupInvitation, getGroupsForUser, getPendingGroupInvitations, rejectGroupInvitation } from "@/lib/groups";
-import { buildConversationId, getLastMessage, getUnreadCountPerConversation } from "@/lib/messaging";
+import {
+    getGroupUnreadCount,
+    getLastGroupMessage,
+} from "@/lib/group-messaging";
+import {
+    acceptGroupInvitation,
+    getGroupsForUser,
+    getPendingGroupInvitations,
+    rejectGroupInvitation,
+} from "@/lib/groups";
+import {
+    buildConversationId,
+    getLastMessage,
+    getUnreadCountPerConversation,
+} from "@/lib/messaging";
 import { isUserOnline } from "@/lib/presence";
 import { Caregiver, Elderly } from "@/types/appwrite";
-import { DirectMessage, Group, GroupMember, GroupMessage } from "@/types/messaging";
+import {
+    DirectMessage,
+    Group,
+    GroupMember,
+    GroupMessage,
+} from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
     Alert,
     FlatList,
+    Keyboard,
     Linking,
+    Modal,
     NativeScrollEvent,
     NativeSyntheticEvent,
     RefreshControl,
     StyleSheet,
     TouchableOpacity,
+    TouchableWithoutFeedback,
     useWindowDimensions,
     View,
 } from "react-native";
 import {
     ActivityIndicator,
     Avatar,
+    Badge,
+    Button,
+    Menu,
     Searchbar,
     Text,
-    useTheme
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 import MomentsView from "@/components/MomentsView";
 
 type ChatListItem =
-  | { type: "direct"; contact: Contact; lastMsg: DirectMessage | null; unread: number }
-  | { type: "group"; group: Group; lastMsg: GroupMessage | null; unread: number };
+  | {
+      type: "direct";
+      contact: Contact;
+      lastMsg: DirectMessage | null;
+      unread: number;
+    }
+  | {
+      type: "group";
+      group: Group;
+      lastMsg: GroupMessage | null;
+      unread: number;
+    };
 
 function chatListItemId(item: ChatListItem): string {
   return item.type === "direct" ? item.contact.id : `group_${item.group.$id}`;
@@ -78,10 +116,17 @@ export default function ElderlyMessages() {
 
   // ── Group state ──
   const [groups, setGroups] = useState<Group[]>([]);
-  const [groupLastMessages, setGroupLastMessages] = useState<Record<string, GroupMessage | null>>({});
-  const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
-  const [groupUnreadCounts, setGroupUnreadCounts] = useState<Record<string, number>>({});
-  const pinnedConversations: string[] = (preferences.pinnedConversations as string[]) ?? [];
+  const [groupLastMessages, setGroupLastMessages] = useState<
+    Record<string, GroupMessage | null>
+  >({});
+  const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(
+    new Map(),
+  );
+  const [groupUnreadCounts, setGroupUnreadCounts] = useState<
+    Record<string, number>
+  >({});
+  const pinnedConversations: string[] =
+    (preferences.pinnedConversations as string[]) ?? [];
 
   // ── Action sheet / Create Group ──
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -104,7 +149,9 @@ export default function ElderlyMessages() {
   const [phoneSearch, setPhoneSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [foundUser, setFoundUser] = useState<
-    { role: "elderly"; data: Elderly } | { role: "caregiver"; data: Caregiver } | null
+    | { role: "elderly"; data: Elderly }
+    | { role: "caregiver"; data: Caregiver }
+    | null
   >(null);
   const [addingContact, setAddingContact] = useState(false);
   const [searchDone, setSearchDone] = useState(false);
@@ -176,7 +223,11 @@ export default function ElderlyMessages() {
   const navigateToConversation = useCallback(
     (contact: Contact) => {
       const convId = buildConversationId(elderlyProfileId!, contact.id);
-      setUnreadCounts((prev) => { const n = new Map(prev); n.delete(convId); return n; });
+      setUnreadCounts((prev) => {
+        const n = new Map(prev);
+        n.delete(convId);
+        return n;
+      });
       router.push({
         pathname: "/conversation",
         params: {
@@ -245,7 +296,11 @@ export default function ElderlyMessages() {
     setSearchDone(false);
     try {
       const result = await searchUserByPhone(trimmed);
-      if (result && result.role === "elderly" && result.data.$id === elderlyProfileId) {
+      if (
+        result &&
+        result.role === "elderly" &&
+        result.data.$id === elderlyProfileId
+      ) {
         setFoundUser(null);
       } else {
         setFoundUser(result);
@@ -266,25 +321,34 @@ export default function ElderlyMessages() {
       if (alreadyExists) {
         Alert.alert(
           t("emergency.alreadyAdded"),
-          t("emergency.alreadyInContacts", { name: foundUser.data.name ?? t("common.unknown") }),
+          t("emergency.alreadyInContacts", {
+            name: foundUser.data.name ?? t("common.unknown"),
+          }),
         );
         setAddingContact(false);
         return;
       }
 
-      const success = await addElderlyConnection(elderlyProfileId, foundUser.data.$id);
+      const success = await addElderlyConnection(
+        elderlyProfileId,
+        foundUser.data.$id,
+      );
 
       if (success) {
         Alert.alert(
           t("emergency.invitationSent"),
-          t("emergency.invitationSentDesc", { name: foundUser.data.name ?? t("common.unknown") }),
+          t("emergency.invitationSentDesc", {
+            name: foundUser.data.name ?? t("common.unknown"),
+          }),
         );
         closeAddDialog();
         await fetchContacts();
       } else {
         Alert.alert(
           t("emergency.alreadyAdded"),
-          t("emergency.alreadyInContactsOrPending", { name: foundUser.data.name ?? t("common.unknown") }),
+          t("emergency.alreadyInContactsOrPending", {
+            name: foundUser.data.name ?? t("common.unknown"),
+          }),
         );
       }
     } catch {
@@ -295,43 +359,57 @@ export default function ElderlyMessages() {
   }, [foundUser, elderlyProfileId, contacts, closeAddDialog, fetchContacts]);
 
   // ── Accept / Reject group invitation handlers ──
-  const handleAcceptGroupInvite = useCallback(async (invite: { membership: GroupMember; group: Group }) => {
-    if (!elderlyProfileId) return;
-    setAcceptingGroupId(invite.membership.$id);
-    try {
-      await acceptGroupInvitation(
-        invite.membership.$id,
-        invite.group.$id,
-        elderlyName,
-        "elderly",
-        elderlyProfileId,
-      );
-      Alert.alert(t('chat.acceptedGroupInvite'), invite.group.name);
-      await fetchContacts();
-    } catch (e) {
-      Alert.alert(t('common.error'), t('chat.failedToAcceptInvite'));
-    } finally {
-      setAcceptingGroupId(null);
-    }
-  }, [elderlyProfileId, elderlyName, fetchContacts, t]);
+  const handleAcceptGroupInvite = useCallback(
+    async (invite: { membership: GroupMember; group: Group }) => {
+      if (!elderlyProfileId) return;
+      setAcceptingGroupId(invite.membership.$id);
+      try {
+        await acceptGroupInvitation(
+          invite.membership.$id,
+          invite.group.$id,
+          elderlyName,
+          "elderly",
+          elderlyProfileId,
+        );
+        Alert.alert(t("chat.acceptedGroupInvite"), invite.group.name);
+        await fetchContacts();
+      } catch (e) {
+        Alert.alert(t("common.error"), t("chat.failedToAcceptInvite"));
+      } finally {
+        setAcceptingGroupId(null);
+      }
+    },
+    [elderlyProfileId, elderlyName, fetchContacts, t],
+  );
 
-  const handleRejectGroupInvite = useCallback((invite: { membership: GroupMember; group: Group }) => {
-    Alert.alert(t('chat.declineGroupInvite'), t('chat.declineGroupConfirm', { name: invite.group.name }), [
-      { text: t('common.cancel'), style: "cancel" },
-      {
-        text: t('emergency.decline'),
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await rejectGroupInvitation(invite.membership.$id);
-            setPendingGroupInvites((prev) => prev.filter((i) => i.membership.$id !== invite.membership.$id));
-          } catch (e) {
-            Alert.alert(t('common.error'), t('chat.failedToDeclineInvite'));
-          }
-        },
-      },
-    ]);
-  }, [t]);
+  const handleRejectGroupInvite = useCallback(
+    (invite: { membership: GroupMember; group: Group }) => {
+      Alert.alert(
+        t("chat.declineGroupInvite"),
+        t("chat.declineGroupConfirm", { name: invite.group.name }),
+        [
+          { text: t("common.cancel"), style: "cancel" },
+          {
+            text: t("emergency.decline"),
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await rejectGroupInvitation(invite.membership.$id);
+                setPendingGroupInvites((prev) =>
+                  prev.filter(
+                    (i) => i.membership.$id !== invite.membership.$id,
+                  ),
+                );
+              } catch (e) {
+                Alert.alert(t("common.error"), t("chat.failedToDeclineInvite"));
+              }
+            },
+          },
+        ],
+      );
+    },
+    [t],
+  );
 
   // ── Build unified chat list ──
   const chatList: ChatListItem[] = React.useMemo(() => {
@@ -339,7 +417,12 @@ export default function ElderlyMessages() {
     const query = searchQuery.toLowerCase();
 
     contacts.forEach((c) => {
-      if (query && !c.name.toLowerCase().includes(query) && !(c.phone && c.phone.includes(query))) return;
+      if (
+        query &&
+        !c.name.toLowerCase().includes(query) &&
+        !(c.phone && c.phone.includes(query))
+      )
+        return;
       const convId = buildConversationId(elderlyProfileId!, c.id);
       items.push({
         type: "direct",
@@ -371,11 +454,23 @@ export default function ElderlyMessages() {
     });
 
     return items;
-  }, [contacts, groups, lastMessages, groupLastMessages, unreadCounts, groupUnreadCounts, pinnedConversations, searchQuery, elderlyProfileId]);
+  }, [
+    contacts,
+    groups,
+    lastMessages,
+    groupLastMessages,
+    unreadCounts,
+    groupUnreadCounts,
+    pinnedConversations,
+    searchQuery,
+    elderlyProfileId,
+  ]);
 
-  useEffect(() => {
-    fetchContacts();
-  }, [fetchContacts]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchContacts();
+    }, [fetchContacts]),
+  );
 
   useEffect(() => {
     if (!elderlyProfileId) return;
@@ -437,21 +532,30 @@ export default function ElderlyMessages() {
     const unsubGroup = clientReactNative.subscribe(groupChannel, (response) => {
       if (!response.events.some((e) => e.endsWith(".create"))) return;
       const payload = response.payload as GroupMessage;
-      setGroupLastMessages((prev) => ({ ...prev, [payload.group_id]: payload }));
+      setGroupLastMessages((prev) => ({
+        ...prev,
+        [payload.group_id]: payload,
+      }));
       if (payload.sender_id !== elderlyProfileId) {
-        setGroupUnreadCounts((prev) => ({ ...prev, [payload.group_id]: (prev[payload.group_id] ?? 0) + 1 }));
+        setGroupUnreadCounts((prev) => ({
+          ...prev,
+          [payload.group_id]: (prev[payload.group_id] ?? 0) + 1,
+        }));
       }
     });
 
     // Subscribe to group_members for realtime group discovery
     const groupMembersChannel = `databases.${DATABASE_ID}.collections.${GROUP_MEMBERS_TABLE_ID}.documents`;
-    const unsubMembers = clientReactNative.subscribe(groupMembersChannel, (response) => {
-      if (!response.events.some((e) => e.endsWith(".create"))) return;
-      const payload = response.payload as { user_profile_id?: string };
-      if (payload?.user_profile_id === elderlyProfileId) {
-        fetchContacts();
-      }
-    });
+    const unsubMembers = clientReactNative.subscribe(
+      groupMembersChannel,
+      (response) => {
+        if (!response.events.some((e) => e.endsWith(".create"))) return;
+        const payload = response.payload as { user_profile_id?: string };
+        if (payload?.user_profile_id === elderlyProfileId) {
+          fetchContacts();
+        }
+      },
+    );
 
     return () => {
       unsubscribe();
@@ -498,31 +602,37 @@ export default function ElderlyMessages() {
     setRefreshing(false);
   }, [fetchContacts]);
 
-  const handleCall = useCallback((phone?: string | null) => {
-    if (!phone)
-      return Alert.alert(
-        t('common.noPhoneNumber'),
-        t('emergency.noPhoneOnFile'),
-      );
-    const url = `tel:${phone}`;
-    Linking.canOpenURL(url).then((supported) => {
-      if (supported) Linking.openURL(url);
-      else Alert.alert(t('common.cannotCall'));
-    });
-  }, [t]);
+  const handleCall = useCallback(
+    (phone?: string | null) => {
+      if (!phone)
+        return Alert.alert(
+          t("common.noPhoneNumber"),
+          t("emergency.noPhoneOnFile"),
+        );
+      const url = `tel:${phone}`;
+      Linking.canOpenURL(url).then((supported) => {
+        if (supported) Linking.openURL(url);
+        else Alert.alert(t("common.cannotCall"));
+      });
+    },
+    [t],
+  );
 
-  const handleSMS = useCallback((phone?: string | null) => {
-    if (!phone)
-      return Alert.alert(
-        t('common.noPhoneNumber'),
-        t('emergency.noPhoneOnFile'),
-      );
-    const url = `sms:${phone}`;
-    Linking.canOpenURL(url).then((supported) => {
-      if (supported) Linking.openURL(url);
-      else Alert.alert(t('common.cannotSMS'));
-    });
-  }, [t]);
+  const handleSMS = useCallback(
+    (phone?: string | null) => {
+      if (!phone)
+        return Alert.alert(
+          t("common.noPhoneNumber"),
+          t("emergency.noPhoneOnFile"),
+        );
+      const url = `sms:${phone}`;
+      Linking.canOpenURL(url).then((supported) => {
+        if (supported) Linking.openURL(url);
+        else Alert.alert(t("common.cannotSMS"));
+      });
+    },
+    [t],
+  );
 
   const renderChatListItem = ({ item }: { item: ChatListItem }) => {
     const itemId = chatListItemId(item);
@@ -538,34 +648,88 @@ export default function ElderlyMessages() {
           activeOpacity={0.7}
           onPress={() => navigateToGroupConversation(group)}
           onLongPress={() => handleLongPress(item)}
-          style={[styles.contactItem, { backgroundColor: isPinned ? theme.colors.surfaceVariant : theme.colors.surface }]}
+          style={[
+            styles.contactItem,
+            {
+              backgroundColor: isPinned
+                ? theme.colors.surfaceVariant
+                : theme.colors.surface,
+            },
+          ]}
         >
           <View style={styles.avatarContainer}>
-            <Avatar.Icon size={56} icon="account-group" style={{ backgroundColor: theme.colors.tertiaryContainer }} />
+            <Avatar.Icon
+              size={56}
+              icon="account-group"
+              style={{ backgroundColor: theme.colors.tertiaryContainer }}
+            />
             {item.unread > 0 && (
-              <Badge size={18} style={styles.unreadBadge}>{item.unread}</Badge>
+              <Badge size={18} style={styles.unreadBadge}>
+                {item.unread}
+              </Badge>
             )}
           </View>
           <View style={styles.contactInfo}>
             <View style={styles.contactHeader}>
-              <View style={{ flex: 1, marginRight: 8, flexDirection: "row", alignItems: "center" }}>
-                {isPinned && <MaterialCommunityIcons name="pin" size={14} color={theme.colors.primary} style={{ marginRight: 4 }} />}
-                <Text variant="titleMedium" style={[styles.contactName, { color: theme.colors.onSurface }]} numberOfLines={1}>
+              <View
+                style={{
+                  flex: 1,
+                  marginRight: 8,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                {isPinned && (
+                  <MaterialCommunityIcons
+                    name="pin"
+                    size={14}
+                    color={theme.colors.primary}
+                    style={{ marginRight: 4 }}
+                  />
+                )}
+                <Text
+                  variant="titleMedium"
+                  style={[
+                    styles.contactName,
+                    { color: theme.colors.onSurface },
+                  ]}
+                  numberOfLines={1}
+                >
                   {group.name}
                 </Text>
               </View>
-              <Text variant="bodySmall" style={[styles.timeText, { color: theme.colors.onSurfaceVariant }]}>
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.timeText,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
                 {formatRelativeTime(time)}
               </Text>
             </View>
             {preview ? (
-              <Text variant="bodySmall" style={[styles.previewText, { color: theme.colors.onSurfaceVariant }]} numberOfLines={1}>
-                {lastMsg?.sender_id === elderlyProfileId ? t('common.you') : `${lastMsg?.sender_name}: `}
-                {lastMsg?.message_type === "voice" ? t('common.voiceMessage') : preview}
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.previewText,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+                numberOfLines={1}
+              >
+                {lastMsg?.sender_id === elderlyProfileId
+                  ? t("common.you")
+                  : `${lastMsg?.sender_name}: `}
+                {lastMsg?.message_type === "voice"
+                  ? t("common.voiceMessage")
+                  : preview}
               </Text>
             ) : (
-              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                {t('messages.tapToChat')}
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {t("messages.tapToChat")}
               </Text>
             )}
           </View>
@@ -585,10 +749,22 @@ export default function ElderlyMessages() {
         activeOpacity={0.7}
         onPress={() => navigateToConversation(contact)}
         onLongPress={() => handleLongPress(item)}
-        style={[styles.contactItem, { backgroundColor: isPinned ? theme.colors.surfaceVariant : theme.colors.surface }]}
+        style={[
+          styles.contactItem,
+          {
+            backgroundColor: isPinned
+              ? theme.colors.surfaceVariant
+              : theme.colors.surface,
+          },
+        ]}
       >
         <View style={styles.avatarContainer}>
-          <UserAvatar avatarFileId={contact.avatarFileId} name={contact.name} size={56} role={contact.role} />
+          <UserAvatar
+            avatarFileId={contact.avatarFileId}
+            name={contact.name}
+            size={56}
+            role={contact.role}
+          />
           <View
             style={[
               styles.onlineDot,
@@ -599,14 +775,30 @@ export default function ElderlyMessages() {
             ]}
           />
           {item.unread > 0 && (
-            <Badge size={18} style={styles.unreadBadge}>{item.unread}</Badge>
+            <Badge size={18} style={styles.unreadBadge}>
+              {item.unread}
+            </Badge>
           )}
         </View>
 
         <View style={styles.contactInfo}>
           <View style={styles.contactHeader}>
-            <View style={{ flex: 1, marginRight: 8, flexDirection: "row", alignItems: "center" }}>
-              {isPinned && <MaterialCommunityIcons name="pin" size={14} color={theme.colors.primary} style={{ marginRight: 4 }} />}
+            <View
+              style={{
+                flex: 1,
+                marginRight: 8,
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
+              {isPinned && (
+                <MaterialCommunityIcons
+                  name="pin"
+                  size={14}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
+              )}
               <Text
                 variant="titleMedium"
                 style={[styles.contactName, { color: theme.colors.onSurface }]}
@@ -632,7 +824,9 @@ export default function ElderlyMessages() {
                 <MaterialCommunityIcons
                   name={lastMsg.is_read ? "check-all" : "check"}
                   size={14}
-                  color={lastMsg.is_read ? "#4CAF50" : theme.colors.onSurfaceVariant}
+                  color={
+                    lastMsg.is_read ? "#4CAF50" : theme.colors.onSurfaceVariant
+                  }
                   style={{ marginRight: 3 }}
                 />
               )}
@@ -644,8 +838,10 @@ export default function ElderlyMessages() {
                 ]}
                 numberOfLines={1}
               >
-                {lastMsg?.sender_id === elderlyProfileId ? t('common.you') : ""}
-                {lastMsg?.message_type === "voice" ? t('common.voiceMessage') : preview}
+                {lastMsg?.sender_id === elderlyProfileId ? t("common.you") : ""}
+                {lastMsg?.message_type === "voice"
+                  ? t("common.voiceMessage")
+                  : preview}
               </Text>
             </View>
           ) : (
@@ -665,14 +861,14 @@ export default function ElderlyMessages() {
                   variant="labelSmall"
                   style={{ color: theme.colors.tertiary, fontWeight: "600" }}
                 >
-                  {t('common.caregiver')}
+                  {t("common.caregiver")}
                 </Text>
               </View>
               <Text
                 variant="bodySmall"
                 style={{ color: theme.colors.onSurfaceVariant }}
               >
-                {t('messages.tapToChat')}
+                {t("messages.tapToChat")}
               </Text>
             </View>
           )}
@@ -718,13 +914,13 @@ export default function ElderlyMessages() {
         variant="headlineSmall"
         style={[styles.emptyTitle, { color: theme.colors.onSurface }]}
       >
-        {t('messages.noCaregiversYet')}
+        {t("messages.noCaregiversYet")}
       </Text>
       <Text
         variant="bodyMedium"
         style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant }]}
       >
-        {t('messages.caregiverAppearHere')}
+        {t("messages.caregiverAppearHere")}
       </Text>
     </View>
   );
@@ -741,7 +937,7 @@ export default function ElderlyMessages() {
           variant="titleSmall"
           style={[styles.sectionLabel, { color: theme.colors.primary }]}
         >
-          {t('messages.myCaregivers')}
+          {t("messages.myCaregivers")}
         </Text>
         <View
           style={[
@@ -778,7 +974,7 @@ export default function ElderlyMessages() {
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.searchRow}>
           <Searchbar
-            placeholder={t('messages.searchCaregivers')}
+            placeholder={t("messages.searchCaregivers")}
             onChangeText={setSearchQuery}
             value={searchQuery}
             style={[
@@ -794,7 +990,10 @@ export default function ElderlyMessages() {
             anchor={
               <TouchableOpacity
                 onPress={() => setShowAddMenu(true)}
-                style={[styles.addBtn, { backgroundColor: theme.colors.primary }]}
+                style={[
+                  styles.addBtn,
+                  { backgroundColor: theme.colors.primary },
+                ]}
                 activeOpacity={0.8}
               >
                 <MaterialCommunityIcons
@@ -807,13 +1006,19 @@ export default function ElderlyMessages() {
           >
             <Menu.Item
               leadingIcon="account-plus"
-              title={t('chat.addNewFriend')}
-              onPress={() => { setShowAddMenu(false); openAddDialog(); }}
+              title={t("chat.addNewFriend")}
+              onPress={() => {
+                setShowAddMenu(false);
+                openAddDialog();
+              }}
             />
             <Menu.Item
               leadingIcon="account-group"
-              title={t('chat.createGroupChat')}
-              onPress={() => { setShowAddMenu(false); setShowCreateGroup(true); }}
+              title={t("chat.createGroupChat")}
+              onPress={() => {
+                setShowAddMenu(false);
+                setShowCreateGroup(true);
+              }}
             />
           </Menu>
         </View>
@@ -821,17 +1026,45 @@ export default function ElderlyMessages() {
 
       {/* Pending Group Invitations */}
       {pendingGroupInvites.length > 0 && !loading && (
-        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-            <MaterialCommunityIcons name="account-group" size={20} color={theme.colors.primary} />
-            <Text variant="titleSmall" style={{ marginLeft: 6, fontWeight: "700", color: theme.colors.primary }}>
-              {t('chat.groupInvitations', { count: pendingGroupInvites.length })}
+        <View
+          style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 8,
+            }}
+          >
+            <MaterialCommunityIcons
+              name="account-group"
+              size={20}
+              color={theme.colors.primary}
+            />
+            <Text
+              variant="titleSmall"
+              style={{
+                marginLeft: 6,
+                fontWeight: "700",
+                color: theme.colors.primary,
+              }}
+            >
+              {t("chat.groupInvitations", {
+                count: pendingGroupInvites.length,
+              })}
             </Text>
           </View>
           {pendingGroupInvites.map((invite) => (
             <View
               key={invite.membership.$id}
-              style={{ flexDirection: "row", alignItems: "center", borderRadius: 14, padding: 12, marginBottom: 8, backgroundColor: theme.colors.primaryContainer }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                borderRadius: 14,
+                padding: 12,
+                marginBottom: 8,
+                backgroundColor: theme.colors.primaryContainer,
+              }}
             >
               <Avatar.Icon
                 size={40}
@@ -842,14 +1075,25 @@ export default function ElderlyMessages() {
                 <Text variant="titleSmall" style={{ fontWeight: "600" }}>
                   {invite.group.name}
                 </Text>
-                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                  {t('chat.invitedYouToGroup')}
+                <Text
+                  variant="bodySmall"
+                  style={{ color: theme.colors.onSurfaceVariant }}
+                >
+                  {t("chat.invitedYouToGroup")}
                 </Text>
               </View>
               <TouchableOpacity
                 onPress={() => handleAcceptGroupInvite(invite)}
                 disabled={acceptingGroupId === invite.membership.$id}
-                style={{ width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center", marginLeft: 8, backgroundColor: "#4CAF50" }}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 17,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginLeft: 8,
+                  backgroundColor: "#4CAF50",
+                }}
               >
                 {acceptingGroupId === invite.membership.$id ? (
                   <ActivityIndicator size={16} color="#fff" />
@@ -859,9 +1103,21 @@ export default function ElderlyMessages() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => handleRejectGroupInvite(invite)}
-                style={{ width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center", marginLeft: 6, backgroundColor: "#FFCDD2" }}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 17,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginLeft: 6,
+                  backgroundColor: "#FFCDD2",
+                }}
               >
-                <MaterialCommunityIcons name="close" size={18} color="#D32F2F" />
+                <MaterialCommunityIcons
+                  name="close"
+                  size={18}
+                  color="#D32F2F"
+                />
               </TouchableOpacity>
             </View>
           ))}
@@ -879,7 +1135,7 @@ export default function ElderlyMessages() {
               { color: theme.colors.onSurfaceVariant },
             ]}
           >
-            {t('messages.loadingCaregivers')}
+            {t("messages.loadingCaregivers")}
           </Text>
         </View>
       ) : (
@@ -891,9 +1147,7 @@ export default function ElderlyMessages() {
             styles.listContent,
             chatList.length === 0 && styles.emptyList,
           ]}
-          ListHeaderComponent={
-            chatList.length > 0 ? renderHeader : null
-          }
+          ListHeaderComponent={chatList.length > 0 ? renderHeader : null}
           ItemSeparatorComponent={() => (
             <View
               style={{
@@ -907,7 +1161,13 @@ export default function ElderlyMessages() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
-          extraData={[lastMessages, groupLastMessages, unreadCounts, groupUnreadCounts, pinnedConversations]}
+          extraData={[
+            lastMessages,
+            groupLastMessages,
+            unreadCounts,
+            groupUnreadCounts,
+            pinnedConversations,
+          ]}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -925,8 +1185,14 @@ export default function ElderlyMessages() {
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
       {/* Top Tab Bar */}
-      <View style={{ flexDirection: 'row', backgroundColor: theme.colors.surface, elevation: 1 }}>
-        {['Chats', 'Moments'].map((tab, index) => {
+      <View
+        style={{
+          flexDirection: "row",
+          backgroundColor: theme.colors.surface,
+          elevation: 1,
+        }}
+      >
+        {["Chats", "Moments"].map((tab, index) => {
           const isActive = activeTab === index;
           return (
             <TouchableOpacity
@@ -934,9 +1200,11 @@ export default function ElderlyMessages() {
               style={{
                 flex: 1,
                 paddingVertical: 14,
-                alignItems: 'center',
+                alignItems: "center",
                 borderBottomWidth: 2,
-                borderBottomColor: isActive ? theme.colors.primary : 'transparent',
+                borderBottomColor: isActive
+                  ? theme.colors.primary
+                  : "transparent",
               }}
               onPress={() => onTabPress(index)}
               activeOpacity={0.7}
@@ -944,8 +1212,10 @@ export default function ElderlyMessages() {
               <Text
                 variant="labelLarge"
                 style={{
-                  color: isActive ? theme.colors.primary : theme.colors.onSurfaceVariant,
-                  fontWeight: isActive ? '700' : '500',
+                  color: isActive
+                    ? theme.colors.primary
+                    : theme.colors.onSurfaceVariant,
+                  fontWeight: isActive ? "700" : "500",
                 }}
               >
                 {tab}
@@ -958,7 +1228,9 @@ export default function ElderlyMessages() {
       <FlatList
         ref={pagerRef}
         data={[0, 1]}
-        renderItem={({ item }) => item === 0 ? renderChatPage() : renderMomentsPage()}
+        renderItem={({ item }) =>
+          item === 0 ? renderChatPage() : renderMomentsPage()
+        }
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -966,9 +1238,11 @@ export default function ElderlyMessages() {
         scrollEventThrottle={16}
         keyExtractor={(item) => item.toString()}
         style={{ flex: 1 }}
-        getItemLayout={(data, index) => (
-          { length: width, offset: width * index, index }
-        )}
+        getItemLayout={(data, index) => ({
+          length: width,
+          offset: width * index,
+          index,
+        })}
       />
 
       {/* ── Add Friend Modal ── */}
@@ -981,17 +1255,32 @@ export default function ElderlyMessages() {
         <TouchableWithoutFeedback onPress={closeAddDialog}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+              <View
+                style={[
+                  styles.modalContent,
+                  { backgroundColor: theme.colors.surface },
+                ]}
+              >
                 <View style={styles.modalHeader}>
                   <Text variant="titleLarge" style={{ fontWeight: "700" }}>
                     {t("emergency.addFriend")}
                   </Text>
                   <TouchableOpacity onPress={closeAddDialog}>
-                    <MaterialCommunityIcons name="close" size={24} color={theme.colors.onSurface} />
+                    <MaterialCommunityIcons
+                      name="close"
+                      size={24}
+                      color={theme.colors.onSurface}
+                    />
                   </TouchableOpacity>
                 </View>
 
-                <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 16 }}>
+                <Text
+                  variant="bodyMedium"
+                  style={{
+                    color: theme.colors.onSurfaceVariant,
+                    marginBottom: 16,
+                  }}
+                >
                   {t("emergency.searchByPhone")}
                 </Text>
 
@@ -1022,18 +1311,34 @@ export default function ElderlyMessages() {
 
                 {searching && (
                   <View style={styles.resultArea}>
-                    <ActivityIndicator size="small" color={theme.colors.primary} />
-                    <Text variant="bodySmall" style={{ marginLeft: 8, color: theme.colors.onSurfaceVariant }}>
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.colors.primary}
+                    />
+                    <Text
+                      variant="bodySmall"
+                      style={{
+                        marginLeft: 8,
+                        color: theme.colors.onSurfaceVariant,
+                      }}
+                    >
                       {t("emergency.searching")}
                     </Text>
                   </View>
                 )}
 
                 {searchDone && !searching && foundUser && (
-                  <View style={[styles.resultCard, { backgroundColor: theme.colors.secondaryContainer }]}>
+                  <View
+                    style={[
+                      styles.resultCard,
+                      { backgroundColor: theme.colors.secondaryContainer },
+                    ]}
+                  >
                     <Avatar.Text
                       size={40}
-                      label={(foundUser.data.name ?? "?").substring(0, 2).toUpperCase()}
+                      label={(foundUser.data.name ?? "?")
+                        .substring(0, 2)
+                        .toUpperCase()}
                       style={{
                         backgroundColor:
                           foundUser.role === "elderly"
@@ -1053,17 +1358,38 @@ export default function ElderlyMessages() {
                       <Text variant="titleMedium" style={{ fontWeight: "600" }}>
                         {foundUser.data.name ?? "Unknown"}
                       </Text>
-                      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2, gap: 8 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center" }}>
-                          <MaterialCommunityIcons name="phone" size={13} color={theme.colors.onSecondaryContainer} />
-                          <Text variant="bodySmall" style={{ marginLeft: 4, color: theme.colors.onSecondaryContainer }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          marginTop: 2,
+                          gap: 8,
+                        }}
+                      >
+                        <View
+                          style={{ flexDirection: "row", alignItems: "center" }}
+                        >
+                          <MaterialCommunityIcons
+                            name="phone"
+                            size={13}
+                            color={theme.colors.onSecondaryContainer}
+                          />
+                          <Text
+                            variant="bodySmall"
+                            style={{
+                              marginLeft: 4,
+                              color: theme.colors.onSecondaryContainer,
+                            }}
+                          >
                             {foundUser.data.phone ?? "N/A"}
                           </Text>
                         </View>
                         <View
                           style={{
                             backgroundColor:
-                              foundUser.role === "elderly" ? theme.colors.primaryContainer : theme.colors.tertiaryContainer,
+                              foundUser.role === "elderly"
+                                ? theme.colors.primaryContainer
+                                : theme.colors.tertiaryContainer,
                             paddingHorizontal: 6,
                             paddingVertical: 1,
                             borderRadius: 6,
@@ -1072,7 +1398,10 @@ export default function ElderlyMessages() {
                           <Text
                             variant="labelSmall"
                             style={{
-                              color: foundUser.role === "elderly" ? theme.colors.primary : theme.colors.tertiary,
+                              color:
+                                foundUser.role === "elderly"
+                                  ? theme.colors.primary
+                                  : theme.colors.tertiary,
                               fontWeight: "600",
                               textTransform: "capitalize",
                             }}
@@ -1082,7 +1411,13 @@ export default function ElderlyMessages() {
                         </View>
                       </View>
                     </View>
-                    <Button mode="contained" onPress={handleAddFriend} loading={addingContact} disabled={addingContact} compact>
+                    <Button
+                      mode="contained"
+                      onPress={handleAddFriend}
+                      loading={addingContact}
+                      disabled={addingContact}
+                      compact
+                    >
                       {t("common.add")}
                     </Button>
                   </View>
@@ -1090,8 +1425,18 @@ export default function ElderlyMessages() {
 
                 {searchDone && !searching && !foundUser && (
                   <View style={styles.resultArea}>
-                    <MaterialCommunityIcons name="account-search" size={28} color={theme.colors.outlineVariant} />
-                    <Text variant="bodyMedium" style={{ marginLeft: 8, color: theme.colors.onSurfaceVariant }}>
+                    <MaterialCommunityIcons
+                      name="account-search"
+                      size={28}
+                      color={theme.colors.outlineVariant}
+                    />
+                    <Text
+                      variant="bodyMedium"
+                      style={{
+                        marginLeft: 8,
+                        color: theme.colors.onSurfaceVariant,
+                      }}
+                    >
                       {t("emergency.noUserFound")}
                     </Text>
                   </View>
@@ -1125,30 +1470,45 @@ export default function ElderlyMessages() {
       >
         <TouchableWithoutFeedback onPress={() => setShowLongPressMenu(false)}>
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.colors.surface, padding: 16 }]}>
-              {longPressItem && (() => {
-                const itemId = chatListItemId(longPressItem);
-                const isPinned = pinnedConversations.includes(itemId);
-                return (
-                  <TouchableOpacity
-                    style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}
-                    onPress={() => {
-                      handleTogglePin(itemId);
-                      setShowLongPressMenu(false);
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name={isPinned ? "pin-off" : "pin"}
-                      size={22}
-                      color={theme.colors.onSurface}
-                      style={{ marginRight: 12 }}
-                    />
-                    <Text variant="bodyLarge" style={{ color: theme.colors.onSurface }}>
-                      {isPinned ? t('chat.unpinConversation') : t('chat.pinConversation')}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })()}
+            <View
+              style={[
+                styles.modalContent,
+                { backgroundColor: theme.colors.surface, padding: 16 },
+              ]}
+            >
+              {longPressItem &&
+                (() => {
+                  const itemId = chatListItemId(longPressItem);
+                  const isPinned = pinnedConversations.includes(itemId);
+                  return (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingVertical: 14,
+                      }}
+                      onPress={() => {
+                        handleTogglePin(itemId);
+                        setShowLongPressMenu(false);
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name={isPinned ? "pin-off" : "pin"}
+                        size={22}
+                        color={theme.colors.onSurface}
+                        style={{ marginRight: 12 }}
+                      />
+                      <Text
+                        variant="bodyLarge"
+                        style={{ color: theme.colors.onSurface }}
+                      >
+                        {isPinned
+                          ? t("chat.unpinConversation")
+                          : t("chat.pinConversation")}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })()}
             </View>
           </View>
         </TouchableWithoutFeedback>

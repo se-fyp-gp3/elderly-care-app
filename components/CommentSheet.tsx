@@ -114,7 +114,9 @@ function CommentItem({
             }}
           >
             <Text variant="labelMedium" style={{ fontWeight: "bold", flex: 1 }}>
-              {comment.author_name}
+              {comment.author_id === "ai-assistant"
+                ? t("moments.aiAssistant")
+                : comment.author_name}
               {comment.author_role === "ai" && (
                 <Text
                   style={{ color: theme.colors.tertiary, fontWeight: "normal" }}

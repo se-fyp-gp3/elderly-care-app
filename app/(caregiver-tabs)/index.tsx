@@ -1,53 +1,54 @@
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
-  createChatSession,
-  deleteChatSession,
-  listChatSessionsForUser,
-  updateChatSession,
+    createChatSession,
+    deleteChatSession,
+    listChatSessionsForUser,
+    updateChatSession,
 } from "@/lib/chat";
 import {
-  fetchDayMedicationEvents,
-  fetchDayScheduleEvents,
-  fetchScheduleCategories,
+    fetchDayMedicationEvents,
+    fetchDayScheduleEvents,
+    fetchScheduleCategories,
 } from "@/lib/schedule";
 import type {
-  ChatSession as AppwriteChatSession,
-  Elderly,
+    ChatSession as AppwriteChatSession,
+    Elderly,
 } from "@/types/appwrite";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  FlatList,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    TouchableOpacity,
+    useColorScheme,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Card,
-  IconButton,
-  Menu,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Card,
+    IconButton,
+    Menu,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 /* ?????? Types ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????? */
@@ -103,6 +104,7 @@ export default function CaregiverChatBot() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   /* State */
   const [messages, setMessages] = useState<Message[]>([]);
@@ -141,12 +143,12 @@ export default function CaregiverChatBot() {
   /* ?????? Quick suggestions ?????????????????????????????????????????????????????????????????????????????????????????? */
   const quickSuggestions = useMemo(
     () => [
-      "What are today's tasks for my elderly?",
-      "Which medications are still pending?",
-      "Any missed events today?",
-      "Give me an overall health summary",
+      t("caregiverAI.suggestion1"),
+      t("caregiverAI.suggestion2"),
+      t("caregiverAI.suggestion3"),
+      t("caregiverAI.suggestion4"),
     ],
-    [],
+    [t],
   );
 
   /* ?????? Load linked elderly & build context ?????????????????????????????????????????????????????? */
@@ -807,7 +809,7 @@ export default function CaregiverChatBot() {
               variant="headlineSmall"
               style={{ marginTop: 16, fontWeight: "bold" }}
             >
-              Care Assistant
+              {t("caregiverAI.careAssistant")}
             </Text>
             <Text
               variant="bodyMedium"
@@ -818,8 +820,7 @@ export default function CaregiverChatBot() {
                 paddingHorizontal: 32,
               }}
             >
-              Ask me about today's tasks, medications, or schedules for your
-              elderly patients.
+              {t("caregiverAI.careAssistantDesc")}
             </Text>
             <View style={styles.suggestionsContainer}>
               {quickSuggestions.map((suggestion, idx) => (
@@ -849,7 +850,7 @@ export default function CaregiverChatBot() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={theme.colors.primary} />
             <Text style={{ marginLeft: 8, color: theme.colors.outline }}>
-              Thinking...
+              {t("caregiverAI.thinking")}
             </Text>
           </View>
         )}
@@ -888,7 +889,7 @@ export default function CaregiverChatBot() {
           style={styles.textInput}
           value={inputText}
           onChangeText={setInputText}
-          placeholder="Ask about your elderly's tasks..."
+          placeholder={t("caregiverAI.chatPlaceholder")}
           mode="outlined"
           dense
           right={
