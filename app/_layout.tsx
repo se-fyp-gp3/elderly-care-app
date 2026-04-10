@@ -2,7 +2,7 @@ import { DATABASE_ID, DIRECT_MESSAGES_TABLE_ID, safeSubscribe } from "@/lib/appw
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getElderlyByUserId } from "@/lib/elderly";
-import { FontSizeProvider } from "@/lib/font-size-context";
+import { FontSizeProvider, useFontSize } from "@/lib/font-size-context";
 import { LanguageProvider } from "@/lib/language-context";
 import {
     registerForPushNotificationsAsync,
