@@ -122,7 +122,7 @@ function CommentItem({
                   style={{ color: theme.colors.tertiary, fontWeight: "normal" }}
                 >
                   {" "}
-                  • AI
+                  ??AI
                 </Text>
               )}
             </Text>
@@ -152,7 +152,7 @@ function CommentItem({
                 variant="labelSmall"
                 style={{ color: theme.colors.primary, fontWeight: "bold" }}
               >
-                ↳ @{comment.reply_to_user_name}
+                ??@{comment.reply_to_user_name}
               </Text>
               {parentComment ? (
                 <Text

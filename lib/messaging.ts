@@ -1,10 +1,10 @@
 import { DirectMessage } from "@/types/messaging";
 import { ID, Query } from "react-native-appwrite";
 import {
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
-  safeSubscribe,
-  tablesDB,
+    DATABASE_ID,
+    DIRECT_MESSAGES_TABLE_ID,
+    safeSubscribe,
+    tablesDB,
 } from "./appwrite";
 import { updatePresence } from "./presence";
 
@@ -146,6 +146,34 @@ export async function getUnreadCount(receiverId: string): Promise<number> {
 }
 
 /**
+ * Get the unread count per conversation for a given receiver.
+ * Returns a Map<conversationId, count>.
+ */
+export async function getUnreadCountPerConversation(
+  receiverId: string,
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  try {
+    const response = await tablesDB.listRows<DirectMessage>({
+      databaseId: DATABASE_ID,
+      tableId: DIRECT_MESSAGES_TABLE_ID,
+      queries: [
+        Query.equal("receiver_id", receiverId),
+        Query.equal("is_read", false),
+        Query.limit(5000),
+      ],
+    });
+    for (const msg of response.rows as unknown as DirectMessage[]) {
+      const convId = msg.conversation_id;
+      map.set(convId, (map.get(convId) ?? 0) + 1);
+    }
+  } catch (error) {
+    console.error("Error getting unread count per conversation:", error);
+  }
+  return map;
+}
+
+/**
  * Get the last message for a given conversation.
  */
 export async function getLastMessage(
@@ -194,48 +222,6 @@ export function subscribeToConversation(
 }
 
 /**
- * Get unread message count grouped by conversation for a given receiver.
- * Returns a Map of conversationId → unread count.
- */
-export async function getUnreadCountPerConversation(
-  receiverId: string,
-): Promise<Map<string, number>> {
-  const result = new Map<string, number>();
-  try {
-    let cursor: string | undefined;
-    let hasMore = true;
-    while (hasMore) {
-      const queries = [
-        Query.equal("receiver_id", receiverId),
-        Query.equal("is_read", false),
-        Query.limit(100),
-      ];
-      if (cursor) queries.push(Query.cursorAfter(cursor));
-
-      const response = await tablesDB.listRows<DirectMessage>({
-        databaseId: DATABASE_ID,
-        tableId: DIRECT_MESSAGES_TABLE_ID,
-        queries,
-      });
-
-      for (const msg of response.rows) {
-        const convId = msg.conversation_id;
-        result.set(convId, (result.get(convId) ?? 0) + 1);
-      }
-
-      if (response.rows.length < 100) {
-        hasMore = false;
-      } else {
-        cursor = response.rows[response.rows.length - 1].$id;
-      }
-    }
-  } catch (error) {
-    console.error("Error getting unread count per conversation:", error);
-  }
-  return result;
-}
-
-/**
  * Subscribe to ALL incoming messages for a specific user (by receiver_id).
  * Used for global push notification triggering.
  * Returns an unsubscribe function.
@@ -248,10 +234,7 @@ export function subscribeToUserMessages(
     const channel = `databases.${DATABASE_ID}.collections.${DIRECT_MESSAGES_TABLE_ID}.documents`;
     const unsubscribe = safeSubscribe(channel, (response) => {
       const payload = response.payload as unknown as DirectMessage;
-      if (
-        payload?.receiver_id === myProfileId &&
-        payload?.sender_id !== myProfileId
-      ) {
+      if (payload?.receiver_id === myProfileId && payload?.sender_id !== myProfileId) {
         onIncomingMessage(payload);
       }
     });

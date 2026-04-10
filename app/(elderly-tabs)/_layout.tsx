@@ -38,6 +38,7 @@ export default function ElderlyTabsLayout() {
   usePresence();
   const { totalUnread } = useUnreadBadge();
   const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
+  const fallDetectionEnabled = preferences.fallDetectionEnabled !== false;
   const visible = getVisibleTabs(uiVersion);
 
   const isAccessible = uiVersion === UIVersion.Accessible;
@@ -49,11 +50,18 @@ export default function ElderlyTabsLayout() {
   const [fallDetected, setFallDetected] = useState(false);
 
   useEffect(() => {
-    startFallDetection(() => setFallDetected(true));
+    if (!fallDetectionEnabled) {
+      setFallDetected(false);
+      void stopFallDetection();
+      return;
+    }
+
+    void startFallDetection(() => setFallDetected(true));
+
     return () => {
-      stopFallDetection();
+      void stopFallDetection();
     };
-  }, []);
+  }, [fallDetectionEnabled]);
 
   return (
     <>

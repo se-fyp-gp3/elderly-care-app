@@ -60,7 +60,7 @@ export async function computeElderlyStatus(
   let lastCheckTime: string | null = null;
   let missedMedCount = 0;
   let nextAppointment: string | null = null;
-  let medicationSummary = i18n.t('medication.upToDate');
+  let medicationSummary = "Up to date";
   let todaySteps: number | null = null;
   let lastActiveTime: string | null = null;
   let isActive = false;

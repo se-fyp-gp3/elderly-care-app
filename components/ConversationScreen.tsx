@@ -1,22 +1,26 @@
-import { ID, storage, VOICE_MESSAGES_BUCKET_ID } from "@/lib/appwrite";
+import {
+  ID,
+  storage,
+  VOICE_MESSAGES_BUCKET_ID,
+} from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-    buildConversationId,
-    fetchConversationMessages,
-    markConversationAsRead,
-    sendDirectMessage,
-    subscribeToConversation,
+  buildConversationId,
+  fetchConversationMessages,
+  markConversationAsRead,
+  sendDirectMessage,
+  subscribeToConversation,
 } from "@/lib/messaging";
 import { DirectMessage } from "@/types/messaging";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
 import {
-    createAudioPlayer,
-    RecordingPresets,
-    requestRecordingPermissionsAsync,
-    setAudioModeAsync,
-    useAudioRecorder,
+  createAudioPlayer,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
 } from "expo-audio";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
@@ -24,26 +28,22 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    FlatList,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Divider,
-    IconButton,
-    Modal,
-    Portal,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  IconButton,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 

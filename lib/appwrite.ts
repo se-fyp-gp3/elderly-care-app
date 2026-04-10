@@ -77,7 +77,7 @@ export const GROUPS_TABLE_ID = process.env.EXPO_PUBLIC_GROUPS_TABLE_ID || "group
 export const GROUP_MEMBERS_TABLE_ID = process.env.EXPO_PUBLIC_GROUP_MEMBERS_TABLE_ID || "group_members";
 export const GROUP_MESSAGES_TABLE_ID = process.env.EXPO_PUBLIC_GROUP_MESSAGES_TABLE_ID || "group_messages";
 export const GROUP_READ_CURSORS_TABLE_ID = process.env.EXPO_PUBLIC_GROUP_READ_CURSORS_TABLE_ID || "group_read_cursors";
-export const USER_ICON_BUCKET_ID = process.env.EXPO_PUBLIC_USER_ICON_BUCKET_ID || "696f4129000d8ad7f041";
+export const USER_ICON_BUCKET_ID = process.env.EXPO_PUBLIC_USER_ICON_BUCKET_ID || "user-icons";
 
 export const ROLE_MANAGEMENT_FUNCTION_ID =
   process.env.EXPO_PUBLIC_ROLE_MANAGEMENT_FUNCTION_ID!;

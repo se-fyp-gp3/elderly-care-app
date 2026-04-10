@@ -1,18 +1,18 @@
 import { generateAIResponse } from "@/lib/ai";
 import {
-    clientReactNative,
-    DATABASE_ID,
-    MOMENTS_COMMENTS_TABLE_ID,
-    MOMENTS_MEDIA_BUCKET_ID,
-    MOMENTS_TABLE_ID,
-    storage,
+  clientReactNative,
+  DATABASE_ID,
+  MOMENTS_COMMENTS_TABLE_ID,
+  MOMENTS_MEDIA_BUCKET_ID,
+  MOMENTS_TABLE_ID,
+  storage,
 } from "@/lib/appwrite";
 import i18n from "@/lib/i18n";
 import {
-    MediaItem,
-    Moment,
-    MomentComment,
-    MomentMediaInput,
+  MediaItem,
+  Moment,
+  MomentComment,
+  MomentMediaInput,
 } from "@/types/moments";
 import * as FileSystem from "expo-file-system";
 import * as VideoThumbnails from "expo-video-thumbnails";
@@ -442,80 +442,6 @@ export async function addComment(
   return comment as unknown as MomentComment;
 }
 
-/**
- * Toggle like on a comment. Returns the new likes array.
- */
-export async function likeComment(
-  commentId: string,
-  userId: string,
-  currentLikes: string[],
-): Promise<string[]> {
-  const isLiked = currentLikes.includes(userId);
-  const newLikes = isLiked
-    ? currentLikes.filter((id) => id !== userId)
-    : [...currentLikes, userId];
-  try {
-    await databases.updateDocument(
-      DATABASE_ID,
-      MOMENTS_COMMENTS_TABLE_ID,
-      commentId,
-      { likes: newLikes },
-    );
-  } catch (error) {
-    console.error("Error liking comment:", error);
-  }
-  return newLikes;
-}
-
-/**
- * Get the latest N comments for a moment (for inline card preview).
- */
-export async function getLatestComments(
-  momentId: string,
-  limit = 3,
-  allowedAuthorIds?: string[],
-): Promise<MomentComment[]> {
-  try {
-    const queries = [
-      Query.equal("moment_id", momentId),
-      Query.orderDesc("$createdAt"),
-      Query.limit(limit),
-    ];
-    if (allowedAuthorIds && allowedAuthorIds.length > 0) {
-      queries.push(Query.equal("author_id", allowedAuthorIds));
-    }
-    const response = await databases.listDocuments(
-      DATABASE_ID,
-      MOMENTS_COMMENTS_TABLE_ID,
-      queries,
-    );
-    return response.documents as unknown as MomentComment[];
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Get IDs of all moments authored by a specific user.
- * Used for notification logic to check "someone commented on my post".
- */
-export async function getUserMomentIds(userId: string): Promise<string[]> {
-  try {
-    const response = await databases.listDocuments(
-      DATABASE_ID,
-      MOMENTS_TABLE_ID,
-      [
-        Query.equal("author_id", userId),
-        Query.select(["$id"]),
-        Query.limit(500),
-      ],
-    );
-    return response.documents.map((d) => d.$id);
-  } catch {
-    return [];
-  }
-}
-
 export async function addAIResponse(
   momentId: string,
   content: string,
@@ -600,5 +526,50 @@ export async function deleteComment(
     });
   } catch (err) {
     console.warn("Failed to decrement comments_count:", err);
+  }
+}
+
+export async function likeComment(
+  commentId: string,
+  userId: string,
+  currentLikes: string[],
+): Promise<string[]> {
+  const isLiked = currentLikes.includes(userId);
+  const newLikes = isLiked
+    ? currentLikes.filter((id) => id !== userId)
+    : [...currentLikes, userId];
+  await databases.updateDocument(
+    DATABASE_ID,
+    MOMENTS_COMMENTS_TABLE_ID,
+    commentId,
+    {
+      likes: newLikes,
+    },
+  );
+  return newLikes;
+}
+
+export async function getLatestComments(
+  momentId: string,
+  limit: number,
+  allowedAuthorIds?: string[],
+): Promise<MomentComment[]> {
+  try {
+    const queries: string[] = [
+      Query.equal("moment_id", momentId),
+      Query.orderDesc("$createdAt"),
+      Query.limit(limit),
+    ];
+    if (allowedAuthorIds && allowedAuthorIds.length > 0) {
+      queries.push(Query.equal("author_id", allowedAuthorIds));
+    }
+    const res = await databases.listDocuments(
+      DATABASE_ID,
+      MOMENTS_COMMENTS_TABLE_ID,
+      queries,
+    );
+    return res.documents as unknown as MomentComment[];
+  } catch {
+    return [];
   }
 }
