@@ -520,31 +520,38 @@ export async function deleteComment(
   }
 }
 
-export async function deleteMoment(momentId: string, mediaBucketId?: string | null, mediaFileId?: string | null): Promise<void> {
-  // Delete associated media file if exists
-  if (mediaBucketId && mediaFileId) {
-    try {
-      await storage.deleteFile(mediaBucketId, mediaFileId);
-    } catch (err) {
-      console.warn("Failed to delete media file:", err);
-    }
-  }
-
-  // Delete the moment document
-  await databases.deleteDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId);
+export async function likeComment(
+  commentId: string,
+  userId: string,
+  currentLikes: string[],
+): Promise<string[]> {
+  const isLiked = currentLikes.includes(userId);
+  const newLikes = isLiked
+    ? currentLikes.filter((id) => id !== userId)
+    : [...currentLikes, userId];
+  await databases.updateDocument(DATABASE_ID, MOMENTS_COMMENTS_TABLE_ID, commentId, {
+    likes: newLikes,
+  });
+  return newLikes;
 }
 
-export async function deleteComment(commentId: string, momentId: string): Promise<void> {
-  await databases.deleteDocument(DATABASE_ID, MOMENTS_COMMENTS_TABLE_ID, commentId);
-
-  // Decrement comments_count on the moment
+export async function getLatestComments(
+  momentId: string,
+  limit: number,
+  allowedAuthorIds?: string[],
+): Promise<MomentComment[]> {
   try {
-    const moment = await databases.getDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId);
-    const currentCount = (moment as unknown as { comments_count?: number }).comments_count || 0;
-    await databases.updateDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId, {
-      comments_count: Math.max(0, currentCount - 1),
-    });
-  } catch (err) {
-    console.warn("Failed to decrement comments_count:", err);
+    const queries: string[] = [
+      Query.equal("moment_id", momentId),
+      Query.orderDesc("$createdAt"),
+      Query.limit(limit),
+    ];
+    if (allowedAuthorIds && allowedAuthorIds.length > 0) {
+      queries.push(Query.equal("author_id", allowedAuthorIds));
+    }
+    const res = await databases.listDocuments(DATABASE_ID, MOMENTS_COMMENTS_TABLE_ID, queries);
+    return res.documents as unknown as MomentComment[];
+  } catch {
+    return [];
   }
 }

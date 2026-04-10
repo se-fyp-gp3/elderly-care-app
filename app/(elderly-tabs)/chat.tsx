@@ -228,8 +228,8 @@ export default function ElderlyChat() {
   }, [aiVoiceEnabled, preferences, stopAiVoicePlayback, updatePreferences]);
 
   const LANG_OPTIONS = [
-    { key: "cantonese", label: "???" },
-    { key: "mandarin", label: "?獢謍喳?" },
+    { key: "cantonese", label: "粵語" },
+    { key: "mandarin", label: "普通話" },
     { key: "english", label: "English" },
   ] as const;
 
@@ -240,7 +240,7 @@ export default function ElderlyChat() {
   ) as string;
 
   const currentLangLabel =
-    LANG_OPTIONS.find((o) => o.key === voiceReplyLang)?.label ?? "???";
+    LANG_OPTIONS.find((o) => o.key === voiceReplyLang)?.label ?? "粵語";
 
   const handleLangChange = useCallback(
     async (lang: string) => {
@@ -381,15 +381,15 @@ export default function ElderlyChat() {
 
     const langInstruction =
       voiceReplyLang === "cantonese"
-        ? "You MUST reply in ?????? (Hong Kong Cantonese written Chinese). Use informal Cantonese written style."
+        ? "You MUST reply in 香港粵語 (Hong Kong Cantonese written Chinese). Use informal Cantonese written style."
         : voiceReplyLang === "mandarin"
-          ? "You MUST reply in ?獢謍喳? (Mandarin Chinese, simplified or traditional)."
+          ? "You MUST reply in 普通話 (Mandarin Chinese, simplified or traditional)."
           : "You MUST reply in English.";
 
     return [
       {
         role: "system",
-        content: `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\nIMPORTANT: Keep your response concise ??no more than 80 words. Be brief and to the point.\n\n${langInstruction}\n\nWhen the user's message contains [SEARCH RESULTS], you MUST base your answer strictly on those results. Do NOT make up or guess information ??only use facts from the provided search data. Summarize the key points for the elderly user in a caring tone.\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
+        content: `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\nIMPORTANT: Keep your response concise — no more than 80 words. Be brief and to the point.\n\n${langInstruction}\n\nWhen the user's message contains [SEARCH RESULTS], you MUST base your answer strictly on those results. Do NOT make up or guess information — only use facts from the provided search data. Summarize the key points for the elderly user in a caring tone.\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
       },
       ...history,
       {
@@ -470,7 +470,7 @@ export default function ElderlyChat() {
       ) {
         return "I'm here to provide general health information. However, for any serious health concerns or symptoms, please consult with a healthcare professional immediately. How can I assist you today?";
       } else if (lowerMessage.includes("emergency")) {
-        return "?蹎? For medical emergencies, please call emergency services immediately (911 or your local emergency number). I'm an AI assistant and cannot provide emergency medical care.";
+        return "⚠️ For medical emergencies, please call emergency services immediately (911 or your local emergency number). I'm an AI assistant and cannot provide emergency medical care.";
       } else {
         return `I understand you're asking about \"${userMessage}\". As your AI Care Assistant, I'm here to help with health information, medication tracking, and wellness support. Could you provide more details about what you'd like to know?`;
       }
@@ -826,7 +826,7 @@ export default function ElderlyChat() {
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText.trim() || "???[Image sent]",
+      text: inputText.trim() || "📷 [Image sent]",
       isUser: true,
       timestamp: new Date(),
       imageUri: selectedImage?.uri,
@@ -847,7 +847,7 @@ export default function ElderlyChat() {
       if (selectedImage) {
         const userText = userMessage.text;
         const isMedQuery =
-          /?此謑???﹄medication|medicine|pill|????apsule|tablet/i.test(
+          /識藥|识药|medication|medicine|pill|藥|药|capsule|tablet/i.test(
             userText,
           );
         messageForAPI = isMedQuery
@@ -908,12 +908,12 @@ export default function ElderlyChat() {
         );
       } else if (searchEnabled && shouldSearch(userMessage.text)) {
         console.log(
-          "[Search] No search context produced ??search may have returned empty results",
+          "[Search] No search context produced — search may have returned empty results",
         );
       }
 
       const finalMessage = searchContext
-        ? `${messageForAPI}\n\n[SEARCH RESULTS ??you MUST base your answer ONLY on these facts. Do NOT add, guess, or invent any information not found below:]\n${searchContext}\n[END SEARCH RESULTS]\n\nUsing ONLY the search results above, answer the user's question concisely.`
+        ? `${messageForAPI}\n\n[SEARCH RESULTS — you MUST base your answer ONLY on these facts. Do NOT add, guess, or invent any information not found below:]\n${searchContext}\n[END SEARCH RESULTS]\n\nUsing ONLY the search results above, answer the user's question concisely.`
         : messageForAPI;
 
       console.log("[AI] Final message to model (full):\n", finalMessage);
@@ -1278,8 +1278,8 @@ export default function ElderlyChat() {
                   { backgroundColor: theme.colors.surfaceVariant },
                 ]}
                 onPress={() => {
-                  if (suggestion.includes("???此謑?)) {
-                    setInputText("?ｇ?曌????隞螞謕?????????蹓踐???????哨???);
+                  if (suggestion.includes("拍照識藥")) {
+                    setInputText("請幫我識別這個藥物的名稱、用途和注意事項。");
                     handleImageOptions();
                   } else {
                     setInputText(suggestion);
