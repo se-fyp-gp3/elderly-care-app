@@ -233,7 +233,18 @@ function MediaGalleryModal({
   );
 }
 
-export default function MomentCard({ moment, currentUserId, onLike, onComment, onAIRequest, onDelete }: MomentCardProps) {
+/** Render a single media item (image or video) in the grid */
+function MediaGridItem({
+  item,
+  index,
+  onPressMedia,
+  gridStyle,
+}: {
+  item: MediaItem;
+  index: number;
+  onPressMedia: (index: number) => void;
+  gridStyle: any;
+}) {
   const theme = useTheme();
 
   if (item.type === "image" && item.url) {
