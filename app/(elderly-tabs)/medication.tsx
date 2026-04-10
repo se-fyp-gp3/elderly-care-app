@@ -1155,7 +1155,7 @@ export default function ElderlyMedicationScreen() {
                   const name = meds[0]?.name || "Medication";
                   // @ts-ignore
                   const medUnit = meds[0]?.unit || "dose";
-                  const dosageStr = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
+                  const dosageStr = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
 
                   const endDateStr = r.end_date
                     ? new Date(r.end_date).toLocaleDateString("en-GB", {
@@ -1163,7 +1163,7 @@ export default function ElderlyMedicationScreen() {
                         month: "short",
                         year: "numeric",
                       })
-                    : "??;
+                    : "—";
 
                   const startDateStr = r.start_date
                     ? new Date(r.start_date).toLocaleDateString("en-GB", {
@@ -1171,7 +1171,7 @@ export default function ElderlyMedicationScreen() {
                         month: "short",
                         year: "numeric",
                       })
-                    : "??;
+                    : "—";
 
                   return (
                     <View
@@ -1214,7 +1214,7 @@ export default function ElderlyMedicationScreen() {
                             marginTop: 2,
                           }}
                         >
-                          {dosageStr} ?爸" "}
+                          {dosageStr} ·{" "}
                           {t("medication.timesDaily", {
                             times: r.reminder_times.length,
                           })}
@@ -1226,7 +1226,7 @@ export default function ElderlyMedicationScreen() {
                             marginTop: 2,
                           }}
                         >
-                          {startDateStr} ??{endDateStr}
+                          {startDateStr} → {endDateStr}
                         </Text>
                       </View>
                       <View

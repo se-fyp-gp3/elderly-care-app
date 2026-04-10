@@ -146,6 +146,34 @@ export async function getUnreadCount(receiverId: string): Promise<number> {
 }
 
 /**
+ * Get the unread count per conversation for a given receiver.
+ * Returns a Map<conversationId, count>.
+ */
+export async function getUnreadCountPerConversation(
+  receiverId: string,
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  try {
+    const response = await tablesDB.listRows<DirectMessage>({
+      databaseId: DATABASE_ID,
+      tableId: DIRECT_MESSAGES_TABLE_ID,
+      queries: [
+        Query.equal("receiver_id", receiverId),
+        Query.equal("is_read", false),
+        Query.limit(5000),
+      ],
+    });
+    for (const msg of response.rows as unknown as DirectMessage[]) {
+      const convId = msg.conversation_id;
+      map.set(convId, (map.get(convId) ?? 0) + 1);
+    }
+  } catch (error) {
+    console.error("Error getting unread count per conversation:", error);
+  }
+  return map;
+}
+
+/**
  * Get the last message for a given conversation.
  */
 export async function getLastMessage(

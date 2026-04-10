@@ -17,7 +17,9 @@
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,
-        "com.apple.developer.healthkit.access": ["health-records"]
+        "com.apple.developer.healthkit.access": [
+          "health-records"
+        ]
       }
     },
     "android": {
@@ -94,7 +96,8 @@
         }
       ],
       "expo-sensors",
-      "expo-task-manager"
+      "expo-task-manager",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

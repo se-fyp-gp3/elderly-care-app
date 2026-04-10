@@ -180,7 +180,7 @@ export default function CaregiverChatBot() {
         const sched = scheduleEvents.filter((ev) => ev.elderlyId === e.$id);
         const meds = medicationEvents.filter((ev) => ev.elderlyId === e.$id);
 
-        let part = `??{e.name}???
+        let part = `${e.name}:\n`;
         if (sched.length === 0 && meds.length === 0) {
           part += "\n  No tasks or medications today.";
         } else {
@@ -612,7 +612,7 @@ export default function CaregiverChatBot() {
       let messageForAPI = userMessage.text;
       if (selectedImage) {
         const isMedQuery =
-          /medication|medicine|pill|????豏吧psule|tablet/i.test(messageForAPI);
+          /medication|medicine|pill|capsule|tablet/i.test(messageForAPI);
         messageForAPI = isMedQuery
           ? `${messageForAPI}\n[Photo of medication. Please identify it.]`
           : `${messageForAPI}\n[User has shared an image]`;

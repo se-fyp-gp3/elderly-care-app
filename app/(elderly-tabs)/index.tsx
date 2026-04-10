@@ -3,22 +3,22 @@ import VoiceCommandButton from "@/components/VoiceCommandButton";
 import { useAuth } from "@/lib/auth-context";
 import { Contact, getContactsForElderly } from "@/lib/contacts";
 import {
-  fetchElderlySchedulesForUser,
-  getElderlyByUserId,
+    fetchElderlySchedulesForUser,
+    getElderlyByUserId,
 } from "@/lib/elderly";
 import { useStepSync } from "@/lib/hooks/useStepSync";
 import {
-  checkAndMarkSkippedMedications,
-  fetchActiveMedicationReminders,
-  fetchDailyMedicationLogs,
-  logMedicationAction,
+    checkAndMarkSkippedMedications,
+    fetchActiveMedicationReminders,
+    fetchDailyMedicationLogs,
+    logMedicationAction,
 } from "@/lib/medication_tracking";
 import { translateUnit } from "@/lib/schedule";
 import {
-  Elderly,
-  ElderlyMedicationReminder,
-  MedicationLogs,
-  Schedule,
+    Elderly,
+    ElderlyMedicationReminder,
+    MedicationLogs,
+    Schedule,
 } from "@/types/appwrite";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -27,22 +27,22 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Alert,
-  AppState,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  useColorScheme,
-  View,
+    ActivityIndicator,
+    Alert,
+    AppState,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    useColorScheme,
+    View,
 } from "react-native";
 import {
-  Button,
-  Card,
-  Chip,
-  Text,
-  TouchableRipple,
-  useTheme
+    Button,
+    Card,
+    Chip,
+    Text,
+    TouchableRipple,
+    useTheme
 } from "react-native-paper";
 
 type TodoItem = {
