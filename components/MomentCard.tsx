@@ -5,26 +5,26 @@ import { useVideoPlayer, VideoPlayer, VideoView } from "expo-video";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    Dimensions,
-    FlatList,
-    Image,
-    Modal,
-    NativeScrollEvent,
-    NativeSyntheticEvent,
-    Pressable,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Divider,
-    Text,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  Divider,
+  Text,
+  useTheme,
 } from "react-native-paper";
 
 interface MomentCardProps {
@@ -51,6 +51,7 @@ function GalleryVideoPage({
   uri: string;
   isActive: boolean;
 }) {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [error, setError] = useState(false);
 
@@ -83,7 +84,13 @@ function GalleryVideoPage({
         <Text style={{ color: "#fff", marginTop: 8 }}>
           {t("moments.videoLoadError")}
         </Text>
-        <Text style={{ color: "#aaa", marginTop: 4, fontSize: 12 }}>
+        <Text
+          style={{
+            color: theme.colors.onSurfaceVariant,
+            marginTop: 4,
+            fontSize: 12,
+          }}
+        >
           {t("moments.tapToRetry")}
         </Text>
       </Pressable>

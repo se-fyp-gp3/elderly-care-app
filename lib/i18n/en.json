@@ -49,7 +49,11 @@
     "daysAgo": "{{days}}d ago",
     "noData": "No data",
     "medicationCount_one": "{{count}} medication",
-    "medicationCount_other": "{{count}} medications"
+    "medicationCount_other": "{{count}} medications",
+    "noDataFound": "No data found.",
+    "loadingDetails": "Loading details...",
+    "yes": "Yes",
+    "no": "No"
   },
   "tabs": {
     "home": "Home",
@@ -541,9 +545,18 @@
     "sendReminderNotif": "Sends you a reminder notification for this event",
     "prev": "Prev",
     "next": "Next",
-    "jan": "Jan", "feb": "Feb", "mar": "Mar", "apr": "Apr",
-    "may": "May", "jun": "Jun", "jul": "Jul", "aug": "Aug",
-    "sep": "Sep", "oct": "Oct", "nov": "Nov", "dec": "Dec"
+    "jan": "Jan",
+    "feb": "Feb",
+    "mar": "Mar",
+    "apr": "Apr",
+    "may": "May",
+    "jun": "Jun",
+    "jul": "Jul",
+    "aug": "Aug",
+    "sep": "Sep",
+    "oct": "Oct",
+    "nov": "Nov",
+    "dec": "Dec"
   },
   "healthData": {
     "myHealthData": "My Health Data",

@@ -1,26 +1,22 @@
-import {
-    ID,
-    storage,
-    VOICE_MESSAGES_BUCKET_ID
-} from "@/lib/appwrite";
+import { ID, storage, VOICE_MESSAGES_BUCKET_ID } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-    fetchGroupMessages,
-    markGroupMessagesAsRead,
-    sendGroupMessage,
-    subscribeToGroupMessages,
-    updateGroupReadCursor,
+  fetchGroupMessages,
+  markGroupMessagesAsRead,
+  sendGroupMessage,
+  subscribeToGroupMessages,
+  updateGroupReadCursor,
 } from "@/lib/group-messaging";
 import { getGroupMembers } from "@/lib/groups";
 import { GroupMember, GroupMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
 import {
-    createAudioPlayer,
-    RecordingPresets,
-    requestRecordingPermissionsAsync,
-    setAudioModeAsync,
-    useAudioRecorder,
+  createAudioPlayer,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
 } from "expo-audio";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
@@ -28,26 +24,26 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    FlatList,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Divider,
-    IconButton,
-    Modal,
-    Portal,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Divider,
+  IconButton,
+  Modal,
+  Portal,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import UserAvatar from "./UserAvatar";
@@ -75,7 +71,8 @@ function VoiceMessageBubble({
   const playerRef = useRef<AudioPlayer | null>(null);
 
   const pipeIdx = body.indexOf("|");
-  const duration = pipeIdx > 0 ? parseInt(body.substring(0, pipeIdx), 10) || 0 : 0;
+  const duration =
+    pipeIdx > 0 ? parseInt(body.substring(0, pipeIdx), 10) || 0 : 0;
   const fileId = pipeIdx > 0 ? body.substring(pipeIdx + 1) : body;
 
   const fmtDur = (s: number) => {
@@ -98,7 +95,10 @@ function VoiceMessageBubble({
     setLoading(true);
     try {
       await setAudioModeAsync({ playsInSilentMode: true });
-      const downloadUrl = storage.getFileDownloadURL(VOICE_MESSAGES_BUCKET_ID, fileId);
+      const downloadUrl = storage.getFileDownloadURL(
+        VOICE_MESSAGES_BUCKET_ID,
+        fileId,
+      );
       const player = createAudioPlayer(downloadUrl.toString());
       playerRef.current = player;
       player.addListener("playbackStatusUpdate", (status) => {
@@ -114,13 +114,21 @@ function VoiceMessageBubble({
   };
 
   useEffect(() => {
-    return () => { playerRef.current?.remove(); };
+    return () => {
+      playerRef.current?.remove();
+    };
   }, []);
 
-  const iconColor = isMe ? themeObj.colors.onPrimary : themeObj.colors.onSurface;
+  const iconColor = isMe
+    ? themeObj.colors.onPrimary
+    : themeObj.colors.onSurface;
 
   return (
-    <TouchableOpacity onPress={handlePlayPause} activeOpacity={0.7} style={styles.voiceBubbleRow}>
+    <TouchableOpacity
+      onPress={handlePlayPause}
+      activeOpacity={0.7}
+      style={styles.voiceBubbleRow}
+    >
       {loading ? (
         <ActivityIndicator size={20} color={iconColor} />
       ) : (
@@ -136,7 +144,11 @@ function VoiceMessageBubble({
             key={i}
             style={[
               styles.voiceBar,
-              { height: 6 + Math.random() * 14, backgroundColor: iconColor, opacity: playing ? 0.9 : 0.5 },
+              {
+                height: 6 + Math.random() * 14,
+                backgroundColor: iconColor,
+                opacity: playing ? 0.9 : 0.5,
+              },
             ]}
           />
         ))}
@@ -227,13 +239,18 @@ export default function GroupConversationScreen({
       });
     })();
 
-    return () => { unsub?.(); };
+    return () => {
+      unsub?.();
+    };
   }, [groupId, myProfileId]);
 
   // Auto-scroll on new messages
   useEffect(() => {
     if (messages.length > 0) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      setTimeout(
+        () => flatListRef.current?.scrollToEnd({ animated: true }),
+        100,
+      );
     }
   }, [messages.length]);
 
@@ -302,8 +319,17 @@ export default function GroupConversationScreen({
       const fileInfo = await FileSystem.getInfoAsync(uri);
       if (!fileInfo.exists) return;
 
-      const file = { name: `voice_${Date.now()}.m4a`, type: "audio/m4a", size: fileInfo.size || 0, uri };
-      const uploaded = await storage.createFile(VOICE_MESSAGES_BUCKET_ID, ID.unique(), file);
+      const file = {
+        name: `voice_${Date.now()}.m4a`,
+        type: "audio/m4a",
+        size: fileInfo.size || 0,
+        uri,
+      };
+      const uploaded = await storage.createFile(
+        VOICE_MESSAGES_BUCKET_ID,
+        ID.unique(),
+        file,
+      );
 
       await sendGroupMessage({
         groupId,
@@ -319,7 +345,15 @@ export default function GroupConversationScreen({
       setSending(false);
       setRecordDuration(0);
     }
-  }, [isRecording, recorder, groupId, myProfileId, myName, myRole, recordDuration]);
+  }, [
+    isRecording,
+    recorder,
+    groupId,
+    myProfileId,
+    myName,
+    myRole,
+    recordDuration,
+  ]);
 
   const cancelRecording = useCallback(() => {
     if (!isRecording) return;
@@ -334,7 +368,9 @@ export default function GroupConversationScreen({
     try {
       const d = new Date(iso);
       return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    } catch { return ""; }
+    } catch {
+      return "";
+    }
   };
 
   const renderMessage = ({ item }: { item: GroupMessage }) => {
@@ -344,7 +380,13 @@ export default function GroupConversationScreen({
     if (isSystem) {
       return (
         <View style={styles.systemMsgContainer}>
-          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, fontStyle: "italic" }}>
+          <Text
+            variant="bodySmall"
+            style={{
+              color: theme.colors.onSurfaceVariant,
+              fontStyle: "italic",
+            }}
+          >
             {item.body}
           </Text>
         </View>
@@ -355,7 +397,9 @@ export default function GroupConversationScreen({
 
     // Read receipt logic for sent messages
     const readBy = item.read_by ?? [];
-    const otherMembersCount = members.filter((m) => m.user_profile_id !== item.sender_id).length;
+    const otherMembersCount = members.filter(
+      (m) => m.user_profile_id !== item.sender_id,
+    ).length;
     const allRead = otherMembersCount > 0 && readBy.length >= otherMembersCount;
 
     const handleLongPress = () => {
@@ -365,15 +409,24 @@ export default function GroupConversationScreen({
 
     return (
       <Pressable onLongPress={handleLongPress} delayLongPress={400}>
-        <View style={[styles.msgRow, isMe ? styles.msgRowRight : styles.msgRowLeft]}>
+        <View
+          style={[styles.msgRow, isMe ? styles.msgRowRight : styles.msgRowLeft]}
+        >
           {!isMe && (
             <View style={styles.senderAvatar}>
-              <UserAvatar name={item.sender_name} size={28} role={item.sender_role} />
+              <UserAvatar
+                name={item.sender_name}
+                size={28}
+                role={item.sender_role}
+              />
             </View>
           )}
           <View style={{ maxWidth: "75%" }}>
             {!isMe && (
-              <Text variant="labelSmall" style={[styles.senderLabel, { color: theme.colors.primary }]}>
+              <Text
+                variant="labelSmall"
+                style={[styles.senderLabel, { color: theme.colors.primary }]}
+              >
                 {item.sender_name}
               </Text>
             )}
@@ -381,16 +434,36 @@ export default function GroupConversationScreen({
               style={[
                 styles.bubble,
                 isMe
-                  ? { backgroundColor: theme.colors.primary, borderBottomRightRadius: 4 }
-                  : { backgroundColor: theme.colors.surfaceVariant, borderBottomLeftRadius: 4 },
+                  ? {
+                      backgroundColor: theme.colors.primary,
+                      borderBottomRightRadius: 4,
+                    }
+                  : {
+                      backgroundColor: theme.colors.surfaceVariant,
+                      borderBottomLeftRadius: 4,
+                    },
               ]}
             >
               {/* Quoted message preview */}
               {item.quoted_message_id ? (
-                <View style={[styles.quoteBubble, { borderLeftColor: isMe ? theme.colors.onPrimary : theme.colors.primary }]}>
+                <View
+                  style={[
+                    styles.quoteBubble,
+                    {
+                      borderLeftColor: isMe
+                        ? theme.colors.onPrimary
+                        : theme.colors.primary,
+                    },
+                  ]}
+                >
                   <Text
                     variant="labelSmall"
-                    style={{ fontWeight: "700", color: isMe ? theme.colors.onPrimary : theme.colors.primary }}
+                    style={{
+                      fontWeight: "700",
+                      color: isMe
+                        ? theme.colors.onPrimary
+                        : theme.colors.primary,
+                    }}
                     numberOfLines={1}
                   >
                     {item.quoted_sender_name}
@@ -398,29 +471,50 @@ export default function GroupConversationScreen({
                   <Text
                     variant="bodySmall"
                     numberOfLines={2}
-                    style={{ color: isMe ? theme.colors.onPrimary : theme.colors.onSurfaceVariant, opacity: 0.8 }}
+                    style={{
+                      color: isMe
+                        ? theme.colors.onPrimary
+                        : theme.colors.onSurfaceVariant,
+                      opacity: 0.8,
+                    }}
                   >
                     {item.quoted_body}
                   </Text>
                 </View>
               ) : null}
               {isVoice ? (
-                <VoiceMessageBubble body={item.body} isMe={isMe} theme={theme} />
+                <VoiceMessageBubble
+                  body={item.body}
+                  isMe={isMe}
+                  theme={theme}
+                />
               ) : (
                 <Text
                   style={[
                     styles.msgText,
-                    { color: isMe ? theme.colors.onPrimary : theme.colors.onSurface },
+                    {
+                      color: isMe
+                        ? theme.colors.onPrimary
+                        : theme.colors.onSurface,
+                    },
                   ]}
                 >
                   {item.body}
                 </Text>
               )}
             </View>
-            <View style={[styles.timeLabelRow, isMe && { flexDirection: "row-reverse" }]}>
+            <View
+              style={[
+                styles.timeLabelRow,
+                isMe && { flexDirection: "row-reverse" },
+              ]}
+            >
               <Text
                 variant="labelSmall"
-                style={[styles.timeLabel, { color: theme.colors.onSurfaceVariant }]}
+                style={[
+                  styles.timeLabel,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
               >
                 {formatTime(item.created_at)}
               </Text>
@@ -441,9 +535,15 @@ export default function GroupConversationScreen({
 
   const navigateToSettings = () => {
     if (myRole === "caregiver") {
-      router.push({ pathname: "/(caregiver-tabs)/group-settings" as any, params: { groupId, groupName } });
+      router.push({
+        pathname: "/(caregiver-tabs)/group-settings" as any,
+        params: { groupId, groupName },
+      });
     } else {
-      router.push({ pathname: "/(elderly-tabs)/group-settings" as any, params: { groupId, groupName } });
+      router.push({
+        pathname: "/(elderly-tabs)/group-settings" as any,
+        params: { groupId, groupName },
+      });
     }
   };
 
@@ -454,17 +554,30 @@ export default function GroupConversationScreen({
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.onSurface} />
+          <MaterialCommunityIcons
+            name="arrow-left"
+            size={24}
+            color={theme.colors.onSurface}
+          />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          <Text variant="titleMedium" style={{ fontWeight: "700", color: theme.colors.onSurface }} numberOfLines={1}>
+          <Text
+            variant="titleMedium"
+            style={{ fontWeight: "700", color: theme.colors.onSurface }}
+            numberOfLines={1}
+          >
             {groupName}
           </Text>
-          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+          <Text
+            variant="bodySmall"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
             {members.length} {t("chat.groupMembers")}
           </Text>
         </View>
@@ -489,40 +602,87 @@ export default function GroupConversationScreen({
             keyExtractor={(item) => item.$id}
             contentContainerStyle={styles.msgList}
             showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            onContentSizeChange={() =>
+              flatListRef.current?.scrollToEnd({ animated: false })
+            }
           />
         )}
 
         {/* Quote preview bar */}
         {quotedMessage && (
-          <View style={[styles.quotePreviewBar, { backgroundColor: theme.colors.surfaceVariant }]}>
-            <View style={[styles.quotePreviewLeft, { borderLeftColor: theme.colors.primary }]}>
-              <Text variant="labelSmall" style={{ fontWeight: "700", color: theme.colors.primary }} numberOfLines={1}>
+          <View
+            style={[
+              styles.quotePreviewBar,
+              { backgroundColor: theme.colors.surfaceVariant },
+            ]}
+          >
+            <View
+              style={[
+                styles.quotePreviewLeft,
+                { borderLeftColor: theme.colors.primary },
+              ]}
+            >
+              <Text
+                variant="labelSmall"
+                style={{ fontWeight: "700", color: theme.colors.primary }}
+                numberOfLines={1}
+              >
                 {quotedMessage.sender_name}
               </Text>
-              <Text variant="bodySmall" numberOfLines={1} style={{ color: theme.colors.onSurfaceVariant }}>
-                {quotedMessage.message_type === "voice" ? `🎤 ${t("chat.voiceMessage")}` : quotedMessage.body}
+              <Text
+                variant="bodySmall"
+                numberOfLines={1}
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {quotedMessage.message_type === "voice"
+                  ? `🎤 ${t("chat.voiceMessage")}`
+                  : quotedMessage.body}
               </Text>
             </View>
-            <IconButton icon="close" size={18} onPress={() => setQuotedMessage(null)} />
+            <IconButton
+              icon="close"
+              size={18}
+              onPress={() => setQuotedMessage(null)}
+            />
           </View>
         )}
 
         {/* Input bar */}
-        <View style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}>
+        <View
+          style={[
+            styles.inputBar,
+            {
+              backgroundColor: theme.colors.surface,
+              borderTopColor: theme.colors.outlineVariant,
+            },
+          ]}
+        >
           {isRecording ? (
             <View style={styles.recordingBar}>
               <TouchableOpacity onPress={cancelRecording}>
-                <MaterialCommunityIcons name="close-circle" size={28} color={theme.colors.error} />
+                <MaterialCommunityIcons
+                  name="close-circle"
+                  size={28}
+                  color={theme.colors.error}
+                />
               </TouchableOpacity>
               <View style={styles.recordingIndicator}>
-                <View style={[styles.recordingDot, { backgroundColor: theme.colors.error }]} />
+                <View
+                  style={[
+                    styles.recordingDot,
+                    { backgroundColor: theme.colors.error },
+                  ]}
+                />
                 <Text style={{ color: theme.colors.error, fontWeight: "600" }}>
                   {fmtRecordDur(recordDuration)}
                 </Text>
               </View>
               <TouchableOpacity onPress={stopAndSendVoice}>
-                <MaterialCommunityIcons name="send-circle" size={36} color={theme.colors.primary} />
+                <MaterialCommunityIcons
+                  name="send-circle"
+                  size={36}
+                  color={theme.colors.primary}
+                />
               </TouchableOpacity>
             </View>
           ) : (
@@ -543,9 +703,15 @@ export default function GroupConversationScreen({
                 dense
                 right={
                   sending ? (
-                    <TextInput.Icon icon={() => <ActivityIndicator size={18} />} />
+                    <TextInput.Icon
+                      icon={() => <ActivityIndicator size={18} />}
+                    />
                   ) : inputText.trim() ? (
-                    <TextInput.Icon icon="send" onPress={handleSend} color={theme.colors.primary} />
+                    <TextInput.Icon
+                      icon="send"
+                      onPress={handleSend}
+                      color={theme.colors.primary}
+                    />
                   ) : undefined
                 }
                 onSubmitEditing={handleSend}
@@ -558,7 +724,14 @@ export default function GroupConversationScreen({
 
       {/* Long-press context menu */}
       <Portal>
-        <Modal visible={!!longPressMsg} onDismiss={() => setLongPressMsg(null)} contentContainerStyle={[styles.menuModal, { backgroundColor: theme.colors.surface }]}>
+        <Modal
+          visible={!!longPressMsg}
+          onDismiss={() => setLongPressMsg(null)}
+          contentContainerStyle={[
+            styles.menuModal,
+            { backgroundColor: theme.colors.surface },
+          ]}
+        >
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => {
@@ -566,7 +739,11 @@ export default function GroupConversationScreen({
               setLongPressMsg(null);
             }}
           >
-            <MaterialCommunityIcons name="reply" size={20} color={theme.colors.onSurface} />
+            <MaterialCommunityIcons
+              name="reply"
+              size={20}
+              color={theme.colors.onSurface}
+            />
             <Text style={{ marginLeft: 12 }}>{t("chat.reply")}</Text>
           </TouchableOpacity>
           <Divider />
@@ -579,7 +756,11 @@ export default function GroupConversationScreen({
               setLongPressMsg(null);
             }}
           >
-            <MaterialCommunityIcons name="content-copy" size={20} color={theme.colors.onSurface} />
+            <MaterialCommunityIcons
+              name="content-copy"
+              size={20}
+              color={theme.colors.onSurface}
+            />
             <Text style={{ marginLeft: 12 }}>{t("chat.copy")}</Text>
           </TouchableOpacity>
           {longPressMsg?.sender_id === myProfileId && (
@@ -592,7 +773,11 @@ export default function GroupConversationScreen({
                   setLongPressMsg(null);
                 }}
               >
-                <MaterialCommunityIcons name="eye-outline" size={20} color={theme.colors.onSurface} />
+                <MaterialCommunityIcons
+                  name="eye-outline"
+                  size={20}
+                  color={theme.colors.onSurface}
+                />
                 <Text style={{ marginLeft: 12 }}>{t("chat.readBy")}</Text>
               </TouchableOpacity>
             </>
@@ -600,28 +785,56 @@ export default function GroupConversationScreen({
         </Modal>
 
         {/* Read-by modal */}
-        <Modal visible={!!readByMsg} onDismiss={() => setReadByMsg(null)} contentContainerStyle={[styles.readByModal, { backgroundColor: theme.colors.surface }]}>
-          <Text variant="titleMedium" style={{ fontWeight: "700", marginBottom: 12 }}>{t("chat.readBy")}</Text>
+        <Modal
+          visible={!!readByMsg}
+          onDismiss={() => setReadByMsg(null)}
+          contentContainerStyle={[
+            styles.readByModal,
+            { backgroundColor: theme.colors.surface },
+          ]}
+        >
+          <Text
+            variant="titleMedium"
+            style={{ fontWeight: "700", marginBottom: 12 }}
+          >
+            {t("chat.readBy")}
+          </Text>
           <ScrollView style={{ maxHeight: 300 }}>
-            {readByMsg && members
-              .filter((m) => m.user_profile_id !== readByMsg.sender_id)
-              .map((m) => {
-                const hasRead = (readByMsg.read_by ?? []).includes(m.user_profile_id);
-                return (
-                  <View key={m.$id} style={styles.readByRow}>
-                    <UserAvatar name={m.user_name} size={32} role={m.user_role} />
-                    <Text style={{ flex: 1, marginLeft: 10 }}>{m.user_name}</Text>
-                    <MaterialCommunityIcons
-                      name={hasRead ? "check-circle" : "clock-outline"}
-                      size={20}
-                      color={hasRead ? "#4FC3F7" : theme.colors.onSurfaceVariant}
-                    />
-                  </View>
-                );
-              })}
+            {readByMsg &&
+              members
+                .filter((m) => m.user_profile_id !== readByMsg.sender_id)
+                .map((m) => {
+                  const hasRead = (readByMsg.read_by ?? []).includes(
+                    m.user_profile_id,
+                  );
+                  return (
+                    <View key={m.$id} style={styles.readByRow}>
+                      <UserAvatar
+                        name={m.user_name}
+                        size={32}
+                        role={m.user_role}
+                      />
+                      <Text style={{ flex: 1, marginLeft: 10 }}>
+                        {m.user_name}
+                      </Text>
+                      <MaterialCommunityIcons
+                        name={hasRead ? "check-circle" : "clock-outline"}
+                        size={20}
+                        color={
+                          hasRead ? "#4FC3F7" : theme.colors.onSurfaceVariant
+                        }
+                      />
+                    </View>
+                  );
+                })}
           </ScrollView>
-          <TouchableOpacity onPress={() => setReadByMsg(null)} style={{ alignSelf: "center", marginTop: 12 }}>
-            <Text style={{ color: theme.colors.primary, fontWeight: "600" }}>{t("common.close")}</Text>
+          <TouchableOpacity
+            onPress={() => setReadByMsg(null)}
+            style={{ alignSelf: "center", marginTop: 12 }}
+          >
+            <Text style={{ color: theme.colors.primary, fontWeight: "600" }}>
+              {t("common.close")}
+            </Text>
           </TouchableOpacity>
         </Modal>
       </Portal>
