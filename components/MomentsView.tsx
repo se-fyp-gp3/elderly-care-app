@@ -6,13 +6,13 @@ import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
 import {
-  addAIResponse,
-  createMoment,
-  deleteMoment,
-  getLatestComments,
-  getMoments,
-  getVisibleCommentCount,
-  likeMoment,
+    addAIResponse,
+    createMoment,
+    deleteMoment,
+    getLatestComments,
+    getMoments,
+    getVisibleCommentCount,
+    likeMoment,
 } from "@/lib/moments";
 import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -20,24 +20,24 @@ import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  FlatList,
-  Image,
-  Keyboard,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Keyboard,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Button,
-  FAB,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Button,
+    FAB,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 const MAX_MEDIA = 4;
@@ -391,6 +391,7 @@ export default function MomentsView() {
                     icon="image-multiple"
                     onPress={pickMedia}
                     disabled={selectedMediaList.length >= MAX_MEDIA}
+                    style={{ flex: 1 }}
                   >
                     {selectedMediaList.length > 0
                       ? t("moments.mediaCount", {
@@ -402,8 +403,7 @@ export default function MomentsView() {
                     mode="outlined"
                     icon="camera"
                     onPress={takePhoto}
-                    compact
-                    style={{ marginLeft: 8 }}
+                    style={{ flex: 1, marginLeft: 8 }}
                   >
                     {t("moments.camera")}
                   </Button>
