@@ -3,7 +3,7 @@ import { Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, useColorScheme, View } from "react-native";
 import { Avatar, Button, Card, Chip, Text, useTheme } from "react-native-paper";
 
 // Define the interface for the elderly item
@@ -47,6 +47,8 @@ export default function ElderlyCard({
 }: ElderlyCardProps) {
   const displayAge = elderly.age ?? calculateAge(elderly.birth);
   const theme = useTheme();
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === "dark";
   const { t } = useTranslation();
 
   const isWarning = elderly.status === ElderlyStatus.WARNING;
@@ -55,15 +57,21 @@ export default function ElderlyCard({
   const reasons = elderly.statusInfo?.reasons ?? [];
 
   const chipLabel = isDanger
-    ? t('caregiverPanel.danger')
+    ? t("caregiverPanel.danger")
     : isWarning
-      ? t('medication.needAttention')
-      : t('caregiverPanel.normal');
+      ? t("medication.needAttention")
+      : t("caregiverPanel.normal");
 
   const chipStyle = isDanger
-    ? styles.dangerChip
+    ? [
+        styles.dangerChip,
+        isDarkMode && { backgroundColor: "rgba(211,47,47,0.12)" },
+      ]
     : isWarning
-      ? styles.warningChip
+      ? [
+          styles.warningChip,
+          isDarkMode && { backgroundColor: "rgba(230,81,0,0.12)" },
+        ]
       : undefined;
 
   const avatarStyle = isDanger
@@ -84,7 +92,10 @@ export default function ElderlyCard({
             />
             <View style={styles.elderlyDetails}>
               <Text variant="titleMedium">{elderly.name}</Text>
-              <Text variant="bodyMedium">{displayAge} {t('healthData.yearsOld', { age: '' }).replace(/^\d*\s*/, '')}</Text>
+              <Text variant="bodyMedium">
+                {displayAge}{" "}
+                {t("healthData.yearsOld", { age: "" }).replace(/^\d*\s*/, "")}
+              </Text>
             </View>
           </View>
           <Chip mode="outlined" style={[styles.statusChip, chipStyle]}>
@@ -96,7 +107,13 @@ export default function ElderlyCard({
         {hasIssue && reasons.length > 0 && (
           <View style={styles.reasonsRow}>
             {reasons.map((reason, idx) => (
-              <View key={idx} style={styles.reasonBadge}>
+              <View
+                key={idx}
+                style={[
+                  styles.reasonBadge,
+                  isDarkMode && { backgroundColor: "rgba(255,248,225,0.12)" },
+                ]}
+              >
                 <MaterialCommunityIcons
                   name="alert-circle-outline"
                   size={13}
@@ -119,27 +136,30 @@ export default function ElderlyCard({
         <View style={styles.elderlyStats}>
           <View style={styles.statRow}>
             <MaterialCommunityIcons name="clock-outline" size={16} />
-            <Text variant="bodySmall"> {t('caregiverPanel.lastCheck')} {elderly.lastCheck}</Text>
+            <Text variant="bodySmall">
+              {" "}
+              {t("caregiverPanel.lastCheck")} {elderly.lastCheck}
+            </Text>
           </View>
           <View style={styles.statRow}>
             <MaterialCommunityIcons
               name="pill"
               size={16}
               color={
-                elderly.medication?.includes('missed')
-                  ? '#E65100'
-                  : undefined
+                elderly.medication?.includes("missed") ? "#E65100" : undefined
               }
             />
             <Text
               variant="bodySmall"
               style={
-                elderly.medication?.includes('missed')
-                  ? { color: '#E65100', fontWeight: 'bold' }
+                elderly.medication?.includes("missed")
+                  ? { color: "#E65100", fontWeight: "bold" }
                   : undefined
               }
             >
-              {' '}{t('home.todaysMedications').split(' ').pop()}: {elderly.medication}
+              {" "}
+              {t("home.todaysMedications").split(" ").pop()}:{" "}
+              {elderly.medication}
             </Text>
           </View>
           <View style={styles.statRow}>
@@ -148,9 +168,9 @@ export default function ElderlyCard({
               size={16}
               color={
                 elderly.statusInfo?.isActive
-                  ? '#4CAF50'
+                  ? "#4CAF50"
                   : elderly.statusInfo?.todaySteps !== null
-                    ? '#E65100'
+                    ? "#E65100"
                     : undefined
               }
             />
@@ -159,25 +179,26 @@ export default function ElderlyCard({
               style={
                 !elderly.statusInfo?.isActive &&
                 elderly.statusInfo?.todaySteps !== null
-                  ? { color: '#E65100', fontWeight: 'bold' }
+                  ? { color: "#E65100", fontWeight: "bold" }
                   : elderly.statusInfo?.isActive
-                    ? { color: '#4CAF50' }
+                    ? { color: "#4CAF50" }
                     : undefined
               }
             >
-              {' '}Activity:{' '}
+              {" "}
+              Activity:{" "}
               {elderly.statusInfo?.todaySteps !== null &&
               elderly.statusInfo?.todaySteps !== undefined
                 ? `${elderly.statusInfo.todaySteps.toLocaleString()} steps today`
-                : 'No data'}
-              {elderly.statusInfo?.isActive ? ' ● Active' : ''}
+                : "No data"}
+              {elderly.statusInfo?.isActive ? " ● Active" : ""}
             </Text>
           </View>
           <View style={styles.statRow}>
             <MaterialCommunityIcons name="calendar" size={16} />
             <Text variant="bodySmall">
               {" "}
-              {t('caregiverPanel.nextAppointment')} {elderly.nextAppointment}
+              {t("caregiverPanel.nextAppointment")} {elderly.nextAppointment}
             </Text>
           </View>
         </View>
@@ -190,7 +211,7 @@ export default function ElderlyCard({
             style={styles.smallButton}
             onPress={() => onCall(elderly.phone || undefined)}
           >
-            {t('caregiverPanel.call')}
+            {t("caregiverPanel.call")}
           </Button>
           <Button
             mode="outlined"
@@ -199,7 +220,7 @@ export default function ElderlyCard({
             style={styles.smallButton}
             onPress={() => onViewInfo(elderly)}
           >
-            {t('caregiverPanel.info')}
+            {t("caregiverPanel.info")}
           </Button>
           <Button
             mode="contained"
@@ -208,7 +229,7 @@ export default function ElderlyCard({
             style={styles.smallButton}
             onPress={() => onViewHealth(elderly.$id)} // Ensure we use the correct ID field
           >
-            {t('caregiverPanel.health')}
+            {t("caregiverPanel.health")}
           </Button>
         </View>
       </Card.Content>

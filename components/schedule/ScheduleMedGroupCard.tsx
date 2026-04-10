@@ -36,8 +36,7 @@ export default function ScheduleMedGroupCard({
 
   const allCompleted = group.events.every(
     (e) =>
-      String(e.status).toLowerCase() ===
-      ScheduleStatus.COMPLETED.toLowerCase(),
+      String(e.status).toLowerCase() === ScheduleStatus.COMPLETED.toLowerCase(),
   );
   const anyMissed = group.events.some(
     (e) =>
@@ -50,14 +49,17 @@ export default function ScheduleMedGroupCard({
       : ScheduleStatus.PENDING;
   const completedCount = group.events.filter(
     (e) =>
-      String(e.status).toLowerCase() ===
-      ScheduleStatus.COMPLETED.toLowerCase(),
+      String(e.status).toLowerCase() === ScheduleStatus.COMPLETED.toLowerCase(),
   ).length;
 
   return (
     <View style={styles.timelineRow}>
       <View style={styles.timeColumn}>
-        <Text style={styles.timeText}>{group.time}</Text>
+        <Text
+          style={[styles.timeText, { color: theme.colors.onSurfaceVariant }]}
+        >
+          {group.time}
+        </Text>
         {allCompleted && (
           <MaterialCommunityIcons
             name="check-circle"
@@ -131,7 +133,7 @@ export default function ScheduleMedGroupCard({
               variant="titleMedium"
               style={{ fontWeight: "bold", fontSize: 16 }}
             >
-              {t('common.medicationCount', { count: group.events.length })}
+              {t("common.medicationCount", { count: group.events.length })}
             </Text>
             <View
               style={{
@@ -268,11 +270,11 @@ export default function ScheduleMedGroupCard({
                   >
                     {String(med.status).toLowerCase() ===
                     ScheduleStatus.COMPLETED.toLowerCase()
-                      ? t('common.taken')
+                      ? t("common.taken")
                       : String(med.status).toLowerCase() ===
                           ScheduleStatus.MISSED.toLowerCase()
-                        ? t('common.missed')
-                        : t('common.pending')}
+                        ? t("common.missed")
+                        : t("common.pending")}
                   </Text>
                 </View>
               </View>
@@ -294,7 +296,7 @@ export default function ScheduleMedGroupCard({
                       onPress={() => onTakeMedication(med)}
                       labelStyle={{ fontSize: 12 }}
                     >
-                      {t('medication.take')}
+                      {t("medication.take")}
                     </Button>
                   </>
                 ) : (
@@ -305,7 +307,7 @@ export default function ScheduleMedGroupCard({
                     onPress={() => onUndoMedication(med)}
                     labelStyle={{ fontSize: 12 }}
                   >
-                    {t('schedule.undo')}
+                    {t("schedule.undo")}
                   </Button>
                 )}
               </View>

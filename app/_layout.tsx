@@ -1,4 +1,8 @@
-import { DATABASE_ID, DIRECT_MESSAGES_TABLE_ID, safeSubscribe } from "@/lib/appwrite";
+import {
+  DATABASE_ID,
+  DIRECT_MESSAGES_TABLE_ID,
+  safeSubscribe,
+} from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getElderlyByUserId } from "@/lib/elderly";
@@ -6,15 +10,20 @@ import { FontSizeProvider, useFontSize } from "@/lib/font-size-context";
 import "@/lib/i18n"; // side-effect: initializes i18next
 import { LanguageProvider } from "@/lib/language-context";
 import {
-    registerForPushNotificationsAsync,
-    sendImmediateNotification,
+  registerForPushNotificationsAsync,
+  sendImmediateNotification,
 } from "@/lib/notifications";
 import { DirectMessage } from "@/types/messaging";
 import { Role } from "@/types/user";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, AppState, useColorScheme, View } from "react-native";
+import {
+  ActivityIndicator,
+  AppState,
+  useColorScheme,
+  View,
+} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   configureFonts,
@@ -72,7 +81,8 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   } = useAuth();
   const segments = useSegments();
   const [appReady, setAppReady] = useState(SKIP_SPLASH);
-  
+  const isDark = useColorScheme() === "dark";
+
   // Ensure notifications show even when app is open
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -117,16 +127,21 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
         const payload = response.payload as DirectMessage;
 
-        if (payload.receiver_id === myProfileId && payload.sender_id !== myProfileId) {
+        if (
+          payload.receiver_id === myProfileId &&
+          payload.sender_id !== myProfileId
+        ) {
           await sendImmediateNotification(
             payload.sender_name || "New Message",
-            payload.message_type === "voice" ? "Sent a voice message" : (payload.body || "Sent a message"),
+            payload.message_type === "voice"
+              ? "Sent a voice message"
+              : payload.body || "Sent a message",
             {
               type: "direct_message",
               contactId: payload.sender_id,
               contactName: payload.sender_name,
               contactRole: payload.sender_role,
-            }
+            },
           );
         }
       });
@@ -135,27 +150,32 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     setup();
 
     // Handle notification tap
-    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      const rawData = response.notification.request.content.data as any;
-      
-      // Safe cast or property access
-      if (rawData && rawData.type === "direct_message") {
-        const contactId = rawData.contactId as string;
-        const contactName = rawData.contactName as string;
-        const contactRole = rawData.contactRole as string;
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const rawData = response.notification.request.content.data as any;
 
-        const targetPath = role === "elderly" ? "/(elderly-tabs)/conversation" : "/(caregiver-tabs)/conversation";
+        // Safe cast or property access
+        if (rawData && rawData.type === "direct_message") {
+          const contactId = rawData.contactId as string;
+          const contactName = rawData.contactName as string;
+          const contactRole = rawData.contactRole as string;
 
-        router.push({
-          pathname: targetPath,
-          params: {
-            contactId,
-            contactName,
-            contactRole,
-          },
-        });
-      }
-    });
+          const targetPath =
+            role === "elderly"
+              ? "/(elderly-tabs)/conversation"
+              : "/(caregiver-tabs)/conversation";
+
+          router.push({
+            pathname: targetPath,
+            params: {
+              contactId,
+              contactName,
+              contactRole,
+            },
+          });
+        }
+      },
+    );
 
     return () => {
       // Cleanup subscription
@@ -235,7 +255,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
             bottom: 0,
             justifyContent: "center",
             alignItems: "center",
-            backgroundColor: "#ffffff",
+            backgroundColor: isDark ? "#121212" : "#ffffff",
           }}
         >
           <ActivityIndicator size="large" />

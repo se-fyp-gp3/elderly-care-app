@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, useColorScheme, View } from "react-native";
 import { Button, Card, Chip, IconButton, Text } from "react-native-paper";
 
 // Define the interface for the medication item
@@ -40,6 +40,8 @@ export default function MedicationCard({
   onMarkProcessed,
 }: MedicationCardProps) {
   const { t } = useTranslation();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
 
   return (
     <Card style={styles.medicationCard}>
@@ -55,8 +57,14 @@ export default function MedicationCard({
             mode="outlined"
             style={[
               styles.statusChip,
-              med.status === "completed" && styles.completedChip,
-              med.status === "overdue" && styles.overdueChip,
+              med.status === "completed" && [
+                styles.completedChip,
+                isDark && { backgroundColor: "rgba(76,175,80,0.15)" },
+              ],
+              med.status === "overdue" && [
+                styles.overdueChip,
+                isDark && { backgroundColor: "rgba(244,67,54,0.12)" },
+              ],
             ]}
             textStyle={
               med.status === "completed"
@@ -67,29 +75,41 @@ export default function MedicationCard({
             }
           >
             {med.status === "completed"
-              ? t('common.completed')
+              ? t("common.completed")
               : med.status === "pending"
-                ? t('common.pending')
-                : t('common.missed')}
+                ? t("common.pending")
+                : t("common.missed")}
           </Chip>
         </View>
 
         <View style={styles.medDetails}>
           <View style={styles.detailRow}>
             <MaterialCommunityIcons name="pill" size={16} />
-            <Text variant="bodySmall"> {t('medication.dose', { dosage: med.dosage })}</Text>
+            <Text variant="bodySmall">
+              {" "}
+              {t("medication.dose", { dosage: med.dosage })}
+            </Text>
           </View>
           <View style={styles.detailRow}>
             <MaterialCommunityIcons name="repeat" size={16} />
-            <Text variant="bodySmall"> {t('medication.frequencyLabel', { frequency: med.frequency })}</Text>
+            <Text variant="bodySmall">
+              {" "}
+              {t("medication.frequencyLabel", { frequency: med.frequency })}
+            </Text>
           </View>
           <View style={styles.detailRow}>
             <MaterialCommunityIcons name="clock-outline" size={16} />
-            <Text variant="bodySmall"> {t('medication.timeLabel', { time: med.time })}</Text>
+            <Text variant="bodySmall">
+              {" "}
+              {t("medication.timeLabel", { time: med.time })}
+            </Text>
           </View>
           <View style={styles.detailRow}>
             <MaterialCommunityIcons name="history" size={16} />
-            <Text variant="bodySmall"> {t('medication.lastTaken', { time: med.lastTaken })}</Text>
+            <Text variant="bodySmall">
+              {" "}
+              {t("medication.lastTaken", { time: med.lastTaken })}
+            </Text>
           </View>
         </View>
 
@@ -101,16 +121,16 @@ export default function MedicationCard({
                 compact
                 onPress={() => onConfirmPress(med)}
               >
-                {t('medication.confirmTaking')}
+                {t("medication.confirmTaking")}
               </Button>
               <Button mode="outlined" compact onPress={() => onRemind(med.id)}>
-                {t('medication.remindLater')}
+                {t("medication.remindLater")}
               </Button>
             </>
           )}
           {med.status === "completed" && (
             <Button mode="outlined" compact disabled>
-              {t('common.completed')}
+              {t("common.completed")}
             </Button>
           )}
           {med.status === "overdue" && (
@@ -120,7 +140,7 @@ export default function MedicationCard({
               style={styles.overdueButton}
               onPress={() => onMarkProcessed(med.id)}
             >
-              {t('medication.markProcessed')}
+              {t("medication.markProcessed")}
             </Button>
           )}
           <IconButton

@@ -4,19 +4,45 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoPlayer, VideoView } from "expo-video";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Image, Modal, Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
-import { ActivityIndicator, Avatar, Divider, Text, useTheme } from "react-native-paper";
+import {
+    Alert,
+    Image,
+    Modal,
+    Pressable,
+    StyleSheet,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import {
+    ActivityIndicator,
+    Avatar,
+    Divider,
+    Text,
+    useTheme,
+} from "react-native-paper";
 
 interface MomentCardProps {
   moment: Moment;
   currentUserId: string;
   onLike: (id: string) => void;
   onComment: (id: string) => void;
-  onAIRequest: (id: string, content: string, imageUrl?: string) => Promise<MomentComment>;
+  onAIRequest: (
+    id: string,
+    content: string,
+    imageUrl?: string,
+  ) => Promise<MomentComment>;
   onDelete?: (id: string) => void;
 }
 
-function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boolean; onClose: () => void }) {
+function VideoPlayerModal({
+  uri,
+  visible,
+  onClose,
+}: {
+  uri: string;
+  visible: boolean;
+  onClose: () => void;
+}) {
   const player = useVideoPlayer(uri, (p: VideoPlayer) => {
     p.loop = false;
   });
@@ -30,7 +56,12 @@ function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boo
   }, [visible, player]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <View style={styles.videoModalOverlay}>
         <VideoView
           player={player}
@@ -46,10 +77,19 @@ function VideoPlayerModal({ uri, visible, onClose }: { uri: string; visible: boo
   );
 }
 
-export default function MomentCard({ moment, currentUserId, onLike, onComment, onAIRequest, onDelete }: MomentCardProps) {
+export default function MomentCard({
+  moment,
+  currentUserId,
+  onLike,
+  onComment,
+  onAIRequest,
+  onDelete,
+}: MomentCardProps) {
   const theme = useTheme();
   const { t } = useTranslation();
-  const [liked, setLiked] = useState(moment.likes?.includes(currentUserId) || false);
+  const [liked, setLiked] = useState(
+    moment.likes?.includes(currentUserId) || false,
+  );
   const [likesCount, setLikesCount] = useState(moment.likes?.length || 0);
   const [loadingAI, setLoadingAI] = useState(false);
   const [aiComment, setAIComment] = useState<MomentComment | null>(null);
@@ -58,7 +98,7 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
   const handleLike = () => {
     const newLiked = !liked;
     setLiked(newLiked);
-    setLikesCount(prev => newLiked ? prev + 1 : prev - 1);
+    setLikesCount((prev) => (newLiked ? prev + 1 : prev - 1));
     onLike(moment.$id);
   };
 
@@ -66,7 +106,8 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
     if (loadingAI || aiComment) return;
     setLoadingAI(true);
     try {
-      const imageUrl = moment.media_type === "image" ? moment.media_url : undefined;
+      const imageUrl =
+        moment.media_type === "image" ? moment.media_url : undefined;
       const comment = await onAIRequest(moment.$id, moment.content, imageUrl);
       setAIComment(comment);
     } catch (error) {
@@ -92,15 +133,20 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
         />
       )}
       <View style={styles.header}>
-        <Avatar.Text 
-            size={40} 
-            label={moment.author_name.substring(0, 1).toUpperCase()} 
-            style={{ backgroundColor: theme.colors.primaryContainer }}
-            color={theme.colors.onPrimaryContainer}
+        <Avatar.Text
+          size={40}
+          label={moment.author_name.substring(0, 1).toUpperCase()}
+          style={{ backgroundColor: theme.colors.primaryContainer }}
+          color={theme.colors.onPrimaryContainer}
         />
         <View style={styles.headerText}>
-          <Text variant="titleMedium" style={{ fontWeight: "bold" }}>{moment.author_name}</Text>
-          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+          <Text variant="titleMedium" style={{ fontWeight: "bold" }}>
+            {moment.author_name}
+          </Text>
+          <Text
+            variant="bodySmall"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
             {moment.author_role} • {formatRelativeTime(moment.$createdAt)}
           </Text>
         </View>
@@ -108,13 +154,25 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
           <TouchableOpacity
             style={{ marginLeft: "auto", padding: 4 }}
             onPress={() => {
-              Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
-                { text: "Cancel", style: "cancel" },
-                { text: "Delete", style: "destructive", onPress: () => onDelete(moment.$id) },
-              ]);
+              Alert.alert(
+                "Delete Post",
+                "Are you sure you want to delete this post?",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => onDelete(moment.$id),
+                  },
+                ],
+              );
             }}
           >
-            <MaterialCommunityIcons name="delete-outline" size={22} color={theme.colors.error} />
+            <MaterialCommunityIcons
+              name="delete-outline"
+              size={22}
+              color={theme.colors.error}
+            />
           </TouchableOpacity>
         )}
       </View>
@@ -124,39 +182,83 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
       </Text>
 
       {moment.media_url && moment.media_type === "image" && (
-        <Image source={{ uri: moment.media_url }} style={styles.mediaImage} resizeMode="cover" />
+        <Image
+          source={{ uri: moment.media_url }}
+          style={styles.mediaImage}
+          resizeMode="cover"
+        />
       )}
 
       {moment.media_type === "video" && (
-        <TouchableOpacity style={[styles.videoBox, { borderColor: theme.colors.outline }]} onPress={handleOpenVideo}>
-          <MaterialCommunityIcons name="video" size={24} color={theme.colors.primary} />
+        <TouchableOpacity
+          style={[styles.videoBox, { borderColor: theme.colors.outline }]}
+          onPress={handleOpenVideo}
+        >
+          <MaterialCommunityIcons
+            name="video"
+            size={24}
+            color={theme.colors.primary}
+          />
           <Text variant="bodyMedium" style={{ marginTop: 6 }}>
-            {t('moments.tapToWatchVideo')}
+            {t("moments.tapToWatchVideo")}
           </Text>
         </TouchableOpacity>
       )}
 
       {/* AI Response Section */}
       {loadingAI && (
-        <View style={styles.aiLoading}>
-            <ActivityIndicator size="small" color={theme.colors.tertiary} />
-            <Text variant="bodySmall" style={{ marginLeft: 8, color: theme.colors.tertiary }}>
-                {t('moments.aiThinking')}
-            </Text>
+        <View
+          style={[
+            styles.aiLoading,
+            { backgroundColor: theme.colors.surfaceVariant },
+          ]}
+        >
+          <ActivityIndicator size="small" color={theme.colors.tertiary} />
+          <Text
+            variant="bodySmall"
+            style={{ marginLeft: 8, color: theme.colors.tertiary }}
+          >
+            {t("moments.aiThinking")}
+          </Text>
         </View>
       )}
 
       {aiComment && (
-        <View style={[styles.aiResponse, { backgroundColor: theme.colors.tertiaryContainer }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                <MaterialCommunityIcons name="robot" size={16} color={theme.colors.onTertiaryContainer} />
-                <Text variant="labelSmall" style={{ marginLeft: 4, color: theme.colors.onTertiaryContainer, fontWeight: 'bold' }}>
-                    {t('moments.aiInsight')}
-                </Text>
-            </View>
-            <Text variant="bodyMedium" style={{ color: theme.colors.onTertiaryContainer }}>
-                {aiComment.content}
+        <View
+          style={[
+            styles.aiResponse,
+            { backgroundColor: theme.colors.tertiaryContainer },
+          ]}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 4,
+            }}
+          >
+            <MaterialCommunityIcons
+              name="robot"
+              size={16}
+              color={theme.colors.onTertiaryContainer}
+            />
+            <Text
+              variant="labelSmall"
+              style={{
+                marginLeft: 4,
+                color: theme.colors.onTertiaryContainer,
+                fontWeight: "bold",
+              }}
+            >
+              {t("moments.aiInsight")}
             </Text>
+          </View>
+          <Text
+            variant="bodyMedium"
+            style={{ color: theme.colors.onTertiaryContainer }}
+          >
+            {aiComment.content}
+          </Text>
         </View>
       )}
 
@@ -164,31 +266,57 @@ export default function MomentCard({ moment, currentUserId, onLike, onComment, o
 
       <View style={styles.actions}>
         <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
-          <MaterialCommunityIcons 
-            name={liked ? "heart" : "heart-outline"} 
-            size={20} 
-            color={liked ? theme.colors.error : theme.colors.onSurfaceVariant} 
+          <MaterialCommunityIcons
+            name={liked ? "heart" : "heart-outline"}
+            size={20}
+            color={liked ? theme.colors.error : theme.colors.onSurfaceVariant}
           />
-          <Text variant="bodyMedium" style={{ marginLeft: 6, color: theme.colors.onSurfaceVariant }}>
-            {likesCount > 0 ? likesCount : t('moments.like')}
+          <Text
+            variant="bodyMedium"
+            style={{ marginLeft: 6, color: theme.colors.onSurfaceVariant }}
+          >
+            {likesCount > 0 ? likesCount : t("moments.like")}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionBtn} onPress={() => onComment(moment.$id)}>
-          <MaterialCommunityIcons name="comment-outline" size={20} color={theme.colors.onSurfaceVariant} />
-          <Text variant="bodyMedium" style={{ marginLeft: 6, color: theme.colors.onSurfaceVariant }}>
-            {moment.comments_count > 0 ? moment.comments_count : t('moments.comment')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-            style={[styles.actionBtn, { marginLeft: 'auto' }]} 
-            onPress={handleAI}
-            disabled={loadingAI || !!aiComment}
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => onComment(moment.$id)}
         >
-          <MaterialCommunityIcons name="creation" size={20} color={theme.colors.tertiary} />
-          <Text variant="bodyMedium" style={{ marginLeft: 6, color: theme.colors.tertiary, fontWeight: '600' }}>
-            {t('moments.aiDiscuss')}
+          <MaterialCommunityIcons
+            name="comment-outline"
+            size={20}
+            color={theme.colors.onSurfaceVariant}
+          />
+          <Text
+            variant="bodyMedium"
+            style={{ marginLeft: 6, color: theme.colors.onSurfaceVariant }}
+          >
+            {moment.comments_count > 0
+              ? moment.comments_count
+              : t("moments.comment")}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionBtn, { marginLeft: "auto" }]}
+          onPress={handleAI}
+          disabled={loadingAI || !!aiComment}
+        >
+          <MaterialCommunityIcons
+            name="creation"
+            size={20}
+            color={theme.colors.tertiary}
+          />
+          <Text
+            variant="bodyMedium"
+            style={{
+              marginLeft: 6,
+              color: theme.colors.tertiary,
+              fontWeight: "600",
+            }}
+          >
+            {t("moments.aiDiscuss")}
           </Text>
         </TouchableOpacity>
       </View>
@@ -225,10 +353,10 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   aiLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: "#f0f0f0",
     borderRadius: 8,
     marginTop: 8,
   },

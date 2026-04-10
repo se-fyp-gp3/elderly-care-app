@@ -4,24 +4,27 @@ import { useFocusEffect } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
-    ActivityIndicator,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    View,
+  ActivityIndicator,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  useColorScheme,
+  View,
 } from "react-native";
 import {
-    Button,
-    Card,
-    Snackbar,
-    Text,
-    TouchableRipple,
-    useTheme,
+  Button,
+  Card,
+  Snackbar,
+  Text,
+  TouchableRipple,
+  useTheme,
 } from "react-native-paper";
 
 export default function ElderlyHealthData() {
   const theme = useTheme();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const { t } = useTranslation();
   const [refreshing, setRefreshing] = React.useState(false);
   const [snackVisible, setSnackVisible] = React.useState(false);
@@ -55,14 +58,14 @@ export default function ElderlyHealthData() {
 
   // Format last sync time for display
   const formatLastSync = (isoString: string | null): string => {
-    if (!isoString) return t('healthData.notSyncedYet');
+    if (!isoString) return t("healthData.notSyncedYet");
     try {
       const date = new Date(isoString);
       const hours = String(date.getHours()).padStart(2, "0");
       const minutes = String(date.getMinutes()).padStart(2, "0");
-      return t('healthData.lastUpdated', { time: `${hours}:${minutes}` });
+      return t("healthData.lastUpdated", { time: `${hours}:${minutes}` });
     } catch {
-      return t('healthData.notSyncedYet');
+      return t("healthData.notSyncedYet");
     }
   };
 
@@ -84,13 +87,15 @@ export default function ElderlyHealthData() {
     if (!isAuthorized) {
       const granted = await authorize();
       if (granted) {
-        setSnackMessage(t('healthData.permissionGrantedSyncing'));
+        setSnackMessage(t("healthData.permissionGrantedSyncing"));
         setSnackVisible(true);
       }
     }
     await manualSync();
     if (!stepError) {
-      setSnackMessage(t('healthData.stepsUpdated', { steps: todaySteps.toLocaleString() }));
+      setSnackMessage(
+        t("healthData.stepsUpdated", { steps: todaySteps.toLocaleString() }),
+      );
       setSnackVisible(true);
     }
   };
@@ -114,19 +119,19 @@ export default function ElderlyHealthData() {
       {/* Header */}
       <View style={styles.header}>
         <Text variant="headlineSmall" style={styles.title}>
-          {t('healthData.myHealthData')}
+          {t("healthData.myHealthData")}
         </Text>
         <Text
           variant="bodyMedium"
           style={{ color: theme.colors.onSurfaceVariant }}
         >
-          {t('healthData.trackAndMonitor')}
+          {t("healthData.trackAndMonitor")}
         </Text>
       </View>
 
       {/* Step Tracking */}
       <Text variant="titleMedium" style={styles.sectionTitle}>
-        {t('home.todaysSteps')}
+        {t("home.todaysSteps")}
       </Text>
 
       <Card
@@ -138,7 +143,11 @@ export default function ElderlyHealthData() {
             <View
               style={[
                 styles.stepIconCircle,
-                { backgroundColor: "#9C27B020" },
+                {
+                  backgroundColor: isDark
+                    ? "rgba(156,39,176,0.12)"
+                    : "rgba(156,39,176,0.13)",
+                },
               ]}
             >
               <MaterialCommunityIcons name="walk" size={40} color="#9C27B0" />
@@ -155,7 +164,7 @@ export default function ElderlyHealthData() {
                     variant="titleSmall"
                     style={{ color: theme.colors.onSurfaceVariant }}
                   >
-                    {t('home.steps')}
+                    {t("home.steps")}
                   </Text>
                 </>
               )}
@@ -165,7 +174,12 @@ export default function ElderlyHealthData() {
           {/* Source & last sync info */}
           <View style={styles.stepInfoRow}>
             {stepSource && (
-              <View style={styles.stepSourceBadge}>
+              <View
+                style={[
+                  styles.stepSourceBadge,
+                  { backgroundColor: theme.colors.surfaceVariant },
+                ]}
+              >
                 <MaterialCommunityIcons
                   name={
                     stepSource === "health_connect"
@@ -198,7 +212,14 @@ export default function ElderlyHealthData() {
 
           {/* Error display */}
           {stepError && (
-            <View style={styles.stepErrorRow}>
+            <View
+              style={[
+                styles.stepErrorRow,
+                {
+                  backgroundColor: isDark ? "rgba(183,28,28,0.12)" : "#FFEBEE",
+                },
+              ]}
+            >
               <MaterialCommunityIcons
                 name="alert-circle-outline"
                 size={16}
@@ -223,8 +244,8 @@ export default function ElderlyHealthData() {
               labelStyle={styles.authButtonLabel}
             >
               {Platform.OS === "android"
-                ? t('healthData.connectHealthConnect')
-                : t('healthData.connectAppleHealth')}
+                ? t("healthData.connectHealthConnect")
+                : t("healthData.connectAppleHealth")}
             </Button>
           )}
 
@@ -253,7 +274,9 @@ export default function ElderlyHealthData() {
                 />
               )}
               <Text variant="titleMedium" style={styles.syncButtonText}>
-                {isSyncing ? t('healthData.syncing') : t('healthData.updateSteps')}
+                {isSyncing
+                  ? t("healthData.syncing")
+                  : t("healthData.updateSteps")}
               </Text>
             </View>
           </TouchableRipple>
@@ -272,7 +295,7 @@ export default function ElderlyHealthData() {
                 marginLeft: 4,
               }}
             >
-              {t('healthData.autoSync')}
+              {t("healthData.autoSync")}
             </Text>
           </View>
         </Card.Content>
@@ -282,7 +305,7 @@ export default function ElderlyHealthData() {
       {stepHistory.length > 0 && (
         <>
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            {t('healthData.stepHistory')}
+            {t("healthData.stepHistory")}
           </Text>
           <Card
             style={[
@@ -291,7 +314,13 @@ export default function ElderlyHealthData() {
             ]}
           >
             {stepHistory.slice(0, 7).map((record, index) => (
-              <View key={record.$id || index} style={styles.stepHistoryItem}>
+              <View
+                key={record.$id || index}
+                style={[
+                  styles.stepHistoryItem,
+                  { borderBottomColor: theme.colors.outlineVariant },
+                ]}
+              >
                 <View style={styles.stepHistoryLeft}>
                   <MaterialCommunityIcons
                     name="calendar"
@@ -313,7 +342,7 @@ export default function ElderlyHealthData() {
                     variant="labelSmall"
                     style={{ color: theme.colors.onSurfaceVariant }}
                   >
-                    {t('home.steps')}
+                    {t("home.steps")}
                   </Text>
                 </View>
               </View>
