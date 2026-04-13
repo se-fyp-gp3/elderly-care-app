@@ -1,11 +1,11 @@
 import { GroupMessage, GroupReadCursor } from "@/types/messaging";
 import { ID, Query } from "react-native-appwrite";
 import {
-    clientReactNative,
     DATABASE_ID,
     GROUP_MESSAGES_TABLE_ID,
     GROUP_READ_CURSORS_TABLE_ID,
-    tablesDB,
+    safeSubscribe,
+    tablesDB
 } from "./appwrite";
 
 /**
@@ -17,7 +17,7 @@ export async function sendGroupMessage(input: {
   senderName: string;
   senderRole: "elderly" | "caregiver";
   body: string;
-  messageType?: "text" | "voice" | "system";
+  messageType?: "text" | "voice" | "image" | "system";
   quotedMessageId?: string;
   quotedSenderName?: string;
   quotedBody?: string;
@@ -41,7 +41,7 @@ export async function sendGroupMessage(input: {
     databaseId: DATABASE_ID,
     tableId: GROUP_MESSAGES_TABLE_ID,
     rowId: ID.unique(),
-    data,
+    data: data as any,
   });
   return doc as unknown as GroupMessage;
 }
@@ -108,13 +108,12 @@ export function subscribeToGroupMessages(
 ): () => void {
   try {
     const channel = `databases.${DATABASE_ID}.collections.${GROUP_MESSAGES_TABLE_ID}.documents`;
-    const unsubscribe = clientReactNative.subscribe(channel, (response) => {
+    return safeSubscribe(channel, (response) => {
       const payload = response.payload as unknown as GroupMessage;
       if (payload?.group_id === groupId) {
         onMessage(payload);
       }
     });
-    return unsubscribe;
   } catch (error) {
     console.error("Error subscribing to group messages:", error);
     return () => {};

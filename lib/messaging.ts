@@ -29,7 +29,7 @@ export async function sendDirectMessage(input: {
   senderRole: "caregiver" | "elderly";
   receiverId: string;
   body: string;
-  messageType?: "text" | "voice";
+  messageType?: "text" | "voice" | "image";
   quotedMessageId?: string;
   quotedSenderName?: string;
   quotedBody?: string;

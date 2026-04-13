@@ -1,49 +1,51 @@
-import { ID, storage, VOICE_MESSAGES_BUCKET_ID } from "@/lib/appwrite";
+import { ID, storage, USER_ICON_BUCKET_ID, VOICE_MESSAGES_BUCKET_ID } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-  buildConversationId,
-  fetchConversationMessages,
-  markConversationAsRead,
-  sendDirectMessage,
-  subscribeToConversation,
+    buildConversationId,
+    fetchConversationMessages,
+    markConversationAsRead,
+    sendDirectMessage,
+    subscribeToConversation,
 } from "@/lib/messaging";
 import { DirectMessage } from "@/types/messaging";
 import { UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
 import {
-  createAudioPlayer,
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  useAudioRecorder,
+    createAudioPlayer,
+    RecordingPresets,
+    requestRecordingPermissionsAsync,
+    setAudioModeAsync,
+    useAudioRecorder,
 } from "expo-audio";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Divider,
-  IconButton,
-  Modal,
-  Portal,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Divider,
+    IconButton,
+    Modal,
+    Portal,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -220,6 +222,10 @@ export default function ConversationScreen({
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Image attachment state ──
+  const [selectedImage, setSelectedImage] = useState<{ uri: string; mimeType?: string; fileName?: string; fileSize?: number } | null>(null);
+  const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
+
   const conversationId = buildConversationId(myProfileId, contactId);
 
   // Load messages
@@ -274,6 +280,11 @@ export default function ConversationScreen({
   }, [messages.length]);
 
   const handleSend = async () => {
+    // If there's an image attached, send as image message
+    if (selectedImage) {
+      await sendImageMessage();
+      return;
+    }
     const text = inputText.trim();
     if (!text || sending) return;
 
@@ -404,6 +415,65 @@ export default function ConversationScreen({
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  // ── Image picker helpers ──
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      const a = result.assets[0];
+      setSelectedImage({ uri: a.uri, mimeType: a.mimeType || "image/jpeg", fileName: a.fileName || undefined, fileSize: a.fileSize || undefined });
+    }
+  };
+
+  const removeSelectedImage = () => setSelectedImage(null);
+
+  const sendImageMessage = async () => {
+    if (!selectedImage) return;
+    setSending(true);
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(selectedImage.uri);
+      const uploadedFile = await storage.createFile({
+        bucketId: USER_ICON_BUCKET_ID,
+        fileId: ID.unique(),
+        file: {
+          name: selectedImage.fileName || `img_${Date.now()}.jpg`,
+          type: selectedImage.mimeType || "image/jpeg",
+          size: selectedImage.fileSize || (fileInfo.exists ? (fileInfo as any).size ?? 0 : 0),
+          uri: selectedImage.uri,
+        },
+      });
+      const imageUrl = storage.getFileViewURL(USER_ICON_BUCKET_ID, uploadedFile.$id).toString();
+      const body = inputText.trim() ? `${inputText.trim()}\n${imageUrl}` : imageUrl;
+      const quoted = quotedMessage;
+      setQuotedMessage(null);
+      const newMsg = await sendDirectMessage({
+        conversationId,
+        senderId: myProfileId,
+        senderName: myName,
+        senderRole: myRole,
+        receiverId: contactId,
+        body,
+        messageType: "text",
+        ...(quoted && {
+          quotedMessageId: quoted.$id,
+          quotedSenderName: quoted.sender_name,
+          quotedBody: quoted.body,
+        }),
+      });
+      setMessages((prev) => prev.some((m) => m.$id === newMsg.$id) ? prev : [...prev, newMsg]);
+      setInputText("");
+      setSelectedImage(null);
+    } catch (error) {
+      console.error("Error sending image:", error);
+      Alert.alert(t("common.error"), t("chat.failedToSendImage") || "Failed to send image");
+    } finally {
+      setSending(false);
+    }
   };
 
   const formatMessageTime = (dateString: string) => {
@@ -573,6 +643,34 @@ export default function ConversationScreen({
                   isMe={isMe}
                   theme={theme}
                 />
+              ) : item.body && /\/storage\/buckets\/.*\/files\/.*\/view/.test(item.body) ? (
+                (() => {
+                  // body may be "caption\nurl" or just "url"
+                  const lines = item.body.split("\n");
+                  const imageUrl = lines.find((l) => l.startsWith("http")) || item.body;
+                  const caption = lines.filter((l) => !l.startsWith("http")).join("\n").trim();
+                  return (
+                    <View>
+                      <TouchableOpacity onPress={() => setPreviewImageUri(imageUrl)}>
+                        <Image
+                          source={{ uri: imageUrl }}
+                          style={{ width: 200, height: 200, borderRadius: 12 }}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                      {caption ? (
+                        <Text
+                          style={[
+                            styles.messageText,
+                            { color: isMe ? theme.colors.onPrimary : theme.colors.onSurface, marginTop: 6 },
+                          ]}
+                        >
+                          {caption}
+                        </Text>
+                      ) : null}
+                    </View>
+                  );
+                })()
               ) : (
                 <Text
                   style={[
@@ -783,10 +881,34 @@ export default function ConversationScreen({
         )}
 
         {/* Input Bar */}
-        {isRecording ? (
-          <View
-            style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}
-          >
+        <View
+          style={[
+            styles.inputContainer,
+            {
+              backgroundColor: theme.colors.surface,
+              borderTopColor: theme.colors.outlineVariant,
+            },
+          ]}
+        >
+          {/* Image preview */}
+          {selectedImage && (
+            <View style={styles.imagePreviewContainer}>
+              <Image
+                source={{ uri: selectedImage.uri }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
+              <IconButton
+                icon="close-circle"
+                size={22}
+                onPress={removeSelectedImage}
+                style={styles.removeImageButton}
+                iconColor="#FFFFFF"
+              />
+            </View>
+          )}
+
+          {isRecording ? (
             <View style={styles.recordingBar}>
               <TouchableOpacity
                 onPress={cancelRecording}
@@ -827,48 +949,62 @@ export default function ConversationScreen({
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        ) : (
-          <View
-            style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}
-          >
-            <TextInput
-              mode="outlined"
-              placeholder={t("chat.typeMessage")}
-              value={inputText}
-              onChangeText={setInputText}
-              style={styles.textInput}
-              outlineStyle={styles.textInputOutline}
-              contentStyle={styles.textInputContent}
-              multiline
-              maxLength={2000}
-              right={
-                inputText.trim() ? (
-                  <TextInput.Icon
-                    icon="send"
-                    color={theme.colors.primary}
-                    onPress={handleSend}
-                    disabled={sending}
-                  />
-                ) : undefined
-              }
-              onSubmitEditing={handleSend}
-              blurOnSubmit={false}
-            />
-            {!inputText.trim() && (
-              <IconButton
-                icon="microphone"
-                mode="contained"
-                containerColor={theme.colors.primary}
-                iconColor={theme.colors.onPrimary}
-                size={22}
-                onPress={startRecording}
-                disabled={sending}
-                style={styles.sendButton}
-              />
-            )}
-          </View>
-        )}
+          ) : (
+            <View style={styles.inputRow}>
+              <View
+                style={[
+                  styles.inputPill,
+                  { backgroundColor: theme.colors.surfaceVariant },
+                ]}
+              >
+                <IconButton
+                  icon="image"
+                  size={24}
+                  onPress={pickImage}
+                  style={styles.photoButton}
+                  iconColor={theme.colors.onSurfaceVariant}
+                />
+                <TextInput
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder={t("chat.typeMessage")}
+                  mode="flat"
+                  style={styles.textInput}
+                  contentStyle={styles.textInputContent}
+                  multiline
+                  maxLength={2000}
+                  underlineColor="transparent"
+                  activeUnderlineColor="transparent"
+                />
+              </View>
+              {inputText.trim() || selectedImage ? (
+                <IconButton
+                  icon="send"
+                  size={24}
+                  onPress={handleSend}
+                  disabled={sending}
+                  style={[
+                    styles.sendButton,
+                    { backgroundColor: theme.colors.primary },
+                  ]}
+                  iconColor={theme.colors.onPrimary}
+                />
+              ) : (
+                <IconButton
+                  icon="microphone"
+                  size={24}
+                  onPress={startRecording}
+                  disabled={sending}
+                  style={[
+                    styles.sendButton,
+                    { backgroundColor: theme.colors.primary },
+                  ]}
+                  iconColor={theme.colors.onPrimary}
+                />
+              )}
+            </View>
+          )}
+        </View>
       </KeyboardAvoidingView>
 
       {/* Long-press context menu */}
@@ -914,6 +1050,27 @@ export default function ConversationScreen({
           </TouchableOpacity>
         </Modal>
       </Portal>
+
+      {/* Image preview modal */}
+      {previewImageUri && (
+        <Pressable
+          style={styles.imagePreviewModal}
+          onPress={() => setPreviewImageUri(null)}
+        >
+          <Image
+            source={{ uri: previewImageUri }}
+            style={{ width: "90%", height: "70%" }}
+            resizeMode="contain"
+          />
+          <IconButton
+            icon="close"
+            size={28}
+            onPress={() => setPreviewImageUri(null)}
+            style={{ position: "absolute", top: 40, right: 16 }}
+            iconColor="#FFFFFF"
+          />
+        </Pressable>
+      )}
     </SafeAreaView>
   );
 }
@@ -1038,28 +1195,83 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: "center",
   },
-  inputBar: {
+  inputContainer: {
+    padding: 10,
+    borderTopWidth: 1,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  inputRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderTopWidth: 0.5,
-    borderTopColor: "rgba(0,0,0,0.08)",
-    gap: 6,
+    alignItems: "center",
+    gap: 8,
+  },
+  inputPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 28,
+    paddingLeft: 2,
+    paddingRight: 8,
+    minHeight: 48,
+  },
+  photoButton: {
+    margin: 0,
+    width: 40,
+    height: 40,
   },
   textInput: {
     flex: 1,
+    backgroundColor: "transparent",
     maxHeight: 120,
+    minHeight: 44,
     fontSize: 15,
-  },
-  textInputOutline: {
-    borderRadius: 24,
+    paddingHorizontal: 0,
   },
   textInputContent: {
     paddingVertical: 8,
+    minHeight: 44,
   },
   sendButton: {
-    marginBottom: 4,
+    margin: 0,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  imagePreviewContainer: {
+    position: "relative",
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: "hidden",
+    alignSelf: "flex-start",
+  },
+  imagePreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    margin: 0,
+  },
+  imagePreviewModal: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
   },
   // Voice message bubble styles
   voiceBubbleRow: {

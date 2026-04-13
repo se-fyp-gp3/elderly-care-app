@@ -108,6 +108,11 @@ export async function updateProfileAvatar(
   });
 }
 
+export function isProfileAvatarSchemaMissing(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.includes('Unknown attribute: "avatar_file_id"');
+}
+
 /**
  * Build a URL for a user avatar from a file ID in the user_icon bucket.
  */

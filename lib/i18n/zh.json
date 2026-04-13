@@ -193,7 +193,8 @@
     "couldNotPickAudio": "无法选择音频文件。",
     "changeAvatar": "点击更换头像",
     "avatarUpdated": "头像已更新！",
-    "avatarUploadFailed": "上传头像失败，请重试。"
+    "avatarUploadFailed": "上传头像失败，请重试。",
+    "avatarSchemaMissing": "目前无法更新个人头像，因为 Appwrite 的 caregiver / elderly 表尚未建立 avatar_file_id 字段。"
   },
   "home": {
     "hello": "你好，{{name}}！",
@@ -351,6 +352,9 @@
     "missedMedAlert": "漏服提醒",
     "missedMedAlertDesc": "您漏服了计划内的药物：{{medications}}。请尽快服用！",
     "todaysPlan": "今日计划",
+    "yesterdaysPlan": "昨日计划",
+    "yesterday": "昨日",
+    "backToToday": "今日",
     "everyone": "全部",
     "noMedRecords": "未找到用药记录。",
     "noMedsScheduled": "没有安排的用药。",

@@ -193,7 +193,8 @@
     "couldNotPickAudio": "Could not pick audio file.",
     "changeAvatar": "Tap to change avatar",
     "avatarUpdated": "Avatar updated!",
-    "avatarUploadFailed": "Failed to upload avatar. Please try again."
+    "avatarUploadFailed": "Failed to upload avatar. Please try again.",
+    "avatarSchemaMissing": "Profile avatar is not available yet because the Appwrite caregiver/elderly tables are missing the avatar_file_id column."
   },
   "home": {
     "hello": "Hello, {{name}}!",
@@ -351,6 +352,9 @@
     "missedMedAlert": "Missed Medication Alert",
     "missedMedAlertDesc": "You have missed your scheduled medication: {{medications}}. Please take it as soon as possible!",
     "todaysPlan": "Today's Plan",
+    "yesterdaysPlan": "Yesterday's Plan",
+    "yesterday": "Yesterday",
+    "backToToday": "Today",
     "everyone": "Everyone",
     "noMedRecords": "No medication records found.",
     "noMedsScheduled": "No medications scheduled.",

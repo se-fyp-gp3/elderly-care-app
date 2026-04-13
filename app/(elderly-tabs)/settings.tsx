@@ -2,16 +2,22 @@ import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 import { useAuth } from "@/lib/auth-context";
 import { getCustomVoicesForElderly } from "@/lib/custom-voice";
 import {
-  getElderlyByUserId,
-  getLinkedCaregivers,
-  updateElderlyEmergencyContact,
+    getElderlyByUserId,
+    getLinkedCaregivers,
+    updateElderlyEmergencyContact,
 } from "@/lib/elderly";
 import {
-  getFallDetectionDiagnostics,
-  triggerFallDetectionTest,
+    getFallDetectionDiagnostics,
+    triggerFallDetectionTest,
 } from "@/lib/fall-detection";
 import { useFontSize } from "@/lib/font-size-context";
 import { useLanguage } from "@/lib/language-context";
+import {
+    buildAvatarUrl,
+    isProfileAvatarSchemaMissing,
+    updateProfileAvatar,
+    uploadAvatar,
+} from "@/lib/user";
 import { Caregiver, CustomVoice, Elderly } from "@/types/appwrite";
 import { FontSize, UIVersion } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -20,28 +26,28 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  Image,
-  Linking,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  useColorScheme,
-  View,
+    Alert,
+    Image,
+    Linking,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    useColorScheme,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Button,
-  Card,
-  Chip,
-  List,
-  SegmentedButtons,
-  Switch,
-  Text,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Button,
+    Card,
+    Chip,
+    List,
+    SegmentedButtons,
+    Switch,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 export default function ElderlySettings() {
@@ -102,12 +108,26 @@ export default function ElderlySettings() {
 
       setUploadingAvatar(true);
       const fileId = await uploadAvatar(result.assets[0]);
-      await updateProfileAvatar(elderlyProfile!.$id, "elderly", fileId);
+      try {
+        await updateProfileAvatar(elderlyProfile!.$id, "elderly", fileId);
+      } catch (e) {
+        if (isProfileAvatarSchemaMissing(e)) {
+          await updatePreferences({
+            ...preferences,
+            avatarFileId: fileId,
+          });
+        } else {
+          throw e;
+        }
+      }
       setAvatarFileId(fileId);
       Alert.alert(t("settings.avatarUpdated"));
     } catch (e) {
       console.error("Avatar upload error:", e);
-      Alert.alert(t("settings.avatarUploadFailed"));
+      Alert.alert(
+        t("common.error"),
+        t("settings.avatarUploadFailed"),
+      );
     } finally {
       setUploadingAvatar(false);
     }
@@ -120,7 +140,9 @@ export default function ElderlySettings() {
       const profile = await getElderlyByUserId(user.$id);
       if (!profile) return;
       setElderlyProfile(profile);
-      setAvatarFileId((profile as any).avatar_file_id ?? null);
+      setAvatarFileId(
+        (profile as any).avatar_file_id ?? preferences.avatarFileId ?? null,
+      );
       setEmergencyContact(profile.emergency_contact ?? null);
       const caregivers = await getLinkedCaregivers(profile.$id);
       setLinkedCaregivers(caregivers);
@@ -134,7 +156,7 @@ export default function ElderlySettings() {
     } catch (e) {
       console.error("Error loading emergency data:", e);
     }
-  }, [user]);
+  }, [preferences.avatarFileId, user]);
 
   useFocusEffect(
     useCallback(() => {

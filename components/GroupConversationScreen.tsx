@@ -1,49 +1,52 @@
-import { ID, storage, VOICE_MESSAGES_BUCKET_ID } from "@/lib/appwrite";
+import { ID, storage, USER_ICON_BUCKET_ID, VOICE_MESSAGES_BUCKET_ID } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-  fetchGroupMessages,
-  markGroupMessagesAsRead,
-  sendGroupMessage,
-  subscribeToGroupMessages,
-  updateGroupReadCursor,
+    fetchGroupMessages,
+    markGroupMessagesAsRead,
+    sendGroupMessage,
+    subscribeToGroupMessages,
+    updateGroupReadCursor,
 } from "@/lib/group-messaging";
 import { getGroupMembers } from "@/lib/groups";
 import { GroupMember, GroupMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
 import {
-  createAudioPlayer,
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  useAudioRecorder,
+    createAudioPlayer,
+    RecordingPresets,
+    requestRecordingPermissionsAsync,
+    setAudioModeAsync,
+    useAudioRecorder,
 } from "expo-audio";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    Modal as RNModal,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Divider,
-  IconButton,
-  Modal,
-  Portal,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Divider,
+    IconButton,
+    Modal,
+    Portal,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import UserAvatar from "./UserAvatar";
@@ -99,7 +102,9 @@ function VoiceMessageBubble({
         VOICE_MESSAGES_BUCKET_ID,
         fileId,
       );
-      const player = createAudioPlayer(downloadUrl.toString());
+      const localUri = `${FileSystem.cacheDirectory}group_voice_${fileId}.m4a`;
+      await FileSystem.downloadAsync(downloadUrl.toString(), localUri);
+      const player = createAudioPlayer(localUri);
       playerRef.current = player;
       player.addListener("playbackStatusUpdate", (status) => {
         if (status.didJustFinish) setPlaying(false);
@@ -176,7 +181,7 @@ export default function GroupConversationScreen({
     if (myRole === "caregiver") {
       router.replace("/(caregiver-tabs)/messages" as any);
     } else {
-      router.replace("/(elderly-tabs)/emergency" as any);
+      router.replace("/(elderly-tabs)/messages" as any);
     }
   };
 
@@ -199,6 +204,10 @@ export default function GroupConversationScreen({
   const [isRecording, setIsRecording] = useState(false);
   const [recordDuration, setRecordDuration] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Image attachment
+  const [selectedImage, setSelectedImage] = useState<{ uri: string; mimeType?: string; fileName?: string; fileSize?: number } | null>(null);
+  const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
 
   // Load messages
   useEffect(() => {
@@ -254,7 +263,58 @@ export default function GroupConversationScreen({
     }
   }, [messages.length]);
 
+  const appendMessage = useCallback((message: GroupMessage) => {
+    setMessages((prev) => {
+      if (prev.some((item) => item.$id === message.$id)) return prev;
+      return [...prev, message];
+    });
+  }, []);
+
   const handleSend = useCallback(async () => {
+    // If there's an image, send as image message
+    if (selectedImage) {
+      setSending(true);
+      Keyboard.dismiss();
+      try {
+        const fileInfo = await FileSystem.getInfoAsync(selectedImage.uri);
+        const uploadedFile = await storage.createFile({
+          bucketId: USER_ICON_BUCKET_ID,
+          fileId: ID.unique(),
+          file: {
+            name: selectedImage.fileName || `img_${Date.now()}.jpg`,
+            type: selectedImage.mimeType || "image/jpeg",
+            size: selectedImage.fileSize || (fileInfo.exists ? (fileInfo as any).size ?? 0 : 0),
+            uri: selectedImage.uri,
+          },
+        });
+        const imageUrl = storage.getFileViewURL(USER_ICON_BUCKET_ID, uploadedFile.$id).toString();
+        const body = inputText.trim() ? `${inputText.trim()}\n${imageUrl}` : imageUrl;
+        const quoted = quotedMessage;
+        setQuotedMessage(null);
+        const newMsg = await sendGroupMessage({
+          groupId,
+          senderId: myProfileId,
+          senderName: myName,
+          senderRole: myRole,
+          body,
+          messageType: "text",
+          ...(quoted && {
+            quotedMessageId: quoted.$id,
+            quotedSenderName: quoted.sender_name,
+            quotedBody: quoted.body,
+          }),
+        });
+        appendMessage(newMsg);
+        setInputText("");
+        setSelectedImage(null);
+      } catch (error) {
+        console.error("Error sending image:", error);
+        Alert.alert(t("common.error"), t("settings.avatarUploadFailed"));
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
     const text = inputText.trim();
     if (!text) return;
     Keyboard.dismiss();
@@ -263,7 +323,7 @@ export default function GroupConversationScreen({
     const quoted = quotedMessage;
     setQuotedMessage(null);
     try {
-      await sendGroupMessage({
+      const newMsg = await sendGroupMessage({
         groupId,
         senderId: myProfileId,
         senderName: myName,
@@ -275,13 +335,14 @@ export default function GroupConversationScreen({
           quotedBody: quoted.body,
         }),
       });
+      appendMessage(newMsg);
     } catch (error) {
       Alert.alert(t("common.error"), String(error));
       setInputText(text);
     } finally {
       setSending(false);
     }
-  }, [inputText, groupId, myProfileId, myName, myRole, quotedMessage]);
+  }, [appendMessage, groupId, inputText, myName, myProfileId, myRole, quotedMessage, selectedImage, t]);
 
   // Voice recording handlers
   const startRecording = useCallback(async () => {
@@ -291,7 +352,11 @@ export default function GroupConversationScreen({
         Alert.alert(t("common.permissionNeeded"), t("chat.micPermission"));
         return;
       }
-      await setAudioModeAsync({ playsInSilentMode: true });
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
+      await recorder.prepareToRecordAsync();
       recorder.record();
       setIsRecording(true);
       setRecordDuration(0);
@@ -299,39 +364,41 @@ export default function GroupConversationScreen({
         () => setRecordDuration((d) => d + 1),
         1000,
       );
-    } catch {
+    } catch (error) {
+      console.error("Failed to start group recording:", error);
       Alert.alert(t("common.error"), t("chat.couldNotStartRecording"));
     }
-  }, [recorder]);
+  }, [recorder, t]);
 
   const stopAndSendVoice = useCallback(async () => {
-    if (!isRecording) return;
-    clearInterval(timerRef.current!);
-    timerRef.current = null;
+    if (!recorder.isRecording) return;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsRecording(false);
+    setSending(true);
 
     try {
       await recorder.stop();
-      setIsRecording(false);
       const uri = recorder.uri;
-      if (!uri) return;
+      if (!uri) throw new Error("No recording URI");
 
-      setSending(true);
       const fileInfo = await FileSystem.getInfoAsync(uri);
-      if (!fileInfo.exists) return;
+      if (!fileInfo.exists) throw new Error("Recording file not found");
 
-      const file = {
-        name: `voice_${Date.now()}.m4a`,
-        type: "audio/m4a",
-        size: fileInfo.size || 0,
-        uri,
-      };
-      const uploaded = await storage.createFile(
-        VOICE_MESSAGES_BUCKET_ID,
-        ID.unique(),
-        file,
-      );
+      const uploaded = await storage.createFile({
+        bucketId: VOICE_MESSAGES_BUCKET_ID,
+        fileId: ID.unique(),
+        file: {
+          name: `voice_${Date.now()}.m4a`,
+          type: "audio/m4a",
+          size: fileInfo.size ?? 0,
+          uri,
+        },
+      });
 
-      await sendGroupMessage({
+      const newMsg = await sendGroupMessage({
         groupId,
         senderId: myProfileId,
         senderName: myName,
@@ -339,30 +406,55 @@ export default function GroupConversationScreen({
         body: `${recordDuration}|${uploaded.$id}`,
         messageType: "voice",
       });
+      appendMessage(newMsg);
     } catch (error) {
+      console.error("Error sending group voice message:", error);
       Alert.alert(t("common.error"), t("chat.failedToSendVoice"));
     } finally {
       setSending(false);
       setRecordDuration(0);
     }
   }, [
-    isRecording,
+    appendMessage,
     recorder,
     groupId,
     myProfileId,
     myName,
     myRole,
     recordDuration,
+    t,
   ]);
 
-  const cancelRecording = useCallback(() => {
+  const cancelRecording = useCallback(async () => {
     if (!isRecording) return;
-    clearInterval(timerRef.current!);
-    timerRef.current = null;
-    recorder.stop();
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     setIsRecording(false);
     setRecordDuration(0);
+    if (recorder.isRecording) {
+      try {
+        await recorder.stop();
+      } catch {
+        // Ignore stale recorder errors on cancel.
+      }
+    }
   }, [isRecording, recorder]);
+
+  const pickImage = useCallback(async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setSelectedImage(result.assets[0]);
+    }
+  }, []);
+
+  const removeSelectedImage = useCallback(() => {
+    setSelectedImage(null);
+  }, []);
 
   const formatTime = (iso: string) => {
     try {
@@ -394,6 +486,7 @@ export default function GroupConversationScreen({
     }
 
     const isVoice = item.message_type === "voice";
+    const isImage = item.body && /\/storage\/buckets\/.*\/files\/.*\/view/.test(item.body);
 
     // Read receipt logic for sent messages
     const readBy = item.read_by ?? [];
@@ -488,6 +581,30 @@ export default function GroupConversationScreen({
                   isMe={isMe}
                   theme={theme}
                 />
+              ) : isImage ? (
+                (() => {
+                  const lines = item.body.split("\n");
+                  const imageUrl = lines.find((l: string) => l.startsWith("http"));
+                  const caption = lines.filter((l: string) => !l.startsWith("http")).join("\n").trim();
+                  return (
+                    <View>
+                      {imageUrl && (
+                        <Pressable onPress={() => setPreviewImageUri(imageUrl)}>
+                          <Image
+                            source={{ uri: imageUrl }}
+                            style={{ width: 200, height: 200, borderRadius: 8, marginBottom: caption ? 4 : 0 }}
+                            resizeMode="cover"
+                          />
+                        </Pressable>
+                      )}
+                      {caption ? (
+                        <Text style={[styles.msgText, { color: isMe ? theme.colors.onPrimary : theme.colors.onSurface }]}>
+                          {caption}
+                        </Text>
+                      ) : null}
+                    </View>
+                  );
+                })()
               ) : (
                 <Text
                   style={[
@@ -650,13 +767,31 @@ export default function GroupConversationScreen({
         {/* Input bar */}
         <View
           style={[
-            styles.inputBar,
+            styles.inputContainer,
             {
               backgroundColor: theme.colors.surface,
               borderTopColor: theme.colors.outlineVariant,
             },
           ]}
         >
+          {/* Image preview */}
+          {selectedImage && (
+            <View style={styles.imagePreviewContainer}>
+              <Image
+                source={{ uri: selectedImage.uri }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
+              <IconButton
+                icon="close-circle"
+                size={22}
+                onPress={removeSelectedImage}
+                style={styles.removeImageButton}
+                iconColor="#FFFFFF"
+              />
+            </View>
+          )}
+
           {isRecording ? (
             <View style={styles.recordingBar}>
               <TouchableOpacity onPress={cancelRecording}>
@@ -686,38 +821,61 @@ export default function GroupConversationScreen({
               </TouchableOpacity>
             </View>
           ) : (
-            <>
-              <IconButton
-                icon="microphone"
-                size={24}
-                onPress={startRecording}
-                iconColor={theme.colors.primary}
-              />
-              <TextInput
-                mode="outlined"
-                placeholder={t("chat.typeMessage")}
-                value={inputText}
-                onChangeText={setInputText}
-                style={styles.textInput}
-                outlineStyle={{ borderRadius: 20 }}
-                dense
-                right={
-                  sending ? (
-                    <TextInput.Icon
-                      icon={() => <ActivityIndicator size={18} />}
-                    />
-                  ) : inputText.trim() ? (
-                    <TextInput.Icon
-                      icon="send"
-                      onPress={handleSend}
-                      color={theme.colors.primary}
-                    />
-                  ) : undefined
-                }
-                onSubmitEditing={handleSend}
-                returnKeyType="send"
-              />
-            </>
+            <View style={styles.inputRow}>
+              <View
+                style={[
+                  styles.inputPill,
+                  { backgroundColor: theme.colors.surfaceVariant },
+                ]}
+              >
+                <IconButton
+                  icon="image"
+                  size={24}
+                  onPress={pickImage}
+                  style={styles.photoButton}
+                  iconColor={theme.colors.onSurfaceVariant}
+                />
+                <TextInput
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder={t("chat.typeMessage")}
+                  mode="flat"
+                  style={styles.textInput}
+                  contentStyle={styles.textInputContent}
+                  multiline
+                  maxLength={2000}
+                  underlineColor="transparent"
+                  activeUnderlineColor="transparent"
+                  onSubmitEditing={handleSend}
+                  returnKeyType="send"
+                />
+              </View>
+              {inputText.trim() || selectedImage ? (
+                <IconButton
+                  icon="send"
+                  size={24}
+                  onPress={handleSend}
+                  disabled={sending}
+                  style={[
+                    styles.sendButton,
+                    { backgroundColor: theme.colors.primary },
+                  ]}
+                  iconColor={theme.colors.onPrimary}
+                />
+              ) : (
+                <IconButton
+                  icon="microphone"
+                  size={24}
+                  onPress={startRecording}
+                  disabled={sending}
+                  style={[
+                    styles.sendButton,
+                    { backgroundColor: theme.colors.primary },
+                  ]}
+                  iconColor={theme.colors.onPrimary}
+                />
+              )}
+            </View>
           )}
         </View>
       </KeyboardAvoidingView>
@@ -838,6 +996,27 @@ export default function GroupConversationScreen({
           </TouchableOpacity>
         </Modal>
       </Portal>
+
+      {/* Fullscreen image preview modal */}
+      <RNModal
+        visible={!!previewImageUri}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewImageUri(null)}
+      >
+        <Pressable
+          style={styles.imagePreviewModal}
+          onPress={() => setPreviewImageUri(null)}
+        >
+          {previewImageUri && (
+            <Image
+              source={{ uri: previewImageUri }}
+              style={{ width: "90%", height: "70%" }}
+              resizeMode="contain"
+            />
+          )}
+        </Pressable>
+      </RNModal>
     </SafeAreaView>
   );
 }
@@ -917,15 +1096,71 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
   },
-  inputBar: {
-    flexDirection: "row",
-    alignItems: "center",
+  inputContainer: {
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
   },
-  textInput: { flex: 1, maxHeight: 100 },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 6,
+  },
+  inputPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    borderRadius: 24,
+    overflow: "hidden",
+    minHeight: 46,
+  },
+  photoButton: {
+    margin: 0,
+    marginLeft: 2,
+    alignSelf: "flex-end",
+    marginBottom: 2,
+  },
+  textInput: {
+    flex: 1,
+    maxHeight: 100,
+    backgroundColor: "transparent",
+    fontSize: 15,
+    paddingHorizontal: 4,
+  },
+  textInputContent: {
+    paddingLeft: 0,
+    minHeight: 46,
+  },
+  sendButton: {
+    margin: 0,
+    marginBottom: 2,
+  },
+  imagePreviewContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  imagePreview: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: 2,
+    right: -4,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    margin: 0,
+    width: 24,
+    height: 24,
+  },
+  imagePreviewModal: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   recordingBar: {
     flex: 1,
     flexDirection: "row",

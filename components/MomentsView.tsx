@@ -26,6 +26,7 @@ import {
     Image,
     Keyboard,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     TouchableOpacity,
@@ -386,7 +387,10 @@ export default function MomentsView() {
                   placeholder={t("moments.whatsOnYourMind")}
                   value={newPostContent}
                   onChangeText={setNewPostContent}
-                  style={{ marginBottom: 16 }}
+                  style={{
+                    marginBottom: 16,
+                    ...(Platform.OS === "android" && { textAlignVertical: "top" }),
+                  }}
                 />
                 <View style={styles.mediaRow}>
                   <Button

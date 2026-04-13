@@ -8,7 +8,12 @@ import {
 import { useFontSize } from "@/lib/font-size-context";
 import { useLanguage } from "@/lib/language-context";
 import { createPersonalVoice, readAudioFileAsBase64 } from "@/lib/personal-voice";
-import { buildAvatarUrl, updateProfileAvatar, uploadAvatar } from "@/lib/user";
+import {
+    buildAvatarUrl,
+    isProfileAvatarSchemaMissing,
+    updateProfileAvatar,
+    uploadAvatar,
+} from "@/lib/user";
 import { Caregiver, CustomVoice, CustomVoiceStatus, Elderly } from "@/types/appwrite";
 import { FontSize } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -104,12 +109,26 @@ export default function Settings() {
 
       setUploadingAvatar(true);
       const fileId = await uploadAvatar(result.assets[0]);
-      await updateProfileAvatar(caregiverProfile!.$id, "caregiver", fileId);
+      try {
+        await updateProfileAvatar(caregiverProfile!.$id, "caregiver", fileId);
+      } catch (e) {
+        if (isProfileAvatarSchemaMissing(e)) {
+          await updatePreferences({
+            ...preferences,
+            avatarFileId: fileId,
+          });
+        } else {
+          throw e;
+        }
+      }
       setAvatarFileId(fileId);
       Alert.alert(t('settings.avatarUpdated'));
     } catch (e) {
       console.error("Avatar upload error:", e);
-      Alert.alert(t('settings.avatarUploadFailed'));
+      Alert.alert(
+        t('common.error'),
+        t('settings.avatarUploadFailed'),
+      );
     } finally {
       setUploadingAvatar(false);
     }
@@ -122,7 +141,9 @@ export default function Settings() {
       const caregiver = await getCaregiverByUserId(user.$id);
       setCaregiverProfile(caregiver);
       if (caregiver) {
-        setAvatarFileId((caregiver as any).avatar_file_id ?? null);
+        setAvatarFileId(
+          (caregiver as any).avatar_file_id ?? preferences.avatarFileId ?? null,
+        );
       }
 
       if (caregiver?.$id) {
@@ -146,7 +167,7 @@ export default function Settings() {
     } catch (error) {
       console.error("Error loading caregiver voice setup data:", error);
     }
-  }, [user?.$id]);
+  }, [preferences.avatarFileId, user?.$id]);
 
   useFocusEffect(
     useCallback(() => {
