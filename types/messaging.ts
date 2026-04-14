@@ -21,7 +21,7 @@ export type DirectMessage = Models.Row & {
   created_at: string;
   /** Whether the receiver has read the message */
   is_read: boolean;
-  /** "text" | "voice" — defaults to "text" */
+  /** "text" | "voice" | "image" — defaults to "text" */
   message_type?: string;
   /** Quote/reply fields */
   quoted_message_id?: string;
@@ -40,7 +40,7 @@ export type GroupMessage = Models.Row & {
   sender_role: "elderly" | "caregiver";
   body: string;
   created_at: string;
-  message_type?: "text" | "voice" | "system";
+  message_type?: "text" | "voice" | "image" | "system";
   /** Array of profile IDs who have read this message */
   read_by?: string[];
   /** Quote/reply fields */

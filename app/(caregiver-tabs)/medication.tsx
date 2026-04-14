@@ -77,6 +77,7 @@ export default function MedicationManagement() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     new Set(),
   );
+  const [viewingYesterday, setViewingYesterday] = useState(false);
   const [undoVisible, setUndoVisible] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(null);
 
@@ -144,7 +145,8 @@ export default function MedicationManagement() {
     if (!user) return;
     setLoading(true);
     try {
-      const result = await fetchCaregiverMedicationData(user.$id);
+      const targetDate = viewingYesterday ? (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d; })() : undefined;
+      const result = await fetchCaregiverMedicationData(user.$id, targetDate);
       setLinkedElderly(result.linkedElderly);
       setElderlyGroups(result.elderlyGroups);
 
@@ -156,13 +158,18 @@ export default function MedicationManagement() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user]);
+  }, [user, viewingYesterday]);
 
   useFocusEffect(
     useCallback(() => {
       fetchData();
     }, [fetchData]),
   );
+
+  // Re-fetch when toggling between today/yesterday
+  useEffect(() => {
+    fetchData();
+  }, [viewingYesterday]);
 
   useEffect(() => {
     // Add AppState listener to refresh data when app returns to foreground
@@ -252,6 +259,14 @@ export default function MedicationManagement() {
   const missedCount = allMeds.filter(
     (m) => m.status === "missed" || m.status === "overdue",
   ).length;
+  const baseStatusLabel =
+    statusFilter === "all"
+      ? t('medication.filterStatus')
+      : statusFilter === "pending"
+        ? t('common.pending')
+        : statusFilter === "completed"
+          ? t('common.completed')
+          : t('common.missed');
 
   const onConfirmTaking = async (medItem: MedicationItem) => {
     try {
@@ -445,7 +460,7 @@ export default function MedicationManagement() {
             }}
           >
             <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-              {t('medication.todaysPlan')}
+              {viewingYesterday ? t('medication.yesterdaysPlan') : t('medication.todaysPlan')}
             </Text>
             <View style={{ flexDirection: "row" }}>
               <Button
@@ -456,13 +471,7 @@ export default function MedicationManagement() {
                 icon="chevron-down"
                 labelStyle={{ fontSize: 14 }}
               >
-                {statusFilter === "all"
-                  ? t('medication.filterStatus')
-                  : statusFilter === "pending"
-                    ? t('common.pending')
-                    : statusFilter === "completed"
-                      ? t('common.completed')
-                      : t('common.missed')}
+                {baseStatusLabel}
               </Button>
               <Button
                 mode="text"
@@ -607,6 +616,11 @@ export default function MedicationManagement() {
           visible={statusFilterVisible}
           onDismiss={() => setStatusFilterVisible(false)}
           statusFilter={statusFilter}
+          viewingYesterday={viewingYesterday}
+          onSelectDay={(value) => {
+            setViewingYesterday(value);
+            setStatusFilterVisible(false);
+          }}
           onSelect={(status) => {
             setStatusFilter(status);
             setStatusFilterVisible(false);

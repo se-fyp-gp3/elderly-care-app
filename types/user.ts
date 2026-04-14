@@ -26,6 +26,7 @@ export type UserPreferences = {
   fontSize?: FontSize;
   voiceTone?: VoiceTone;
   notifications?: boolean;
+  avatarFileId?: string;
   fallDetectionEnabled?: boolean;
   aiVoiceEnabled?: boolean;
   aiVoiceId?: string;

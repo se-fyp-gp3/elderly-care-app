@@ -140,6 +140,8 @@ interface StatusFilterDialogProps {
   onDismiss: () => void;
   statusFilter: string;
   onSelect: (status: string) => void;
+  viewingYesterday: boolean;
+  onSelectDay: (value: boolean) => void;
 }
 
 export function StatusFilterDialog({
@@ -147,6 +149,8 @@ export function StatusFilterDialog({
   onDismiss,
   statusFilter,
   onSelect,
+  viewingYesterday,
+  onSelectDay,
 }: StatusFilterDialogProps) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -159,6 +163,51 @@ export function StatusFilterDialog({
     >
       <Dialog.Title>{t('medication.filterStatus')}</Dialog.Title>
       <Dialog.Content>
+        {[
+          {
+            key: "today",
+            icon: "calendar-today",
+            label: t('medication.todaysPlan'),
+            selected: !viewingYesterday,
+            onPress: () => onSelectDay(false),
+          },
+          {
+            key: "yesterday",
+            icon: "calendar-arrow-left",
+            label: t('medication.yesterday'),
+            selected: viewingYesterday,
+            onPress: () => onSelectDay(true),
+          },
+        ].map((item) => (
+          <TouchableOpacity
+            key={item.key}
+            style={[
+              styles.selectionRow,
+              {
+                backgroundColor: item.selected
+                  ? theme.colors.secondaryContainer
+                  : "transparent",
+              },
+            ]}
+            onPress={item.onPress}
+          >
+            <MaterialCommunityIcons
+              name={item.icon as any}
+              size={24}
+              color={theme.colors.onSurface}
+              style={{ marginRight: 16 }}
+            />
+            <Text variant="titleMedium">{item.label}</Text>
+            {item.selected && (
+              <MaterialCommunityIcons
+                name="check"
+                size={24}
+                color={theme.colors.onSecondaryContainer}
+                style={{ marginLeft: "auto" }}
+              />
+            )}
+          </TouchableOpacity>
+        ))}
         {["all", "pending", "completed", "missed"].map((status) => (
           <TouchableOpacity
             key={status}

@@ -24,6 +24,7 @@ import {
 } from "@/lib/group-messaging";
 import {
     acceptGroupInvitation,
+    buildGroupAvatarUrl,
     getGroupsForUser,
     getPendingGroupInvitations,
     rejectGroupInvitation,
@@ -658,11 +659,18 @@ export default function ElderlyMessages() {
           ]}
         >
           <View style={styles.avatarContainer}>
-            <Avatar.Icon
-              size={56}
-              icon="account-group"
-              style={{ backgroundColor: theme.colors.tertiaryContainer }}
-            />
+            {group.avatar_file_id ? (
+              <Avatar.Image
+                size={56}
+                source={{ uri: buildGroupAvatarUrl(group.avatar_file_id).toString() }}
+              />
+            ) : (
+              <Avatar.Icon
+                size={56}
+                icon="account-group"
+                style={{ backgroundColor: theme.colors.tertiaryContainer }}
+              />
+            )}
             {item.unread > 0 && (
               <Badge size={18} style={styles.unreadBadge}>
                 {item.unread}

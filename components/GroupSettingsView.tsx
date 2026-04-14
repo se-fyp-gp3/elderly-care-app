@@ -1,4 +1,5 @@
 import {
+    buildGroupAvatarUrl,
     disbandGroup,
     getGroupMembers,
     getGroupsForUser,
@@ -18,6 +19,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
     Alert,
+    Image,
     ScrollView,
     StyleSheet,
     TouchableOpacity,
@@ -60,6 +62,15 @@ export default function GroupSettingsView({
   const [muted, setMuted] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [groupAvatarFileId, setGroupAvatarFileId] = useState<string | null>(null);
+
+  const handleBack = useCallback(() => {
+    if (myRole === "caregiver") {
+      router.replace("/(caregiver-tabs)/messages" as any);
+    } else {
+      router.replace("/(elderly-tabs)/messages" as any);
+    }
+  }, [myRole, router]);
 
   const loadData = useCallback(async () => {
     try {
@@ -74,6 +85,7 @@ export default function GroupSettingsView({
       const group = groups.find((g) => g.$id === groupId);
       if (group) {
         setMuted(isGroupMuted(group, myProfileId));
+        setGroupAvatarFileId(group.avatar_file_id ?? null);
       }
     } catch (error) {
       console.error("Error loading group settings:", error);
@@ -113,9 +125,11 @@ export default function GroupSettingsView({
 
       const fileId = await uploadAvatar(result.assets[0]);
       await updateGroupAvatar(groupId, fileId);
+      setGroupAvatarFileId(fileId);
       Alert.alert(t("common.success"), t("settings.avatarUpdated"));
-    } catch (error) {
-      Alert.alert(t("common.error"), t("settings.avatarUploadFailed"));
+    } catch (error: any) {
+      console.error("Group avatar upload error:", error);
+      Alert.alert(t("common.error"), error?.message || t("settings.avatarUploadFailed"));
     }
   };
 
@@ -159,7 +173,7 @@ export default function GroupSettingsView({
         onPress: async () => {
           try {
             await leaveGroup(groupId, myProfileId);
-            router.back();
+            handleBack();
           } catch (error) {
             Alert.alert(t("common.error"), String(error));
           }
@@ -178,7 +192,7 @@ export default function GroupSettingsView({
           try {
             const success = await disbandGroup(groupId, myProfileId);
             if (success) {
-              router.back();
+              handleBack();
             } else {
               Alert.alert(t("common.error"), t("chat.notAdmin"));
             }
@@ -204,7 +218,7 @@ export default function GroupSettingsView({
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.onSurface} />
         </TouchableOpacity>
         <Text variant="titleMedium" style={{ fontWeight: "700", flex: 1, marginLeft: 12 }}>
@@ -214,20 +228,32 @@ export default function GroupSettingsView({
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Group Avatar */}
-        {isAdmin && (
-          <TouchableOpacity style={styles.avatarSection} onPress={handleChangeAvatar}>
+        <TouchableOpacity
+          style={styles.avatarSection}
+          onPress={isAdmin ? handleChangeAvatar : undefined}
+          activeOpacity={isAdmin ? 0.7 : 1}
+          disabled={!isAdmin}
+        >
             <View style={[styles.avatarCircle, { backgroundColor: theme.colors.primaryContainer }]}>
-              <MaterialCommunityIcons
-                name="account-group"
-                size={48}
-                color={theme.colors.primary}
-              />
+              {groupAvatarFileId ? (
+                <Image
+                  source={{ uri: buildGroupAvatarUrl(groupAvatarFileId).toString() }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <MaterialCommunityIcons
+                  name="account-group"
+                  size={48}
+                  color={theme.colors.primary}
+                />
+              )}
             </View>
-            <Text variant="bodySmall" style={{ color: theme.colors.primary, marginTop: 8 }}>
-              {t("settings.changeAvatar")}
-            </Text>
+            {isAdmin && (
+              <Text variant="bodySmall" style={{ color: theme.colors.primary, marginTop: 8 }}>
+                {t("settings.changeAvatar")}
+              </Text>
+            )}
           </TouchableOpacity>
-        )}
 
         {/* Group Name */}
         <View style={styles.section}>
@@ -353,6 +379,12 @@ const styles = StyleSheet.create({
     borderRadius: 48,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
   },
   section: {
     padding: 16,

@@ -90,6 +90,7 @@ export const getRelationshipId = (val: any): string | null => {
  */
 export async function fetchCaregiverMedicationData(
   userId: string,
+  targetDate?: Date,
 ): Promise<FetchMedicationResult> {
   // 1. Get Caregiver & Linked Elderly
   const caregiver = await getCaregiverByUserId(userId);
@@ -155,11 +156,12 @@ export async function fetchCaregiverMedicationData(
   }
 
   // 4. Fetch Logs (Expanded range to catch timezone shifts)
-  const logRangeStart = new Date();
+  const baseDate = targetDate ?? new Date();
+  const logRangeStart = new Date(baseDate);
   logRangeStart.setDate(logRangeStart.getDate() - 1);
   logRangeStart.setHours(0, 0, 0, 0);
 
-  const logRangeEnd = new Date();
+  const logRangeEnd = new Date(baseDate);
   logRangeEnd.setDate(logRangeEnd.getDate() + 1);
   logRangeEnd.setHours(23, 59, 59, 999);
 
@@ -233,11 +235,11 @@ export async function fetchCaregiverMedicationData(
 
           // HK timezone offset for start_date filtering
           const hkOffset = 8 * 60 * 60 * 1000;
-          const hkNow = new Date(Date.now() + hkOffset);
+          const hkNow = new Date(baseDate.getTime() + hkOffset);
           const todayStr = hkNow.toISOString().slice(0, 10);
 
           const slots = times.map((tStr, index) => {
-            const todayScheduledTime = new Date();
+            const todayScheduledTime = new Date(baseDate);
             if (tStr.includes("T")) {
               const d = new Date(tStr);
               todayScheduledTime.setHours(
@@ -351,7 +353,11 @@ export async function fetchCaregiverMedicationData(
 
             if (status === "pending") {
               const now = new Date();
-              if (now > slot.timeObj) {
+              const endOfTargetDay = new Date(baseDate);
+              endOfTargetDay.setHours(23, 59, 59, 999);
+              if (now > slot.timeObj && now > endOfTargetDay) {
+                status = "missed";
+              } else if (now > slot.timeObj) {
                 status = "missed";
               }
             }
