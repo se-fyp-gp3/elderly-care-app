@@ -15,6 +15,7 @@ import {
     ELDERLY_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+import i18n from "@/lib/i18n";
 
 export interface Contact {
   id: string;
@@ -265,13 +266,14 @@ export function formatRelativeTime(dateString?: string): string {
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
+    const t = i18n.t.bind(i18n);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < 1) return t("common.justNow");
+    if (diffMins < 60) return t("common.minutesAgo", { minutes: diffMins });
+    if (diffHours < 24) return t("common.hoursAgo", { hours: diffHours });
+    if (diffDays < 7) return t("common.daysAgo", { days: diffDays });
 
-    return date.toLocaleDateString(undefined, {
+    return date.toLocaleDateString(i18n.language, {
       month: "short",
       day: "numeric",
     });

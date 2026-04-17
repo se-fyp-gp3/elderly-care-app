@@ -20,6 +20,7 @@ import React, {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 import {
   ActivityIndicator,
   Alert,
@@ -73,14 +74,14 @@ function getTypeConfig(type: string) {
 
 function formatRelativeTime(isoDate: string): string {
   const diff = Date.now() - new Date(isoDate).getTime();
+  const t = i18n.t.bind(i18n);
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t("common.justNow");
+  if (mins < 60) return t("common.minutesAgo", { minutes: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t("common.hoursAgo", { hours: hrs });
   const days = Math.floor(hrs / 24);
-  if (days === 1) return "yesterday";
-  return `${days}d ago`;
+  return t("common.daysAgo", { days });
 }
 
 type FilterStatus = "all" | "active" | "investigating" | "resolved";
