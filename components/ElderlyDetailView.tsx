@@ -1,3 +1,4 @@
+import UserAvatar from "@/components/UserAvatar";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -10,7 +11,6 @@ import {
     View,
 } from "react-native";
 import {
-    Avatar,
     Card,
     Chip,
     Divider,
@@ -24,6 +24,7 @@ import {
 export interface ElderlyDetailData {
   id: string;
   name: string;
+  avatarFileId?: string;
   age?: number;
   birth?: string;
   gender?: string;
@@ -78,10 +79,11 @@ export default function ElderlyDetailView({
         elevation={1}
       >
         <View style={styles.headerTop}>
-          <Avatar.Text
+          <UserAvatar
+            avatarFileId={data.avatarFileId}
+            name={data.name || "??"}
             size={80}
-            label={data.name ? data.name.substring(0, 2) : "??"}
-            style={{ backgroundColor: theme.colors.primary }}
+            role="elderly"
           />
           <View style={styles.headerInfo}>
             <Text variant="headlineSmall" style={{ fontWeight: "bold" }}>

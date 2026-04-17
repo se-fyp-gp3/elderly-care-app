@@ -70,6 +70,7 @@ export default function ElderlyDetailPage() {
           const mappedData: ElderlyDetailData = {
             id: doc.$id,
             name: doc.name || "Unknown",
+            avatarFileId: doc.avatar_file_id || undefined,
             age,
             birth: doc.birth || undefined,
             gender: doc.gender || undefined,

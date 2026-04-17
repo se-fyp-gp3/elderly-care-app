@@ -1,5 +1,6 @@
 import AddElderlyDialog from "@/components/AddElderlyDialog";
 import ElderlyCard from "@/components/ElderlyCard";
+import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import { calculateAge } from "@/lib/elderly";
@@ -22,7 +23,6 @@ import {
     View,
 } from "react-native";
 import {
-    Avatar,
     Button,
     Card,
     Dialog,
@@ -414,15 +414,12 @@ export default function CaregiverDashboard() {
                     key={item.$id}
                     title={item.name}
                     description={`${t('caregiverPanel.age')} ${item.age || t('common.unknown')}`}
-                    left={(props) => (
-                      <Avatar.Text
-                        {...props}
+                    left={() => (
+                      <UserAvatar
+                        avatarFileId={item.avatar_file_id ?? undefined}
+                        name={item.name || "??"}
                         size={40}
-                        label={item.name ? item.name.substring(0, 2) : "??"}
-                        style={{
-                          backgroundColor: theme.colors.primary,
-                          marginRight: 10,
-                        }}
+                        role="elderly"
                       />
                     )}
                     onPress={() => {
@@ -460,9 +457,11 @@ export default function CaregiverDashboard() {
                 marginBottom: 8,
               }}
             >
-              <Avatar.Text
+              <UserAvatar
+                avatarFileId={selectedElderly?.avatar_file_id ?? undefined}
+                name={selectedElderly?.name || "??"}
                 size={48}
-                label={selectedElderly?.name?.substring(0, 2) ?? ""}
+                role="elderly"
               />
               <View style={{ marginLeft: 12 }}>
                 <Text variant="titleMedium">{selectedElderly?.name}</Text>
