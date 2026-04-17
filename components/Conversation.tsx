@@ -65,6 +65,7 @@ export default function Conversation() {
 
   return (
     <ConversationScreen
+      key={params.contactId}
       myProfileId={profileId}
       myName={profileName}
       myRole={role}

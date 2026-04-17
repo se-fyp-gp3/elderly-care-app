@@ -46,6 +46,7 @@ export default function GroupConversation() {
 
   return (
     <GroupConversationScreen
+      key={params.groupId}
       myProfileId={profileId}
       myName={profileName}
       myRole="elderly"
