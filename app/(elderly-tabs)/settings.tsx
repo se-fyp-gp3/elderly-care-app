@@ -195,12 +195,12 @@ export default function ElderlySettings() {
       setEmergencyContact(caregiver.phone);
       setPickerVisible(false);
       Alert.alert(
-        "Saved",
-        `Emergency set to ${caregiver.name ?? caregiver.phone}`,
+        t("settings.emergencySavedTitle"),
+        t("settings.emergencySavedMsg", { name: caregiver.name ?? caregiver.phone }),
       );
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", "Failed to save emergency.");
+      Alert.alert(t("common.error"), t("settings.failedSaveEmergency"));
     } finally {
       setSaving(false);
     }
@@ -212,9 +212,9 @@ export default function ElderlySettings() {
     try {
       await updateElderlyEmergencyContact(elderlyProfile.$id, null);
       setEmergencyContact(null);
-      Alert.alert("Cleared", "Emergency has been removed.");
+      Alert.alert(t("settings.emergencyClearedTitle"), t("settings.emergencyClearedMsg"));
     } catch (e) {
-      Alert.alert("Error", "Failed to clear emergency.");
+      Alert.alert(t("common.error"), t("settings.failedClearEmergency"));
     } finally {
       setSaving(false);
     }
@@ -263,8 +263,8 @@ export default function ElderlySettings() {
   const handleTestFallAlert = useCallback(() => {
     if (!fallDetectionEnabled) {
       Alert.alert(
-        "Fall Detection Off",
-        "Turn on fall detection first, then try the test alert again.",
+        t("settings.fallDetectionOffTitle"),
+        t("settings.fallDetectionOffMsg"),
       );
       return;
     }
@@ -296,8 +296,8 @@ export default function ElderlySettings() {
   const handleAiVoiceToggle = async (value: boolean) => {
     if (value && !hasVoiceOptions) {
       Alert.alert(
-        "No available voice",
-        "No linked caregiver voice found. Please ask caregiver to create one first.",
+        t("settings.noAvailableVoice"),
+        t("settings.noVoiceFoundDesc"),
       );
       return;
     }
@@ -331,9 +331,9 @@ export default function ElderlySettings() {
       });
       setAiVoiceEnabled(true);
       setVoicePickerVisible(false);
-      Alert.alert("Saved", `AI voice set to ${voice.caregiver_name}.`);
+      Alert.alert(t("settings.emergencySavedTitle"), t("settings.aiVoiceSet", { name: voice.caregiver_name }));
     } catch (e) {
-      Alert.alert("Error", "Failed to save AI voice selection.");
+      Alert.alert(t("common.error"), t("settings.failedSaveAiVoice"));
     } finally {
       setVoiceSaving(false);
     }
@@ -350,9 +350,9 @@ export default function ElderlySettings() {
         aiVoiceCaregiverName: undefined,
       });
       setAiVoiceEnabled(false);
-      Alert.alert("Cleared", "AI voice selection has been removed.");
+      Alert.alert(t("settings.emergencyClearedTitle"), t("settings.aiVoiceCleared"));
     } catch {
-      Alert.alert("Error", "Failed to clear AI voice selection.");
+      Alert.alert(t("common.error"), t("settings.failedClearAiVoice"));
     } finally {
       setVoiceSaving(false);
     }
@@ -485,16 +485,16 @@ export default function ElderlySettings() {
 
         {/* Emergency */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
-          Emergency
+          {t("settings.emergencySection")}
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <List.Item
-            title="Emergency"
+            title={t("settings.emergencySection")}
             titleStyle={styles.listTitle}
             description={
               emergencyContact
                 ? `${selectedCaregiverName ?? "Caregiver"} (${emergencyContact})`
-                : "Not set — tap to choose your emergency caregiver"
+                : t("settings.emergencyNotSetDesc")
             }
             descriptionStyle={styles.listDescription}
             left={() => (
@@ -534,9 +534,9 @@ export default function ElderlySettings() {
             ]}
           />
           <List.Item
-            title="Fall Detection"
+            title={t("settings.fallDetection")}
             titleStyle={styles.listTitle}
-            description={fallDetectionEnabled ? "On" : "Off"}
+            description={fallDetectionEnabled ? t("settings.fallDetectionOn") : t("settings.fallDetectionOff")}
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>
@@ -566,9 +566,9 @@ export default function ElderlySettings() {
             ]}
           />
           <List.Item
-            title="Fall Detection Test"
+            title={t("settings.fallDetectionTest")}
             titleStyle={styles.listTitle}
-            description="Check sensors, test the alert, or review MIUI setup"
+            description={t("settings.fallDetectionTestDesc")}
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>
@@ -587,21 +587,21 @@ export default function ElderlySettings() {
               onPress={handleCheckFallSensors}
               icon="cellphone-cog"
             >
-              Check sensors
+              {t("settings.checkSensors")}
             </Button>
             <Button
               mode="contained"
               onPress={handleTestFallAlert}
               icon="alert-decagram"
             >
-              Test alert
+              {t("settings.testAlert")}
             </Button>
             <Button
               mode="text"
               onPress={handleOpenMiuiGuide}
               icon="cog-outline"
             >
-              MIUI setup
+              {t("settings.miuiSetup")}
             </Button>
           </View>
           {emergencyContact && (
@@ -613,7 +613,7 @@ export default function ElderlySettings() {
                 ]}
               />
               <List.Item
-                title="Clear Emergency"
+                title={t("settings.clearEmergency")}
                 titleStyle={[styles.listTitle, { color: theme.colors.error }]}
                 left={() => (
                   <View
