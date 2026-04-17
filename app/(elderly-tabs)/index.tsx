@@ -376,7 +376,7 @@ export default function ElderlyHome() {
               accessibleStyles?.greetingName,
             ]}
           >
-            Hello, {elderlyProfile?.name || user?.name || t("common.there")}!
+            {t("home.hello", { name: elderlyProfile?.name || user?.name || t("common.there") })}
           </Text>
           <Text
             variant="bodyLarge"
