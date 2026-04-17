@@ -1,3 +1,4 @@
+import UserAvatar from "@/components/UserAvatar";
 import { formatRelativeTime } from "@/lib/contacts";
 import { MediaItem, Moment, MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -39,6 +40,7 @@ interface MomentCardProps {
   ) => Promise<MomentComment>;
   onDelete?: (id: string) => void;
   latestComments?: MomentComment[];
+  authorAvatarFileId?: string;
 }
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -544,6 +546,7 @@ export default function MomentCard({
   onAIRequest,
   onDelete,
   latestComments,
+  authorAvatarFileId,
 }: MomentCardProps) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -594,11 +597,11 @@ export default function MomentCard({
         />
       )}
       <View style={styles.header}>
-        <Avatar.Text
+        <UserAvatar
+          avatarFileId={authorAvatarFileId}
+          name={moment.author_name}
           size={40}
-          label={moment.author_name.substring(0, 1).toUpperCase()}
-          style={{ backgroundColor: theme.colors.primaryContainer }}
-          color={theme.colors.onPrimaryContainer}
+          role={moment.author_role as "elderly" | "caregiver" | undefined}
         />
         <View style={styles.headerText}>
           <Text variant="titleMedium" style={{ fontWeight: "bold" }}>

@@ -1,3 +1,4 @@
+import UserAvatar from "@/components/UserAvatar";
 import { formatRelativeTime } from "@/lib/contacts";
 import {
     addComment,
@@ -44,6 +45,8 @@ interface CommentSheetProps {
   currentUserRole: "elderly" | "caregiver";
   allowedAuthorIds?: string[];
   onCommentAdded?: () => void;
+  avatarMap?: Record<string, string>;
+  currentUserAvatarFileId?: string;
 }
 
 function CommentItem({
@@ -53,6 +56,7 @@ function CommentItem({
   onReply,
   onLike,
   onDelete,
+  avatarFileId,
 }: {
   comment: MomentComment;
   currentUserId: string;
@@ -60,6 +64,7 @@ function CommentItem({
   onReply: (comment: MomentComment) => void;
   onLike: (comment: MomentComment) => void;
   onDelete: (commentId: string) => void;
+  avatarFileId?: string;
 }) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -89,20 +94,11 @@ function CommentItem({
 
   return (
     <View style={styles.commentItem}>
-      <Avatar.Text
+      <UserAvatar
+        avatarFileId={avatarFileId}
+        name={comment.author_name}
         size={32}
-        label={comment.author_name.substring(0, 1).toUpperCase()}
-        style={{
-          backgroundColor:
-            comment.author_role === "ai"
-              ? theme.colors.tertiaryContainer
-              : theme.colors.primaryContainer,
-        }}
-        color={
-          comment.author_role === "ai"
-            ? theme.colors.onTertiaryContainer
-            : theme.colors.onPrimaryContainer
-        }
+        role={comment.author_role as "elderly" | "caregiver" | undefined}
       />
       <View style={styles.commentBody}>
         <View style={styles.commentBubble}>
@@ -236,6 +232,8 @@ export default function CommentSheet({
   currentUserRole,
   allowedAuthorIds,
   onCommentAdded,
+  avatarMap,
+  currentUserAvatarFileId,
 }: CommentSheetProps) {
   const theme = useTheme();
   const [comments, setComments] = useState<MomentComment[]>([]);
@@ -436,6 +434,7 @@ export default function CommentSheet({
                   onReply={handleReply}
                   onLike={handleLikeComment}
                   onDelete={handleDeleteComment}
+                  avatarFileId={avatarMap?.[item.author_id]}
                 />
               )}
               contentContainerStyle={styles.listContent}
@@ -491,11 +490,10 @@ export default function CommentSheet({
           <View
             style={[styles.inputBar, { backgroundColor: theme.colors.surface }]}
           >
-            <Avatar.Text
+            <UserAvatar
+              avatarFileId={currentUserAvatarFileId}
+              name={currentUserName}
               size={28}
-              label={currentUserName.substring(0, 1).toUpperCase()}
-              style={{ backgroundColor: theme.colors.primaryContainer }}
-              color={theme.colors.onPrimaryContainer}
             />
             <RNTextInput
               ref={inputRef}

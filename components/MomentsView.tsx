@@ -59,6 +59,8 @@ export default function MomentsView() {
   >([]);
   const [posting, setPosting] = useState(false);
   const [currentUserName, setCurrentUserName] = useState("");
+  const [currentUserAvatarFileId, setCurrentUserAvatarFileId] = useState<string | undefined>();
+  const [avatarMap, setAvatarMap] = useState<Record<string, string>>({});
   const [commentMomentId, setCommentMomentId] = useState<string | null>(null);
   const [allowedIds, setAllowedIds] = useState<string[]>([]);
   const [latestCommentsMap, setLatestCommentsMap] = useState<
@@ -77,19 +79,31 @@ export default function MomentsView() {
 
       // 1. Get contacts based on role
       let contacts: any[] = [];
+      let ownAvatarFileId: string | undefined;
       if (preferences.role === "caregiver") {
         const profile = await getCaregiverByUserId(user.$id);
         if (profile) {
           contacts = await getContactsForCaregiver(profile.$id);
           setCurrentUserName(profile.name || user.name || "Anonymous");
+          ownAvatarFileId = profile.avatar_file_id ?? undefined;
         }
       } else if (preferences.role === "elderly") {
         const profile = await getElderlyByUserId(user.$id);
         if (profile) {
           contacts = await getContactsForElderly(profile.$id);
           setCurrentUserName(profile.name || user.name || "Anonymous");
+          ownAvatarFileId = profile.avatar_file_id ?? undefined;
         }
       }
+
+      // Build avatar map keyed by userId ($id of user account)
+      const map: Record<string, string> = {};
+      if (user.$id && ownAvatarFileId) map[user.$id] = ownAvatarFileId;
+      contacts.forEach((c: any) => {
+        if (c.userId && c.avatarFileId) map[c.userId] = c.avatarFileId;
+      });
+      setAvatarMap(map);
+      setCurrentUserAvatarFileId(ownAvatarFileId);
 
       // 2. Extract User IDs allowed to be seen (My friends + Me + AI)
       const ids = [
@@ -325,6 +339,7 @@ export default function MomentsView() {
               onAIRequest={handleAIRequest}
               latestComments={latestCommentsMap[item.$id]}
               onDelete={handleDeleteMoment}
+              authorAvatarFileId={avatarMap[item.author_id]}
             />
           )}
           refreshing={refreshing}
@@ -360,6 +375,8 @@ export default function MomentsView() {
         }
         allowedAuthorIds={allowedIds}
         onCommentAdded={handleCommentAdded}
+        avatarMap={avatarMap}
+        currentUserAvatarFileId={currentUserAvatarFileId}
       />
 
       <Modal
