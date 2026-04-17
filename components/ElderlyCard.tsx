@@ -1,10 +1,11 @@
+import UserAvatar from "@/components/UserAvatar";
 import { ElderlyStatusInfo } from "@/lib/elderly-status";
 import { Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, useColorScheme, View } from "react-native";
-import { Avatar, Button, Card, Chip, Text, useTheme } from "react-native-paper";
+import { Button, Card, Chip, Text, useTheme } from "react-native-paper";
 
 // Define the interface for the elderly item
 export interface ElderlyItem extends Elderly {
@@ -74,21 +75,16 @@ export default function ElderlyCard({
         ]
       : undefined;
 
-  const avatarStyle = isDanger
-    ? styles.dangerAvatar
-    : isWarning
-      ? styles.warningAvatar
-      : styles.avatar;
-
   return (
     <Card style={styles.elderlyCard}>
       <Card.Content>
         <View style={styles.elderlyHeader}>
           <View style={styles.elderlyInfo}>
-            <Avatar.Text
+            <UserAvatar
+              avatarFileId={elderly.avatar_file_id ?? undefined}
+              name={elderly.name || "??"}
               size={50}
-              label={elderly.name ? elderly.name.substring(0, 2) : "??"}
-              style={avatarStyle}
+              role="elderly"
             />
             <View style={styles.elderlyDetails}>
               <Text variant="titleMedium">{elderly.name}</Text>

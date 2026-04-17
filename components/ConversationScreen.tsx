@@ -1,3 +1,4 @@
+import UserAvatar from "@/components/UserAvatar";
 import { ID, storage, USER_ICON_BUCKET_ID, VOICE_MESSAGES_BUCKET_ID } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -38,14 +39,13 @@ import {
 } from "react-native";
 import {
     ActivityIndicator,
-    Avatar,
     Divider,
     IconButton,
     Modal,
     Portal,
     Text,
     TextInput,
-    useTheme,
+    useTheme
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -62,6 +62,10 @@ interface ConversationScreenProps {
   contactName: string;
   /** The other party's role */
   contactRole: "caregiver" | "elderly";
+  /** The other party's avatar file ID (optional) */
+  contactAvatarFileId?: string;
+  /** Current user's avatar file ID (optional) */
+  myAvatarFileId?: string;
 }
 
 /** Inline voice message player */
@@ -186,6 +190,8 @@ export default function ConversationScreen({
   contactId,
   contactName,
   contactRole,
+  contactAvatarFileId,
+  myAvatarFileId,
 }: ConversationScreenProps) {
   const theme = useTheme();
   const router = useRouter();
@@ -567,26 +573,14 @@ export default function ConversationScreen({
             ]}
           >
             {!isMe && (
-              <Avatar.Text
-                size={32}
-                label={contactName.substring(0, 2).toUpperCase()}
-                style={[
-                  styles.messageAvatar,
-                  {
-                    backgroundColor:
-                      contactRole === "caregiver"
-                        ? theme.colors.tertiaryContainer
-                        : theme.colors.primaryContainer,
-                  },
-                ]}
-                labelStyle={{
-                  fontSize: 12,
-                  color:
-                    contactRole === "caregiver"
-                      ? theme.colors.onTertiaryContainer
-                      : theme.colors.onPrimaryContainer,
-                }}
-              />
+              <View style={styles.messageAvatar}>
+                <UserAvatar
+                  avatarFileId={contactAvatarFileId}
+                  name={contactName}
+                  size={32}
+                  role={contactRole}
+                />
+              </View>
             )}
             <View
               style={[
@@ -772,22 +766,11 @@ export default function ConversationScreen({
             onPress={handleBack}
             style={styles.backButton}
           />
-          <Avatar.Text
+          <UserAvatar
+            avatarFileId={contactAvatarFileId}
+            name={contactName}
             size={40}
-            label={contactName.substring(0, 2).toUpperCase()}
-            style={{
-              backgroundColor:
-                contactRole === "caregiver"
-                  ? theme.colors.tertiaryContainer
-                  : theme.colors.primaryContainer,
-            }}
-            labelStyle={{
-              color:
-                contactRole === "caregiver"
-                  ? theme.colors.onTertiaryContainer
-                  : theme.colors.onPrimaryContainer,
-              fontWeight: "600",
-            }}
+            role={contactRole}
           />
           <View style={styles.chatHeaderInfo}>
             <Text

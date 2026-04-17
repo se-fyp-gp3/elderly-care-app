@@ -2,21 +2,21 @@ import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 import { useAuth } from "@/lib/auth-context";
 import { getCustomVoicesForElderly } from "@/lib/custom-voice";
 import {
-    getElderlyByUserId,
-    getLinkedCaregivers,
-    updateElderlyEmergencyContact,
+  getElderlyByUserId,
+  getLinkedCaregivers,
+  updateElderlyEmergencyContact,
 } from "@/lib/elderly";
 import {
-    getFallDetectionDiagnostics,
-    triggerFallDetectionTest,
+  getFallDetectionDiagnostics,
+  triggerFallDetectionTest,
 } from "@/lib/fall-detection";
 import { useFontSize } from "@/lib/font-size-context";
 import { useLanguage } from "@/lib/language-context";
 import {
-    buildAvatarUrl,
-    isProfileAvatarSchemaMissing,
-    updateProfileAvatar,
-    uploadAvatar,
+  buildAvatarUrl,
+  isProfileAvatarSchemaMissing,
+  updateProfileAvatar,
+  uploadAvatar,
 } from "@/lib/user";
 import { Caregiver, CustomVoice, Elderly } from "@/types/appwrite";
 import { FontSize, UIVersion } from "@/types/user";
@@ -26,28 +26,28 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    Image,
-    Linking,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    useColorScheme,
-    View,
+  Alert,
+  Image,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  useColorScheme,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Button,
-    Card,
-    Chip,
-    List,
-    SegmentedButtons,
-    Switch,
-    Text,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  Button,
+  Card,
+  Chip,
+  List,
+  SegmentedButtons,
+  Switch,
+  Text,
+  useTheme,
 } from "react-native-paper";
 
 export default function ElderlySettings() {
@@ -195,12 +195,12 @@ export default function ElderlySettings() {
       setEmergencyContact(caregiver.phone);
       setPickerVisible(false);
       Alert.alert(
-        "Saved",
-        `Emergency set to ${caregiver.name ?? caregiver.phone}`,
+        t("settings.emergencySavedTitle"),
+        t("settings.emergencySavedMsg", { name: caregiver.name ?? caregiver.phone }),
       );
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", "Failed to save emergency.");
+      Alert.alert(t("common.error"), t("settings.failedSaveEmergency"));
     } finally {
       setSaving(false);
     }
@@ -212,9 +212,9 @@ export default function ElderlySettings() {
     try {
       await updateElderlyEmergencyContact(elderlyProfile.$id, null);
       setEmergencyContact(null);
-      Alert.alert("Cleared", "Emergency has been removed.");
+      Alert.alert(t("settings.emergencyClearedTitle"), t("settings.emergencyClearedMsg"));
     } catch (e) {
-      Alert.alert("Error", "Failed to clear emergency.");
+      Alert.alert(t("common.error"), t("settings.failedClearEmergency"));
     } finally {
       setSaving(false);
     }
@@ -234,37 +234,29 @@ export default function ElderlySettings() {
     const notes: string[] = [];
 
     if (!diagnostics.accelerometerAvailable) {
-      notes.push(
-        "This phone does not provide an accelerometer, so fall detection cannot run.",
-      );
+      notes.push(t("settings.fallCheckNoAccelerometer"));
     }
     if (!diagnostics.gyroscopeAvailable) {
-      notes.push(
-        "This phone does not provide a gyroscope. The app has switched to an accelerometer-only fallback, so shake-style tests may be less reliable.",
-      );
+      notes.push(t("settings.fallCheckNoGyroscope"));
     }
     if (!diagnostics.backgroundServiceRunning) {
-      notes.push(
-        "Background service is not running. On MIUI, battery saver or background restrictions may be stopping fall detection even when sensors are available.",
-      );
+      notes.push(t("settings.fallCheckNoBackground"));
     }
     if (!notes.length) {
-      notes.push(
-        "Sensors look available on this phone. If the test alert opens, the emergency overlay path is working.",
-      );
+      notes.push(t("settings.fallCheckOk"));
     }
 
     Alert.alert(
-      "Fall Detection Check",
-      `Device: ${diagnostics.deviceModel || "Unknown"}\nProfile: ${diagnostics.profileName}\nSensor interval: ${diagnostics.sensorIntervalMs} ms\nAccelerometer: ${diagnostics.accelerometerAvailable ? "Available" : "Unavailable"} (g-force units)\nGyroscope: ${diagnostics.gyroscopeAvailable ? "Available" : "Unavailable"}\nDetector running: ${diagnostics.isRunning ? "Yes" : "No"}\nBackground service: ${diagnostics.backgroundServiceRunning ? "Running" : "Not running"}\n\n${notes.join("\n")}`,
+      t("settings.fallCheckTitle"),
+      `Device: ${diagnostics.deviceModel || "Unknown"}\nProfile: ${diagnostics.profileName}\nSensor interval: ${diagnostics.sensorIntervalMs} ms\nAccelerometer: ${diagnostics.accelerometerAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")} (g-force units)\nGyroscope: ${diagnostics.gyroscopeAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")}\nDetector running: ${diagnostics.isRunning ? t("settings.fallCheckYes") : t("settings.fallCheckNo")}\nBackground service: ${diagnostics.backgroundServiceRunning ? t("settings.fallCheckRunning") : t("settings.fallCheckNotRunning")}\n\n${notes.join("\n")}`,
     );
-  }, []);
+  }, [t]);
 
   const handleTestFallAlert = useCallback(() => {
     if (!fallDetectionEnabled) {
       Alert.alert(
-        "Fall Detection Off",
-        "Turn on fall detection first, then try the test alert again.",
+        t("settings.fallDetectionOffTitle"),
+        t("settings.fallDetectionOffMsg"),
       );
       return;
     }
@@ -274,30 +266,30 @@ export default function ElderlySettings() {
 
   const handleOpenMiuiGuide = useCallback(() => {
     Alert.alert(
-      "MIUI Setup for Fall Detection",
-      "MIUI usually does not block sensors with a permission prompt. Instead, it kills or restricts apps in the background. Please check these settings:\n\n1. Battery saver -> set this app to No restrictions / Unrestricted\n2. Autostart -> allow this app to start automatically\n3. App info -> Other permissions / Background location -> allow always\n4. Recent apps screen -> lock this app so MIUI does not swipe-kill it\n5. Disable any Game Turbo / extreme battery saver mode while testing\n\nTap Open Settings to jump to the app settings page first.",
+      t("settings.miuiSetupTitle"),
+      t("settings.miuiSetupMsg"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Open Settings",
+          text: t("settings.miuiOpenSettings"),
           onPress: () => {
             Linking.openSettings().catch(() => {
               Alert.alert(
-                "Unable to open settings",
-                "Please open Settings manually and search for this app.",
+                t("settings.miuiUnableToOpenSettings"),
+                t("settings.miuiOpenSettingsManually"),
               );
             });
           },
         },
       ],
     );
-  }, []);
+  }, [t]);
 
   const handleAiVoiceToggle = async (value: boolean) => {
     if (value && !hasVoiceOptions) {
       Alert.alert(
-        "No available voice",
-        "No linked caregiver voice found. Please ask caregiver to create one first.",
+        t("settings.noAvailableVoice"),
+        t("settings.noVoiceFoundDesc"),
       );
       return;
     }
@@ -331,9 +323,9 @@ export default function ElderlySettings() {
       });
       setAiVoiceEnabled(true);
       setVoicePickerVisible(false);
-      Alert.alert("Saved", `AI voice set to ${voice.caregiver_name}.`);
+      Alert.alert(t("settings.emergencySavedTitle"), t("settings.aiVoiceSet", { name: voice.caregiver_name }));
     } catch (e) {
-      Alert.alert("Error", "Failed to save AI voice selection.");
+      Alert.alert(t("common.error"), t("settings.failedSaveAiVoice"));
     } finally {
       setVoiceSaving(false);
     }
@@ -350,9 +342,9 @@ export default function ElderlySettings() {
         aiVoiceCaregiverName: undefined,
       });
       setAiVoiceEnabled(false);
-      Alert.alert("Cleared", "AI voice selection has been removed.");
+      Alert.alert(t("settings.emergencyClearedTitle"), t("settings.aiVoiceCleared"));
     } catch {
-      Alert.alert("Error", "Failed to clear AI voice selection.");
+      Alert.alert(t("common.error"), t("settings.failedClearAiVoice"));
     } finally {
       setVoiceSaving(false);
     }
@@ -485,16 +477,16 @@ export default function ElderlySettings() {
 
         {/* Emergency */}
         <Text variant="titleLarge" style={styles.sectionTitle}>
-          Emergency
+          {t("settings.emergencySection")}
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <List.Item
-            title="Emergency"
+            title={t("settings.emergencySection")}
             titleStyle={styles.listTitle}
             description={
               emergencyContact
                 ? `${selectedCaregiverName ?? "Caregiver"} (${emergencyContact})`
-                : "Not set — tap to choose your emergency caregiver"
+                : t("settings.emergencyNotSetDesc")
             }
             descriptionStyle={styles.listDescription}
             left={() => (
@@ -534,9 +526,9 @@ export default function ElderlySettings() {
             ]}
           />
           <List.Item
-            title="Fall Detection"
+            title={t("settings.fallDetection")}
             titleStyle={styles.listTitle}
-            description={fallDetectionEnabled ? "On" : "Off"}
+            description={fallDetectionEnabled ? t("settings.fallDetectionOn") : t("settings.fallDetectionOff")}
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>
@@ -566,9 +558,9 @@ export default function ElderlySettings() {
             ]}
           />
           <List.Item
-            title="Fall Detection Test"
+            title={t("settings.fallDetectionTest")}
             titleStyle={styles.listTitle}
-            description="Check sensors, test the alert, or review MIUI setup"
+            description={t("settings.fallDetectionTestDesc")}
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>
@@ -587,21 +579,21 @@ export default function ElderlySettings() {
               onPress={handleCheckFallSensors}
               icon="cellphone-cog"
             >
-              Check sensors
+              {t("settings.checkSensors")}
             </Button>
             <Button
               mode="contained"
               onPress={handleTestFallAlert}
               icon="alert-decagram"
             >
-              Test alert
+              {t("settings.testAlert")}
             </Button>
             <Button
               mode="text"
               onPress={handleOpenMiuiGuide}
               icon="cog-outline"
             >
-              MIUI setup
+              {t("settings.miuiSetup")}
             </Button>
           </View>
           {emergencyContact && (
@@ -613,7 +605,7 @@ export default function ElderlySettings() {
                 ]}
               />
               <List.Item
-                title="Clear Emergency"
+                title={t("settings.clearEmergency")}
                 titleStyle={[styles.listTitle, { color: theme.colors.error }]}
                 left={() => (
                   <View
@@ -648,7 +640,11 @@ export default function ElderlySettings() {
           <List.Item
             title={t("settings.fontSize")}
             titleStyle={styles.listTitle}
-            description={fontSize}
+            description={
+              fontSize === FontSize.Small ? t("settings.fontSizeSmall") :
+              fontSize === FontSize.Large ? t("settings.fontSizeLarge") :
+              t("settings.fontSizeMedium")
+            }
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>

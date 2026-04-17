@@ -595,7 +595,11 @@ export default function Settings() {
         <List.Item
           title={t('settings.fontSize')}
           titleStyle={styles.listTitle}
-          description={fontSize}
+          description={
+            fontSize === FontSize.Small ? t("settings.fontSizeSmall") :
+            fontSize === FontSize.Large ? t("settings.fontSizeLarge") :
+            t("settings.fontSizeMedium")
+          }
           descriptionStyle={styles.listDescription}
           left={() => (
             <View style={styles.iconContainer}>

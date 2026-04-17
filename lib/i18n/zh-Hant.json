@@ -194,7 +194,44 @@
     "changeAvatar": "點擊更換頭像",
     "avatarUpdated": "頭像已更新！",
     "avatarUploadFailed": "上傳頭像失敗，請重試。",
-    "avatarSchemaMissing": "目前未能更新個人頭像，因為 Appwrite 的 caregiver / elderly 表尚未建立 avatar_file_id 欄位。"
+    "avatarSchemaMissing": "目前未能更新個人頭像，因為 Appwrite 的 caregiver / elderly 表尚未建立 avatar_file_id 欄位。",
+    "emergencySection": "緊急聯絡",
+    "emergencyNotSetDesc": "未設定 — 點擊選擇您的緊急聯絡人",
+    "emergencySavedTitle": "已儲存",
+    "emergencySavedMsg": "緊急聯絡人已設定為 {{name}}",
+    "failedSaveEmergency": "儲存緊急聯絡人失敗。",
+    "emergencyClearedTitle": "已清除",
+    "emergencyClearedMsg": "緊急聯絡人已清除。",
+    "failedClearEmergency": "清除緊急聯絡人失敗。",
+    "fallDetection": "跌倒偵測",
+    "fallDetectionOn": "開啟",
+    "fallDetectionOff": "關閉",
+    "fallDetectionTest": "跌倒偵測測試",
+    "fallDetectionTestDesc": "檢查感測器、測試警報或查看 MIUI 設定",
+    "checkSensors": "檢查感測器",
+    "testAlert": "測試警報",
+    "miuiSetup": "MIUI 設定",
+    "clearEmergency": "清除緊急聯絡人",
+    "fallDetectionOffTitle": "跌倒偵測已關閉",
+    "fallDetectionOffMsg": "請先開啟跌倒偵測，再進行警報測試。",
+    "failedSaveAiVoice": "儲存 AI 語音選擇失敗。",
+    "failedClearAiVoice": "清除 AI 語音選擇失敗。",
+    "miuiSetupTitle": "MIUI 跌倒偵測設定",
+    "miuiSetupMsg": "MIUI 通常不會透過權限提示攔截感測器，而是會在背景終止或限制應用程式運行。請檢查以下設定：\n\n1. 省電策略 -> 將此應用設為無限制\n2. 自動啟動 -> 允許此應用自動啟動\n3. 應用程式資訊 -> 其他權限 / 背景位置 -> 永遠允許\n4. 最近任務畫面 -> 鎖定此應用，防止 MIUI 滑動清除\n5. 測試時請關閉遊戲加速 / 極省電模式\n\n點擊「開啟設定」可直接跳轉到應用程式設定頁面。",
+    "miuiOpenSettings": "開啟設定",
+    "miuiUnableToOpenSettings": "無法開啟設定",
+    "miuiOpenSettingsManually": "請手動開啟設定並搜尋此應用程式。",
+    "fallCheckTitle": "跌倒偵測檢查",
+    "fallCheckNoAccelerometer": "此手機不提供加速度感測器，無法執行跌倒偵測。",
+    "fallCheckNoGyroscope": "此手機不提供陀螺儀感測器，應用程式已切換至純加速度計模式，晃動測試可能不夠準確。",
+    "fallCheckNoBackground": "背景服務未執行。在 MIUI 上，省電策略或背景限制可能導致跌倒偵測停止，即使感測器可用。",
+    "fallCheckOk": "此手機的感測器看起來可用。如果測試警報彈出，代表緊急覆蓋層已正常運作。",
+    "fallCheckAvailable": "可用",
+    "fallCheckUnavailable": "不可用",
+    "fallCheckRunning": "執行中",
+    "fallCheckNotRunning": "未執行",
+    "fallCheckYes": "是",
+    "fallCheckNo": "否"
   },
   "home": {
     "hello": "你好，{{name}}！",
@@ -307,7 +344,9 @@
     "failedToAcceptInvite": "接受邀請失敗",
     "failedToDeclineInvite": "拒絕邀請失敗",
     "declineGroupInvite": "拒絕邀請",
-    "declineGroupConfirm": "拒絕加入 \"{{name}}\" 的邀請？"
+    "declineGroupConfirm": "拒絕加入 \"{{name}}\" 的邀請？",
+    "createdTheGroup": "{{name}} 建立了群組",
+    "joinedTheGroup": "{{name}} 加入了群組"
   },
   "medication": {
     "toTakeToday": "今日待服用",
@@ -560,7 +599,9 @@
     "sep": "九月",
     "oct": "十月",
     "nov": "十一月",
-    "dec": "十二月"
+    "dec": "十二月",
+    "sun": "日", "mon": "一", "tue": "二", "wed": "三",
+    "thu": "四", "fri": "五", "sat": "六"
   },
   "healthData": {
     "myHealthData": "我的健康資料",
@@ -621,7 +662,8 @@
     "noHealthDataRecorded": "暫無健康資料",
     "systolicShort": "收縮壓",
     "diastolicShort": "舒張壓",
-    "stepsLabel": "步數"
+    "stepsLabel": "步數",
+    "noActivityDetected": "未檢測到活動（0 步）"
   },
   "messages": {
     "noCaregiversYet": "暫無照顧者",

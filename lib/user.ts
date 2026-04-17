@@ -77,8 +77,13 @@ export async function removeRoleLabel(
  */
 export async function uploadAvatar(asset: ImagePickerAsset): Promise<string> {
   const uri = asset.uri;
-  const fileName = asset.fileName || `avatar_${Date.now()}.jpg`;
-  const mimeType = asset.mimeType || "image/jpeg";
+
+  // Normalize mimeType to a supported image format (jpeg or png)
+  // On iOS, picked images may have mimeType "image/heic" or similar unsupported formats.
+  const rawMime = asset.mimeType || "image/jpeg";
+  const mimeType = rawMime === "image/png" ? "image/png" : "image/jpeg";
+  const ext = mimeType === "image/png" ? "png" : "jpg";
+  const fileName = `avatar_${Date.now()}.${ext}`;
 
   const file = {
     name: fileName,

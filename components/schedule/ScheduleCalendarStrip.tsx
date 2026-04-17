@@ -1,4 +1,3 @@
-import { getDateLocale } from "@/lib/i18n";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -9,6 +8,8 @@ import {
     View,
 } from "react-native";
 import { Text, useTheme } from "react-native-paper";
+
+const MONTH_KEYS = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"] as const;
 
 interface DateItem {
   day: string;
@@ -33,8 +34,12 @@ export default function ScheduleCalendarStrip({
   onOpenMonthPicker,
 }: ScheduleCalendarStripProps) {
   const theme = useTheme();
-  const { i18n } = useTranslation();
-  const locale = getDateLocale(i18n.language);
+  const { t, i18n } = useTranslation();
+  const monthLabel = t(`schedule.${MONTH_KEYS[referenceDate.getMonth()]}`);
+  const headerText =
+    i18n.language === "zh" || i18n.language === "zh-Hant"
+      ? `${referenceDate.getFullYear()}年${monthLabel}`
+      : `${monthLabel} ${referenceDate.getFullYear()}`;
 
   return (
     <View
@@ -57,10 +62,7 @@ export default function ScheduleCalendarStrip({
             variant="headlineSmall"
             style={{ fontWeight: "bold", marginRight: 8 }}
           >
-            {referenceDate.toLocaleDateString(locale, {
-              month: "long",
-              year: "numeric",
-            })}
+            {headerText}
           </Text>
           <MaterialCommunityIcons
             name="chevron-down"

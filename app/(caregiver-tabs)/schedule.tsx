@@ -10,7 +10,6 @@
 } from "@/components/schedule";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
-import { getDateLocale } from "@/lib/i18n";
 import {
     createScheduleTask,
     fetchDayMedicationEvents,
@@ -254,11 +253,12 @@ export default function SchedulePage() {
   };
 
   // Generate next 7 days from referenceDate
+  const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
   const dates = Array.from({ length: 7 }, (_, i) => {
     const dateItem = new Date(referenceDate);
     dateItem.setDate(referenceDate.getDate() + i);
     return {
-      day: dateItem.toLocaleDateString(getDateLocale(i18n.language), { weekday: "short" }),
+      day: t(`schedule.${WEEKDAY_KEYS[dateItem.getDay()]}`),
       date: dateItem.getDate(),
       fullDate: dateItem,
       isToday: dateItem.toDateString() === new Date().toDateString(),

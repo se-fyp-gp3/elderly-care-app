@@ -1,3 +1,4 @@
+import i18n from "@/lib/i18n";
 import {
     Caregiver,
     CaregiverConnection,
@@ -108,7 +109,7 @@ async function getElderlyContactsForCaregiver(
       phone: elderly.phone,
       role: "elderly" as const,
       avatarLabel: (elderly.name || "??").substring(0, 2).toUpperCase(),
-      avatarFileId: (elderly as any).avatar_file_id ?? undefined,
+      avatarFileId: elderly.avatar_file_id ?? undefined,
       status: elderly.status,
       lastActive: elderly.last_active ?? elderly.$updatedAt,
     }));
@@ -167,7 +168,7 @@ export async function getContactsForElderly(
       phone: caregiver.phone,
       role: "caregiver" as const,
       avatarLabel: (caregiver.name || "??").substring(0, 2).toUpperCase(),
-      avatarFileId: (caregiver as any).avatar_file_id ?? undefined,
+      avatarFileId: caregiver.avatar_file_id ?? undefined,
       lastActive: caregiver.last_active ?? caregiver.$updatedAt,
     }));
   } catch (error) {
@@ -265,13 +266,14 @@ export function formatRelativeTime(dateString?: string): string {
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
+    const t = i18n.t.bind(i18n);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < 1) return t("common.justNow");
+    if (diffMins < 60) return t("common.minutesAgo", { minutes: diffMins });
+    if (diffHours < 24) return t("common.hoursAgo", { hours: diffHours });
+    if (diffDays < 7) return t("common.daysAgo", { days: diffDays });
 
-    return date.toLocaleDateString(undefined, {
+    return date.toLocaleDateString(i18n.language, {
       month: "short",
       day: "numeric",
     });
@@ -540,7 +542,7 @@ export async function getElderlyContacts(
       phone: elderly.phone,
       role: "elderly" as const,
       avatarLabel: (elderly.name || "??").substring(0, 2).toUpperCase(),
-      avatarFileId: (elderly as any).avatar_file_id ?? undefined,
+      avatarFileId: elderly.avatar_file_id ?? undefined,
       status: elderly.status,
       lastActive: elderly.$updatedAt,
     }));
@@ -791,7 +793,7 @@ export async function getCaregiverContacts(
       phone: c.phone,
       role: "caregiver" as const,
       avatarLabel: (c.name || "??").substring(0, 2).toUpperCase(),
-      avatarFileId: (c as any).avatar_file_id ?? undefined,
+      avatarFileId: c.avatar_file_id ?? undefined,
       lastActive: c.$updatedAt,
     }));
 
@@ -802,7 +804,7 @@ export async function getCaregiverContacts(
       phone: e.phone,
       role: "elderly" as const,
       avatarLabel: (e.name || "??").substring(0, 2).toUpperCase(),
-      avatarFileId: (e as any).avatar_file_id ?? undefined,
+      avatarFileId: e.avatar_file_id ?? undefined,
       status: e.status,
       lastActive: e.$updatedAt,
     }));

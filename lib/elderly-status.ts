@@ -391,7 +391,7 @@ export async function computeElderlyStatus(
         if (status === ElderlyStatus.NORMAL) {
           status = ElderlyStatus.WARNING;
         }
-        reasons.push("No activity detected (0 steps)");
+        reasons.push(i18n.t('healthData.noActivityDetected'));
       } else if (stepRecords.length === 0) {
         // No step data at all — don't flag, tracking may not be enabled
       }

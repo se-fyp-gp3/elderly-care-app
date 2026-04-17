@@ -194,7 +194,44 @@
     "changeAvatar": "Tap to change avatar",
     "avatarUpdated": "Avatar updated!",
     "avatarUploadFailed": "Failed to upload avatar. Please try again.",
-    "avatarSchemaMissing": "Profile avatar is not available yet because the Appwrite caregiver/elderly tables are missing the avatar_file_id column."
+    "avatarSchemaMissing": "Profile avatar is not available yet because the Appwrite caregiver/elderly tables are missing the avatar_file_id column.",
+    "emergencySection": "Emergency",
+    "emergencyNotSetDesc": "Not set — tap to choose your emergency caregiver",
+    "emergencySavedTitle": "Saved",
+    "emergencySavedMsg": "Emergency set to {{name}}",
+    "failedSaveEmergency": "Failed to save emergency.",
+    "emergencyClearedTitle": "Cleared",
+    "emergencyClearedMsg": "Emergency has been removed.",
+    "failedClearEmergency": "Failed to clear emergency.",
+    "fallDetection": "Fall Detection",
+    "fallDetectionOn": "On",
+    "fallDetectionOff": "Off",
+    "fallDetectionTest": "Fall Detection Test",
+    "fallDetectionTestDesc": "Check sensors, test the alert, or review MIUI setup",
+    "checkSensors": "Check sensors",
+    "testAlert": "Test alert",
+    "miuiSetup": "MIUI setup",
+    "clearEmergency": "Clear Emergency",
+    "fallDetectionOffTitle": "Fall Detection Off",
+    "fallDetectionOffMsg": "Turn on fall detection first, then try the test alert again.",
+    "failedSaveAiVoice": "Failed to save AI voice selection.",
+    "failedClearAiVoice": "Failed to clear AI voice selection.",
+    "miuiSetupTitle": "MIUI Setup for Fall Detection",
+    "miuiSetupMsg": "MIUI usually does not block sensors with a permission prompt. Instead, it kills or restricts apps in the background. Please check these settings:\n\n1. Battery saver -> set this app to No restrictions / Unrestricted\n2. Autostart -> allow this app to start automatically\n3. App info -> Other permissions / Background location -> allow always\n4. Recent apps screen -> lock this app so MIUI does not swipe-kill it\n5. Disable any Game Turbo / extreme battery saver mode while testing\n\nTap Open Settings to jump to the app settings page first.",
+    "miuiOpenSettings": "Open Settings",
+    "miuiUnableToOpenSettings": "Unable to open settings",
+    "miuiOpenSettingsManually": "Please open Settings manually and search for this app.",
+    "fallCheckTitle": "Fall Detection Check",
+    "fallCheckNoAccelerometer": "This phone does not provide an accelerometer, so fall detection cannot run.",
+    "fallCheckNoGyroscope": "This phone does not provide a gyroscope. The app has switched to an accelerometer-only fallback, so shake-style tests may be less reliable.",
+    "fallCheckNoBackground": "Background service is not running. On MIUI, battery saver or background restrictions may be stopping fall detection even when sensors are available.",
+    "fallCheckOk": "Sensors look available on this phone. If the test alert opens, the emergency overlay path is working.",
+    "fallCheckAvailable": "Available",
+    "fallCheckUnavailable": "Unavailable",
+    "fallCheckRunning": "Running",
+    "fallCheckNotRunning": "Not running",
+    "fallCheckYes": "Yes",
+    "fallCheckNo": "No"
   },
   "home": {
     "hello": "Hello, {{name}}!",
@@ -307,7 +344,9 @@
     "failedToAcceptInvite": "Failed to accept invitation",
     "failedToDeclineInvite": "Failed to decline invitation",
     "declineGroupInvite": "Decline Invitation",
-    "declineGroupConfirm": "Decline the invitation to join \"{{name}}\"?"
+    "declineGroupConfirm": "Decline the invitation to join \"{{name}}\"?",
+    "createdTheGroup": "{{name}} created the group",
+    "joinedTheGroup": "{{name}} joined the group"
   },
   "medication": {
     "toTakeToday": "To Take Today",
@@ -560,7 +599,9 @@
     "sep": "Sep",
     "oct": "Oct",
     "nov": "Nov",
-    "dec": "Dec"
+    "dec": "Dec",
+    "sun": "Sun", "mon": "Mon", "tue": "Tue", "wed": "Wed",
+    "thu": "Thu", "fri": "Fri", "sat": "Sat"
   },
   "healthData": {
     "myHealthData": "My Health Data",
@@ -621,7 +662,8 @@
     "noHealthDataRecorded": "No health data recorded",
     "systolicShort": "Systolic",
     "diastolicShort": "Diastolic",
-    "stepsLabel": "Steps"
+    "stepsLabel": "Steps",
+    "noActivityDetected": "No activity detected (0 steps)"
   },
   "messages": {
     "noCaregiversYet": "No Caregivers Yet",

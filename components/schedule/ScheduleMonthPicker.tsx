@@ -1,8 +1,9 @@
-import { getDateLocale } from "@/lib/i18n";
-import React, { useMemo } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Button, Dialog, Portal, Text, useTheme } from "react-native-paper";
+
+const MONTH_KEYS = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"] as const;
 
 interface ScheduleMonthPickerProps {
   visible: boolean;
@@ -22,15 +23,8 @@ export default function ScheduleMonthPicker({
   onSelectMonth,
 }: ScheduleMonthPickerProps) {
   const theme = useTheme();
-  const { t, i18n } = useTranslation();
-  const locale = getDateLocale(i18n.language);
-  const MONTHS = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) =>
-        new Date(2024, i).toLocaleDateString(locale, { month: "short" })
-      ),
-    [locale]
-  );
+  const { t } = useTranslation();
+  const MONTHS = MONTH_KEYS.map(k => t(`schedule.${k}`));
 
   return (
     <Portal>
