@@ -1,3 +1,4 @@
+import i18n from "@/lib/i18n";
 import {
     Caregiver,
     CaregiverConnection,
@@ -15,7 +16,6 @@ import {
     ELDERLY_TABLE_ID,
     tablesDB,
 } from "./appwrite";
-import i18n from "@/lib/i18n";
 
 export interface Contact {
   id: string;

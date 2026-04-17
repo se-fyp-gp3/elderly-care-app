@@ -1,50 +1,50 @@
 import {
-  DATABASE_ID,
-  EMERGENCY_ALERTS_TABLE_ID,
-  safeSubscribe,
+    DATABASE_ID,
+    EMERGENCY_ALERTS_TABLE_ID,
+    safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-  fetchEmergencyAlerts,
-  resolveEmergencyAlert,
-  updateAlertStatus,
+    fetchEmergencyAlerts,
+    resolveEmergencyAlert,
+    updateAlertStatus,
 } from "@/lib/emergency";
+import i18n from "@/lib/i18n";
 import type { EmergencyAlert } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation, useRouter } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useState,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import i18n from "@/lib/i18n";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Linking,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Linking,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    useColorScheme,
+    View,
 } from "react-native";
 import {
-  Button,
-  Card,
-  Chip,
-  Dialog,
-  Divider,
-  Menu,
-  Portal,
-  Searchbar,
-  Surface,
-  Text,
-  useTheme,
+    Button,
+    Card,
+    Chip,
+    Dialog,
+    Divider,
+    Menu,
+    Portal,
+    Searchbar,
+    Surface,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 /* ── Helpers ────────────────────────────────────────────── */
