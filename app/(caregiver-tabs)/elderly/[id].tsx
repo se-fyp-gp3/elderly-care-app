@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, TouchableOpacity, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 
@@ -15,6 +16,7 @@ export default function ElderlyDetailPage() {
   const router = useRouter();
   const navigation = useNavigation();
   const theme = useTheme();
+  const { t } = useTranslation();
 
   // Ensure id is a string
   const docId = Array.isArray(id) ? id[0] : id;
@@ -112,7 +114,7 @@ export default function ElderlyDetailPage() {
             size={28}
             color={theme.colors.onSurface}
           />
-          <Text style={{ marginLeft: 5, fontSize: 16 }}>Back</Text>
+          <Text style={{ marginLeft: 5, fontSize: 16 }}>{t("common.back")}</Text>
         </TouchableOpacity>
       ),
     });
@@ -122,7 +124,7 @@ export default function ElderlyDetailPage() {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
-        <Text style={{ marginTop: 10 }}>Loading details...</Text>
+        <Text style={{ marginTop: 10 }}>{t("common.loadingDetails")}</Text>
       </View>
     );
   }
@@ -130,7 +132,7 @@ export default function ElderlyDetailPage() {
   if (!data) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>No data found.</Text>
+        <Text>{t("common.noDataFound")}</Text>
       </View>
     );
   }

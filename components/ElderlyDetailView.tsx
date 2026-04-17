@@ -53,7 +53,14 @@ export default function ElderlyDetailView({
   const theme = useTheme();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === "zh" ? "zh-CN" : i18n.language === "zh-Hant" ? "zh-TW" : "en-GB";
+  const translatedStatus =
+    data.status === "Danger"
+      ? t("caregiverPanel.danger")
+      : data.status === "Warning"
+        ? t("caregiverPanel.needsAttention")
+        : t("caregiverPanel.normal");
   const handleCall = (phone?: string) => {
     if (onCall && phone) {
       onCall(phone);
@@ -106,7 +113,7 @@ export default function ElderlyDetailView({
                 textStyle={{ color: isDark ? "#81C784" : "#2E7D32" }}
                 compact
               >
-                {data.status || t("caregiverPanel.normal")}
+                {translatedStatus}
               </Chip>
             </View>
           </View>
@@ -231,7 +238,7 @@ export default function ElderlyDetailView({
             <>
               <List.Item
                 title={t("healthData.dateOfBirth")}
-                description={new Date(data.birth).toLocaleDateString("en-GB", {
+                description={new Date(data.birth).toLocaleDateString(dateLocale, {
                   year: "numeric",
                   month: "long",
                   day: "numeric",
