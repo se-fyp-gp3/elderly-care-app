@@ -1,7 +1,7 @@
 import {
+  clientReactNative,
   DATABASE_ID,
   MEDICATION_LOGS_TABLE_ID,
-  safeSubscribe
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -13,9 +13,7 @@ import {
   deactivateMedicationReminder,
   fetchActiveMedicationReminders,
   fetchDailyMedicationLogs,
-  fetchFinishedMedicationReminders,
   logMedicationAction,
-  markPreviousDaysPendingAsMissing,
 } from "@/lib/medication_tracking";
 import {
   cancelAllNotifications,
@@ -23,7 +21,6 @@ import {
   scheduleMedicationNotification,
   sendImmediateNotification,
 } from "@/lib/notifications";
-import { translateUnit } from "@/lib/schedule";
 import {
   Caregiver,
   ElderlyMedicationReminder,
@@ -34,7 +31,6 @@ import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import React from "react";
-import { useTranslation } from "react-i18next";
 import {
   Alert,
   Animated,
@@ -44,7 +40,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
@@ -54,6 +49,7 @@ import {
   Divider,
   FAB,
   IconButton,
+  List,
   Modal,
   Portal,
   Switch,
@@ -84,25 +80,14 @@ type TodoItem = {
   dosage: string;
 };
 
-type TimeGroup = {
-  time: string; // HH:mm
-  items: TodoItem[];
-};
-
 export default function ElderlyMedicationScreen() {
   const { user } = useAuth();
   const theme = useTheme();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const { t } = useTranslation();
   const [refreshing, setRefreshing] = React.useState(false);
 
   const [reminders, setReminders] = React.useState<ElderlyMedicationReminder[]>(
     [],
   );
-  const [finishedReminders, setFinishedReminders] = React.useState<
-    ElderlyMedicationReminder[]
-  >([]);
   const [todayLogs, setTodayLogs] = React.useState<MedicationLogs[]>([]);
 
   const [caregivers, setCaregivers] = React.useState<Caregiver[]>([]);
@@ -130,23 +115,17 @@ export default function ElderlyMedicationScreen() {
     if (!user) return;
 
     try {
-      if (user) {
-        await markPreviousDaysPendingAsMissing(user.$id); // Sweep old pending -> missing
-        await checkAndMarkSkippedMedications(user.$id); // Check for skipped status first
-      }
+      if (user) await checkAndMarkSkippedMedications(user.$id); // Check for skipped status first
 
-      const [remindersData, logsData, caregiversData, finishedData] =
-        await Promise.all([
-          fetchActiveMedicationReminders(user.$id),
-          fetchDailyMedicationLogs(user.$id, new Date()),
-          fetchCaregiversForElderly(user.$id),
-          fetchFinishedMedicationReminders(user.$id),
-        ]);
+      const [remindersData, logsData, caregiversData] = await Promise.all([
+        fetchActiveMedicationReminders(user.$id),
+        fetchDailyMedicationLogs(user.$id, new Date()),
+        fetchCaregiversForElderly(user.$id),
+      ]);
 
       setReminders(remindersData);
       setTodayLogs(logsData);
       setCaregivers(caregiversData);
-      setFinishedReminders(finishedData);
     } catch (err) {
       console.error("Error fetching medication data:", err);
     }
@@ -168,7 +147,7 @@ export default function ElderlyMedicationScreen() {
     }, 30000);
 
     // 3. Appwrite Realtime: Subscribe to medication logs changes
-    const realtimeUnsubscribe = safeSubscribe(
+    const realtimeUnsubscribe = clientReactNative.subscribe(
       `databases.${DATABASE_ID}.collections.${MEDICATION_LOGS_TABLE_ID}.documents`,
       (response) => {
         if (
@@ -229,23 +208,6 @@ export default function ElderlyMedicationScreen() {
           return;
         }
 
-        // Hide if scheduled_at is beyond duration_days
-        if (r.start_date && r.duration_days) {
-          const startDateMs = new Date(r.start_date).getTime();
-          const startHkDate = new Date(startDateMs + hkOffset)
-            .toISOString()
-            .slice(0, 10);
-          const firstCandBase = new Date(startHkDate);
-          firstCandBase.setUTCHours(hours, minutes, 0, 0);
-          const firstCandUtcMs = firstCandBase.getTime() - hkOffset;
-          const startDelay = firstCandUtcMs <= startDateMs ? 1 : 0;
-          const lastValidUtcMs =
-            firstCandUtcMs + (startDelay + r.duration_days - 1) * 86400000;
-          if (scheduledDate.getTime() > lastValidUtcMs) {
-            return;
-          }
-        }
-
         // Find if logged
         const log = todayLogs.find((l) => {
           const logRemId =
@@ -275,7 +237,7 @@ export default function ElderlyMedicationScreen() {
         // @ts-ignore
         const medUnit = medications[0]?.unit || "dose";
         // @ts-ignore
-        const medDosage = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
+        const medDosage = `${r.elderly_medication?.dosage || 1} ${medUnit}`;
 
         list.push({
           reminder: r,
@@ -292,24 +254,6 @@ export default function ElderlyMedicationScreen() {
     // Sort by time
     return list.sort((a, b) => a.time.localeCompare(b.time));
   }, [reminders, todayLogs]);
-
-  // Group todoList items by time slot for display
-  const groupedTodoList = React.useMemo(() => {
-    const groupMap = new Map<string, TodoItem[]>();
-    todoList.forEach((item) => {
-      const existing = groupMap.get(item.time);
-      if (existing) {
-        existing.push(item);
-      } else {
-        groupMap.set(item.time, [item]);
-      }
-    });
-    const groups: TimeGroup[] = [];
-    groupMap.forEach((items, time) => {
-      groups.push({ time, items });
-    });
-    return groups.sort((a, b) => a.time.localeCompare(b.time));
-  }, [todoList]);
 
   // Notification Logic: Schedule reminders and alert on missing
   React.useEffect(() => {
@@ -329,8 +273,8 @@ export default function ElderlyMedicationScreen() {
       if (newMissing.length > 0) {
         // Summarize
         const names = newMissing.map((i) => i.medicationName).join(", ");
-        const body = t("medication.missedMedAlertDesc", { medications: names });
-        await sendImmediateNotification(t("medication.missedMedAlert"), body);
+        const body = `You have missed your scheduled medication: ${names}. Please take it as soon as possible!`;
+        await sendImmediateNotification("Missed Medication Alert", body);
 
         // Mark as notified
         newMissing.forEach((i) => {
@@ -361,8 +305,8 @@ export default function ElderlyMedicationScreen() {
         if (triggerDate.getTime() > Date.now()) {
           const medList = names.join(", ");
           await scheduleMedicationNotification(
-            t("medication.medicationReminder"),
-            t("medication.medReminder", { medications: medList }),
+            "Medication Reminder",
+            `It's time to take your medication: ${medList}`,
             triggerDate,
           );
         }
@@ -389,7 +333,7 @@ export default function ElderlyMedicationScreen() {
         });
       }
       return await FileSystem.readAsStringAsync(uri, {
-        encoding: "base64",
+        encoding: FileSystem.EncodingType.Base64,
       });
     } catch (e) {
       console.error("Base64 error:", e);
@@ -413,7 +357,7 @@ export default function ElderlyMedicationScreen() {
 
   const analyzeMedicationImage = async (uri: string) => {
     if (!OPENROUTER_API_KEY) {
-      Alert.alert(t("medication.configError"), t("medication.apiKeyMissing"));
+      Alert.alert("Configuration Error", "API Key missing.");
       return null;
     }
 
@@ -460,7 +404,7 @@ export default function ElderlyMedicationScreen() {
       return JSON.parse(jsonString);
     } catch (error) {
       console.error("AI Analysis failed:", error);
-      Alert.alert(t("common.error"), t("medication.scanFailed"));
+      Alert.alert("Error", "Failed to analyze image.");
       return null;
     }
   };
@@ -469,10 +413,7 @@ export default function ElderlyMedicationScreen() {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          t("common.permissionNeeded"),
-          t("medication.cameraPermissionRequired"),
-        );
+        Alert.alert("Permission needed", "Camera permission is required.");
         return;
       }
 
@@ -505,12 +446,12 @@ export default function ElderlyMedicationScreen() {
 
           if (data.durationDays) setDurationDays(Number(data.durationDays));
 
-          Alert.alert(t("common.success"), t("medication.medDetailsScanned"));
+          Alert.alert("Success", "Medication details scanned!");
         }
       }
     } catch (error) {
       setIsScanning(false);
-      Alert.alert(t("common.error"), t("medication.scanFailed"));
+      Alert.alert("Error", "Scan failed.");
     }
   };
 
@@ -533,7 +474,7 @@ export default function ElderlyMedicationScreen() {
       );
       await fetchData();
     } catch (error) {
-      Alert.alert(t("common.error"), t("medication.failedToUpdateStatus"));
+      Alert.alert("Error", "Failed to update status");
     }
   };
 
@@ -658,18 +599,12 @@ export default function ElderlyMedicationScreen() {
     if (!user) return;
 
     if (!medicineName.trim()) {
-      showMessage(
-        t("medication.missingInfo"),
-        t("medication.enterMedicineName"),
-      );
+      showMessage("Missing info", "Please enter medicine name.");
       return;
     }
 
     if (timesPerDay < 1 || timesPerDay > 10) {
-      showMessage(
-        t("medication.invalidValue"),
-        t("medication.timesPerDayRange"),
-      );
+      showMessage("Invalid value", "Times per day must be between 1 and 10.");
       return;
     }
 
@@ -678,7 +613,7 @@ export default function ElderlyMedicationScreen() {
       .filter(Boolean);
 
     if (cleanedTimes.length === 0) {
-      showMessage(t("medication.missingInfo"), t("medication.addReminderTime"));
+      showMessage("Missing info", "Please add at least one reminder time.");
       return;
     }
 
@@ -701,7 +636,7 @@ export default function ElderlyMedicationScreen() {
       await fetchData();
     } catch (error) {
       console.error("Error saving medication:", error);
-      showMessage(t("common.error"), t("medication.failedToSave"));
+      showMessage("Error", "Failed to save medication.");
     } finally {
       setSaving(false);
     }
@@ -727,221 +662,77 @@ export default function ElderlyMedicationScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* To Take Today - Grouped by Time */}
-        <Text variant="titleLarge" style={styles.sectionTitle}>
-          {t("medication.toTakeToday")}
+        {/* NEW: To Take Today (Ci hecklist view) */}
+        <Text variant="titleMedium" style={styles.sectionTitle}>
+          To Take Today
         </Text>
-        {groupedTodoList.length > 0 ? (
-          groupedTodoList.map((group) => {
-            const allTaken = group.items.every((i) => i.status === "taken");
-            const hasMissing = group.items.some((i) => i.status === "missing");
-
-            const groupAccent = allTaken
-              ? "#4CAF50"
-              : hasMissing
-                ? "#E53935"
-                : "#FF8F00";
-            const groupBg = hasMissing
-              ? isDark
-                ? "rgba(229,57,53,0.1)"
-                : "#FFF5F5"
-              : theme.colors.surface;
-
-            return (
-              <View
-                key={`group-${group.time}`}
-                style={[
-                  styles.medCard,
-                  {
-                    backgroundColor: groupBg,
-                    borderLeftColor: groupAccent,
-                  },
-                ]}
-              >
-                {/* Group Header: Time */}
-                <View style={styles.groupHeader}>
-                  <View
-                    style={[
-                      styles.medCardTime,
-                      { backgroundColor: theme.colors.surfaceVariant },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="clock-outline"
-                      size={18}
-                      color={theme.colors.onSurfaceVariant}
-                    />
-                    <Text
-                      variant="titleMedium"
+        <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          {todoList.length > 0 ? (
+            todoList.map((item, index) => {
+              const isTaken = item.status === "taken";
+              return (
+                <List.Item
+                  key={`${item.reminder.$id}-${item.time}-${index}`}
+                  title={`${item.medicationName} (${item.dosage})`}
+                  description={`Value time: ${item.time}`}
+                  left={(props) => (
+                    <View style={styles.iconContainer}>
+                      <MaterialCommunityIcons
+                        name={isTaken ? "check-circle" : "clock-outline"}
+                        size={28}
+                        color={isTaken ? "#4CAF50" : theme.colors.primary}
+                      />
+                    </View>
+                  )}
+                  right={() => (
+                    <View
                       style={{
-                        color: theme.colors.onSurface,
-                        marginLeft: 6,
-                        fontWeight: "700",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
                       }}
                     >
-                      {group.time}
-                    </Text>
-                  </View>
-                  <Text
-                    variant="bodySmall"
-                    style={{ color: theme.colors.onSurfaceVariant }}
-                  >
-                    {t("medication.medications", { count: group.items.length })}
-                  </Text>
-                </View>
-
-                {/* Individual medications within group */}
-                {group.items.map((item, index) => {
-                  const isTaken = item.status === "taken";
-                  const isMissing = item.status === "missing";
-
-                  return (
-                    <View key={`${item.reminder.$id}-${item.time}-${index}`}>
-                      {index > 0 && <Divider style={{ marginVertical: 8 }} />}
-                      <View style={styles.groupItemRow}>
-                        <View
-                          style={[
-                            styles.groupItemIcon,
-                            {
-                              backgroundColor: isTaken
-                                ? isDark
-                                  ? "rgba(76,175,80,0.15)"
-                                  : "#E8F5E9"
-                                : isMissing
-                                  ? isDark
-                                    ? "rgba(229,57,53,0.15)"
-                                    : "#FFEBEE"
-                                  : isDark
-                                    ? "rgba(94,53,177,0.15)"
-                                    : "#EDE7F6",
-                            },
-                          ]}
+                      <Text
+                        variant="labelMedium"
+                        style={{
+                          textTransform: "capitalize",
+                          color:
+                            item.status === "taken"
+                              ? "#4CAF50"
+                              : item.status === "missing"
+                                ? "#D32F2F"
+                                : item.status === "pending"
+                                  ? "#FFA000"
+                                  : theme.colors.onSurfaceVariant,
+                        }}
+                      >
+                        {item.status}
+                      </Text>
+                      {!isTaken && (
+                        <Button
+                          mode="contained"
+                          onPress={() => handleTakeMedication(item)}
+                          compact
                         >
-                          <MaterialCommunityIcons
-                            name={
-                              isTaken
-                                ? "check-circle"
-                                : isMissing
-                                  ? "close-circle"
-                                  : "pill"
-                            }
-                            size={22}
-                            color={
-                              isTaken
-                                ? "#4CAF50"
-                                : isMissing
-                                  ? "#E53935"
-                                  : "#5E35B1"
-                            }
-                          />
-                        </View>
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text
-                            variant="titleSmall"
-                            style={{ fontWeight: "700" }}
-                          >
-                            {item.medicationName}
-                          </Text>
-                          <Text
-                            variant="bodySmall"
-                            style={{
-                              color: theme.colors.onSurfaceVariant,
-                              marginTop: 1,
-                            }}
-                          >
-                            {item.dosage}
-                          </Text>
-                        </View>
-                        {/* Per-item action button */}
-                        {isTaken ? (
-                          <TouchableOpacity
-                            onPress={() => handleTakeMedication(item)}
-                            style={[
-                              styles.groupItemBtnDone,
-                              {
-                                backgroundColor: isDark
-                                  ? "rgba(76,175,80,0.15)"
-                                  : "#E8F5E9",
-                              },
-                            ]}
-                            activeOpacity={0.7}
-                          >
-                            <MaterialCommunityIcons
-                              name="check-circle"
-                              size={18}
-                              color={isDark ? "#81C784" : "#2E7D32"}
-                            />
-                            <Text
-                              style={{
-                                color: isDark ? "#81C784" : "#2E7D32",
-                                fontSize: 12,
-                                fontWeight: "600",
-                                marginLeft: 4,
-                              }}
-                            >
-                              {t("common.taken")}
-                            </Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
-                            onPress={() => handleTakeMedication(item)}
-                            style={[
-                              styles.groupItemBtn,
-                              {
-                                backgroundColor: isMissing
-                                  ? "#E53935"
-                                  : "#4CAF50",
-                              },
-                            ]}
-                            activeOpacity={0.8}
-                          >
-                            <MaterialCommunityIcons
-                              name="check-bold"
-                              size={16}
-                              color="#FFF"
-                            />
-                            <Text
-                              style={{
-                                color: "#FFF",
-                                fontSize: 12,
-                                fontWeight: "bold",
-                                marginLeft: 4,
-                              }}
-                            >
-                              {t("medication.take")}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                          Take
+                        </Button>
+                      )}
                     </View>
-                  );
-                })}
-              </View>
-            );
-          })
-        ) : (
-          <Card
-            style={[styles.card, { backgroundColor: theme.colors.surface }]}
-          >
+                  )}
+                  style={[styles.listItem, isTaken && { opacity: 0.6 }]}
+                />
+              );
+            })
+          ) : (
             <View style={styles.emptyState}>
-              <MaterialCommunityIcons
-                name="check-circle-outline"
-                size={48}
-                color="#A5D6A7"
-              />
-              <Text
-                variant="bodyLarge"
-                style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}
-              >
-                {t("medication.noMedsToday")}
-              </Text>
+              <Text>No medications scheduled for today.</Text>
             </View>
-          </Card>
-        )}
+          )}
+        </Card>
 
-        {/* My Medications List (Overview) */}
-        <Text variant="titleLarge" style={styles.sectionTitle}>
-          {t("medication.activePrescriptions")}
+        {/* OLD: My Medications List (Overview) */}
+        <Text variant="titleMedium" style={styles.sectionTitle}>
+          Active Prescriptions
         </Text>
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           {reminders.length > 0 ? (
@@ -955,12 +746,12 @@ export default function ElderlyMedicationScreen() {
 
               const handleDelete = () => {
                 Alert.alert(
-                  t("medication.removePrescription"),
-                  t("medication.removePrescriptionConfirm"),
+                  "Remove Prescription",
+                  "Are you sure you want to remove this prescription? It will be hidden from your active list and pending schedules.",
                   [
-                    { text: t("common.cancel"), style: "cancel" },
+                    { text: "Cancel", style: "cancel" },
                     {
-                      text: t("common.remove"),
+                      text: "Remove",
                       style: "destructive",
                       onPress: async () => {
                         try {
@@ -973,8 +764,8 @@ export default function ElderlyMedicationScreen() {
                         } catch (e) {
                           console.error(e);
                           Alert.alert(
-                            t("common.error"),
-                            t("medication.couldNotRemove"),
+                            "Error",
+                            "Could not remove prescription.",
                           );
                           await fetchData();
                         }
@@ -1013,294 +804,52 @@ export default function ElderlyMedicationScreen() {
 
               return (
                 <Swipeable key={r.$id} renderRightActions={renderRightActions}>
-                  <View
-                    style={[
-                      styles.prescriptionItem,
-                      { borderBottomColor: theme.colors.outlineVariant },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.prescriptionIconContainer,
-                        {
-                          backgroundColor: isDark
-                            ? "rgba(94,53,177,0.15)"
-                            : "#EDE7F6",
-                        },
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        name="pill"
-                        size={26}
-                        color="#5E35B1"
-                      />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 14 }}>
-                      <Text variant="titleMedium" style={{ fontWeight: "700" }}>
-                        {name}
-                      </Text>
-                      <Text
-                        variant="bodyMedium"
-                        style={{
-                          color: theme.colors.onSurfaceVariant,
-                          marginTop: 2,
-                        }}
-                      >
-                        {t("medication.timesDaily", {
-                          times: r.reminder_times.length,
-                        })}{" "}
-                        ({r.reminder_times.join(", ")})
-                      </Text>
-                    </View>
-                    <MaterialCommunityIcons
-                      name="chevron-left"
-                      size={22}
-                      color={theme.colors.onSurfaceVariant}
-                      style={{ marginRight: 4 }}
-                    />
-                  </View>
+                  <List.Item
+                    title={name}
+                    description={`${r.reminder_times.length} times daily (${r.reminder_times.join(", ")})`}
+                    left={(props) => <List.Icon {...props} icon="pill" />}
+                  />
                 </Swipeable>
               );
             })
           ) : (
             <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="pill" size={48} color="#BDBDBD" />
-              <Text
-                variant="bodyLarge"
-                style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}
-              >
-                {t("medication.noActivePrescriptions")}
-              </Text>
+              <Text>No active prescriptions.</Text>
             </View>
           )}
         </Card>
-
-        {/* Finished Medications */}
-        <Text variant="titleLarge" style={styles.sectionTitle}>
-          {t("medication.finishedMedications")}
-        </Text>
-        {(() => {
-          if (finishedReminders.length === 0) {
-            return (
-              <Card
-                style={[styles.card, { backgroundColor: theme.colors.surface }]}
-              >
-                <View style={styles.emptyState}>
-                  <MaterialCommunityIcons
-                    name="history"
-                    size={48}
-                    color="#BDBDBD"
-                  />
-                  <Text
-                    variant="bodyLarge"
-                    style={{
-                      marginTop: 8,
-                      color: theme.colors.onSurfaceVariant,
-                    }}
-                  >
-                    {t("medication.noFinishedMeds")}
-                  </Text>
-                </View>
-              </Card>
-            );
-          }
-
-          const now = new Date();
-          const todayStart = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate(),
-          );
-          const weekStart = new Date(todayStart);
-          weekStart.setDate(weekStart.getDate() - 7);
-          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-          const groups: { label: string; items: typeof finishedReminders }[] = [
-            { label: "Today", items: [] },
-            { label: "This Week", items: [] },
-            { label: "This Month", items: [] },
-            { label: "A Long Time Ago", items: [] },
-          ];
-
-          for (const r of finishedReminders) {
-            const d = r.end_date
-              ? new Date(r.end_date)
-              : r.$updatedAt
-                ? new Date(r.$updatedAt)
-                : null;
-            if (!d) {
-              groups[3].items.push(r);
-              continue;
-            }
-            if (d >= todayStart) groups[0].items.push(r);
-            else if (d >= weekStart) groups[1].items.push(r);
-            else if (d >= monthStart) groups[2].items.push(r);
-            else groups[3].items.push(r);
-          }
-
-          const nonEmptyGroups = groups.filter((g) => g.items.length > 0);
-
-          return nonEmptyGroups.map((group) => (
-            <View key={`fg-${group.label}`}>
-              <Text style={styles.finishedGroupLabel}>{group.label}</Text>
-              <Card
-                style={[styles.card, { backgroundColor: theme.colors.surface }]}
-              >
-                {group.items.map((r) => {
-                  // @ts-ignore
-                  const meds = Array.isArray(r.elderly_medication?.medication)
-                    ? r.elderly_medication.medication
-                    : [];
-                  // @ts-ignore
-                  const name = meds[0]?.name || "Medication";
-                  // @ts-ignore
-                  const medUnit = meds[0]?.unit || "dose";
-                  const dosageStr = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
-
-                  const endDateStr = r.end_date
-                    ? new Date(r.end_date).toLocaleDateString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })
-                    : "—";
-
-                  const startDateStr = r.start_date
-                    ? new Date(r.start_date).toLocaleDateString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })
-                    : "—";
-
-                  return (
-                    <View
-                      key={r.$id}
-                      style={[
-                        styles.finishedItem,
-                        { borderBottomColor: theme.colors.outlineVariant },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.finishedIconContainer,
-                          {
-                            backgroundColor: isDark
-                              ? "rgba(96,125,139,0.15)"
-                              : "#ECEFF1",
-                          },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="check-decagram"
-                          size={26}
-                          color={isDark ? "#B0BEC5" : "#78909C"}
-                        />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 14 }}>
-                        <Text
-                          variant="titleMedium"
-                          style={{
-                            fontWeight: "700",
-                            color: isDark ? "#B0BEC5" : "#546E7A",
-                          }}
-                        >
-                          {name}
-                        </Text>
-                        <Text
-                          variant="bodySmall"
-                          style={{
-                            color: theme.colors.onSurfaceVariant,
-                            marginTop: 2,
-                          }}
-                        >
-                          {dosageStr} ·{" "}
-                          {t("medication.timesDaily", {
-                            times: r.reminder_times.length,
-                          })}
-                        </Text>
-                        <Text
-                          variant="bodySmall"
-                          style={{
-                            color: theme.colors.onSurfaceVariant,
-                            marginTop: 2,
-                          }}
-                        >
-                          {startDateStr} → {endDateStr}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.finishedBadge,
-                          {
-                            backgroundColor: isDark
-                              ? "rgba(0,105,92,0.15)"
-                              : "#E0F2F1",
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.finishedBadgeText,
-                            { color: isDark ? "#80CBC4" : "#00695C" },
-                          ]}
-                        >
-                          {t("common.completed")}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </Card>
-            </View>
-          ));
-        })()}
 
         {/* Notes */}
         <Card
           style={[
             styles.notesCard,
-            { backgroundColor: isDark ? "rgba(76,175,80,0.1)" : "#E8F5E9" },
+            { backgroundColor: theme.colors.primaryContainer },
           ]}
         >
           <Card.Content>
             <View style={styles.notesHeader}>
-              <View
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: isDark ? "rgba(76,175,80,0.2)" : "#C8E6C9",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <MaterialCommunityIcons
-                  name="information"
-                  size={24}
-                  color={isDark ? "#81C784" : "#2E7D32"}
-                />
-              </View>
+              <MaterialCommunityIcons
+                name="information"
+                size={24}
+                color={theme.colors.primary}
+              />
               <Text
-                variant="titleMedium"
+                variant="titleSmall"
                 style={{
-                  marginLeft: 10,
-                  color: isDark ? "#A5D6A7" : "#1B5E20",
-                  fontWeight: "700",
+                  marginLeft: 8,
+                  color: theme.colors.onPrimaryContainer,
                 }}
               >
-                {t("medication.reminder")}
+                Reminder
               </Text>
             </View>
             <Text
-              variant="bodyLarge"
-              style={{
-                color: isDark ? "#81C784" : "#2E7D32",
-                marginTop: 10,
-                lineHeight: 24,
-              }}
+              variant="bodyMedium"
+              style={{ color: theme.colors.onPrimaryContainer, marginTop: 8 }}
             >
-              {t("medication.reminderTip")}
+              Take your medications with water. If you miss a dose, take it as
+              soon as you remember unless it&apos;s almost time for the next
+              dose.
             </Text>
           </Card.Content>
         </Card>
@@ -1312,7 +861,7 @@ export default function ElderlyMedicationScreen() {
         icon="plus"
         style={styles.fab}
         onPress={openAddModal}
-        label={t("medication.addMedication")}
+        label="Add Medication"
       />
 
       <Portal>
@@ -1326,7 +875,7 @@ export default function ElderlyMedicationScreen() {
         >
           <ScrollView contentContainerStyle={{ padding: 20 }}>
             <Text variant="titleLarge" style={styles.modalTitle}>
-              {t("medication.addMedication")}
+              Add Medication
             </Text>
 
             <Button
@@ -1337,16 +886,16 @@ export default function ElderlyMedicationScreen() {
               disabled={isScanning}
               style={{ marginBottom: 20 }}
             >
-              {t("medication.scanMedication")}
+              Scan Medication
             </Button>
             {isScanning && (
               <Text style={{ textAlign: "center", marginBottom: 16 }}>
-                {t("medication.analyzingImage")}
+                Analyzing image...
               </Text>
             )}
 
             <TextInput
-              label={t("medication.medicineName") + " *"}
+              label="Medicine Name *"
               value={medicineName}
               onChangeText={setMedicineName}
               style={styles.input}
@@ -1354,7 +903,7 @@ export default function ElderlyMedicationScreen() {
             />
 
             <TextInput
-              label={t("medication.unit")}
+              label="Unit (e.g., tablet)"
               value={unit}
               onChangeText={setUnit}
               style={styles.input}
@@ -1362,7 +911,7 @@ export default function ElderlyMedicationScreen() {
             />
 
             <TextInput
-              label={t("medication.dosage")}
+              label="Dosage"
               value={dosage}
               onChangeText={setDosage}
               style={styles.input}
@@ -1371,7 +920,7 @@ export default function ElderlyMedicationScreen() {
             />
 
             <Text variant="labelLarge" style={styles.label}>
-              {t("medication.timesPerDay")} *
+              Times Per Day (1-10) *
             </Text>
             <View style={styles.counterRow}>
               <IconButton
@@ -1396,7 +945,7 @@ export default function ElderlyMedicationScreen() {
             </View>
 
             <Text variant="labelLarge" style={styles.label}>
-              {t("medication.durationDays")}
+              Duration (Days)
             </Text>
             <View style={styles.counterRow}>
               <IconButton
@@ -1415,7 +964,7 @@ export default function ElderlyMedicationScreen() {
             </View>
 
             <TextInput
-              label={t("medication.followUpCaregivers")}
+              label="Follow-up Caregiver(s)"
               value={followUpCaregiver}
               mode="outlined"
               style={styles.input}
@@ -1424,21 +973,19 @@ export default function ElderlyMedicationScreen() {
             />
 
             <View style={styles.switchRow}>
-              <Text variant="bodyLarge">{t("medication.takeAfterMeal")}</Text>
+              <Text variant="bodyLarge">Take after meal?</Text>
               <Switch value={afterMeal} onValueChange={handleAfterMealChange} />
             </View>
 
             <Divider style={styles.divider} />
 
             <Text variant="titleMedium" style={styles.timesTitle}>
-              {t("medication.reminderTimes", { count: reminderTimes.length })}
+              Reminder Times ({reminderTimes.length})
             </Text>
 
             {reminderTimes.map((timeSlot, index) => (
               <View key={index} style={styles.timeInputRow}>
-                <Text variant="bodyLarge">
-                  {t("medication.time", { index: index + 1 })}:
-                </Text>
+                <Text variant="bodyLarge">Time {index + 1}:</Text>
                 {Platform.OS === "web" ? (
                   <input
                     type="time"
@@ -1474,7 +1021,7 @@ export default function ElderlyMedicationScreen() {
                 style={styles.modalButton}
                 disabled={saving}
               >
-                {t("common.cancel")}
+                Cancel
               </Button>
               <Button
                 mode="contained"
@@ -1483,7 +1030,7 @@ export default function ElderlyMedicationScreen() {
                 loading={saving}
                 disabled={saving}
               >
-                {t("common.save")}
+                Save
               </Button>
             </View>
           </ScrollView>
@@ -1499,7 +1046,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 18,
+    padding: 16,
   },
   header: {
     marginBottom: 24,
@@ -1509,93 +1056,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontWeight: "bold",
-    marginTop: 12,
-    marginBottom: 14,
-    fontSize: 20,
+    marginTop: 8,
+    marginBottom: 12,
   },
   card: {
-    marginBottom: 18,
-    borderRadius: 20,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-  },
-  medCard: {
-    marginBottom: 14,
-    borderRadius: 16,
-    borderLeftWidth: 5,
-    padding: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-  },
-  medCardTop: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  medCardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  medCardTime: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    marginBottom: 16,
     borderRadius: 12,
-  },
-  medCardAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 14,
-    paddingVertical: 13,
-    borderRadius: 14,
-    gap: 8,
-  },
-  medCardActionText: {
-    color: "#FFF",
-    fontSize: 17,
-    fontWeight: "bold",
-  },
-  medCardDone: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: "#E8F5E9",
-    gap: 6,
-  },
-  medCardDoneText: {
-    color: "#2E7D32",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  prescriptionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#E0E0E0",
-  },
-  prescriptionIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#EDE7F6",
-    justifyContent: "center",
-    alignItems: "center",
   },
   listItem: {
     paddingVertical: 8,
@@ -1607,25 +1073,23 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: "center",
-    padding: 36,
+    padding: 32,
   },
   notesCard: {
-    marginTop: 10,
-    borderRadius: 20,
-    elevation: 1,
+    marginTop: 8,
+    borderRadius: 12,
   },
   notesHeader: {
     flexDirection: "row",
     alignItems: "center",
   },
   bottomSpacer: {
-    height: 40,
+    height: 32,
   },
   fab: {
     position: "absolute",
     right: 16,
     bottom: 16,
-    borderRadius: 28,
   },
   modal: {
     margin: 20,
@@ -1696,74 +1160,5 @@ const styles = StyleSheet.create({
   deleteButton: {
     alignItems: "center",
     justifyContent: "center",
-  },
-  groupHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  groupItemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  groupItemIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  groupItemBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  groupItemBtnDone: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: "#E8F5E9",
-  },
-  finishedGroupLabel: {
-    fontWeight: "600",
-    color: "#888",
-    fontSize: 13,
-    marginBottom: 8,
-    marginTop: 8,
-    marginLeft: 4,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  finishedItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#E0E0E0",
-  },
-  finishedIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#ECEFF1",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  finishedBadge: {
-    backgroundColor: "#E0F2F1",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  finishedBadgeText: {
-    color: "#00695C",
-    fontSize: 11,
-    fontWeight: "700",
   },
 });
