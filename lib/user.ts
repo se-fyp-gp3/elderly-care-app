@@ -77,8 +77,47 @@ export async function removeRoleLabel(
  */
 export async function uploadAvatar(asset: ImagePickerAsset): Promise<string> {
   const uri = asset.uri;
-  const fileName = asset.fileName || `avatar_${Date.now()}.jpg`;
-  const mimeType = asset.mimeType || "image/jpeg";
+  // Ensure we have a filename with an extension that matches the MIME type.
+  let fileName = asset.fileName || `avatar_${Date.now()}`;
+  let mimeType = asset.mimeType || "image/jpeg";
+
+  // Helper: derive extension from mime type
+  const extFromMime = (m?: string) => {
+    if (!m) return "";
+    const parts = m.split("/");
+    if (parts.length < 2) return "";
+    let ext = parts[1].toLowerCase();
+    if (ext === "jpeg") ext = "jpg";
+    // strip parameters like image/jpeg; charset=utf-8
+    ext = ext.split(";")[0];
+    return ext ? `.${ext}` : "";
+  };
+
+  // If filename has no extension, try to get one from mime or from the uri path
+  const hasExt = /\.[a-z0-9]+$/i.test(fileName);
+  if (!hasExt) {
+    // try mime
+    const ext = extFromMime(mimeType);
+    if (ext) {
+      fileName = `${fileName}${ext}`;
+    } else {
+      // fallback: try to parse uri for an extension
+      try {
+        const clean = uri?.split("?")[0] || "";
+        const uriExtMatch = clean.match(/\.([a-z0-9]{1,6})$/i);
+        if (uriExtMatch) {
+          fileName = `${fileName}.${uriExtMatch[1]}`;
+        } else {
+          // final fallback
+          fileName = `${fileName}.jpg`;
+          mimeType = "image/jpeg";
+        }
+      } catch {
+        fileName = `${fileName}.jpg`;
+        mimeType = "image/jpeg";
+      }
+    }
+  }
 
   const file = {
     name: fileName,
@@ -86,6 +125,9 @@ export async function uploadAvatar(asset: ImagePickerAsset): Promise<string> {
     size: asset.fileSize || 0,
     uri,
   };
+
+  // Log minimal details to aid debugging on EAS builds (avoid large dumps)
+  console.debug("uploadAvatar: file ->", { name: file.name, type: file.type, uri: file.uri });
 
   const result = await storage.createFile(USER_ICON_BUCKET_ID, AppwriteID.unique(), file);
   return result.$id;
