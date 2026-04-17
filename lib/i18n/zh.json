@@ -307,7 +307,9 @@
     "failedToAcceptInvite": "接受邀请失败",
     "failedToDeclineInvite": "拒绝邀请失败",
     "declineGroupInvite": "拒绝邀请",
-    "declineGroupConfirm": "拒绝加入 \"{{name}}\" 的邀请？"
+    "declineGroupConfirm": "拒绝加入 \"{{name}}\" 的邀请？",
+    "createdTheGroup": "{{name}} 创建了群组",
+    "joinedTheGroup": "{{name}} 加入了群组"
   },
   "medication": {
     "toTakeToday": "今日待服用",
@@ -610,7 +612,8 @@
     "noHealthDataRecorded": "暂无健康数据",
     "systolicShort": "收缩压",
     "diastolicShort": "舒张压",
-    "stepsLabel": "步数"
+    "stepsLabel": "步数",
+    "noActivityDetected": "未检测到活动（0 步）"
   },
   "messages": {
     "noCaregiversYet": "暂无照顾者",

@@ -307,7 +307,9 @@
     "failedToAcceptInvite": "Failed to accept invitation",
     "failedToDeclineInvite": "Failed to decline invitation",
     "declineGroupInvite": "Decline Invitation",
-    "declineGroupConfirm": "Decline the invitation to join \"{{name}}\"?"
+    "declineGroupConfirm": "Decline the invitation to join \"{{name}}\"?",
+    "createdTheGroup": "{{name}} created the group",
+    "joinedTheGroup": "{{name}} joined the group"
   },
   "medication": {
     "toTakeToday": "To Take Today",
@@ -621,7 +623,8 @@
     "noHealthDataRecorded": "No health data recorded",
     "systolicShort": "Systolic",
     "diastolicShort": "Diastolic",
-    "stepsLabel": "Steps"
+    "stepsLabel": "Steps",
+    "noActivityDetected": "No activity detected (0 steps)"
   },
   "messages": {
     "noCaregiversYet": "No Caregivers Yet",

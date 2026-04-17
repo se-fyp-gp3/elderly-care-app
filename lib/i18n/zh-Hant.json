@@ -307,7 +307,9 @@
     "failedToAcceptInvite": "接受邀請失敗",
     "failedToDeclineInvite": "拒絕邀請失敗",
     "declineGroupInvite": "拒絕邀請",
-    "declineGroupConfirm": "拒絕加入 \"{{name}}\" 的邀請？"
+    "declineGroupConfirm": "拒絕加入 \"{{name}}\" 的邀請？",
+    "createdTheGroup": "{{name}} 建立了群組",
+    "joinedTheGroup": "{{name}} 加入了群組"
   },
   "medication": {
     "toTakeToday": "今日待服用",
@@ -621,7 +623,8 @@
     "noHealthDataRecorded": "暫無健康資料",
     "systolicShort": "收縮壓",
     "diastolicShort": "舒張壓",
-    "stepsLabel": "步數"
+    "stepsLabel": "步數",
+    "noActivityDetected": "未檢測到活動（0 步）"
   },
   "messages": {
     "noCaregiversYet": "暫無照顧者",

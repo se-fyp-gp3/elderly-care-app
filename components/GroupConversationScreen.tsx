@@ -470,6 +470,15 @@ export default function GroupConversationScreen({
     const isSystem = item.message_type === "system";
 
     if (isSystem) {
+      // Translate hardcoded English system messages stored in the database
+      let displayBody = item.body;
+      const createdMatch = item.body.match(/^(.+) created the group$/);
+      const joinedMatch = item.body.match(/^(.+) joined the group$/);
+      if (createdMatch) {
+        displayBody = t("chat.createdTheGroup", { name: createdMatch[1] });
+      } else if (joinedMatch) {
+        displayBody = t("chat.joinedTheGroup", { name: joinedMatch[1] });
+      }
       return (
         <View style={styles.systemMsgContainer}>
           <Text
@@ -479,7 +488,7 @@ export default function GroupConversationScreen({
               fontStyle: "italic",
             }}
           >
-            {item.body}
+            {displayBody}
           </Text>
         </View>
       );
