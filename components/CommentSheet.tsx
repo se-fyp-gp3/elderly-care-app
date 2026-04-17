@@ -117,14 +117,6 @@ function CommentItem({
               {comment.author_id === "ai-assistant"
                 ? t("moments.aiAssistant")
                 : comment.author_name}
-              {comment.author_role === "ai" && (
-                <Text
-                  style={{ color: theme.colors.tertiary, fontWeight: "normal" }}
-                >
-                  {" "}
-                  ??AI
-                </Text>
-              )}
             </Text>
             {isOwn && (
               <Pressable onPress={handleDelete} hitSlop={10}>
