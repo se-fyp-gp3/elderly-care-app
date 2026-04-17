@@ -234,31 +234,23 @@ export default function ElderlySettings() {
     const notes: string[] = [];
 
     if (!diagnostics.accelerometerAvailable) {
-      notes.push(
-        "This phone does not provide an accelerometer, so fall detection cannot run.",
-      );
+      notes.push(t("settings.fallCheckNoAccelerometer"));
     }
     if (!diagnostics.gyroscopeAvailable) {
-      notes.push(
-        "This phone does not provide a gyroscope. The app has switched to an accelerometer-only fallback, so shake-style tests may be less reliable.",
-      );
+      notes.push(t("settings.fallCheckNoGyroscope"));
     }
     if (!diagnostics.backgroundServiceRunning) {
-      notes.push(
-        "Background service is not running. On MIUI, battery saver or background restrictions may be stopping fall detection even when sensors are available.",
-      );
+      notes.push(t("settings.fallCheckNoBackground"));
     }
     if (!notes.length) {
-      notes.push(
-        "Sensors look available on this phone. If the test alert opens, the emergency overlay path is working.",
-      );
+      notes.push(t("settings.fallCheckOk"));
     }
 
     Alert.alert(
-      "Fall Detection Check",
-      `Device: ${diagnostics.deviceModel || "Unknown"}\nProfile: ${diagnostics.profileName}\nSensor interval: ${diagnostics.sensorIntervalMs} ms\nAccelerometer: ${diagnostics.accelerometerAvailable ? "Available" : "Unavailable"} (g-force units)\nGyroscope: ${diagnostics.gyroscopeAvailable ? "Available" : "Unavailable"}\nDetector running: ${diagnostics.isRunning ? "Yes" : "No"}\nBackground service: ${diagnostics.backgroundServiceRunning ? "Running" : "Not running"}\n\n${notes.join("\n")}`,
+      t("settings.fallCheckTitle"),
+      `Device: ${diagnostics.deviceModel || "Unknown"}\nProfile: ${diagnostics.profileName}\nSensor interval: ${diagnostics.sensorIntervalMs} ms\nAccelerometer: ${diagnostics.accelerometerAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")} (g-force units)\nGyroscope: ${diagnostics.gyroscopeAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")}\nDetector running: ${diagnostics.isRunning ? t("settings.fallCheckYes") : t("settings.fallCheckNo")}\nBackground service: ${diagnostics.backgroundServiceRunning ? t("settings.fallCheckRunning") : t("settings.fallCheckNotRunning")}\n\n${notes.join("\n")}`,
     );
-  }, []);
+  }, [t]);
 
   const handleTestFallAlert = useCallback(() => {
     if (!fallDetectionEnabled) {
@@ -274,24 +266,24 @@ export default function ElderlySettings() {
 
   const handleOpenMiuiGuide = useCallback(() => {
     Alert.alert(
-      "MIUI Setup for Fall Detection",
-      "MIUI usually does not block sensors with a permission prompt. Instead, it kills or restricts apps in the background. Please check these settings:\n\n1. Battery saver -> set this app to No restrictions / Unrestricted\n2. Autostart -> allow this app to start automatically\n3. App info -> Other permissions / Background location -> allow always\n4. Recent apps screen -> lock this app so MIUI does not swipe-kill it\n5. Disable any Game Turbo / extreme battery saver mode while testing\n\nTap Open Settings to jump to the app settings page first.",
+      t("settings.miuiSetupTitle"),
+      t("settings.miuiSetupMsg"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Open Settings",
+          text: t("settings.miuiOpenSettings"),
           onPress: () => {
             Linking.openSettings().catch(() => {
               Alert.alert(
-                "Unable to open settings",
-                "Please open Settings manually and search for this app.",
+                t("settings.miuiUnableToOpenSettings"),
+                t("settings.miuiOpenSettingsManually"),
               );
             });
           },
         },
       ],
     );
-  }, []);
+  }, [t]);
 
   const handleAiVoiceToggle = async (value: boolean) => {
     if (value && !hasVoiceOptions) {
@@ -648,7 +640,11 @@ export default function ElderlySettings() {
           <List.Item
             title={t("settings.fontSize")}
             titleStyle={styles.listTitle}
-            description={fontSize}
+            description={
+              fontSize === FontSize.Small ? t("settings.fontSizeSmall") :
+              fontSize === FontSize.Large ? t("settings.fontSizeLarge") :
+              t("settings.fontSizeMedium")
+            }
             descriptionStyle={styles.listDescription}
             left={() => (
               <View style={styles.iconContainer}>
