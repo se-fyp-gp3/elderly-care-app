@@ -504,7 +504,7 @@ function InlineCommentPreview({
             variant="labelMedium"
             style={{ fontWeight: "bold", color: theme.colors.primary }}
           >
-            {c.author_name}
+            {c.author_id === "ai-assistant" ? t("moments.aiAssistant") : c.author_name}
             {c.reply_to_user_name && (
               <Text
                 style={{
