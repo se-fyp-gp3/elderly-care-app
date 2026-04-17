@@ -132,6 +132,15 @@
           "array": false,
           "default": null,
           "format": ""
+        },
+        {
+          "key": "avatar_file_id",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 36,
+          "default": null,
+          "encrypt": false
         }
       ],
       "indexes": [
@@ -203,6 +212,15 @@
           "array": false,
           "default": null,
           "format": ""
+        },
+        {
+          "key": "avatar_file_id",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 36,
+          "default": null,
+          "encrypt": false
         }
       ],
       "indexes": [

@@ -108,7 +108,7 @@ async function getElderlyContactsForCaregiver(
       phone: elderly.phone,
       role: "elderly" as const,
       avatarLabel: (elderly.name || "??").substring(0, 2).toUpperCase(),
-      avatarFileId: (elderly as any).avatar_file_id ?? undefined,
+      avatarFileId: elderly.avatar_file_id ?? undefined,
       status: elderly.status,
       lastActive: elderly.last_active ?? elderly.$updatedAt,
     }));
@@ -167,7 +167,7 @@ export async function getContactsForElderly(
       phone: caregiver.phone,
       role: "caregiver" as const,
       avatarLabel: (caregiver.name || "??").substring(0, 2).toUpperCase(),
-      avatarFileId: (caregiver as any).avatar_file_id ?? undefined,
+      avatarFileId: caregiver.avatar_file_id ?? undefined,
       lastActive: caregiver.last_active ?? caregiver.$updatedAt,
     }));
   } catch (error) {
@@ -540,7 +540,7 @@ export async function getElderlyContacts(
       phone: elderly.phone,
       role: "elderly" as const,
       avatarLabel: (elderly.name || "??").substring(0, 2).toUpperCase(),
-      avatarFileId: (elderly as any).avatar_file_id ?? undefined,
+      avatarFileId: elderly.avatar_file_id ?? undefined,
       status: elderly.status,
       lastActive: elderly.$updatedAt,
     }));
@@ -791,7 +791,7 @@ export async function getCaregiverContacts(
       phone: c.phone,
       role: "caregiver" as const,
       avatarLabel: (c.name || "??").substring(0, 2).toUpperCase(),
-      avatarFileId: (c as any).avatar_file_id ?? undefined,
+      avatarFileId: c.avatar_file_id ?? undefined,
       lastActive: c.$updatedAt,
     }));
 
@@ -802,7 +802,7 @@ export async function getCaregiverContacts(
       phone: e.phone,
       role: "elderly" as const,
       avatarLabel: (e.name || "??").substring(0, 2).toUpperCase(),
-      avatarFileId: (e as any).avatar_file_id ?? undefined,
+      avatarFileId: e.avatar_file_id ?? undefined,
       status: e.status,
       lastActive: e.$updatedAt,
     }));
