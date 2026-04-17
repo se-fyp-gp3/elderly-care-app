@@ -26,10 +26,9 @@ import {
 } from "react-native";
 import {
     ActivityIndicator,
-    Avatar,
     Divider,
     Text,
-    useTheme,
+    useTheme
 } from "react-native-paper";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;

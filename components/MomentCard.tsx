@@ -22,10 +22,9 @@ import {
 } from "react-native";
 import {
     ActivityIndicator,
-    Avatar,
     Divider,
     Text,
-    useTheme,
+    useTheme
 } from "react-native-paper";
 
 interface MomentCardProps {

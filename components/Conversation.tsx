@@ -1,18 +1,18 @@
 import ConversationScreen from "@/components/ConversationScreen";
-import { useAuth } from "@/lib/auth-context";
-import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
     CAREGIVER_TABLE_ID,
     DATABASE_ID,
     ELDERLY_TABLE_ID,
     tablesDB,
 } from "@/lib/appwrite";
+import { useAuth } from "@/lib/auth-context";
+import { getCaregiverByUserId } from "@/lib/caregiver";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { useTheme } from "react-native-paper";
 import { Query } from "react-native-appwrite";
+import { useTheme } from "react-native-paper";
 
 export default function Conversation() {
   const theme = useTheme();

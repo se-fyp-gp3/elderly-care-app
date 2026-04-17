@@ -39,14 +39,13 @@ import {
 } from "react-native";
 import {
     ActivityIndicator,
-    Avatar,
     Divider,
     IconButton,
     Modal,
     Portal,
     Text,
     TextInput,
-    useTheme,
+    useTheme
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
