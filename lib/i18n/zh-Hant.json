@@ -562,7 +562,9 @@
     "sep": "九月",
     "oct": "十月",
     "nov": "十一月",
-    "dec": "十二月"
+    "dec": "十二月",
+    "sun": "日", "mon": "一", "tue": "二", "wed": "三",
+    "thu": "四", "fri": "五", "sat": "六"
   },
   "healthData": {
     "myHealthData": "我的健康資料",

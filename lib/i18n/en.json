@@ -562,7 +562,9 @@
     "sep": "Sep",
     "oct": "Oct",
     "nov": "Nov",
-    "dec": "Dec"
+    "dec": "Dec",
+    "sun": "Sun", "mon": "Mon", "tue": "Tue", "wed": "Wed",
+    "thu": "Thu", "fri": "Fri", "sat": "Sat"
   },
   "healthData": {
     "myHealthData": "My Health Data",
