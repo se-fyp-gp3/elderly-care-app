@@ -1,20 +1,43 @@
 /**
  * Fall Detection Service
  *
- * Two detection paths:
- *   Path A (impact): accelerometer spike + gyroscope rotation → stillness
- *   Path B (freefall): freefall (near 0 g) → impact → stillness (no gyro needed)
+ * Foreground path:
+ *   JS sensor listeners keep the in-app countdown overlay responsive while the app is active.
  *
- * Uses expo-sensors (Accelerometer + Gyroscope).
- * Uses expo-task-manager + expo-location to keep sensors alive in background.
+ * Background path on Android:
+ *   A native foreground service monitors accelerometer/gyroscope and wakes the app
+ *   with a fall alert route when the device is locked or the app is backgrounded.
+ *
+ * Fallback path:
+ *   If the native service is unavailable, keep the legacy background-location workaround
+ *   as a best-effort fallback for development builds.
  */
 
 import * as Location from "expo-location";
 import { Accelerometer, Gyroscope } from "expo-sensors";
 import * as TaskManager from "expo-task-manager";
-import { AppState, Platform } from "react-native";
+import {
+  AppState,
+  AppStateStatus,
+  NativeModules,
+  Platform,
+} from "react-native";
 
 const BACKGROUND_LOCATION_TASK = "FALL_DETECTION_BG_LOCATION";
+const FALL_DETECTION_DEEP_LINK =
+  "appwrite-callback-elderly-care-app:///fall-alert?source=background";
+
+type NativeFallDetectionModule = {
+  start: (deepLinkUrl?: string) => Promise<boolean>;
+  stop: () => Promise<boolean>;
+};
+
+type LocationFallbackState = "idle" | "ready" | "unavailable";
+
+const nativeFallDetectionModule =
+  Platform.OS === "android"
+    ? (NativeModules.FallDetectionModule as NativeFallDetectionModule | undefined)
+    : undefined;
 
 /* ── Thresholds ─────────────────────────────────────────── */
 type FallDetectionProfile = {
@@ -71,12 +94,15 @@ let gyroConfirmed = false;
 let stillStartTime = 0;
 let lastTriggerTime = 0;
 let isRunning = false;
-let bgRunning = false;
+let backgroundMode: "none" | "native" | "location" = "none";
 let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
 let accelerometerAvailable = true;
 let gyroscopeAvailable = true;
 let activeProfile: FallDetectionProfile = DEFAULT_PROFILE;
 let activeDeviceModel = "unknown";
+let lastAppState: AppStateStatus = AppState.currentState;
+let locationFallbackState: LocationFallbackState = "idle";
+const emittedWarnings = new Set<string>();
 
 // Freefall state
 let freefallStart = 0;
@@ -125,6 +151,20 @@ function reset() {
   stillStartTime = 0;
   freefallStart = 0;
   freefallConfirmed = false;
+}
+
+function warnOnce(key: string, message: string, error?: unknown) {
+  if (emittedWarnings.has(key)) return;
+  emittedWarnings.add(key);
+  if (error !== undefined) {
+    console.warn(message, error);
+    return;
+  }
+  console.warn(message);
+}
+
+function isNativeBackgroundServiceAvailable() {
+  return Platform.OS === "android" && typeof nativeFallDetectionModule?.start === "function";
 }
 
 function handleAccelData(data: { x: number; y: number; z: number }) {
@@ -214,61 +254,194 @@ function handleGyroData(data: { x: number; y: number; z: number }) {
 /* ── Background Service ─────────────────────────────────── */
 
 async function startBackgroundService() {
-  if (bgRunning) return;
+  if (backgroundMode !== "none") return;
+  if (Platform.OS !== "android") return;
+
+  if (isNativeBackgroundServiceAvailable()) {
+    try {
+      await nativeFallDetectionModule.start(FALL_DETECTION_DEEP_LINK);
+      backgroundMode = "native";
+      return;
+    } catch (err) {
+      warnOnce(
+        "native-background-start-failed",
+        "[FallDetection] Native background service failed to start. Background fall detection will be unavailable until the service can be started again.",
+        err,
+      );
+      backgroundMode = "none";
+      return;
+    }
+  }
+}
+
+async function ensureBackgroundLocationFallbackReady() {
   if (Platform.OS !== "android") return; // iOS uses HealthKit / Apple Watch
+  if (isNativeBackgroundServiceAvailable()) return;
+  if (locationFallbackState === "ready" || locationFallbackState === "unavailable") {
+    backgroundMode = locationFallbackState === "ready" ? "location" : "none";
+    return;
+  }
+  if (lastAppState !== "active") {
+    warnOnce(
+      "location-fallback-needs-foreground",
+      "[FallDetection] JS background fallback can only be prepared while the app is open. Rebuild the Android app to use the native background fall-detection service.",
+    );
+    return;
+  }
 
   try {
-    const { status: fgStatus } =
-      await Location.requestForegroundPermissionsAsync();
-    if (fgStatus !== "granted") {
-      console.warn("[FallDetection] Foreground location permission denied");
-      return;
-    }
-
-    const { status: bgStatus } =
-      await Location.requestBackgroundPermissionsAsync();
-    if (bgStatus !== "granted") {
-      console.warn("[FallDetection] Background location permission denied");
-      return;
-    }
-
-    const hasStarted = await Location.hasStartedLocationUpdatesAsync(
+    const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(
       BACKGROUND_LOCATION_TASK,
     ).catch(() => false);
-
-    if (!hasStarted) {
-      await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-        accuracy: Location.Accuracy.Lowest,
-        timeInterval: 60_000, // 1 min – just to keep service alive
-        distanceInterval: 0,
-        deferredUpdatesInterval: 60_000,
-        showsBackgroundLocationIndicator: false,
-        foregroundService: {
-          notificationTitle: "跌倒偵測運行中",
-          notificationBody: "正在背景監測，保障您的安全",
-          notificationColor: "#4CAF50",
-        },
-      });
+    if (alreadyStarted) {
+      locationFallbackState = "ready";
+      backgroundMode = "location";
+      return;
     }
-    bgRunning = true;
+
+    let fgStatus = (await Location.getForegroundPermissionsAsync()).status;
+    if (fgStatus !== "granted") {
+      fgStatus = (await Location.requestForegroundPermissionsAsync()).status;
+    }
+    if (fgStatus !== "granted") {
+      locationFallbackState = "unavailable";
+      warnOnce(
+        "location-fallback-foreground-denied",
+        "[FallDetection] Foreground location permission denied. JS background fallback is disabled.",
+      );
+      return;
+    }
+
+    let bgStatus = (await Location.getBackgroundPermissionsAsync()).status;
+    if (bgStatus !== "granted") {
+      bgStatus = (await Location.requestBackgroundPermissionsAsync()).status;
+    }
+    if (bgStatus !== "granted") {
+      locationFallbackState = "unavailable";
+      warnOnce(
+        "location-fallback-background-denied",
+        "[FallDetection] Background location permission denied. JS background fallback is disabled.",
+      );
+      return;
+    }
+
+    await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+      accuracy: Location.Accuracy.Lowest,
+      timeInterval: 60_000,
+      distanceInterval: 0,
+      deferredUpdatesInterval: 60_000,
+      showsBackgroundLocationIndicator: false,
+      foregroundService: {
+        notificationTitle: "跌倒偵測運行中",
+        notificationBody: "正在背景監測，保障您的安全",
+        notificationColor: "#4CAF50",
+      },
+    });
+
+    locationFallbackState = "ready";
+    backgroundMode = "location";
   } catch (err) {
-    console.warn("[FallDetection] Failed to start background service:", err);
+    locationFallbackState = "unavailable";
+    warnOnce(
+      "location-fallback-start-failed",
+      "[FallDetection] JS background fallback could not be prepared. Rebuild the Android app to use the native background fall-detection service.",
+      err,
+    );
   }
 }
 
 async function stopBackgroundService() {
-  if (!bgRunning) return;
-  try {
-    const hasStarted = await Location.hasStartedLocationUpdatesAsync(
-      BACKGROUND_LOCATION_TASK,
-    ).catch(() => false);
-    if (hasStarted) {
-      await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+  if (backgroundMode === "native") {
+    try {
+      await nativeFallDetectionModule?.stop?.();
+    } catch (err) {
+      console.warn("[FallDetection] Failed to stop native background service:", err);
     }
-  } catch (err) {
-    console.warn("[FallDetection] Failed to stop background service:", err);
   }
-  bgRunning = false;
+
+  if (locationFallbackState === "ready") {
+    try {
+      const hasStarted = await Location.hasStartedLocationUpdatesAsync(
+        BACKGROUND_LOCATION_TASK,
+      ).catch(() => false);
+      if (hasStarted) {
+        await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!message.includes("TaskNotFoundException")) {
+        console.warn("[FallDetection] Failed to stop background fallback service:", err);
+      }
+    } finally {
+      locationFallbackState = "idle";
+    }
+  } else if (locationFallbackState === "unavailable") {
+    locationFallbackState = "idle";
+  }
+
+  backgroundMode = "none";
+}
+
+function attachForegroundSensorListeners() {
+  if (accelSub) return;
+
+  Accelerometer.setUpdateInterval(activeProfile.sensorIntervalMs);
+  if (gyroscopeAvailable) {
+    Gyroscope.setUpdateInterval(activeProfile.sensorIntervalMs);
+  }
+
+  accelSub = Accelerometer.addListener(handleAccelData);
+  gyroSub = gyroscopeAvailable ? Gyroscope.addListener(handleGyroData) : null;
+}
+
+function detachForegroundSensorListeners() {
+  accelSub?.remove();
+  gyroSub?.remove();
+  accelSub = null;
+  gyroSub = null;
+}
+
+async function syncMonitoringForAppState(state: AppStateStatus) {
+  lastAppState = state;
+  if (!isRunning) return;
+
+  if (Platform.OS === "android") {
+    if (isNativeBackgroundServiceAvailable()) {
+      if (state === "active") {
+        await stopBackgroundService();
+        attachForegroundSensorListeners();
+        return;
+      }
+
+      detachForegroundSensorListeners();
+      await startBackgroundService();
+      return;
+    }
+
+    attachForegroundSensorListeners();
+    await ensureBackgroundLocationFallbackReady();
+    if (locationFallbackState === "ready") {
+      backgroundMode = "location";
+      return;
+    }
+
+    backgroundMode = "none";
+    if (state !== "active") {
+      warnOnce(
+        "background-monitoring-unavailable",
+        "[FallDetection] Background fall detection is unavailable in this build. Keep the app open, or rebuild the Android app so the native FallDetection service is included.",
+      );
+    }
+    return;
+  }
+
+  attachForegroundSensorListeners();
+}
+
+function getBackgroundCapability() {
+  if (isNativeBackgroundServiceAvailable()) return "native";
+  if (locationFallbackState === "ready") return "location";
+  return "none";
 }
 
 /* ── Public API ─────────────────────────────────────────── */
@@ -291,7 +464,11 @@ export async function getFallDetectionDiagnostics() {
     profileName: activeProfile.name,
     sensorIntervalMs: activeProfile.sensorIntervalMs,
     isRunning,
-    backgroundServiceRunning: bgRunning,
+    backgroundServiceRunning: backgroundMode !== "none",
+    backgroundServiceMode: backgroundMode,
+    backgroundCapability: getBackgroundCapability(),
+    nativeBackgroundServiceAvailable: isNativeBackgroundServiceAvailable(),
+    locationFallbackReady: locationFallbackState === "ready",
   };
 }
 
@@ -317,41 +494,18 @@ export async function startFallDetection(
     console.warn("[FallDetection] Gyroscope unavailable; using accelerometer-only fallback");
   }
 
-  Accelerometer.setUpdateInterval(activeProfile.sensorIntervalMs);
-  if (gyroscopeAvailable) {
-    Gyroscope.setUpdateInterval(activeProfile.sensorIntervalMs);
-  }
-
-  accelSub = Accelerometer.addListener(handleAccelData);
-  gyroSub = gyroscopeAvailable ? Gyroscope.addListener(handleGyroData) : null;
   isRunning = true;
 
-  // Start background foreground-service to keep sensors alive
-  await startBackgroundService();
-
-  // Re-attach sensors when app returns to foreground (Android may suspend them)
-  appStateSubscription = AppState.addEventListener("change", (state) => {
-    if (state === "active" && isRunning) {
-      // Re-ensure sensors are attached
-      if (!accelSub) {
-        Accelerometer.setUpdateInterval(activeProfile.sensorIntervalMs);
-        accelSub = Accelerometer.addListener(handleAccelData);
-      }
-      if (gyroscopeAvailable && !gyroSub) {
-        Gyroscope.setUpdateInterval(activeProfile.sensorIntervalMs);
-        gyroSub = Gyroscope.addListener(handleGyroData);
-      }
-    }
+  await syncMonitoringForAppState(lastAppState);
+  appStateSubscription = AppState.addEventListener("change", (nextState) => {
+    void syncMonitoringForAppState(nextState);
   });
 
   return true;
 }
 
 export async function stopFallDetection() {
-  accelSub?.remove();
-  gyroSub?.remove();
-  accelSub = null;
-  gyroSub = null;
+  detachForegroundSensorListeners();
   onFallDetected = null;
   isRunning = false;
   reset();

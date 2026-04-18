@@ -2,9 +2,8 @@
   "extends": "expo/tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
     "downlevelIteration": true,
-    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["./*"]
     }

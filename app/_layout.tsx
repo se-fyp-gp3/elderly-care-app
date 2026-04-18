@@ -42,6 +42,7 @@ const tabs: Record<Role, "/(elderly-tabs)" | "/(caregiver-tabs)"> = {
   [Role.Caregiver]: "/(caregiver-tabs)",
 };
 const authRoutes = ["start", "signup", "auth", "qr-register", "reauth"];
+const protectedStandaloneRoutes = ["fall-alert"];
 
 const getRoleHomeRoute = (role: Role | undefined) => {
   if (role && tabs[role as keyof typeof tabs]) {
@@ -54,13 +55,22 @@ const isInMainTab = (inElderlyTabs: boolean, inCaregiverTabs: boolean) => {
   return inElderlyTabs || inCaregiverTabs;
 };
 
+const isOnProtectedStandaloneRoute = (currentRoute: string) => {
+  return protectedStandaloneRoutes.includes(currentRoute);
+};
+
 const isOnCorrectRoute = (params: {
+  currentRoute: string;
   inAuthGroup: boolean;
   inElderlyTabs: boolean;
   inCaregiverTabs: boolean;
 }) => {
-  const { inAuthGroup, inElderlyTabs, inCaregiverTabs } = params;
-  return !inAuthGroup && isInMainTab(inElderlyTabs, inCaregiverTabs);
+  const { currentRoute, inAuthGroup, inElderlyTabs, inCaregiverTabs } = params;
+  return (
+    !inAuthGroup &&
+    (isInMainTab(inElderlyTabs, inCaregiverTabs) ||
+      isOnProtectedStandaloneRoute(currentRoute))
+  );
 };
 
 const isOnRoute = (currentRoute: string, ...names: string[]) => {
@@ -144,37 +154,65 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
     setup();
 
+    const navigateFromNotificationData = async (rawData: any) => {
+      if (!rawData) return;
+
+      if (typeof rawData.url === "string" && rawData.url.trim()) {
+        router.push(rawData.url);
+        return;
+      }
+
+      if (rawData.type === "fall_detected" && role === "elderly") {
+        router.push("/fall-alert");
+        return;
+      }
+
+      if (rawData.type === "direct_message") {
+        const contactId = rawData.contactId as string;
+        const contactName = rawData.contactName as string;
+        const contactRole = rawData.contactRole as string;
+
+        const targetPath =
+          role === "elderly"
+            ? "/(elderly-tabs)/conversation"
+            : "/(caregiver-tabs)/conversation";
+
+        router.push({
+          pathname: targetPath,
+          params: {
+            contactId,
+            contactName,
+            contactRole,
+          },
+        });
+        return;
+      }
+
+      if (rawData.type === "moment_comment") {
+        const targetPath =
+          role === "elderly"
+            ? "/(elderly-tabs)/emergency"
+            : "/(caregiver-tabs)/caregiver";
+        router.push(targetPath);
+      }
+    };
+
+    void Notifications.getLastNotificationResponseAsync().then(
+      async (response) => {
+        if (!response) return;
+        await navigateFromNotificationData(
+          response.notification.request.content.data,
+        );
+        await Notifications.clearLastNotificationResponseAsync();
+      },
+    );
+
     // Handle notification tap
     const subscription = Notifications.addNotificationResponseReceivedListener(
       (response) => {
-        const rawData = response.notification.request.content.data as any;
-
-        if (rawData && rawData.type === "direct_message") {
-          const contactId = rawData.contactId as string;
-          const contactName = rawData.contactName as string;
-          const contactRole = rawData.contactRole as string;
-
-          const targetPath =
-            role === "elderly"
-              ? "/(elderly-tabs)/conversation"
-              : "/(caregiver-tabs)/conversation";
-
-          router.push({
-            pathname: targetPath,
-            params: {
-              contactId,
-              contactName,
-              contactRole,
-            },
-          });
-        } else if (rawData && rawData.type === "moment_comment") {
-          // Navigate to community / emergency tab (where moments are shown)
-          const targetPath =
-            role === "elderly"
-              ? "/(elderly-tabs)/emergency"
-              : "/(caregiver-tabs)/caregiver";
-          router.push(targetPath);
-        }
+        void navigateFromNotificationData(
+          response.notification.request.content.data,
+        );
       },
     );
 
@@ -218,7 +256,14 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     }
 
     // If signed in and on correct route, do nothing
-    if (isOnCorrectRoute({ inAuthGroup, inCaregiverTabs, inElderlyTabs })) {
+    if (
+      isOnCorrectRoute({
+        currentRoute: currentRoute as string,
+        inAuthGroup,
+        inCaregiverTabs,
+        inElderlyTabs,
+      })
+    ) {
       return;
     }
 
@@ -317,6 +362,10 @@ function ThemedApp() {
                   <Stack.Screen name="auth" options={{ headerShown: false }} />
                   <Stack.Screen
                     name="profile-setup"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="fall-alert"
                     options={{ headerShown: false }}
                   />
                   <Stack.Screen

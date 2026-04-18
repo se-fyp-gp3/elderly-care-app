@@ -239,8 +239,12 @@ export default function ElderlySettings() {
     if (!diagnostics.gyroscopeAvailable) {
       notes.push(t("settings.fallCheckNoGyroscope"));
     }
-    if (!diagnostics.backgroundServiceRunning) {
+    if (diagnostics.backgroundCapability === "none") {
       notes.push(t("settings.fallCheckNoBackground"));
+    }
+    if (!diagnostics.nativeBackgroundServiceAvailable) {
+      notes.push("Native Android background service is not available in this installed build.");
+      notes.push("Rebuild and reinstall the Android app to enable lock-screen fall detection.");
     }
     if (!notes.length) {
       notes.push(t("settings.fallCheckOk"));
@@ -248,7 +252,7 @@ export default function ElderlySettings() {
 
     Alert.alert(
       t("settings.fallCheckTitle"),
-      `Device: ${diagnostics.deviceModel || "Unknown"}\nProfile: ${diagnostics.profileName}\nSensor interval: ${diagnostics.sensorIntervalMs} ms\nAccelerometer: ${diagnostics.accelerometerAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")} (g-force units)\nGyroscope: ${diagnostics.gyroscopeAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")}\nDetector running: ${diagnostics.isRunning ? t("settings.fallCheckYes") : t("settings.fallCheckNo")}\nBackground service: ${diagnostics.backgroundServiceRunning ? t("settings.fallCheckRunning") : t("settings.fallCheckNotRunning")}\n\n${notes.join("\n")}`,
+      `Device: ${diagnostics.deviceModel || "Unknown"}\nProfile: ${diagnostics.profileName}\nSensor interval: ${diagnostics.sensorIntervalMs} ms\nAccelerometer: ${diagnostics.accelerometerAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")} (g-force units)\nGyroscope: ${diagnostics.gyroscopeAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")}\nDetector running: ${diagnostics.isRunning ? t("settings.fallCheckYes") : t("settings.fallCheckNo")}\nBackground service: ${diagnostics.backgroundServiceRunning ? t("settings.fallCheckRunning") : t("settings.fallCheckNotRunning")}\nBackground capability: ${diagnostics.backgroundCapability}\nNative service available: ${diagnostics.nativeBackgroundServiceAvailable ? t("settings.fallCheckYes") : t("settings.fallCheckNo")}\nLocation fallback ready: ${diagnostics.locationFallbackReady ? t("settings.fallCheckYes") : t("settings.fallCheckNo")}\n\n${notes.join("\n")}`,
     );
   }, [t]);
 
