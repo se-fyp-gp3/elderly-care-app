@@ -53,7 +53,8 @@
     "noDataFound": "未找到資料",
     "loadingDetails": "正在載入詳情...",
     "yes": "是",
-    "no": "否"
+    "no": "否",
+    "done": "完成"
   },
   "tabs": {
     "home": "首頁",
@@ -535,7 +536,13 @@
     "invitationSentDesc": "已向 {{name}} 傳送邀請。",
     "chatOnceAccepted": "對方接受後即可開始聊天。",
     "alreadyInContactsOrPending": "{{name}} 已在您的聯絡人中或有待處理的請求。",
-    "pendingRequests": "待處理請求"
+    "pendingRequests": "待處理請求",
+    "recentAlerts": "近期警報",
+    "activeLabel": "活躍",
+    "activeAlertsCount": "{{count}} 個活躍警報",
+    "statusActive": "活躍",
+    "statusInvestigating": "處理中",
+    "statusResolved": "已解決"
   },
   "schedule": {
     "mySchedule": "我的日程",
@@ -586,6 +593,14 @@
     "undo": "撤銷",
     "setReminder": "設定提醒",
     "sendReminderNotif": "為此事件傳送提醒通知",
+    "remindBefore": "提前提醒",
+    "noReminder": "不提醒",
+    "reminderOn": "提醒已開啟",
+    "reminderTime": "提醒時間",
+    "minutesBefore": "提前 {{minutes}} 分鐘",
+    "hourBefore": "提前 1 小時",
+    "upcomingEvent": "即將到來的活動",
+    "inMinutes": "{{minutes}} 分鐘後開始",
     "prev": "上一個",
     "next": "下一個",
     "jan": "一月",
@@ -856,6 +871,7 @@
     "like": "按讚",
     "comment": "評論",
     "aiDiscuss": "AI 討論",
+    "enableAIDiscuss": "啟用 AI 討論",
     "noMomentsYet": "暫無動態。成為第一個分享的人吧！",
     "createPost": "發佈動態",
     "whatsOnYourMind": "你在想什麼？",

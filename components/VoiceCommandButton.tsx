@@ -304,7 +304,7 @@ export default function VoiceCommandButton() {
           // Write to temp file and play
           const tempPath = `${FileSystem.cacheDirectory}voice_cmd_${Date.now()}.mp3`;
           await FileSystem.writeAsStringAsync(tempPath, audioBase64, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: "base64" as any,
           });
 
           // Clean up previous player

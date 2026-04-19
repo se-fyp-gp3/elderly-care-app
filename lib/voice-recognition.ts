@@ -7,7 +7,7 @@ import * as FileSystem from "expo-file-system/legacy";
 const DASHSCOPE_API_KEY =
   process.env.EXPO_PUBLIC_DASHSCOPE_API_KEY?.trim() || "";
 const DASHSCOPE_AUDIO_MODEL =
-  process.env.EXPO_PUBLIC_DASHSCOPE_AUDIO_MODEL?.trim() || "qwen2.5-omni-7b";
+  process.env.EXPO_PUBLIC_DASHSCOPE_AUDIO_MODEL?.trim() || "qwen-omni-turbo";
 
 // Language options for voice commands
 export type VoiceLanguage = "yue" | "zh" | "en";
@@ -53,6 +53,7 @@ const SYSTEM_PROMPTS: Record<VoiceLanguage, string> = {
 3. call_contact - 打電話畀人。例如「打畀阿女」「打電話」。params要有name
 4. check_medication - 查詢藥物（用戶係問句，問自己要食咩）。例如「今日食咩藥」「有咩藥未食」「仲有咩未食」。⚠️ 只有用戶係問問題先用呢個 intent，如果用戶陳述已完成就用 record_medication。
 5. set_schedule - 設定日程。例如「下晝三點覆診」。params要有title, datetime(ISO格式), description
+   ⚠️ 嚴格規則：datetime 同 title 只能放用戶明確講出嘅資訊。如果用戶冇講幾時（例如只講「幫我新增行程」），datetime 必須留空字串 ""，reply 要問用戶想幾時同做咩。絕對唔可以自己捏造日期時間！
 6. general_chat - 其他所有對話
 
 ${DB_SCHEMA_INFO}
@@ -62,6 +63,7 @@ ${DB_SCHEMA_INFO}
 - reply 欄位必須係自然嘅廣東話回覆（繁體中文），唔好放JSON，唔好用簡體字
 - 如果語音唔清楚，reply寫「對唔住，我聽唔清楚，可以再講一次嗎？」，intent設為general_chat
 - add_medication 嘅 params 只包含用戶親口講出嘅資料，用戶冇提及嘅欄位唔好放入params
+- set_schedule 嘅 params 同樣只包含用戶明確講出嘅資料。用戶冇講日期時間就 datetime=""，用戶冇講標題就 title=""，然後reply要問清楚
 
 請以JSON格式回覆：{"intent":"英文intent名","transcript":"用戶原話（原文轉錄，唔係翻譯）","params":{},"reply":"廣東話回覆"}`,
 
@@ -78,6 +80,7 @@ ${DB_SCHEMA_INFO}
 3. call_contact - 打电话给人。例如"打给女儿""打电话"。params要有name
 4. check_medication - 查询药物（用户是疑问句，问自己要吃什么）。例如"今天吃什么药""有什么药没吃""还有什么没吃"。⚠️ 只有用户是问问题才用这个 intent，如果用户陈述已完成就用 record_medication。
 5. set_schedule - 设定日程。例如"下午三点看医生"。params要有title, datetime(ISO格式), description
+   ⚠️ 严格规则：datetime 和 title 只能放用户明确说出的信息。如果用户没说具体时间（例如只说"帮我新增行程"），datetime 必须留空字符串 ""，reply 要问用户想什么时候做什么。绝对不能自己捏造日期时间！
 6. general_chat - 其他所有对话
 
 ${DB_SCHEMA_INFO}
@@ -87,6 +90,7 @@ ${DB_SCHEMA_INFO}
 - reply 字段必须是自然的普通话回复，不要放JSON
 - 如果语音不清楚，reply写"对不起，我听不清楚，请再说一次"，intent设为general_chat
 - add_medication 的 params 只包含用户亲口说出的资料，用户没提到的字段不要放进params
+- set_schedule 的 params 同样只包含用户明确说出的信息。用户没说日期时间就 datetime=""，用户没说标题就 title=""，然后reply要问清楚
 
 请以JSON格式回复：{"intent":"英文intent名","transcript":"用户原话（逐字）","params":{},"reply":"普通话回复"}`,
 
@@ -103,6 +107,7 @@ Listen carefully to the user's voice and identify their intent. The intent field
 3. call_contact - Call a contact. e.g. "Call my daughter". params should include name
 4. check_medication - Check medication (user ASKS what they need to take). e.g. "What medicine today", "What haven't I taken". ⚠️ Only use this when the user is ASKING a question; if they are STATING they have finished, use record_medication instead.
 5. set_schedule - Set schedule. e.g. "Doctor at 3pm". params should include title, datetime (ISO format), description
+   ⚠️ STRICT RULE: datetime and title must ONLY contain information the user explicitly stated. If the user did NOT specify a time (e.g. just said "add a schedule"), datetime MUST be an empty string "", and reply must ask the user WHEN and WHAT they want to schedule. NEVER fabricate a date or time!
 6. general_chat - All other conversations
 
 ${DB_SCHEMA_INFO}
@@ -112,6 +117,7 @@ Important rules:
 - reply field must be a natural English response, NOT JSON
 - If the speech is unclear, set reply to "Sorry, I didn't catch that. Could you say it again?" and intent to general_chat
 - add_medication params must ONLY include fields the user explicitly mentioned; omit all fields the user did not mention
+- set_schedule params must ONLY include info the user explicitly stated. If user didn't say a date/time, datetime="". If user didn't say a title, title="". Then reply must ask them for the missing details.
 
 Reply in JSON format: {"intent":"english_intent_name","transcript":"user's exact words (verbatim)","params":{},"reply":"natural reply"}`,
 };
@@ -205,8 +211,10 @@ export async function recognizeVoiceCommand(
     temperature: 0.3,
     modalities: ["text"],
     audio: { voice: "Chelsie", format: "wav" },
+    enable_thinking: false,
   };
 
+  const voiceStart = Date.now();
   const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
@@ -224,6 +232,7 @@ export async function recognizeVoiceCommand(
   }
 
   const data = await response.json();
+  console.log(`[AI-TIMING] Voice recognition API: ${Date.now() - voiceStart}ms`);
   const rawContent =
     data?.choices?.[0]?.message?.content ||
     data?.output?.choices?.[0]?.message?.content ||
@@ -374,6 +383,6 @@ function parseRecognitionResponse(
  */
 export async function readAudioAsBase64(uri: string): Promise<string> {
   return FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: "base64" as any,
   });
 }

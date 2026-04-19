@@ -633,6 +633,33 @@ export async function undoMedicationTaken(logId: string): Promise<void> {
 }
 
 /**
+ * Mark all overdue PENDING schedule items as MISSED in-place.
+ * Returns the updated array (mutates status on each item).
+ */
+export function markOverdueSchedulesAsMissed(schedules: Schedule[]): Schedule[] {
+  const now = new Date();
+  for (const s of schedules) {
+    if (s.status === ScheduleStatus.PENDING && s.time) {
+      const taskTime = new Date(s.time);
+      if (taskTime < now) {
+        s.status = ScheduleStatus.MISSED;
+        tablesDB
+          .updateRow({
+            databaseId: DATABASE_ID,
+            tableId: SCHEDULE_TABLE_ID,
+            rowId: s.$id,
+            data: { status: ScheduleStatus.MISSED },
+          })
+          .catch((err) =>
+            console.error("Failed to auto-mark schedule as MISSED:", s.$id, err),
+          );
+      }
+    }
+  }
+  return schedules;
+}
+
+/**
  * Persist a new generic schedule task to the database.
  */
 export async function createScheduleTask(params: {
@@ -643,8 +670,9 @@ export async function createScheduleTask(params: {
   elderlyId: string;
   typeName: string;
   categoryId?: string;
+  remindMinutes?: number;
 }): Promise<void> {
-  const { title, description, datetime, elderlyId, typeName, categoryId } = params;
+  const { title, description, datetime, elderlyId, typeName, categoryId, remindMinutes } = params;
   const data: Record<string, any> = {
     title,
     description,
@@ -654,6 +682,7 @@ export async function createScheduleTask(params: {
     type: typeName.toLowerCase(),
   };
   if (categoryId) data.scheduleCategory = categoryId;
+  if (remindMinutes != null) data.remind_minutes = remindMinutes;
 
   await tablesDB.createRow({
     databaseId: DATABASE_ID,

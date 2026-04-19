@@ -6,6 +6,7 @@
  */
 
 import { MedicationItem } from "@/components/MedicationCard";
+import { checkAndFinishReminder } from "@/lib/medication_tracking";
 import { translateFrequency, translateUnit } from "@/lib/schedule";
 import {
     Elderly,
@@ -286,6 +287,10 @@ export async function fetchCaregiverMedicationData(
               if (scheduledHkDateStr < startHkDateStr) {
                 return;
               }
+              // On the same calendar day, also skip slots chronologically before the exact start_date time
+              if (scheduledHkDateStr === startHkDateStr && scheduledUtcMs < startDateMs) {
+                return;
+              }
 
               // Skip slots beyond duration_days
               if (reminder.duration_days) {
@@ -353,11 +358,9 @@ export async function fetchCaregiverMedicationData(
 
             if (status === "pending") {
               const now = new Date();
-              const endOfTargetDay = new Date(baseDate);
-              endOfTargetDay.setHours(23, 59, 59, 999);
-              if (now > slot.timeObj && now > endOfTargetDay) {
-                status = "missed";
-              } else if (now > slot.timeObj) {
+              const graceMs = 10 * 60 * 1000; // 10-minute grace period
+              const deadlineMs = slot.timeObj.getTime() + graceMs;
+              if (now.getTime() > deadlineMs) {
                 status = "missed";
               }
             }
@@ -712,6 +715,11 @@ export async function confirmMedicationTaking(
         last_taken: new Date().toISOString(),
       },
     });
+
+    // Check if all logs for this reminder are now taken → auto-finish reminder
+    if (resolvedReminderId) {
+      await checkAndFinishReminder(resolvedReminderId);
+    }
 
     return { logId: resultLogId };
   } else {

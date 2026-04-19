@@ -79,3 +79,23 @@ export async function updateAlertStatus(
     data: { status },
   });
 }
+
+/**
+ * Fetch recent emergency alerts for a specific elderly person.
+ * Returns latest alerts (active/investigating first, then resolved).
+ */
+export async function fetchAlertsByElderlyId(
+  elderlyId: string,
+  limit = 5,
+): Promise<EmergencyAlert[]> {
+  const response = await tablesDB.listRows<EmergencyAlert>({
+    databaseId: DATABASE_ID,
+    tableId: EMERGENCY_ALERTS_TABLE_ID,
+    queries: [
+      Query.equal("elderly_id", elderlyId),
+      Query.orderDesc("$createdAt"),
+      Query.limit(limit),
+    ],
+  });
+  return response.rows;
+}

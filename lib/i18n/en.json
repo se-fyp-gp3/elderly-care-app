@@ -53,7 +53,8 @@
     "noDataFound": "No data found.",
     "loadingDetails": "Loading details...",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "done": "Done"
   },
   "tabs": {
     "home": "Home",
@@ -535,7 +536,13 @@
     "invitationSentDesc": "An invitation has been sent to {{name}}.",
     "chatOnceAccepted": "You can chat once they accept.",
     "alreadyInContactsOrPending": "{{name}} is already in your contacts or has a pending request.",
-    "pendingRequests": "Pending Requests"
+    "pendingRequests": "Pending Requests",
+    "recentAlerts": "Recent Alerts",
+    "activeLabel": "active",
+    "activeAlertsCount": "{{count}} active alert(s)",
+    "statusActive": "Active",
+    "statusInvestigating": "Investigating",
+    "statusResolved": "Resolved"
   },
   "schedule": {
     "mySchedule": "My Schedule",
@@ -586,6 +593,14 @@
     "undo": "Undo",
     "setReminder": "Set reminder for this event",
     "sendReminderNotif": "Sends you a reminder notification for this event",
+    "remindBefore": "Remind Before",
+    "noReminder": "No Reminder",
+    "reminderOn": "Reminder On",
+    "reminderTime": "Reminder Time",
+    "minutesBefore": "{{minutes}} min before",
+    "hourBefore": "1 hour before",
+    "upcomingEvent": "Upcoming Event",
+    "inMinutes": "in {{minutes}} minutes",
     "prev": "Prev",
     "next": "Next",
     "jan": "Jan",
@@ -856,6 +871,7 @@
     "like": "Like",
     "comment": "Comment",
     "aiDiscuss": "AI Discuss",
+    "enableAIDiscuss": "Enable AI Discussion",
     "noMomentsYet": "No moments yet. Be the first to share!",
     "createPost": "Create Post",
     "whatsOnYourMind": "What's on your mind?",

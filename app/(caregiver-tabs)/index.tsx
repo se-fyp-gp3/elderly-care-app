@@ -316,7 +316,7 @@ export default function CaregiverChatBot() {
   const buildConversationMessages = (
     latestUserMessage: string,
   ): ChatMessage[] => {
-    const history: ChatMessage[] = messages.slice(-8).map((msg) => ({
+    const history: ChatMessage[] = messages.slice(-4).map((msg) => ({
       role: msg.isUser ? "user" : "assistant",
       content: msg.text,
     }));
@@ -328,7 +328,7 @@ export default function CaregiverChatBot() {
     return [
       {
         role: "system",
-        content: `You are an AI care assistant for caregivers who manage elderly patients. Provide clear, professional, and helpful responses about the elderly's daily schedule, medication status, and health tasks.\n\nIMPORTANT: Keep your response concise ??no more than 120 words. Be brief and to the point.\n\nWhen responding about tasks, medications, or schedules, use the data provided. Do NOT invent data that is not listed below. If you don't have enough data, say so.\n\nYou can identify medication from photos ??provide name, common uses, dosage, and warnings. If unsure, advise consulting a pharmacist.\n\nAlways remind the caregiver to consult healthcare professionals for serious concerns.${dataBlock}`,
+        content: `You are an AI assistant for caregivers managing elderly patients. Be concise (max 80 words). Use only the data provided — do NOT invent data. You can identify medication from photos. Advise consulting professionals for serious concerns.${dataBlock}`,
       },
       ...history,
       { role: "user", content: latestUserMessage },
@@ -462,8 +462,9 @@ export default function CaregiverChatBot() {
     const payload = {
       model: resolvedModel,
       messages: messagesPayload,
-      max_tokens: 300,
+      max_tokens: 150,
       temperature: 0.7,
+      enable_thinking: false,
     };
 
     const maxAttempts = 3;
@@ -477,6 +478,7 @@ export default function CaregiverChatBot() {
           REQUEST_TIMEOUT_MS,
         );
 
+        const fetchStart = Date.now();
         const response = await fetch(`${DASHSCOPE_API_URL}/chat/completions`, {
           method: "POST",
           headers: {
@@ -489,6 +491,7 @@ export default function CaregiverChatBot() {
 
         const rawText = await response.text();
         clearTimeout(timeoutId);
+        console.log(`[AI-TIMING] Caregiver chat API fetch attempt ${attempt}: ${Date.now() - fetchStart}ms (model: ${resolvedModel})`);
 
         if (response.ok) {
           const data: AIAPIResponse = rawText ? JSON.parse(rawText) : {};

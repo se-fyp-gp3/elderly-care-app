@@ -8,6 +8,7 @@
 
 import {
     CAREGIVER_ELDERLY_TABLE_ID,
+    CAREGIVER_TABLE_ID,
     DATABASE_ID,
     ELDERLY_TABLE_ID,
     tablesDB,
@@ -15,7 +16,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { createEmergencyAlert } from "@/lib/emergency";
 import { sendImmediateNotification } from "@/lib/notifications";
-import type { CaregiverElderly, Elderly } from "@/types/appwrite";
+import type { Caregiver, CaregiverElderly, Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -115,30 +116,42 @@ export default function FallCountdownOverlay({
       const elderlyName = elderlyDoc?.name ?? user.name ?? "Unknown";
       const elderlyId = elderlyDoc?.$id ?? user.$id;
 
-      // Find all linked caregivers
+      // Find all linked caregivers and resolve their auth user_id
       const ceRows = await tablesDB.listRows<CaregiverElderly>({
         databaseId: DATABASE_ID,
         tableId: CAREGIVER_ELDERLY_TABLE_ID,
         queries: [Query.equal("elderly", elderlyId), Query.limit(100)],
       });
 
-      const caregiverIds: string[] = [];
+      const caregiverUserIds: string[] = [];
       for (const row of ceRows.rows) {
         const cg = row.caregiver;
         if (typeof cg === "string") {
-          caregiverIds.push(cg);
-        } else if (cg && "$id" in cg) {
-          caregiverIds.push((cg as any).user_id ?? (cg as any).$id);
+          // cg is the caregiver profile $id – need to look up user_id
+          try {
+            const cgRows = await tablesDB.listRows<Caregiver>({
+              databaseId: DATABASE_ID,
+              tableId: CAREGIVER_TABLE_ID,
+              queries: [Query.equal("$id", cg), Query.limit(1)],
+            });
+            if (cgRows.rows.length > 0 && cgRows.rows[0].user_id) {
+              caregiverUserIds.push(cgRows.rows[0].user_id);
+            }
+          } catch {
+            // skip unresolvable caregiver
+          }
+        } else if (cg && typeof cg === "object" && "user_id" in cg) {
+          caregiverUserIds.push((cg as any).user_id);
         }
       }
 
       // Create emergency alert for each caregiver
-      for (const cgId of caregiverIds) {
+      for (const cgUserId of caregiverUserIds) {
         await createEmergencyAlert({
           type: "fall",
           elderly_id: elderlyId,
           elderly_name: elderlyName,
-          caregiver_user_id: cgId,
+          caregiver_user_id: cgUserId,
           latitude,
           longitude,
           location_name: locationName,
@@ -149,7 +162,7 @@ export default function FallCountdownOverlay({
       // Local notification
       await sendImmediateNotification(
         "🚨 SOS Sent",
-        `Fall detected – alert sent to ${caregiverIds.length} caregiver(s).`,
+        `Fall detected – alert sent to ${caregiverUserIds.length} caregiver(s).`,
         { type: "fall_sos_sent" },
       );
     } catch (err) {

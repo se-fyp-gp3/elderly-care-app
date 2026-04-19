@@ -174,6 +174,11 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
               ? "/(elderly-tabs)/emergency"
               : "/(caregiver-tabs)/caregiver";
           router.push(targetPath);
+        } else if (rawData && rawData.type === "fall_detected") {
+          // Fall detected notification tapped – bring elderly to home (overlay will show)
+          if (role === "elderly") {
+            router.push("/(elderly-tabs)");
+          }
         }
       },
     );

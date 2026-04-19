@@ -35,7 +35,6 @@ import {
 } from "react-native";
 import {
     Button,
-    Card,
     Chip,
     Dialog,
     Divider,
@@ -470,63 +469,6 @@ export default function EmergencyPage() {
           )}
         </Surface>
 
-        {/* Quick Actions Grid */}
-        <View style={styles.sectionHeader}>
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            {t("emergency.emergencyResponse")}
-          </Text>
-        </View>
-        <View style={styles.grid}>
-          <Card
-            style={[styles.gridCard, { backgroundColor: "#FFEBEE" }]}
-            onPress={() => handleCallEmergency("999")}
-          >
-            <Card.Content style={styles.gridContent}>
-              <MaterialCommunityIcons
-                name="ambulance"
-                size={32}
-                color="#D32F2F"
-              />
-              <Text style={[styles.gridLabel, { color: "#D32F2F" }]}>
-                {t("emergency.call999")}
-              </Text>
-            </Card.Content>
-          </Card>
-          <Card
-            style={[styles.gridCard, { backgroundColor: "#E3F2FD" }]}
-            onPress={() => handleCallEmergency("110")}
-          >
-            <Card.Content style={styles.gridContent}>
-              <MaterialCommunityIcons
-                name="police-badge"
-                size={32}
-                color="#1976D2"
-              />
-              <Text style={[styles.gridLabel, { color: "#1976D2" }]}>
-                {t("emergency.police")}
-              </Text>
-            </Card.Content>
-          </Card>
-          <Card
-            style={[styles.gridCard, { backgroundColor: "#fff" }]}
-            onPress={() =>
-              Alert.alert(
-                t("emergency.broadcast"),
-                t("emergency.broadcastDesc"),
-              )
-            }
-          >
-            <Card.Content style={styles.gridContent}>
-              <MaterialCommunityIcons
-                name="bullhorn-outline"
-                size={32}
-                color={theme.colors.primary}
-              />
-              <Text style={styles.gridLabel}>{t("emergency.broadcast")}</Text>
-            </Card.Content>
-          </Card>
-        </View>
-
         {/* Search & Filter */}
         <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
           <Searchbar
@@ -766,25 +708,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontWeight: "bold",
   },
-  grid: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    gap: 10,
-    marginBottom: 20,
-  },
-  gridCard: {
-    flex: 1,
-    borderRadius: 12,
-  },
-  gridContent: {
-    alignItems: "center",
-    paddingVertical: 16,
-  },
-  gridLabel: {
-    marginTop: 8,
-    fontWeight: "600",
-    fontSize: 12,
-  },
+
   logCard: {
     backgroundColor: "white",
     borderRadius: 12,

@@ -168,7 +168,7 @@ export default function ElderlyChat() {
             tempUri,
             synthesized.audioBase64,
             {
-              encoding: FileSystem.EncodingType.Base64,
+              encoding: "base64" as any,
             },
           );
           audioSourceUri = tempUri;
@@ -377,7 +377,7 @@ export default function ElderlyChat() {
   const buildConversationMessages = (
     latestUserMessage: string,
   ): ChatMessage[] => {
-    const history: ChatMessage[] = messages.slice(-8).map((msg) => ({
+    const history: ChatMessage[] = messages.slice(-4).map((msg) => ({
       role: msg.isUser ? "user" : "assistant",
       content: msg.text,
     }));
@@ -392,7 +392,7 @@ export default function ElderlyChat() {
     return [
       {
         role: "system",
-        content: `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\nIMPORTANT: Keep your response concise — no more than 80 words. Be brief and to the point.\n\n${langInstruction}\n\nWhen the user's message contains [SEARCH RESULTS], you MUST base your answer strictly on those results. Do NOT make up or guess information — only use facts from the provided search data. Summarize the key points for the elderly user in a caring tone.\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
+        content: `You are a caring AI assistant for elderly users. Be concise (max 50 words). ${langInstruction}\n\nIf [SEARCH RESULTS] are provided, answer ONLY using those facts. When user sends a medication photo, identify the medication name, uses, and warnings. For serious concerns, advise consulting a doctor.`,
       },
       ...history,
       {
@@ -507,8 +507,9 @@ export default function ElderlyChat() {
     const payload = {
       model: resolvedModel,
       messages: messagesPayload,
-      max_tokens: 200,
+      max_tokens: 120,
       temperature: hasSearchContext ? 0.2 : 0.7,
+      enable_thinking: false,
     };
 
     const maxAttempts = 3;
@@ -520,6 +521,7 @@ export default function ElderlyChat() {
           abortControllerRef.current?.abort();
         }, REQUEST_TIMEOUT_MS);
 
+        const fetchStart = Date.now();
         const response = await fetch(`${DASHSCOPE_API_URL}/chat/completions`, {
           method: "POST",
           headers: {
@@ -532,6 +534,7 @@ export default function ElderlyChat() {
 
         const rawText = await response.text();
         clearTimeout(timeoutId);
+        console.log(`[AI-TIMING] API fetch attempt ${attempt}: ${Date.now() - fetchStart}ms (model: ${resolvedModel})`);
 
         if (response.ok) {
           const data: AIAPIResponse = rawText ? JSON.parse(rawText) : {};
@@ -846,6 +849,7 @@ export default function ElderlyChat() {
     Keyboard.dismiss();
 
     try {
+      const sendStart = Date.now();
       let messageForAPI: string;
       if (selectedImage) {
         const userText = userMessage.text;
@@ -873,8 +877,10 @@ export default function ElderlyChat() {
         shouldSearch(userMessage.text)
       ) {
         try {
+          const searchStart = Date.now();
           rawSearchResponse = await searchWeb(userMessage.text);
           searchContext = formatSearchResultsForContext(rawSearchResponse);
+          console.log(`[AI-TIMING] Web search: ${Date.now() - searchStart}ms`);
         } catch (e) {
           console.warn("Search failed, proceeding without:", e);
         }
@@ -929,6 +935,7 @@ export default function ElderlyChat() {
 
       const aiResponse = await aiResponsePromise;
 
+      console.log(`[AI-TIMING] Total send-to-response: ${Date.now() - sendStart}ms`);
       console.log("[AI] Model reply (full):", aiResponse);
 
       const aiMessage: Message = {

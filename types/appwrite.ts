@@ -103,6 +103,7 @@ export type Schedule = Models.Row & {
     description: string | null;
     status: ScheduleStatus | null;
     type: ScheduleType | null;
+    remind_minutes: number | null;
     elderly: Elderly;
     scheduleCategory: ScheduleCategory;
 }

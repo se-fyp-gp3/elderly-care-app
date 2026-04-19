@@ -6,22 +6,24 @@ import {
 import {
   createScheduleTask,
   fetchScheduleCategories,
+  markOverdueSchedulesAsMissed,
   markScheduleTaskCompleted,
 } from "@/lib/schedule";
 import { Schedule, ScheduleCategory } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "expo-router";
+import * as Notifications from "expo-notifications";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
-  Keyboard,
+  Modal as RNModal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   useColorScheme,
   View,
 } from "react-native";
@@ -55,13 +57,33 @@ export default function ElderlySchedule() {
     title: "",
     description: "",
     date: new Date(),
-    time: "",
+    time: "08:00",
     typeId: "",
     typeName: "Activity",
+    remindAt: new Date(Date.now() + 15 * 60 * 1000) as Date | null, // default: 15 min before
   });
   const [datePickerVisible, setDatePickerVisible] = React.useState(false);
   const [timePickerVisible, setTimePickerVisible] = React.useState(false);
   const [selectingType, setSelectingType] = React.useState(false);
+  // Temp state for iOS spinner pickers
+  const [tempDate, setTempDate] = React.useState(new Date());
+  const [tempTime, setTempTime] = React.useState(new Date());
+  // Remind date+time picker state
+  const [remindPickerVisible, setRemindPickerVisible] = React.useState(false);
+  const [remindPickerMode, setRemindPickerMode] = React.useState<"date" | "time">("date");
+  const [tempRemindDate, setTempRemindDate] = React.useState(new Date());
+
+  // Local state for text inputs to prevent IME (handwriting/pinyin) composition interruption
+  const [localTitle, setLocalTitle] = React.useState("");
+  const [localDescription, setLocalDescription] = React.useState("");
+
+  // Sync local state when modal opens
+  React.useEffect(() => {
+    if (newTaskVisible) {
+      setLocalTitle(newTask.title);
+      setLocalDescription(newTask.description);
+    }
+  }, [newTaskVisible]);
 
   const fetchSchedules = React.useCallback(async () => {
     if (!user) return;
@@ -75,6 +97,8 @@ export default function ElderlySchedule() {
       const nonMedSchedules = (response as Schedule[]).filter(
         (s) => s.type !== "medication",
       );
+      // Auto-mark past PENDING items as MISSED
+      markOverdueSchedulesAsMissed(nonMedSchedules);
       setSchedules(nonMedSchedules);
     } catch (err) {
       console.error("Error fetching schedules:", err);
@@ -104,6 +128,33 @@ export default function ElderlySchedule() {
       fetchSchedules();
     }, [fetchSchedules]),
   );
+
+  // Schedule notifications for upcoming events
+  React.useEffect(() => {
+    const scheduleUpcomingNotifications = async () => {
+      const now = Date.now();
+      for (const s of schedules) {
+        if (s.status !== "Pending" || !s.time) continue;
+        const eventTime = new Date(s.time).getTime();
+        if (eventTime <= now) continue;
+        const remindMins = s.remind_minutes ?? 15;
+        if (remindMins <= 0) continue;
+        const notifyAt = new Date(eventTime - remindMins * 60 * 1000);
+        if (notifyAt.getTime() > now) {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: t("schedule.upcomingEvent"),
+              body: `${s.title} — ${t("schedule.inMinutes", { minutes: remindMins })}`,
+              sound: true,
+              data: { type: "schedule_reminder", scheduleId: s.$id },
+            },
+            trigger: { type: "date", date: notifyAt } as any,
+          });
+        }
+      }
+    };
+    if (schedules.length > 0) scheduleUpcomingNotifications();
+  }, [schedules, t]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -177,7 +228,12 @@ export default function ElderlySchedule() {
   };
 
   const handleSaveTask = async () => {
-    if (!newTask.title.trim()) {
+    // Sync local IME state before validation
+    const finalTitle = localTitle;
+    const finalDescription = localDescription;
+    setNewTask((prev) => ({ ...prev, title: finalTitle, description: finalDescription }));
+
+    if (!finalTitle.trim()) {
       Alert.alert("Missing Information", "Please enter a title.");
       return;
     }
@@ -196,23 +252,47 @@ export default function ElderlySchedule() {
       const [hours, minutes] = newTask.time.split(":").map(Number);
       combinedDatetime.setHours(hours, minutes, 0, 0);
 
+      // Compute remind_minutes from the picked remind datetime
+      const remindAt = newTask.remindAt;
+      const remindMinutes = remindAt
+        ? Math.max(0, Math.round((combinedDatetime.getTime() - remindAt.getTime()) / 60000))
+        : 0;
+
       await createScheduleTask({
-        title: newTask.title,
-        description: newTask.description,
+        title: finalTitle,
+        description: finalDescription,
         datetime: combinedDatetime,
         elderlyId: elderlyProfileId,
         typeName: newTask.typeName,
         categoryId: newTask.typeId || undefined,
+        remindMinutes,
       });
+
+      // Schedule a local notification at the remind datetime
+      if (remindAt && remindAt.getTime() > Date.now()) {
+        const bodyText = remindMinutes > 0
+          ? `${finalTitle} — ${t("schedule.inMinutes", { minutes: remindMinutes })}`
+          : `${finalTitle}`;
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: t("schedule.upcomingEvent"),
+            body: bodyText,
+            sound: true,
+            data: { type: "schedule_reminder" },
+          },
+          trigger: { type: "date", date: remindAt } as any,
+        });
+      }
 
       setNewTaskVisible(false);
       setNewTask({
         title: "",
         description: "",
         date: new Date(),
-        time: "",
+        time: "08:00",
         typeId: "",
         typeName: "Activity",
+        remindAt: new Date(Date.now() + 15 * 60 * 1000),
       });
       await fetchSchedules();
     } catch (err) {
@@ -224,21 +304,76 @@ export default function ElderlySchedule() {
   };
 
   const onConfirmDate = (_event: any, selectedDate?: Date) => {
-    setDatePickerVisible(false);
+    if (Platform.OS !== "ios") setDatePickerVisible(false);
     if (selectedDate) {
-      setNewTask((prev) => ({ ...prev, date: selectedDate }));
+      if (Platform.OS === "ios") {
+        setTempDate(selectedDate);
+      } else {
+        setNewTask((prev) => ({ ...prev, date: selectedDate }));
+      }
     }
   };
 
+  const onConfirmDateDone = () => {
+    setDatePickerVisible(false);
+    setNewTask((prev) => ({ ...prev, date: tempDate }));
+  };
+
   const onConfirmTime = (_event: any, selectedDate?: Date) => {
-    setTimePickerVisible(false);
+    if (Platform.OS !== "ios") setTimePickerVisible(false);
     if (selectedDate) {
-      const hours = selectedDate.getHours();
-      const mins = selectedDate.getMinutes();
-      setNewTask((prev) => ({
-        ...prev,
-        time: `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`,
-      }));
+      if (Platform.OS === "ios") {
+        setTempTime(selectedDate);
+      } else {
+        const hours = selectedDate.getHours();
+        const mins = selectedDate.getMinutes();
+        setNewTask((prev) => ({
+          ...prev,
+          time: `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`,
+        }));
+      }
+    }
+  };
+
+  const onConfirmTimeDone = () => {
+    setTimePickerVisible(false);
+    const hours = tempTime.getHours();
+    const mins = tempTime.getMinutes();
+    setNewTask((prev) => ({
+      ...prev,
+      time: `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`,
+    }));
+  };
+
+  // Remind date+time picker handlers
+  const onChangeRemind = (_event: any, selectedDate?: Date) => {
+    if (Platform.OS !== "ios") {
+      if (remindPickerMode === "date" && selectedDate) {
+        // Android: after picking date, switch to time mode
+        setTempRemindDate(selectedDate);
+        setRemindPickerMode("time");
+      } else if (remindPickerMode === "time" && selectedDate) {
+        // Android: after picking time, save and close
+        const merged = new Date(tempRemindDate);
+        merged.setHours(selectedDate.getHours(), selectedDate.getMinutes(), 0, 0);
+        setNewTask((prev) => ({ ...prev, remindAt: merged }));
+        setRemindPickerVisible(false);
+      } else {
+        setRemindPickerVisible(false);
+      }
+    } else if (selectedDate) {
+      setTempRemindDate(selectedDate);
+    }
+  };
+
+  const onConfirmRemindDone = () => {
+    if (remindPickerMode === "date") {
+      // Move to time step
+      setRemindPickerMode("time");
+    } else {
+      // Save and close
+      setNewTask((prev) => ({ ...prev, remindAt: tempRemindDate }));
+      setRemindPickerVisible(false);
     }
   };
 
@@ -772,8 +907,7 @@ export default function ElderlySchedule() {
           ]}
         >
           {!selectingType ? (
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text
                   variant="headlineSmall"
                   style={{ marginBottom: 20, fontWeight: "bold" }}
@@ -784,20 +918,18 @@ export default function ElderlySchedule() {
                 <TextInput
                   mode="outlined"
                   label="Title"
-                  value={newTask.title}
-                  onChangeText={(text) =>
-                    setNewTask((prev) => ({ ...prev, title: text }))
-                  }
+                  value={localTitle}
+                  onChangeText={setLocalTitle}
+                  onBlur={() => setNewTask((prev) => ({ ...prev, title: localTitle }))}
                   style={styles.input}
                 />
 
                 <TextInput
                   mode="outlined"
                   label="Description (optional)"
-                  value={newTask.description}
-                  onChangeText={(text) =>
-                    setNewTask((prev) => ({ ...prev, description: text }))
-                  }
+                  value={localDescription}
+                  onChangeText={setLocalDescription}
+                  onBlur={() => setNewTask((prev) => ({ ...prev, description: localDescription }))}
                   style={styles.input}
                   multiline
                 />
@@ -809,7 +941,10 @@ export default function ElderlySchedule() {
                   }}
                 >
                   <TouchableOpacity
-                    onPress={() => setDatePickerVisible(true)}
+                    onPress={() => {
+                      setTempDate(newTask.date);
+                      setDatePickerVisible(true);
+                    }}
                     style={{ flex: 1, marginRight: 8 }}
                   >
                     <TextInput
@@ -821,25 +956,34 @@ export default function ElderlySchedule() {
                       right={
                         <TextInput.Icon
                           icon="calendar"
-                          onPress={() => setDatePickerVisible(true)}
+                          onPress={() => {
+                            setTempDate(newTask.date);
+                            setDatePickerVisible(true);
+                          }}
                         />
                       }
                     />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => setTimePickerVisible(true)}
+                    onPress={() => {
+                      setTempTime(new Date());
+                      setTimePickerVisible(true);
+                    }}
                     style={{ flex: 1 }}
                   >
                     <TextInput
                       mode="outlined"
                       label="Time"
-                      value={newTask.time || "Select time"}
+                      value={newTask.time || "08:00"}
                       editable={false}
                       style={styles.input}
                       right={
                         <TextInput.Icon
                           icon="clock"
-                          onPress={() => setTimePickerVisible(true)}
+                          onPress={() => {
+                            setTempTime(new Date());
+                            setTimePickerVisible(true);
+                          }}
                         />
                       }
                     />
@@ -862,6 +1006,70 @@ export default function ElderlySchedule() {
                   />
                 </TouchableOpacity>
 
+                {/* Reminder date+time picker */}
+                <Text variant="labelLarge" style={{ marginBottom: 8 }}>
+                  {t("schedule.remindBefore")}
+                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                  <Chip
+                    selected={newTask.remindAt !== null}
+                    onPress={() => {
+                      if (newTask.remindAt) {
+                        setNewTask((prev) => ({ ...prev, remindAt: null }));
+                      } else {
+                        // Default to event time - 15 min
+                        const eventDate = new Date(newTask.date);
+                        const [h, m] = newTask.time.split(":").map(Number);
+                        eventDate.setHours(h, m, 0, 0);
+                        const defaultRemind = new Date(eventDate.getTime() - 15 * 60 * 1000);
+                        setNewTask((prev) => ({ ...prev, remindAt: defaultRemind }));
+                      }
+                    }}
+                    style={{
+                      backgroundColor: newTask.remindAt
+                        ? theme.colors.primaryContainer
+                        : theme.colors.surfaceVariant,
+                    }}
+                    icon={newTask.remindAt ? "bell" : "bell-off"}
+                  >
+                    {newTask.remindAt ? t("schedule.reminderOn") : t("schedule.noReminder")}
+                  </Chip>
+                </View>
+                {newTask.remindAt && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setTempRemindDate(newTask.remindAt!);
+                      setRemindPickerMode("date");
+                      setRemindPickerVisible(true);
+                    }}
+                    style={{ marginBottom: 16 }}
+                  >
+                    <TextInput
+                      mode="outlined"
+                      label={t("schedule.reminderTime")}
+                      value={newTask.remindAt.toLocaleString([], {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      editable={false}
+                      style={styles.input}
+                      right={
+                        <TextInput.Icon
+                          icon="bell-ring"
+                          onPress={() => {
+                            setTempRemindDate(newTask.remindAt!);
+                            setRemindPickerMode("date");
+                            setRemindPickerVisible(true);
+                          }}
+                        />
+                      }
+                    />
+                  </TouchableOpacity>
+                )}
+
                 <Button
                   mode="contained"
                   onPress={handleSaveTask}
@@ -872,9 +1080,8 @@ export default function ElderlySchedule() {
                   Save Event
                 </Button>
               </ScrollView>
-            </TouchableWithoutFeedback>
           ) : (
-            <View>
+            <View style={{ flex: 1 }}>
               <View
                 style={{
                   flexDirection: "row",
@@ -892,7 +1099,7 @@ export default function ElderlySchedule() {
                   Select Type
                 </Text>
               </View>
-              <ScrollView style={{ maxHeight: 300 }}>
+              <ScrollView showsVerticalScrollIndicator={false}>
                 {categories.length > 0 ? (
                   categories.map((cat) => (
                     <TouchableOpacity
@@ -952,21 +1159,94 @@ export default function ElderlySchedule() {
         </Modal>
       </Portal>
 
-      {datePickerVisible && (
-        <DateTimePicker
-          value={newTask.date}
-          mode="date"
-          display="default"
-          onChange={onConfirmDate}
-        />
+      {Platform.OS === "ios" ? (
+        <RNModal visible={datePickerVisible} transparent animationType="slide">
+          <View style={styles.pickerOverlay}>
+            <View style={[styles.pickerSheet, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.pickerHeader}>
+                <Button onPress={() => setDatePickerVisible(false)}>{t('common.cancel')}</Button>
+                <Button onPress={onConfirmDateDone}>{t('common.done')}</Button>
+              </View>
+              <DateTimePicker
+                value={tempDate}
+                mode="date"
+                display="spinner"
+                onChange={onConfirmDate}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        </RNModal>
+      ) : (
+        datePickerVisible && (
+          <DateTimePicker
+            value={newTask.date}
+            mode="date"
+            display="default"
+            onChange={onConfirmDate}
+          />
+        )
       )}
-      {timePickerVisible && (
-        <DateTimePicker
-          value={new Date()}
-          mode="time"
-          display="default"
-          onChange={onConfirmTime}
-        />
+
+      {Platform.OS === "ios" ? (
+        <RNModal visible={timePickerVisible} transparent animationType="slide">
+          <View style={styles.pickerOverlay}>
+            <View style={[styles.pickerSheet, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.pickerHeader}>
+                <Button onPress={() => setTimePickerVisible(false)}>{t('common.cancel')}</Button>
+                <Button onPress={onConfirmTimeDone}>{t('common.done')}</Button>
+              </View>
+              <DateTimePicker
+                value={tempTime}
+                mode="time"
+                display="spinner"
+                onChange={onConfirmTime}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        </RNModal>
+      ) : (
+        timePickerVisible && (
+          <DateTimePicker
+            value={new Date()}
+            mode="time"
+            display="default"
+            onChange={onConfirmTime}
+          />
+        )
+      )}
+
+      {/* Remind date+time picker */}
+      {Platform.OS === "ios" ? (
+        <RNModal visible={remindPickerVisible} transparent animationType="slide">
+          <View style={styles.pickerOverlay}>
+            <View style={[styles.pickerSheet, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.pickerHeader}>
+                <Button onPress={() => setRemindPickerVisible(false)}>{t('common.cancel')}</Button>
+                <Button onPress={onConfirmRemindDone}>
+                  {remindPickerMode === "date" ? t('schedule.next') : t('common.done')}
+                </Button>
+              </View>
+              <DateTimePicker
+                value={tempRemindDate}
+                mode={remindPickerMode}
+                display="spinner"
+                onChange={onChangeRemind}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        </RNModal>
+      ) : (
+        remindPickerVisible && (
+          <DateTimePicker
+            value={tempRemindDate}
+            mode={remindPickerMode}
+            display="default"
+            onChange={onChangeRemind}
+          />
+        )
       )}
     </View>
   );
@@ -1068,7 +1348,7 @@ const styles = StyleSheet.create({
     margin: 20,
     padding: 20,
     borderRadius: 16,
-    maxHeight: "80%",
+    maxHeight: "100%",
   },
   input: {
     marginBottom: 10,
@@ -1081,5 +1361,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#ccc",
     borderRadius: 12,
+  },
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  pickerSheet: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 30,
+    alignItems: "center",
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignSelf: "stretch",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
 });

@@ -1,5 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
-import { ExecutionMethod } from "react-native-appwrite";
+import { ExecutionMethod, ID } from "react-native-appwrite";
 import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, functions, storage, VOICE_CLONE_FUNCTION_ID } from "./appwrite";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -63,23 +63,94 @@ export async function createPersonalVoice(
   }
   assertDashScopeConfigured();
 
-  // ── Step 1: Convert audio to MP3 via Appwrite function ──
-  console.log("[voice] Calling Appwrite function to convert audio...");
-  const fnResult = await functions.createExecution({
-    functionId: VOICE_CLONE_FUNCTION_ID,
-    body: JSON.stringify({
-      mode: "clone",
-      samplesBase64,
-      speakerName,
-    }),
-    method: ExecutionMethod.POST,
-  });
+  // Estimate total base64 payload size (in bytes)
+  const totalBase64Bytes = samplesBase64.reduce((sum, s) => sum + s.length, 0);
+  const SIZE_THRESHOLD = 500 * 1024; // 500 KB — Appwrite function body limit safe zone
 
   let clonePayload: any;
-  try {
-    clonePayload = JSON.parse(fnResult.responseBody);
-  } catch {
-    throw new Error(`Voice clone function returned invalid JSON: ${fnResult.responseBody}`);
+
+  if (totalBase64Bytes < SIZE_THRESHOLD) {
+    // ── Small file: send base64 directly in function body ──
+    console.log(`[voice] Small payload (${(totalBase64Bytes / 1024).toFixed(0)} KB), sending base64 directly...`);
+    const fnResult = await functions.createExecution({
+      functionId: VOICE_CLONE_FUNCTION_ID,
+      body: JSON.stringify({
+        mode: "clone",
+        samplesBase64,
+        speakerName,
+      }),
+      method: ExecutionMethod.POST,
+    });
+
+    try {
+      clonePayload = JSON.parse(fnResult.responseBody);
+    } catch {
+      throw new Error(`Voice clone function returned invalid JSON: ${fnResult.responseBody}`);
+    }
+  } else {
+    // ── Large file: upload to Storage first, pass URLs to function ──
+    console.log(`[voice] Large payload (${(totalBase64Bytes / 1024).toFixed(0)} KB), uploading to Storage first...`);
+
+    const uploadedFileIds: string[] = [];
+    const sampleUrls: string[] = [];
+
+    try {
+      for (let i = 0; i < samplesBase64.length; i++) {
+        const b64 = samplesBase64[i];
+        const tmpPath = `${FileSystem.cacheDirectory}voice_tmp_${Date.now()}_${i}.m4a`;
+        await FileSystem.writeAsStringAsync(tmpPath, b64, {
+          encoding: "base64" as any,
+        });
+
+        const fileInfo = await FileSystem.getInfoAsync(tmpPath);
+        if (!fileInfo.exists) throw new Error("Failed to write temp audio file");
+
+        const fileId = ID.unique();
+        await storage.createFile(
+          VOICE_CLONE_BUCKET,
+          fileId,
+          {
+            name: `tmp_sample_${i}_${Date.now()}.m4a`,
+            type: "audio/mp4",
+            size: (fileInfo as any).size || 0,
+            uri: tmpPath,
+          } as any,
+        );
+        uploadedFileIds.push(fileId);
+
+        const url = `${APPWRITE_ENDPOINT}/storage/buckets/${VOICE_CLONE_BUCKET}/files/${fileId}/view?project=${APPWRITE_PROJECT_ID}`;
+        sampleUrls.push(url);
+        console.log(`[voice] Uploaded sample ${i + 1}/${samplesBase64.length}: ${fileId}`);
+
+        await FileSystem.deleteAsync(tmpPath, { idempotent: true });
+      }
+
+      // Call function with URLs instead of base64
+      const fnResult = await functions.createExecution({
+        functionId: VOICE_CLONE_FUNCTION_ID,
+        body: JSON.stringify({
+          mode: "clone_url",
+          sampleUrls,
+          speakerName,
+        }),
+        method: ExecutionMethod.POST,
+      });
+
+      try {
+        clonePayload = JSON.parse(fnResult.responseBody);
+      } catch {
+        throw new Error(`Voice clone function returned invalid JSON: ${fnResult.responseBody}`);
+      }
+    } finally {
+      // Clean up temp Storage files (best-effort)
+      for (const fid of uploadedFileIds) {
+        try {
+          await storage.deleteFile(VOICE_CLONE_BUCKET, fid);
+        } catch {
+          // Ignore cleanup failures
+        }
+      }
+    }
   }
 
   if (!clonePayload?.success) {
@@ -102,7 +173,7 @@ export async function createPersonalVoice(
     const audioBase64 = convertedSamples[0];
     const tempPath = `${FileSystem.cacheDirectory}voice_ref_${Date.now()}.${ext}`;
     await FileSystem.writeAsStringAsync(tempPath, audioBase64, {
-      encoding: FileSystem.EncodingType.Base64,
+      encoding: "base64" as any,
     });
 
     const fileInfo = await FileSystem.getInfoAsync(tempPath);
@@ -398,7 +469,7 @@ async function synthesizeWithReference(
 // ── Utility ──
 export async function readAudioFileAsBase64(uri: string): Promise<string> {
   return FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: "base64" as any,
   });
 }
 

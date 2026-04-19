@@ -30,15 +30,19 @@ import {
   MedicationLogs,
 } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import React from "react";
 import { useTranslation } from "react-i18next";
+import DateTimePicker, {
+    DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import {
   Alert,
   Animated,
   AppState,
+  Modal as RNModal,
   Platform,
   RefreshControl,
   ScrollView,
@@ -62,14 +66,14 @@ import {
   useTheme,
 } from "react-native-paper";
 
-// --- AI / Scan Configuration ---
-const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY?.trim();
-const OPENROUTER_API_URL =
-  process.env.EXPO_PUBLIC_OPENROUTER_API_URL?.trim() ||
-  "https://openrouter.ai/api/v1";
-const OPENROUTER_IMAGE_MODEL =
-  process.env.EXPO_PUBLIC_OPENROUTER_IMAGE_MODEL?.trim() ||
-  "google/gemini-2.0-flash-exp:free";
+// --- AI / Scan Configuration (DashScope) ---
+const DASHSCOPE_API_KEY = process.env.EXPO_PUBLIC_DASHSCOPE_API_KEY?.trim();
+const DASHSCOPE_API_URL =
+  process.env.EXPO_PUBLIC_DASHSCOPE_API_URL?.trim() ||
+  "https://dashscope.aliyuncs.com/compatible-mode/v1";
+const DASHSCOPE_IMAGE_MODEL =
+  process.env.EXPO_PUBLIC_DASHSCOPE_IMAGE_MODEL?.trim() ||
+  "qwen-vl-max-latest";
 
 // Maximum image size for upload (1.5MB to be safe)
 const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
@@ -119,12 +123,20 @@ export default function ElderlyMedicationScreen() {
   // Form State
   const [medicineName, setMedicineName] = React.useState("");
   const [unit, setUnit] = React.useState("dose");
+  // Local state for text inputs to prevent IME (handwriting/pinyin) composition interruption
+  const [localMedicineName, setLocalMedicineName] = React.useState("");
+  const [localUnit, setLocalUnit] = React.useState("dose");
   const [dosage, setDosage] = React.useState("1");
   const [timesPerDay, setTimesPerDay] = React.useState(1);
   const [durationDays, setDurationDays] = React.useState(7);
   const [followUpCaregiver, setFollowUpCaregiver] = React.useState("");
   const [afterMeal, setAfterMeal] = React.useState(false);
   const [reminderTimes, setReminderTimes] = React.useState<string[]>(["08:00"]);
+
+  // iOS time picker state for reminder times
+  const [medTimePickerVisible, setMedTimePickerVisible] = React.useState(false);
+  const [editingTimeIdx, setEditingTimeIdx] = React.useState<number>(0);
+  const [tempMedTime, setTempMedTime] = React.useState(new Date());
 
   const fetchData = React.useCallback(async () => {
     if (!user) return;
@@ -277,11 +289,22 @@ export default function ElderlyMedicationScreen() {
         // @ts-ignore
         const medDosage = `${r.elderly_medication?.dosage || 1} ${translateUnit(medUnit)}`;
 
+        // Derive display status: mark as missing if >10 min past scheduled time
+        let status: "pending" | "taken" | "missing" = log
+          ? (log.status as any)
+          : "pending";
+        if (
+          status === "pending" &&
+          now.getTime() - scheduledDate.getTime() > 10 * 60 * 1000
+        ) {
+          status = "missing";
+        }
+
         list.push({
           reminder: r,
           time,
           scheduledAt,
-          status: log ? (log.status as any) : "pending",
+          status,
           logId: log?.$id,
           medicationName: medName,
           dosage: medDosage,
@@ -412,7 +435,7 @@ export default function ElderlyMedicationScreen() {
   };
 
   const analyzeMedicationImage = async (uri: string) => {
-    if (!OPENROUTER_API_KEY) {
+    if (!DASHSCOPE_API_KEY) {
       Alert.alert(t("medication.configError"), t("medication.apiKeyMissing"));
       return null;
     }
@@ -421,16 +444,14 @@ export default function ElderlyMedicationScreen() {
       const processedUri = await prepareImageForUpload(uri);
       const base64 = await getImageBase64(processedUri);
 
-      const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
+      const response = await fetch(`${DASHSCOPE_API_URL}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          "HTTP-Referer": "https://elderly-care-app.local",
-          "X-Title": "elderly-care-app",
+          Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
         },
         body: JSON.stringify({
-          model: OPENROUTER_IMAGE_MODEL,
+          model: DASHSCOPE_IMAGE_MODEL,
           messages: [
             {
               role: "user",
@@ -449,8 +470,18 @@ export default function ElderlyMedicationScreen() {
         }),
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("DashScope API error:", response.status, errorText);
+        throw new Error(`API returned ${response.status}: ${errorText}`);
+      }
+
       const data = await response.json();
-      const content = data.choices?.[0]?.message?.content;
+      console.log("DashScope response:", JSON.stringify(data).slice(0, 500));
+      const content =
+        data.choices?.[0]?.message?.content ||
+        data.output?.choices?.[0]?.message?.content ||
+        data.output?.text;
       if (!content) throw new Error("No content from AI");
 
       const jsonString = content
@@ -488,8 +519,8 @@ export default function ElderlyMedicationScreen() {
         setIsScanning(false);
 
         if (data) {
-          if (data.name) setMedicineName(data.name);
-          if (data.unit) setUnit(data.unit);
+          if (data.name) { setMedicineName(data.name); setLocalMedicineName(data.name); }
+          if (data.unit) { setUnit(data.unit); setLocalUnit(data.unit); }
           if (data.dosage) setDosage(String(data.dosage));
 
           const tpd = Number(data.timesPerDay) || 1;
@@ -605,9 +636,19 @@ export default function ElderlyMedicationScreen() {
     [],
   );
 
+  // Sync local state when modal opens
+  React.useEffect(() => {
+    if (modalVisible) {
+      setLocalMedicineName(medicineName);
+      setLocalUnit(unit);
+    }
+  }, [modalVisible]);
+
   const resetForm = React.useCallback(() => {
     setMedicineName("");
     setUnit("dose");
+    setLocalMedicineName("");
+    setLocalUnit("dose");
     setDosage("1");
     setTimesPerDay(1);
     setDurationDays(7);
@@ -654,10 +695,45 @@ export default function ElderlyMedicationScreen() {
     [],
   );
 
+  const openTimePicker = React.useCallback((index: number) => {
+    const [h, m] = (reminderTimes[index] || "08:00").split(":").map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    setTempMedTime(d);
+    setEditingTimeIdx(index);
+    setMedTimePickerVisible(true);
+  }, [reminderTimes]);
+
+  const onMedTimePickerChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === "ios") {
+      if (selectedDate) setTempMedTime(selectedDate);
+      return;
+    }
+    setMedTimePickerVisible(false);
+    if (selectedDate) {
+      const h = selectedDate.getHours().toString().padStart(2, "0");
+      const m = selectedDate.getMinutes().toString().padStart(2, "0");
+      handleTimeChange(editingTimeIdx, `${h}:${m}`);
+    }
+  };
+
+  const onMedTimePickerDone = () => {
+    setMedTimePickerVisible(false);
+    const h = tempMedTime.getHours().toString().padStart(2, "0");
+    const m = tempMedTime.getMinutes().toString().padStart(2, "0");
+    handleTimeChange(editingTimeIdx, `${h}:${m}`);
+  };
+
   const saveMedication = React.useCallback(async () => {
     if (!user) return;
 
-    if (!medicineName.trim()) {
+    // Sync local IME state before validation
+    const finalName = localMedicineName;
+    const finalUnit = localUnit;
+    setMedicineName(finalName);
+    setUnit(finalUnit);
+
+    if (!finalName.trim()) {
       showMessage(
         t("medication.missingInfo"),
         t("medication.enterMedicineName"),
@@ -688,8 +764,8 @@ export default function ElderlyMedicationScreen() {
     try {
       setSaving(true);
       await createElderlyMedicationWithReminder(user.$id, {
-        name: medicineName.trim(),
-        unit: unit.trim() || "dose",
+        name: finalName.trim(),
+        unit: finalUnit.trim() || "dose",
         dosage: safeDosage,
         timesPerDay,
         durationDays,
@@ -711,11 +787,11 @@ export default function ElderlyMedicationScreen() {
     durationDays,
     fetchData,
     followUpCaregiver,
-    medicineName,
+    localMedicineName,
+    localUnit,
     reminderTimes,
     showMessage,
     timesPerDay,
-    unit,
     user,
   ]);
 
@@ -1347,16 +1423,18 @@ export default function ElderlyMedicationScreen() {
 
             <TextInput
               label={t("medication.medicineName") + " *"}
-              value={medicineName}
-              onChangeText={setMedicineName}
+              value={localMedicineName}
+              onChangeText={setLocalMedicineName}
+              onBlur={() => setMedicineName(localMedicineName)}
               style={styles.input}
               mode="outlined"
             />
 
             <TextInput
               label={t("medication.unit")}
-              value={unit}
-              onChangeText={setUnit}
+              value={localUnit}
+              onChangeText={setLocalUnit}
+              onBlur={() => setUnit(localUnit)}
               style={styles.input}
               mode="outlined"
             />
@@ -1455,14 +1533,16 @@ export default function ElderlyMedicationScreen() {
                     }}
                   />
                 ) : (
-                  <TextInput
-                    mode="outlined"
-                    value={timeSlot}
-                    onChangeText={(value) => handleTimeChange(index, value)}
-                    style={styles.timeInput}
-                    placeholder="HH:mm"
-                    keyboardType="numbers-and-punctuation"
-                  />
+                  <TouchableOpacity onPress={() => openTimePicker(index)}>
+                    <TextInput
+                      mode="outlined"
+                      value={timeSlot}
+                      editable={false}
+                      style={styles.timeInput}
+                      placeholder="HH:mm"
+                      right={<TextInput.Icon icon="clock" onPress={() => openTimePicker(index)} />}
+                    />
+                  </TouchableOpacity>
                 )}
               </View>
             ))}
@@ -1489,6 +1569,36 @@ export default function ElderlyMedicationScreen() {
           </ScrollView>
         </Modal>
       </Portal>
+
+      {/* iOS Time Picker for Medication Reminder Times */}
+      {Platform.OS === "ios" ? (
+        <RNModal visible={medTimePickerVisible} transparent animationType="slide">
+          <View style={styles.pickerOverlay}>
+            <View style={[styles.pickerSheet, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.pickerHeader}>
+                <Button onPress={() => setMedTimePickerVisible(false)}>{t('common.cancel')}</Button>
+                <Button onPress={onMedTimePickerDone}>{t('common.done')}</Button>
+              </View>
+              <DateTimePicker
+                value={tempMedTime}
+                mode="time"
+                display="spinner"
+                onChange={onMedTimePickerChange}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        </RNModal>
+      ) : (
+        medTimePickerVisible && (
+          <DateTimePicker
+            value={tempMedTime}
+            mode="time"
+            display="default"
+            onChange={onMedTimePickerChange}
+          />
+        )
+      )}
     </View>
   );
 }
@@ -1630,7 +1740,7 @@ const styles = StyleSheet.create({
   modal: {
     margin: 20,
     borderRadius: 12,
-    maxHeight: "90%",
+    maxHeight: "100%",
     overflow: "hidden",
   },
   modalTitle: {
@@ -1765,5 +1875,22 @@ const styles = StyleSheet.create({
     color: "#00695C",
     fontSize: 11,
     fontWeight: "700",
+  },
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  pickerSheet: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 30,
+    alignItems: "center",
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignSelf: "stretch",
+    padding: 8,
   },
 });

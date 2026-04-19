@@ -1,11 +1,12 @@
 import i18n from "@/lib/i18n";
-import { ElderlyStatus, HealthData } from "@/types/appwrite";
+import { ElderlyStatus, EmergencyAlert, HealthData } from "@/types/appwrite";
 import { Query } from "react-native-appwrite";
 import {
     DATABASE_ID,
     ELDERLY_DAILY_STEPS_TABLE_ID,
     ELDERLY_MEDICATION_REMINDER_TABLE_ID,
     ELDERLY_MEDICATION_TABLE_ID,
+    EMERGENCY_ALERTS_TABLE_ID,
     HEALTH_DATA_TABLE_ID,
     MEDICATION_LOGS_TABLE_ID,
     SCHEDULE_TABLE_ID,
@@ -25,6 +26,8 @@ export interface ElderlyStatusInfo {
   lastActiveTime: string | null;
   /** Whether the elderly has shown recent activity (steps > 0 today or yesterday) */
   isActive: boolean;
+  /** Recent emergency alerts (active/investigating) for this elderly */
+  recentAlerts: EmergencyAlert[];
 }
 
 /**
@@ -64,6 +67,7 @@ export async function computeElderlyStatus(
   let todaySteps: number | null = null;
   let lastActiveTime: string | null = null;
   let isActive = false;
+  let recentAlerts: EmergencyAlert[] = [];
 
   try {
     // ── 1. Latest health data ───────────────────────────────────────────
@@ -399,6 +403,34 @@ export async function computeElderlyStatus(
       // Step query may fail; ignore
     }
 
+    // ── 5. Recent emergency alerts ──────────────────────────────────
+    try {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const alertsRes = await tablesDB.listRows<EmergencyAlert>({
+        databaseId: DATABASE_ID,
+        tableId: EMERGENCY_ALERTS_TABLE_ID,
+        queries: [
+          Query.equal("elderly_id", elderlyId),
+          Query.greaterThan("$createdAt", oneDayAgo),
+          Query.orderDesc("$createdAt"),
+          Query.limit(5),
+        ],
+      });
+      recentAlerts = alertsRes.rows;
+
+      const activeAlerts = recentAlerts.filter(
+        (a) => a.status === "active" || a.status === "investigating",
+      );
+      if (activeAlerts.length > 0) {
+        status = ElderlyStatus.DANGER;
+        reasons.push(
+          i18n.t("emergency.activeAlertsCount", { count: activeAlerts.length }),
+        );
+      }
+    } catch {
+      // Alert query may fail; ignore
+    }
+
   } catch (err) {
     console.error("Error computing elderly status:", err);
   }
@@ -413,6 +445,7 @@ export async function computeElderlyStatus(
     todaySteps,
     lastActiveTime,
     isActive,
+    recentAlerts,
   };
 }
 

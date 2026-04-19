@@ -1,6 +1,6 @@
 import UserAvatar from "@/components/UserAvatar";
 import { ElderlyStatusInfo } from "@/lib/elderly-status";
-import { Elderly, ElderlyStatus } from "@/types/appwrite";
+import { Elderly, ElderlyStatus, EmergencyAlert } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -56,6 +56,39 @@ export default function ElderlyCard({
   const isDanger = elderly.status === ElderlyStatus.DANGER;
   const hasIssue = isWarning || isDanger;
   const reasons = elderly.statusInfo?.reasons ?? [];
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  const recentAlerts = (elderly.statusInfo?.recentAlerts ?? []).filter(
+    (a) => new Date(a.$createdAt).getTime() > oneDayAgo,
+  );
+  const activeAlerts = recentAlerts.filter(
+    (a) => a.status === "active" || a.status === "investigating",
+  );
+
+  const getAlertTypeConfig = (type: string) => {
+    switch (type) {
+      case "fall":
+        return { icon: "alert-decagram" as const, color: "#D32F2F", label: t("emergency.fallDetected") };
+      case "sos":
+        return { icon: "bell-alert" as const, color: "#C62828", label: t("emergency.sosAlert") };
+      case "hr_warning":
+        return { icon: "heart-broken" as const, color: "#E64A19", label: t("emergency.healthWarning") };
+      case "geo_fence":
+        return { icon: "map-marker-alert" as const, color: "#F57C00", label: t("emergency.geoFence") };
+      default:
+        return { icon: "alert" as const, color: "#757575", label: t("emergency.alert") };
+    }
+  };
+
+  const formatAlertTime = (createdAt: string) => {
+    const diff = Date.now() - new Date(createdAt).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return t("common.justNow");
+    if (mins < 60) return t("common.minutesAgo", { minutes: mins });
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return t("common.hoursAgo", { hours });
+    const days = Math.floor(hours / 24);
+    return t("common.daysAgo", { days });
+  };
 
   const chipLabel = isDanger
     ? t("caregiverPanel.danger")
@@ -199,6 +232,62 @@ export default function ElderlyCard({
           </View>
         </View>
 
+        {/* Recent alerts section */}
+        {recentAlerts.length > 0 && (
+          <View style={[styles.alertsSection, isDarkMode && { backgroundColor: "rgba(211,47,47,0.06)" }]}>
+            <View style={styles.alertsHeader}>
+              <MaterialCommunityIcons name="bell-alert-outline" size={16} color="#D32F2F" />
+              <Text variant="labelMedium" style={{ color: "#D32F2F", marginLeft: 4, fontWeight: "bold" }}>
+                {t("emergency.recentAlerts")}
+                {activeAlerts.length > 0 && ` (${activeAlerts.length} ${t("emergency.activeLabel")})`}
+              </Text>
+            </View>
+            {recentAlerts.slice(0, 3).map((alert) => {
+              const config = getAlertTypeConfig(alert.type);
+              const isActive = alert.status === "active" || alert.status === "investigating";
+              return (
+                <View key={alert.$id} style={styles.alertRow}>
+                  <MaterialCommunityIcons
+                    name={config.icon}
+                    size={14}
+                    color={isActive ? config.color : "#9E9E9E"}
+                  />
+                  <Text
+                    variant="bodySmall"
+                    style={[
+                      { marginLeft: 6, flex: 1 },
+                      isActive ? { color: config.color, fontWeight: "bold" } : { color: "#9E9E9E" },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {config.label}
+                  </Text>
+                  <Chip
+                    mode="flat"
+                    compact
+                    style={[
+                      styles.alertStatusChip,
+                      isActive
+                        ? { backgroundColor: "#FFEBEE" }
+                        : { backgroundColor: "#E8F5E9" },
+                    ]}
+                    textStyle={{ fontSize: 10 }}
+                  >
+                    {alert.status === "active"
+                      ? t("emergency.statusActive")
+                      : alert.status === "investigating"
+                        ? t("emergency.statusInvestigating")
+                        : t("emergency.statusResolved")}
+                  </Chip>
+                  <Text variant="labelSmall" style={{ color: "#9E9E9E", marginLeft: 6 }}>
+                    {formatAlertTime(alert.$createdAt)}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         <View style={styles.actionButtons}>
           <Button
             mode="outlined"
@@ -297,5 +386,24 @@ const styles = StyleSheet.create({
   smallButton: {
     flex: 1,
     marginHorizontal: 4,
+  },
+  alertsSection: {
+    backgroundColor: "#FFF5F5",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+  },
+  alertsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  alertRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  alertStatusChip: {
+    marginLeft: 6,
   },
 });

@@ -19,8 +19,8 @@ export async function checkAndMarkSkippedMedications(
   userId: string,
 ): Promise<void> {
   const now = new Date();
-  // 1 minute buffer (reduced from 10m to be more responsive)
-  const bufferTime = 1 * 60 * 1000;
+  // 10 minute buffer before marking as missing
+  const bufferTime = 10 * 60 * 1000;
 
   // HK Offset (UTC+8)
   const hkOffset = 8 * 60 * 60 * 1000;
