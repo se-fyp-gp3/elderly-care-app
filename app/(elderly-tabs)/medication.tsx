@@ -1,69 +1,69 @@
 import {
-  DATABASE_ID,
-  MEDICATION_LOGS_TABLE_ID,
-  safeSubscribe
+    DATABASE_ID,
+    MEDICATION_LOGS_TABLE_ID,
+    safeSubscribe
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-  createElderlyMedicationWithReminder,
-  fetchCaregiversForElderly,
+    createElderlyMedicationWithReminder,
+    fetchCaregiversForElderly,
 } from "@/lib/elderly";
 import {
-  checkAndMarkSkippedMedications,
-  deactivateMedicationReminder,
-  fetchActiveMedicationReminders,
-  fetchDailyMedicationLogs,
-  fetchFinishedMedicationReminders,
-  logMedicationAction,
-  markPreviousDaysPendingAsMissing,
+    checkAndMarkSkippedMedications,
+    deactivateMedicationReminder,
+    fetchActiveMedicationReminders,
+    fetchDailyMedicationLogs,
+    fetchFinishedMedicationReminders,
+    logMedicationAction,
+    markPreviousDaysPendingAsMissing,
 } from "@/lib/medication_tracking";
 import {
-  cancelAllNotifications,
-  registerForPushNotificationsAsync,
-  scheduleMedicationNotification,
-  sendImmediateNotification,
+    cancelAllNotifications,
+    registerForPushNotificationsAsync,
+    scheduleMedicationNotification,
+    sendImmediateNotification,
 } from "@/lib/notifications";
 import { translateUnit } from "@/lib/schedule";
 import {
-  Caregiver,
-  ElderlyMedicationReminder,
-  MedicationLogs,
+    Caregiver,
+    ElderlyMedicationReminder,
+    MedicationLogs,
 } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import DateTimePicker, {
+    DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import DateTimePicker, {
-    DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
 import {
-  Alert,
-  Animated,
-  AppState,
-  Modal as RNModal,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    Alert,
+    Animated,
+    AppState,
+    Platform,
+    RefreshControl,
+    Modal as RNModal,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    useColorScheme,
+    View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
 import {
-  Button,
-  Card,
-  Divider,
-  FAB,
-  IconButton,
-  Modal,
-  Portal,
-  Switch,
-  Text,
-  TextInput,
-  useTheme,
+    Button,
+    Card,
+    Divider,
+    FAB,
+    IconButton,
+    Modal,
+    Portal,
+    Switch,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 // --- AI / Scan Configuration (DashScope) ---

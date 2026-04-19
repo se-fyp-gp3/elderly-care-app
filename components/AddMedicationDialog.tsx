@@ -5,7 +5,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { ScrollView, StyleSheet, TouchableOpacity, View, Platform, Modal as RNModal } from "react-native";
+import { Platform, Modal as RNModal, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import {
     Avatar,
     Button,

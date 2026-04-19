@@ -1,42 +1,42 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-  fetchElderlySchedulesForUser,
-  getElderlyByUserId,
+    fetchElderlySchedulesForUser,
+    getElderlyByUserId,
 } from "@/lib/elderly";
 import {
-  createScheduleTask,
-  fetchScheduleCategories,
-  markOverdueSchedulesAsMissed,
-  markScheduleTaskCompleted,
+    createScheduleTask,
+    fetchScheduleCategories,
+    markOverdueSchedulesAsMissed,
+    markScheduleTaskCompleted,
 } from "@/lib/schedule";
 import { Schedule, ScheduleCategory } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useFocusEffect } from "expo-router";
 import * as Notifications from "expo-notifications";
+import { useFocusEffect } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  Modal as RNModal,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    Alert,
+    Platform,
+    RefreshControl,
+    Modal as RNModal,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    useColorScheme,
+    View,
 } from "react-native";
 import {
-  Button,
-  Card,
-  Chip,
-  FAB,
-  Modal,
-  Portal,
-  Text,
-  TextInput,
-  useTheme
+    Button,
+    Card,
+    Chip,
+    FAB,
+    Modal,
+    Portal,
+    Text,
+    TextInput,
+    useTheme
 } from "react-native-paper";
 
 export default function ElderlySchedule() {

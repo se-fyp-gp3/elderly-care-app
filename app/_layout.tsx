@@ -10,24 +10,23 @@ import {
     sendImmediateNotification,
 } from "@/lib/notifications";
 import { DirectMessage } from "@/types/messaging";
-import { MomentComment } from "@/types/moments";
 import { Role } from "@/types/user";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  AppState,
-  useColorScheme,
-  View,
+    ActivityIndicator,
+    AppState,
+    useColorScheme,
+    View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
-  configureFonts,
-  MD3DarkTheme,
-  MD3LightTheme,
-  MD3Theme,
-  PaperProvider,
+    configureFonts,
+    MD3DarkTheme,
+    MD3LightTheme,
+    MD3Theme,
+    PaperProvider,
 } from "react-native-paper";
 import { enGB, registerTranslation } from "react-native-paper-dates";
 import { SafeAreaProvider } from "react-native-safe-area-context";

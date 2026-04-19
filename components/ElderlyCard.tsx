@@ -1,6 +1,6 @@
 import UserAvatar from "@/components/UserAvatar";
 import { ElderlyStatusInfo } from "@/lib/elderly-status";
-import { Elderly, ElderlyStatus, EmergencyAlert } from "@/types/appwrite";
+import { Elderly, ElderlyStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
