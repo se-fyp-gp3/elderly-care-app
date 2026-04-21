@@ -1,7 +1,7 @@
 import {
-  CustomVoice,
-  CustomVoiceSlot,
-  CustomVoiceStatus,
+    CustomVoice,
+    CustomVoiceSlot,
+    CustomVoiceStatus,
 } from "@/types/appwrite";
 import type { UserPreferences } from "@/types/user";
 import { ID, Query } from "react-native-appwrite";
