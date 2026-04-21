@@ -22,7 +22,7 @@ const DEFAULT_VOICE =
 
 // Storage bucket for reference audio
 const VOICE_CLONE_BUCKET =
-  process.env.EXPO_PUBLIC_VOICE_CLONE_BUCKET_ID?.trim() || "voice-clones";
+  process.env.EXPO_PUBLIC_VOICE_CLONE_BUCKET_ID?.trim() || "69ba654e003c3aa1b2c8";
 
 // ── Endpoints ──
 const VOICE_CLONE_URL =
@@ -88,11 +88,10 @@ export async function createPersonalVoice(
       throw new Error(`Voice clone function returned invalid JSON: ${fnResult.responseBody}`);
     }
   } else {
-    // ── Large file: upload to Storage first, pass URLs to function ──
-    console.log(`[voice] Large payload (${(totalBase64Bytes / 1024).toFixed(0)} KB), uploading to Storage first...`);
+    // ── Large file: upload to Storage → function converts internally → result in Storage ──
+    console.log(`[voice] Large payload (${(totalBase64Bytes / 1024).toFixed(0)} KB), using clone_storage mode...`);
 
     const uploadedFileIds: string[] = [];
-    const sampleUrls: string[] = [];
 
     try {
       for (let i = 0; i < samplesBase64.length; i++) {
@@ -106,43 +105,117 @@ export async function createPersonalVoice(
         if (!fileInfo.exists) throw new Error("Failed to write temp audio file");
 
         const fileId = ID.unique();
-        await storage.createFile(
-          VOICE_CLONE_BUCKET,
-          fileId,
-          {
-            name: `tmp_sample_${i}_${Date.now()}.m4a`,
-            type: "audio/mp4",
-            size: (fileInfo as any).size || 0,
-            uri: tmpPath,
-          } as any,
-        );
-        uploadedFileIds.push(fileId);
 
-        const url = `${APPWRITE_ENDPOINT}/storage/buckets/${VOICE_CLONE_BUCKET}/files/${fileId}/view?project=${APPWRITE_PROJECT_ID}`;
-        sampleUrls.push(url);
+        // Upload via REST API to avoid react-native-appwrite SDK
+        // chunked-upload bug with expo-file-system v19
+        const formData = new FormData();
+        formData.append("fileId", fileId);
+        formData.append("file", {
+          uri: tmpPath,
+          name: `tmp_sample_${i}_${Date.now()}.m4a`,
+          type: "audio/mp4",
+        } as any);
+
+        const uploadRes = await fetch(
+          `${APPWRITE_ENDPOINT}/storage/buckets/${VOICE_CLONE_BUCKET}/files`,
+          {
+            method: "POST",
+            headers: {
+              "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+            },
+            body: formData,
+          },
+        );
+        if (!uploadRes.ok) {
+          const errText = await uploadRes.text();
+          throw new Error(`Storage upload failed (${uploadRes.status}): ${errText}`);
+        }
+        uploadedFileIds.push(fileId);
         console.log(`[voice] Uploaded sample ${i + 1}/${samplesBase64.length}: ${fileId}`);
 
         await FileSystem.deleteAsync(tmpPath, { idempotent: true });
       }
 
-      // Call function with URLs instead of base64
-      const fnResult = await functions.createExecution({
-        functionId: VOICE_CLONE_FUNCTION_ID,
-        body: JSON.stringify({
-          mode: "clone_url",
-          sampleUrls,
-          speakerName,
-        }),
-        method: ExecutionMethod.POST,
-      });
+      // Call function with clone_storage mode — function downloads internally,
+      // converts with ffmpeg, uploads result WAV back to storage, returns file IDs only
+      const execRes = await fetch(
+        `${APPWRITE_ENDPOINT}/functions/${VOICE_CLONE_FUNCTION_ID}/executions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+          },
+          body: JSON.stringify({
+            body: JSON.stringify({
+              mode: "clone_storage",
+              fileIds: uploadedFileIds,
+              bucketId: VOICE_CLONE_BUCKET,
+              speakerName,
+            }),
+            method: "POST",
+          }),
+        },
+      );
+      if (!execRes.ok) {
+        const errText = await execRes.text();
+        throw new Error(`Function execution failed (${execRes.status}): ${errText}`);
+      }
+      const fnResult = await execRes.json();
+      console.log(`[voice] Function execution ${fnResult.$id}: status=${fnResult.status}`);
 
+      let storagePayload: any;
       try {
-        clonePayload = JSON.parse(fnResult.responseBody);
+        storagePayload = JSON.parse(fnResult.responseBody);
       } catch {
         throw new Error(`Voice clone function returned invalid JSON: ${fnResult.responseBody}`);
       }
+      if (!storagePayload?.success) {
+        throw new Error(storagePayload?.error || "Voice clone function failed");
+      }
+
+      const resultFileIds: string[] = storagePayload.resultFileIds || [];
+      const fallbackId: string = storagePayload.voiceId || `pv_${Date.now()}`;
+
+      if (resultFileIds.length === 0) {
+        throw new Error("Voice clone function returned no result files.");
+      }
+
+      // The function already uploaded the normalized reference audio to storage.
+      // Use resultFileIds[0] as the reference audio for DashScope registration.
+      const referenceStorageFileId = resultFileIds[0];
+      console.log(`[voice] Converted reference audio in storage: ${referenceStorageFileId}`);
+
+      // Register voice clone using the reference file's public download URL.
+      const publicAudioUrl = `${APPWRITE_ENDPOINT}/storage/buckets/${VOICE_CLONE_BUCKET}/files/${referenceStorageFileId}/download?project=${APPWRITE_PROJECT_ID}`;
+      console.log(`[voice] Public audio URL for DashScope: ${publicAudioUrl}`);
+
+      try {
+        console.log(`[voice] Attempting DashScope voice clone (${VC_MODEL})...`);
+        const dashScopeVoiceId = await registerVoiceWithDashScope(
+          publicAudioUrl,
+          speakerName,
+        );
+        console.log(`[voice] DashScope voice registered: ${dashScopeVoiceId}`);
+        return {
+          voiceId: dashScopeVoiceId,
+          convertedSamplesBase64: [],
+          mode: "registered",
+        };
+      } catch (regErr) {
+        console.warn("[voice] DashScope voice registration failed:", regErr);
+      }
+
+      // Fallback — use reference audio for zero-shot cloning
+      const refVoiceId = `ref:${referenceStorageFileId}`;
+      console.log(`[voice] Using reference-based voice: ${refVoiceId}`);
+      return {
+        voiceId: refVoiceId,
+        convertedSamplesBase64: [],
+        mode: "reference",
+      };
     } finally {
-      // Clean up temp Storage files (best-effort)
+      // Clean up temp input files from Storage (best-effort)
       for (const fid of uploadedFileIds) {
         try {
           await storage.deleteFile(VOICE_CLONE_BUCKET, fid);
@@ -152,6 +225,8 @@ export async function createPersonalVoice(
       }
     }
   }
+
+  // ── Below: shared path for small-file flow only ──
 
   if (!clonePayload?.success) {
     throw new Error(clonePayload?.error || "Voice clone function failed");
@@ -179,18 +254,30 @@ export async function createPersonalVoice(
     const fileInfo = await FileSystem.getInfoAsync(tempPath);
     if (!fileInfo.exists) throw new Error("Temp file not created");
 
-    // Upload using the Appwrite Storage SDK
-    const uploadResult = await storage.createFile(
-      VOICE_CLONE_BUCKET,
-      `ref_${speakerName.replace(/\W/g, "_")}_${Date.now()}`,
+    // Upload via REST API to avoid SDK chunked-upload bug with expo-file-system v19
+    const refFileId = `ref_${speakerName.replace(/\W/g, "_")}_${Date.now()}`;
+    const refFormData = new FormData();
+    refFormData.append("fileId", refFileId);
+    refFormData.append("file", {
+      uri: tempPath,
+      name: `${speakerName}_reference.${ext}`,
+      type: mimeType,
+    } as any);
+
+    const refUploadRes = await fetch(
+      `${APPWRITE_ENDPOINT}/storage/buckets/${VOICE_CLONE_BUCKET}/files`,
       {
-        name: `${speakerName}_reference.${ext}`,
-        type: mimeType,
-        size: (fileInfo as any).size || 0,
-        uri: tempPath,
-      } as any,
+        method: "POST",
+        headers: {
+          "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+        },
+        body: refFormData,
+      },
     );
-    storageFileId = uploadResult.$id;
+    if (!refUploadRes.ok) {
+      throw new Error(`Reference upload failed (${refUploadRes.status})`);
+    }
+    storageFileId = refFileId;
     console.log(`[voice] Reference audio uploaded: ${storageFileId}`);
 
     // Clean up temp file
@@ -203,7 +290,7 @@ export async function createPersonalVoice(
   if (storageFileId) {
     try {
       // Construct a publicly-accessible download URL for the uploaded file
-      const publicAudioUrl = `${APPWRITE_ENDPOINT}/storage/buckets/${VOICE_CLONE_BUCKET}/files/${storageFileId}/view?project=${APPWRITE_PROJECT_ID}`;
+      const publicAudioUrl = `${APPWRITE_ENDPOINT}/storage/buckets/${VOICE_CLONE_BUCKET}/files/${storageFileId}/download?project=${APPWRITE_PROJECT_ID}`;
       console.log(`[voice] Public audio URL for DashScope: ${publicAudioUrl}`);
 
       console.log(`[voice] Attempting DashScope voice clone (${VC_MODEL})...`);

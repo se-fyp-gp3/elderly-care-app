@@ -50,6 +50,9 @@ import {
 
 type VoiceCreationStep = "idle" | "recording" | "converting" | "cloning" | "done" | "error";
 
+const MIN_VOICE_SAMPLE_SECONDS = 3;
+const MAX_VOICE_SAMPLE_SECONDS = 100;
+
 export default function Settings() {
   const {
     user,
@@ -235,7 +238,13 @@ export default function Settings() {
       setRecordingSampleUri(asset.uri);
       // Estimate duration from file size (rough: ~16KB/s for typical audio)
       const estimatedSec = asset.size ? Math.round(asset.size / 16000) : 10;
-      setRecordingSeconds(estimatedSec);
+      if (estimatedSec > MAX_VOICE_SAMPLE_SECONDS) {
+        Alert.alert(
+          "Long sample detected",
+          `This file is about ${estimatedSec} seconds long. Only the first ${MAX_VOICE_SAMPLE_SECONDS} seconds will be used for voice cloning.`
+        );
+      }
+      setRecordingSeconds(Math.min(estimatedSec, MAX_VOICE_SAMPLE_SECONDS));
     } catch (err) {
       console.error("Pick audio file error:", err);
       Alert.alert("Error", "Could not pick audio file.");
@@ -273,7 +282,18 @@ export default function Settings() {
         clearInterval(recordingTimerRef.current);
       }
       recordingTimerRef.current = setInterval(() => {
-        setRecordingSeconds((prev) => prev + 1);
+        setRecordingSeconds((prev) => {
+          const next = prev + 1;
+          if (next >= MAX_VOICE_SAMPLE_SECONDS) {
+            if (recordingTimerRef.current) {
+              clearInterval(recordingTimerRef.current);
+              recordingTimerRef.current = null;
+            }
+            void handleStopVoiceRecording();
+            return MAX_VOICE_SAMPLE_SECONDS;
+          }
+          return next;
+        });
       }, 1000);
     } catch (error) {
       console.error("Failed to start recording:", error);
@@ -301,10 +321,10 @@ export default function Settings() {
         return;
       }
 
-      if (recordingSeconds < 3) {
+      if (recordingSeconds < MIN_VOICE_SAMPLE_SECONDS) {
         setRecordingSampleUri(null);
         setRecordingSeconds(0);
-        Alert.alert("Sample too short", "Please record at least 3 seconds.");
+        Alert.alert("Sample too short", `Please record at least ${MIN_VOICE_SAMPLE_SECONDS} seconds.`);
         return;
       }
 

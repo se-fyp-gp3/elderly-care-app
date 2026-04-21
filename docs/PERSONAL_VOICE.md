@@ -39,6 +39,10 @@ The Personal Voice feature allows caregivers to clone their own voice and use it
 
 Caregiver records voice samples in the settings page using `expo-audio`. Recorded as `.m4a` files.
 
+- Recommended sample length: **10 to 100 seconds** of clear speech
+- The app now auto-stops recordings at **100 seconds**
+- Longer imported files are accepted, but only the **first 100 seconds** are used for voice enrollment
+
 ### Step 2 — Convert Audio (Appwrite Function)
 
 Request: `mode: "clone"` with `samplesBase64` array.
@@ -59,7 +63,7 @@ Calls DashScope voice enrollment API:
 - **Endpoint:** `https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization`
 - **Model:** `voice-enrollment`
 - **Target model:** `cosyvoice-v2`
-- **Input:** Publicly-accessible Appwrite Storage URL for the reference audio
+- **Input:** Publicly-accessible Appwrite Storage **download URL** for the reference audio
 - **Retry:** Up to 3 attempts for transient 500 errors (e.g. "request asr failed")
 
 ### Step 5 — Poll Voice Status (Client)
@@ -145,7 +149,7 @@ Server → Client:  task-finished
 | `EXPO_PUBLIC_DASHSCOPE_TTS_MODEL` | `cosyvoice-v2` | TTS synthesis model |
 | `EXPO_PUBLIC_DASHSCOPE_VC_MODEL` | `cosyvoice-clone-v1` | Voice enrollment model |
 | `EXPO_PUBLIC_DASHSCOPE_TTS_VOICE` | `longxiaochun_v2` | Default preset voice |
-| `EXPO_PUBLIC_VOICE_CLONE_BUCKET_ID` | `voice-clones` | Appwrite Storage bucket |
+| `EXPO_PUBLIC_VOICE_CLONE_BUCKET_ID` | `69ba654e003c3aa1b2c8` | Appwrite Storage bucket ID (`voice-clones`) |
 | `DASHSCOPE_API_KEY` | — | Same key, used in Appwrite function env |
 | `DASHSCOPE_TTS_MODEL` | `cosyvoice-v2` | TTS model in Appwrite function |
 
@@ -219,7 +223,8 @@ Voice clone failed: audio did not pass quality check (UNDEPLOYED)
 
 **Resolution:**
 - Ensured audio conversion produces clean **mono 16kHz PCM WAV** via ffmpeg
-- Recommended minimum 10 seconds of clear speech for clone registration
+- Long samples are trimmed to the first **100 seconds** before registration
+- Recommended sample range is **10 to 100 seconds** of clear speech for clone registration
 - Added fallback path: if clone fails, stores reference audio ID (`ref:<storageFileId>`) and falls back to default preset voice for TTS
 
 ---
