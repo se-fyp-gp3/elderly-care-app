@@ -314,22 +314,18 @@ export default function AuthProvider({
       await account.updatePrefs({ prefs: newPreferences });
       const updatedUser = await account.get();
       setUser(updatedUser);
-      setPreferences(newPreferences);
+      setPreferences((updatedUser.prefs as UserPreferences) ?? newPreferences);
+      return null;
     } catch (error) {
       console.error("Error updating preferences:", error);
+      return error instanceof Error
+        ? error.message
+        : "Failed to update preferences.";
     }
-    return null;
   };
 
   const setPreference = async (key: string, value: any) => {
-    const newPrefs = { ...preferences, [key]: value };
-    try {
-      await account.updatePrefs({ prefs: newPrefs });
-      setPreferences(newPrefs);
-    } catch (error) {
-      console.error("Error updating preference:", error);
-    }
-    return null;
+    return updatePreferences({ ...preferences, [key]: value });
   };
 
   return (

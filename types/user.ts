@@ -28,8 +28,11 @@ export type UserPreferences = {
   notifications?: boolean;
   avatarFileId?: string;
   fallDetectionEnabled?: boolean;
+  voiceReplyLang?: string;
   aiVoiceEnabled?: boolean;
   aiVoiceId?: string;
+  aiVoiceDefaultId?: string;
+  aiVoiceCantoneseId?: string;
   aiVoiceCaregiverId?: string;
   aiVoiceCaregiverName?: string;
   uiVersion?: UIVersion;

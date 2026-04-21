@@ -52,6 +52,11 @@ export enum CustomVoiceStatus {
     FAILED = "failed"
 }
 
+export enum CustomVoiceSlot {
+    DEFAULT = "default",
+    CANTONESE = "cantonese"
+}
+
 export type Elderly = Models.Row & {
     user_id: string;
     name: string;
@@ -185,6 +190,7 @@ export type CustomVoice = Models.Row & {
     caregiver_name: string;
     elderly_id: string;
     voice_id: string;
+    voice_slot?: CustomVoiceSlot | null;
     status: CustomVoiceStatus;
     created_at: string | null;
     updated_at: string | null;

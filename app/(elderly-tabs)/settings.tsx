@@ -1,6 +1,11 @@
 import { VERSION_OPTIONS } from "@/components/MiniSettingsModal";
 import { useAuth } from "@/lib/auth-context";
-import { getCustomVoicesForElderly } from "@/lib/custom-voice";
+import {
+  getCustomVoiceSelectionsForCaregiver,
+  getCustomVoicesForElderly,
+  getResolvedCustomVoiceId,
+  resolvePreferredAiVoiceId,
+} from "@/lib/custom-voice";
 import {
   getElderlyByUserId,
   getLinkedCaregivers,
@@ -82,15 +87,9 @@ export default function ElderlySettings() {
   const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [aiVoiceEnabled, setAiVoiceEnabled] = useState(
-    preferences.aiVoiceEnabled ?? false,
-  );
   const [voicePickerVisible, setVoicePickerVisible] = useState(false);
   const [voiceOptions, setVoiceOptions] = useState<CustomVoice[]>([]);
   const [voiceSaving, setVoiceSaving] = useState(false);
-  const [voiceReplyLang, setVoiceReplyLang] = useState<string>(
-    (preferences.voiceReplyLang as string) ?? "cantonese",
-  );
 
   // ── Avatar state ──
   const [avatarFileId, setAvatarFileId] = useState<string | null>(null);
@@ -164,9 +163,12 @@ export default function ElderlySettings() {
     }, [loadEmergencyData]),
   );
 
-  useEffect(() => {
-    setAiVoiceEnabled(preferences.aiVoiceEnabled ?? false);
-  }, [preferences.aiVoiceEnabled]);
+  const aiVoiceEnabled = preferences.aiVoiceEnabled ?? false;
+  const voiceReplyLang =
+    typeof preferences.voiceReplyLang === "string"
+      ? preferences.voiceReplyLang
+      : "cantonese";
+  const activeVoiceId = resolvePreferredAiVoiceId(preferences, voiceReplyLang);
 
   // Get the name of the currently-selected emergency caregiver
   const selectedCaregiverName = linkedCaregivers.find(
@@ -174,18 +176,25 @@ export default function ElderlySettings() {
   )?.name;
 
   const dedupedVoiceOptions = useMemo(() => {
-    return Array.from(
-      new Map(
-        voiceOptions.map((voice) => [voice.caregiver_id, voice]),
-      ).values(),
-    );
+    return Array.from(new Set(voiceOptions.map((voice) => voice.caregiver_id)))
+      .map((caregiverId) => {
+        const { defaultVoice, cantoneseVoice } =
+          getCustomVoiceSelectionsForCaregiver(voiceOptions, caregiverId);
+
+        return defaultVoice ?? cantoneseVoice;
+      })
+      .filter((voice): voice is CustomVoice => Boolean(voice));
   }, [voiceOptions]);
 
   const hasVoiceOptions = dedupedVoiceOptions.length > 0;
 
-  const selectedVoice = dedupedVoiceOptions.find(
-    (voice) => voice.voice_id === preferences.aiVoiceId,
-  );
+  const selectedVoice =
+    dedupedVoiceOptions.find(
+      (voice) => voice.caregiver_id === preferences.aiVoiceCaregiverId,
+    ) ??
+    dedupedVoiceOptions.find(
+      (voice) => getResolvedCustomVoiceId(voice) === activeVoiceId,
+    );
 
   const handleSelectEmergencyContact = async (caregiver: Caregiver) => {
     if (!elderlyProfile) return;
@@ -294,19 +303,24 @@ export default function ElderlySettings() {
       return;
     }
 
-    setAiVoiceEnabled(value);
-    await updatePreferences({
+    const error = await updatePreferences({
       ...preferences,
       aiVoiceEnabled: value,
     });
+
+    if (error) {
+      Alert.alert(t("common.error"), error);
+    }
   };
 
   useEffect(() => {
     if (!hasVoiceOptions && aiVoiceEnabled) {
-      setAiVoiceEnabled(false);
       void updatePreferences({
         ...preferences,
         aiVoiceEnabled: false,
+        aiVoiceId: undefined,
+        aiVoiceDefaultId: undefined,
+        aiVoiceCantoneseId: undefined,
       });
     }
   }, [aiVoiceEnabled, hasVoiceOptions, preferences, updatePreferences]);
@@ -314,14 +328,38 @@ export default function ElderlySettings() {
   const handleSelectAiVoice = async (voice: CustomVoice) => {
     setVoiceSaving(true);
     try {
-      await updatePreferences({
+      const { defaultVoice, cantoneseVoice } =
+        getCustomVoiceSelectionsForCaregiver(voiceOptions, voice.caregiver_id);
+
+      if (!defaultVoice && !cantoneseVoice) {
+        Alert.alert(t("common.error"), t("settings.noVoiceFoundDesc"));
+        return;
+      }
+
+      const nextPreferences = {
         ...preferences,
         aiVoiceEnabled: true,
-        aiVoiceId: voice.voice_id,
+        aiVoiceDefaultId: defaultVoice
+          ? getResolvedCustomVoiceId(defaultVoice)
+          : undefined,
+        aiVoiceCantoneseId: (cantoneseVoice ?? defaultVoice)
+          ? getResolvedCustomVoiceId(cantoneseVoice ?? defaultVoice)
+          : undefined,
         aiVoiceCaregiverId: voice.caregiver_id,
         aiVoiceCaregiverName: voice.caregiver_name,
+      };
+
+      const error = await updatePreferences({
+        ...nextPreferences,
+        aiVoiceId:
+          resolvePreferredAiVoiceId(nextPreferences, voiceReplyLang) || undefined,
       });
-      setAiVoiceEnabled(true);
+
+      if (error) {
+        Alert.alert(t("common.error"), error);
+        return;
+      }
+
       setVoicePickerVisible(false);
       Alert.alert(t("settings.emergencySavedTitle"), t("settings.aiVoiceSet", { name: voice.caregiver_name }));
     } catch (e) {
@@ -334,14 +372,21 @@ export default function ElderlySettings() {
   const handleClearAiVoice = async () => {
     setVoiceSaving(true);
     try {
-      await updatePreferences({
+      const error = await updatePreferences({
         ...preferences,
         aiVoiceEnabled: false,
         aiVoiceId: undefined,
+        aiVoiceDefaultId: undefined,
+        aiVoiceCantoneseId: undefined,
         aiVoiceCaregiverId: undefined,
         aiVoiceCaregiverName: undefined,
       });
-      setAiVoiceEnabled(false);
+
+      if (error) {
+        Alert.alert(t("common.error"), error);
+        return;
+      }
+
       Alert.alert(t("settings.emergencyClearedTitle"), t("settings.aiVoiceCleared"));
     } catch {
       Alert.alert(t("common.error"), t("settings.failedClearAiVoice"));
@@ -351,11 +396,19 @@ export default function ElderlySettings() {
   };
 
   const handleVoiceReplyLangChange = async (lang: string) => {
-    setVoiceReplyLang(lang);
-    await updatePreferences({
+    const nextPreferences = {
       ...preferences,
       voiceReplyLang: lang,
+    };
+
+    const error = await updatePreferences({
+      ...nextPreferences,
+      aiVoiceId: resolvePreferredAiVoiceId(nextPreferences, lang) || undefined,
     });
+
+    if (error) {
+      Alert.alert(t("common.error"), error);
+    }
   };
 
   const LANG_OPTIONS = [
@@ -804,7 +857,7 @@ export default function ElderlySettings() {
             titleStyle={styles.listTitle}
             description={
               selectedVoice
-                ? `${selectedVoice.caregiver_name} (${selectedVoice.voice_id})`
+                ? `${selectedVoice.caregiver_name} (${activeVoiceId || selectedVoice.voice_id})`
                 : t("settings.voiceNotSelected")
             }
             descriptionStyle={styles.listDescription}
@@ -1401,7 +1454,8 @@ export default function ElderlySettings() {
                   </View>
                 ) : (
                   dedupedVoiceOptions.map((voice) => {
-                    const isSelected = voice.voice_id === preferences.aiVoiceId;
+                    const isSelected =
+                      voice.caregiver_id === preferences.aiVoiceCaregiverId;
                     return (
                       <TouchableOpacity
                         key={voice.$id}
@@ -1444,7 +1498,7 @@ export default function ElderlySettings() {
                               marginTop: 2,
                             }}
                           >
-                            {voice.voice_id}
+                            {getResolvedCustomVoiceId(voice)}
                           </Text>
                         </View>
                         {isSelected && (

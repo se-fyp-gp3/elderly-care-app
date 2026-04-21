@@ -4,7 +4,12 @@
 
 import { Linking } from "react-native";
 import { getContactsForElderly, getElderlyContacts } from "./contacts";
-import { getCustomVoicesForElderly } from "./custom-voice";
+import {
+  getCustomVoicesForElderly,
+  getResolvedCustomVoiceId,
+  resolveCustomVoiceSlotFromLanguage,
+  selectBestCustomVoiceForSlot,
+} from "./custom-voice";
 import { createElderlyMedicationWithReminder, getElderlyByUserId } from "./elderly";
 import {
     fetchActiveMedicationReminders,
@@ -620,7 +625,7 @@ export async function executePendingAction(
 }
 
 /**
- * Synthesize a command result message using CosyVoice-v2 with family voice.
+ * Synthesize a command result message using the saved family voice or the default Qwen preset voice.
  *
  * @param message - Text to synthesize
  * @param elderlyId - Elderly profile ID (to look up custom voice)
@@ -636,7 +641,12 @@ export async function synthesizeCommandResponse(
     // Try to find a custom voice for this elderly
     const customVoices = await getCustomVoicesForElderly(elderlyId);
     const voiceId =
-      customVoices.length > 0 ? customVoices[0].voice_id : DEFAULT_VOICE;
+      getResolvedCustomVoiceId(
+        selectBestCustomVoiceForSlot(
+          customVoices,
+          resolveCustomVoiceSlotFromLanguage(language),
+        ),
+      ) || DEFAULT_VOICE;
 
     const result = await synthesizePersonalVoice(message, voiceId, undefined, language);
     return result.audioBase64 || null;

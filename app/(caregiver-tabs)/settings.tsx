@@ -3,7 +3,10 @@ import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
     deleteCustomVoiceRecord,
     getCustomVoicesForCaregiver,
+  getResolvedCustomVoiceId,
+  normalizeCustomVoiceSlot,
     saveCustomVoiceRecord,
+  updateCustomVoiceRecord,
 } from "@/lib/custom-voice";
 import { useFontSize } from "@/lib/font-size-context";
 import { useLanguage } from "@/lib/language-context";
@@ -14,7 +17,13 @@ import {
     updateProfileAvatar,
     uploadAvatar,
 } from "@/lib/user";
-import { Caregiver, CustomVoice, CustomVoiceStatus, Elderly } from "@/types/appwrite";
+import {
+  Caregiver,
+  CustomVoice,
+  CustomVoiceSlot,
+  CustomVoiceStatus,
+  Elderly,
+} from "@/types/appwrite";
 import { FontSize } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
@@ -50,7 +59,7 @@ import {
 
 type VoiceCreationStep = "idle" | "recording" | "converting" | "cloning" | "done" | "error";
 
-const MIN_VOICE_SAMPLE_SECONDS = 3;
+const MIN_VOICE_SAMPLE_SECONDS = 10;
 const MAX_VOICE_SAMPLE_SECONDS = 100;
 
 export default function Settings() {
@@ -82,6 +91,10 @@ export default function Settings() {
   const [isRecordingSample, setIsRecordingSample] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [voiceSampleSource, setVoiceSampleSource] = useState<"recorded" | "file" | null>(null);
+  const [voiceSampleTranscript, setVoiceSampleTranscript] = useState(
+    t('settings.voiceSampleDefaultScript'),
+  );
 
   // ── Playback state ──
   const [isPlayingSample, setIsPlayingSample] = useState(false);
@@ -90,6 +103,14 @@ export default function Settings() {
   // ── Voice creation state ──
   const [voiceStep, setVoiceStep] = useState<VoiceCreationStep>("idle");
   const [voiceStepMessage, setVoiceStepMessage] = useState("");
+  const [selectedVoiceSlot, setSelectedVoiceSlot] = useState<CustomVoiceSlot>(
+    CustomVoiceSlot.DEFAULT,
+  );
+
+  const getRecommendedVoiceSampleTranscript = (slot: CustomVoiceSlot) =>
+    slot === CustomVoiceSlot.CANTONESE
+      ? t('settings.voiceSampleCantoneseScript')
+      : t('settings.voiceSampleDefaultScript');
 
   // ── Existing voices ──
   const [existingVoices, setExistingVoices] = useState<CustomVoice[]>([]);
@@ -236,6 +257,8 @@ export default function Settings() {
       }
 
       setRecordingSampleUri(asset.uri);
+      setVoiceSampleSource("file");
+      setVoiceSampleTranscript("");
       // Estimate duration from file size (rough: ~16KB/s for typical audio)
       const estimatedSec = asset.size ? Math.round(asset.size / 16000) : 10;
       if (estimatedSec > MAX_VOICE_SAMPLE_SECONDS) {
@@ -275,6 +298,8 @@ export default function Settings() {
       recorder.record();
       console.log("[Voice] Recording started");
       setRecordingSampleUri(null);
+      setVoiceSampleSource("recorded");
+      setVoiceSampleTranscript(getRecommendedVoiceSampleTranscript(selectedVoiceSlot));
       setIsRecordingSample(true);
       setRecordingSeconds(0);
 
@@ -323,6 +348,8 @@ export default function Settings() {
 
       if (recordingSeconds < MIN_VOICE_SAMPLE_SECONDS) {
         setRecordingSampleUri(null);
+        setVoiceSampleSource(null);
+        setVoiceSampleTranscript(getRecommendedVoiceSampleTranscript(selectedVoiceSlot));
         setRecordingSeconds(0);
         Alert.alert("Sample too short", `Please record at least ${MIN_VOICE_SAMPLE_SECONDS} seconds.`);
         return;
@@ -361,23 +388,44 @@ export default function Settings() {
       setVoiceStep("cloning");
       setVoiceStepMessage("Creating voice clone...");
       const speakerName = caregiverProfile.name || `caregiver_${caregiverProfile.$id}`;
-      const { voiceId, mode } = await createPersonalVoice([sampleBase64], speakerName);
+      const { voiceId, mode } = await createPersonalVoice([sampleBase64], speakerName, {
+        transcript: voiceSampleTranscript.trim() || undefined,
+        language: "zh",
+      });
 
       // Step 3: Saving
       setVoiceStepMessage("Saving voice record...");
-      await saveCustomVoiceRecord({
-        caregiverId: caregiverProfile.$id,
-        caregiverName: speakerName,
-        elderlyId: selectedElderlyId,
-        voiceId,
-        status: CustomVoiceStatus.READY,
-      });
+      const existingVoiceForSlot = existingVoices.find(
+        (voice) =>
+          voice.elderly_id === selectedElderlyId &&
+          voice.caregiver_id === caregiverProfile.$id &&
+          normalizeCustomVoiceSlot(voice) === selectedVoiceSlot,
+      );
+
+      if (existingVoiceForSlot) {
+        await updateCustomVoiceRecord(existingVoiceForSlot.$id, {
+          voice_id: voiceId,
+          voice_slot: selectedVoiceSlot,
+          status: CustomVoiceStatus.READY,
+        });
+      } else {
+        await saveCustomVoiceRecord({
+          caregiverId: caregiverProfile.$id,
+          caregiverName: speakerName,
+          elderlyId: selectedElderlyId,
+          voiceId,
+          voiceSlot: selectedVoiceSlot,
+          status: CustomVoiceStatus.READY,
+        });
+      }
 
       // Done
       setVoiceStep("done");
       const modeLabel = mode === "registered" ? "registered with DashScope" : "reference-based";
       setVoiceStepMessage(`Voice created (${modeLabel})`);
       setRecordingSampleUri(null);
+      setVoiceSampleSource(null);
+      setVoiceSampleTranscript(getRecommendedVoiceSampleTranscript(selectedVoiceSlot));
       setRecordingSeconds(0);
 
       // Refresh voices list
@@ -841,6 +889,23 @@ export default function Settings() {
           >
             {t('settings.voiceSampleDesc')}
           </Text>
+          <TextInput
+            mode="outlined"
+            label={t('settings.voiceSampleTranscript')}
+            value={voiceSampleTranscript}
+            onChangeText={setVoiceSampleTranscript}
+            multiline
+            numberOfLines={4}
+            style={{ marginBottom: 8 }}
+          />
+          <Text
+            variant="bodySmall"
+            style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12 }}
+          >
+            {voiceSampleSource === "file"
+              ? t('settings.voiceSampleFileTranscriptHint')
+              : t('settings.voiceSampleTranscriptDesc')}
+          </Text>
 
           {/* Recording indicator */}
           {isRecordingSample && (
@@ -921,6 +986,37 @@ export default function Settings() {
               {t('settings.pickFile')}
             </Button>
           </View>
+          <View style={[styles.voiceActionsRow, { marginTop: 16 }]}>
+            <SegmentedButtons
+              value={selectedVoiceSlot}
+              onValueChange={(value) => {
+                const nextSlot = value as CustomVoiceSlot;
+                setSelectedVoiceSlot(nextSlot);
+                if (voiceSampleSource !== "file") {
+                  setVoiceSampleTranscript(getRecommendedVoiceSampleTranscript(nextSlot));
+                }
+              }}
+              buttons={[
+                {
+                  value: CustomVoiceSlot.DEFAULT,
+                  label: t('settings.voiceSlotDefault'),
+                },
+                {
+                  value: CustomVoiceSlot.CANTONESE,
+                  label: t('settings.cantonese'),
+                },
+              ]}
+              style={styles.segmentedButtons}
+            />
+          </View>
+          <Text
+            variant="bodySmall"
+            style={{ color: theme.colors.onSurfaceVariant, marginTop: 10 }}
+          >
+            {selectedVoiceSlot === CustomVoiceSlot.CANTONESE
+              ? t('settings.voiceSlotCantoneseHint')
+              : t('settings.voiceSlotDefaultHint')}
+          </Text>
           <View style={[styles.voiceActionsRow, { marginTop: 16 }]}>
             <Button
               mode="contained"
@@ -1039,9 +1135,21 @@ export default function Settings() {
                       style={{ color: theme.colors.onSurfaceVariant }}
                       numberOfLines={1}
                     >
-                      {voice.voice_id.startsWith("ref:")
+                      {getResolvedCustomVoiceId(voice).startsWith("ref:")
                         ? t('settings.referenceVoice')
-                        : `${t('settings.id')}${voice.voice_id}`}
+                        : `${t('settings.id')}${getResolvedCustomVoiceId(voice)}`}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      {t('settings.voiceSlotLabel', {
+                        slot:
+                          normalizeCustomVoiceSlot(voice) ===
+                          CustomVoiceSlot.CANTONESE
+                            ? t('settings.cantonese')
+                            : t('settings.voiceSlotDefault'),
+                      })}
                     </Text>
                     <Text
                       variant="bodySmall"

@@ -1,63 +1,64 @@
 import { useAuth } from "@/lib/auth-context";
 import {
-    createChatSession,
-    deleteChatSession,
-    listChatSessionsForUser,
-    updateChatSession,
+  createChatSession,
+  deleteChatSession,
+  listChatSessionsForUser,
+  updateChatSession,
 } from "@/lib/chat";
 import {
-    buildScheduleSummary,
-    fetchElderlySchedulesForUser,
+  buildScheduleSummary,
+  fetchElderlySchedulesForUser,
 } from "@/lib/elderly";
+import { resolvePreferredAiVoiceId } from "@/lib/custom-voice";
 import { getFormattedTodayMedicationSummary } from "@/lib/medication_tracking";
 import { synthesizePersonalVoice } from "@/lib/personal-voice";
 import {
-    formatSearchResultsForContext,
-    searchWeb,
-    shouldSearch,
+  formatSearchResultsForContext,
+  searchWeb,
+  shouldSearch,
 } from "@/lib/search";
 import type { ChatSession as AppwriteChatSession } from "@/types/appwrite";
 import {
-    createAudioPlayer,
-    setAudioModeAsync,
-    type AudioPlayer,
+  createAudioPlayer,
+  setAudioModeAsync,
+  type AudioPlayer,
 } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "expo-router";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    FlatList,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    TouchableOpacity,
-    useColorScheme,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Card,
-    Chip,
-    IconButton,
-    Menu,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  Card,
+  Chip,
+  IconButton,
+  Menu,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 interface Message {
@@ -126,8 +127,21 @@ export default function ElderlyChat() {
   const aiVoicePlayerRef = useRef<AudioPlayer | null>(null);
 
   const aiVoiceEnabled = preferences.aiVoiceEnabled === true;
-  const selectedVoiceId =
-    typeof preferences.aiVoiceId === "string" ? preferences.aiVoiceId : "";
+  const voiceReplyLang = (
+    typeof preferences.voiceReplyLang === "string"
+      ? preferences.voiceReplyLang
+      : "cantonese"
+  ) as string;
+  const ttsReplyLang =
+    voiceReplyLang === "cantonese"
+      ? "yue"
+      : voiceReplyLang === "mandarin"
+        ? "zh"
+        : "en";
+  const selectedVoiceId = resolvePreferredAiVoiceId(
+    preferences,
+    voiceReplyLang,
+  );
 
   const stopAiVoicePlayback = useCallback(() => {
     if (aiVoicePlayerRef.current) {
@@ -156,6 +170,8 @@ export default function ElderlyChat() {
         const synthesized = await synthesizePersonalVoice(
           plainText,
           selectedVoiceId,
+          undefined,
+          ttsReplyLang,
         );
 
         let audioSourceUri: string | null = null;
@@ -204,7 +220,7 @@ export default function ElderlyChat() {
         setIsVoiceSynthesizing(false);
       }
     },
-    [aiVoiceEnabled, selectedVoiceId, stopAiVoicePlayback],
+    [aiVoiceEnabled, selectedVoiceId, stopAiVoicePlayback, ttsReplyLang],
   );
 
   const handleToggleAiVoice = useCallback(async () => {
@@ -234,19 +250,26 @@ export default function ElderlyChat() {
     { key: "english", label: "English" },
   ] as const;
 
-  const voiceReplyLang = (
-    typeof preferences.voiceReplyLang === "string"
-      ? preferences.voiceReplyLang
-      : "cantonese"
-  ) as string;
-
   const currentLangLabel =
     LANG_OPTIONS.find((o) => o.key === voiceReplyLang)?.label ?? "粵語";
 
   const handleLangChange = useCallback(
     async (lang: string) => {
+      const nextPreferences = {
+        ...preferences,
+        voiceReplyLang: lang,
+      };
+      const error = await updatePreferences({
+        ...nextPreferences,
+        aiVoiceId: resolvePreferredAiVoiceId(nextPreferences, lang) || undefined,
+      });
+
+      if (error) {
+        Alert.alert("Unable to save language", error);
+        return;
+      }
+
       setLangMenuVisible(false);
-      await updatePreferences({ ...preferences, voiceReplyLang: lang });
     },
     [preferences, updatePreferences],
   );

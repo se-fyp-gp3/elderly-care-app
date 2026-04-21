@@ -2,20 +2,24 @@
 
 ## Overview
 
-The Personal Voice feature allows caregivers to clone their own voice and use it for AI text-to-speech (TTS) replies in the elderly chat interface. The system uses **Alibaba DashScope CosyVoice v2** for multilingual TTS synthesis and voice cloning, with an **Appwrite Cloud Function** as middleware.
+The Personal Voice feature allows caregivers to register a reusable personal voice and use it for AI text-to-speech (TTS) replies in the elderly chat interface. The production path now uses **Alibaba DashScope Qwen TTS** with an **Appwrite Cloud Function** as middleware.
+
+- Standard preset voices use `qwen3-tts-flash` over HTTP.
+- Personal cloned voices use `qwen-voice-enrollment` plus `qwen3-tts-vc-realtime-2026-01-15` for synthesis.
+- Legacy CosyVoice voices are still playable through a compatibility fallback so older saved records do not break immediately.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────┐      ┌──────────────────────────┐      ┌─────────────────────┐
-│  React Native    │ ──►  │  Appwrite Function        │ ──►  │  DashScope API       │
-│  (Expo)          │      │  voice-clone-convert       │      │  CosyVoice v2        │
-│                  │ ◄──  │  (Node 18 + ffmpeg)        │ ◄──  │  WebSocket TTS       │
-└─────────────────┘      └──────────────────────────┘      └─────────────────────┘
-         │                         │
-         ▼                         ▼
+┌─────────────────┐      ┌──────────────────────────┐      ┌──────────────────────────────┐
+│  React Native   │ ──►  │  Appwrite Function       │ ──►  │  DashScope Qwen APIs         │
+│  (Expo)         │      │  voice-clone-convert     │      │  - HTTP TTS (`qwen3-tts`)    │
+│                 │ ◄──  │  (Node 22 + ffmpeg)      │ ◄──  │  - Realtime VC synthesis     │
+└─────────────────┘      └──────────────────────────┘      │  - Voice enrollment          │
+      │                         │                        └──────────────────────────────┘
+      ▼                         ▼
    Appwrite Prefs            Appwrite Storage
    (voice selection)         (reference audio)
 ```
@@ -24,9 +28,9 @@ The Personal Voice feature allows caregivers to clone their own voice and use it
 
 | Component | File | Role |
 |-----------|------|------|
-| Client voice lib | `lib/personal-voice.ts` | Voice cloning registration, TTS synthesis calls |
+| Client voice lib | `lib/personal-voice.ts` | Qwen voice registration, model routing, TTS calls |
 | Custom voice CRUD | `lib/custom-voice.ts` | Appwrite DB records for saved voices |
-| Appwrite function | `voice-clone-convert/src/main.js` | Audio conversion (ffmpeg) + WebSocket TTS |
+| Appwrite function | `voice-clone-convert/src/main.js` | Audio normalization + Qwen HTTP/realtime synthesis |
 | Elderly chat | `app/(elderly-tabs)/chat.tsx` | AI chat with TTS playback + language selector |
 | Elderly settings | `app/(elderly-tabs)/settings.tsx` | Voice toggle, caregiver voice picker, language |
 | Caregiver settings | `app/(caregiver-tabs)/settings.tsx` | Voice recording, cloning UI, language selector |
@@ -39,9 +43,9 @@ The Personal Voice feature allows caregivers to clone their own voice and use it
 
 Caregiver records voice samples in the settings page using `expo-audio`. Recorded as `.m4a` files.
 
-- Recommended sample length: **10 to 100 seconds** of clear speech
-- The app now auto-stops recordings at **100 seconds**
-- Longer imported files are accepted, but only the **first 100 seconds** are used for voice enrollment
+- Recommended sample length: **10 to 30 seconds** of clear speech
+- Longer recordings are accepted, but the middleware trims them to the **first 30 seconds** before enrollment
+- A shorter clean clip has been more reliable than long recordings for DashScope enrollment
 
 ### Step 2 — Convert Audio (Appwrite Function)
 
@@ -49,33 +53,28 @@ Request: `mode: "clone"` with `samplesBase64` array.
 
 The Appwrite function:
 1. Writes base64 audio to temp files
-2. Converts `.m4a` → `.wav` (mono, 16kHz, PCM s16le) via **ffmpeg-static**
+2. Normalizes the first sample to a short mono 16kHz reference clip via **ffmpeg-static**
 3. Generates a deterministic `voiceId` via SHA-256 hash of speaker name + samples
-4. Returns `convertedSamplesBase64` (WAV) + `voiceId`
+4. Returns normalized audio data or a Storage file ID for downstream registration
 
 ### Step 3 — Upload Reference Audio (Client)
 
-The client uploads the first converted WAV to **Appwrite Storage** bucket `voice-clones` for persistent reference.
+The client uploads the normalized reference clip to **Appwrite Storage** bucket `voice-clones` for persistent reference.
 
 ### Step 4 — Register Voice with DashScope (Client)
 
 Calls DashScope voice enrollment API:
 - **Endpoint:** `https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization`
-- **Model:** `voice-enrollment`
-- **Target model:** `cosyvoice-v2`
-- **Input:** Publicly-accessible Appwrite Storage **download URL** for the reference audio
-- **Retry:** Up to 3 attempts for transient 500 errors (e.g. "request asr failed")
+- **Model:** `qwen-voice-enrollment`
+- **Action:** `create`
+- **Target model:** `qwen3-tts-vc-realtime-2026-01-15`
+- **Input:** `audio.data = <Appwrite Storage download URL>`
+- **Output:** `output.voice` (for example `qwen-tts-vc-...`)
+- **Retry:** Up to 3 attempts for transient 5xx errors
 
-### Step 5 — Poll Voice Status (Client)
+### Step 5 — Save Voice Record (Client)
 
-After registration, polls `query_voice` action every 2s (max 60 attempts / 2 min):
-- `DEPLOYING` → keep polling
-- `OK` → voice is ready, return `voice_id` (e.g. `cosyvoice-v2-aaa-8b2334ad4efe4ed48d47e0153513a968`)
-- `UNDEPLOYED` → audio failed quality check, throw error
-
-### Step 6 — Save Voice Record (Client)
-
-On success, saves a `CustomVoice` document to Appwrite database with `voice_id`, `caregiver_id`, `elderly_id`, status `READY`.
+On success, saves a `CustomVoice` document to Appwrite database with `voice_id`, `caregiver_id`, `elderly_id`, status `READY`. If DashScope registration fails, the app still stores a `ref:<storageFileId>` fallback and uses the preset Qwen voice during playback.
 
 ---
 
@@ -87,35 +86,35 @@ When `aiVoiceEnabled` is ON in elderly preferences, after each AI response in ch
 
 ### Flow
 
-1. **Client** (`lib/personal-voice.ts` → `synthesizeDirect`) calls Appwrite function
-2. **Appwrite function** (`mode: "synthesize"`) opens WebSocket to DashScope:
-   - URL: `wss://dashscope.aliyuncs.com/api-ws/v1/inference`
-   - Sends `run-task` → receives `task-started` → sends `continue-task` (text) → sends `finish-task`
-   - Collects binary audio chunks → returns base64 MP3
-3. **Client** decodes base64, writes to temp file, plays via `expo-audio`
+1. **Client** (`lib/personal-voice.ts` → `synthesizeDirect`) calls Appwrite function.
+2. **Appwrite function** (`mode: "synthesize"`) selects the backend by voice type:
+   - Standard/system voice → `qwen3-tts-flash` via HTTP.
+   - Personal cloned voice (`qwen-tts-vc-*`) → `qwen3-tts-vc-realtime-2026-01-15` via realtime WebSocket.
+   - Legacy CosyVoice ID → old inference WebSocket fallback.
+3. The function downloads or assembles the audio, returns base64 plus the resolved model.
+4. **Client** decodes base64, writes to temp file, plays via `expo-audio`.
 
-### WebSocket Message Sequence
+### Realtime Message Sequence
 
 ```
-Client → Server:  run-task     (model, voice, format, rate, etc.)
-Server → Client:  task-started
-Client → Server:  continue-task (text payload)
-Client → Server:  finish-task
-Server → Client:  [binary audio chunks...]
-Server → Client:  task-finished
+Client → Server:  session.update          (voice, format, sample rate)
+Client → Server:  input_text_buffer.append
+Client → Server:  session.finish
+Server → Client:  response.audio.delta ...
+Server → Client:  response.done
 ```
 
 ### TTS Parameters
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| Model | `cosyvoice-v2` | Multilingual (Cantonese/Mandarin/English) |
+| Standard model | `qwen3-tts-flash` | Used for preset/system voices |
+| Personal voice model | `qwen3-tts-vc-realtime-2026-01-15` | Used for registered cloned voices |
 | Format | `mp3` | Output audio format |
-| Sample rate | 22050 Hz | |
-| Rate | 0.9 | Slightly slower for elderly users |
-| Volume | 50 | Default level |
-| Timeout | 90s | WebSocket connection timeout |
-| Default voice | `longxiaochun_v2` | Fallback when no custom voice set |
+| Sample rate | 22050 Hz / 24000 Hz | Standard HTTP path uses 22050 request default; realtime VC uses 24000 |
+| Rate | `0.9` request hint | Slightly slower for elderly users |
+| Timeout | 90s | Function-level synthesis timeout |
+| Default voice | `Kiki` | Fallback when no custom voice is set |
 
 ---
 
@@ -133,7 +132,8 @@ Server → Client:  task-finished
 
 - Stored in Appwrite user preferences as `voiceReplyLang` (default: `"cantonese"`)
 - The AI system prompt in `buildConversationMessages()` includes a language instruction
-- CosyVoice v2 is natively multilingual — it detects the language from the input text, so **no backend language parameter is needed**
+- The Qwen realtime path maps the app language into `language_type` (`Chinese` or `English`) for synthesis sessions
+- The standard HTTP path relies on the input text plus selected voice
 - The language selector appears in:
   - Elderly chat top bar (Menu + Chip dropdown, visible only when voice is ON)
   - Elderly settings (Chip row after Caregiver Voice, visible only when voice is ON)
@@ -146,27 +146,28 @@ Server → Client:  task-finished
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `EXPO_PUBLIC_DASHSCOPE_API_KEY` | — | DashScope API key (required) |
-| `EXPO_PUBLIC_DASHSCOPE_TTS_MODEL` | `cosyvoice-v2` | TTS synthesis model |
-| `EXPO_PUBLIC_DASHSCOPE_VC_MODEL` | `cosyvoice-clone-v1` | Voice enrollment model |
-| `EXPO_PUBLIC_DASHSCOPE_TTS_VOICE` | `longxiaochun_v2` | Default preset voice |
+| `EXPO_PUBLIC_DASHSCOPE_TTS_MODEL` | `qwen3-tts-flash` | Standard preset/system TTS model |
+| `EXPO_PUBLIC_DASHSCOPE_VC_MODEL` | `qwen3-tts-vc-realtime-2026-01-15` | Personal voice synthesis target model |
+| `EXPO_PUBLIC_DASHSCOPE_TTS_VOICE` | `Kiki` | Default preset voice |
 | `EXPO_PUBLIC_VOICE_CLONE_BUCKET_ID` | `69ba654e003c3aa1b2c8` | Appwrite Storage bucket ID (`voice-clones`) |
 | `DASHSCOPE_API_KEY` | — | Same key, used in Appwrite function env |
-| `DASHSCOPE_TTS_MODEL` | `cosyvoice-v2` | TTS model in Appwrite function |
+| `DASHSCOPE_TTS_MODEL` | `qwen3-tts-flash` | Standard TTS model in Appwrite function |
+| `DASHSCOPE_VC_MODEL` | `qwen3-tts-vc-realtime-2026-01-15` | Personal voice realtime model in Appwrite function |
 
 ### Appwrite Function Config
 
 | Setting | Value |
 |---------|-------|
 | Function ID | `69a525190013dd81fb58` |
-| Runtime | Node 18 |
+| Runtime | Node 22 |
 | Entrypoint | `src/main.js` |
 | Build command | `npm install` |
-| Timeout | 15s (clone) / 90s (WebSocket TTS internal) |
+| Timeout | 120s |
 | Permissions | `any` |
 
 ---
 
-## Errors Encountered & Resolutions
+## Legacy Notes
 
 ### 1. DashScope REST TTS 403 — "Access denied" for `cosyvoice-v2`
 

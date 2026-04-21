@@ -2,23 +2,76 @@ import * as FileSystem from "expo-file-system/legacy";
 import { ExecutionMethod, ID } from "react-native-appwrite";
 import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, functions, storage, VOICE_CLONE_FUNCTION_ID } from "./appwrite";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 // ── DashScope config ──
 const DASHSCOPE_API_KEY =
   process.env.EXPO_PUBLIC_DASHSCOPE_API_KEY?.trim() || "";
 
+const DEFAULT_STANDARD_TTS_MODEL = "qwen3-tts-flash";
+const DEFAULT_PERSONAL_TTS_MODEL = "qwen3-tts-vc-realtime-2026-01-15";
+const DEFAULT_PRESET_VOICE = "Kiki";
+
+const LEGACY_TTS_MODELS = new Set(["cosyvoice-v2", "qwen3.5-tts"]);
+const LEGACY_VC_MODELS = new Set(["cosyvoice-clone-v1"]);
+const LEGACY_PRESET_VOICES = new Set(["longxiaochun_v2"]);
+
+function cleanConfigValue(value?: string | null): string {
+  return value?.trim() || "";
+}
+
+function normalizeStandardModel(model?: string | null): string {
+  const value = cleanConfigValue(model);
+  if (!value || LEGACY_TTS_MODELS.has(value)) {
+    return DEFAULT_STANDARD_TTS_MODEL;
+  }
+  return value;
+}
+
+function normalizeVcModel(model?: string | null): string {
+  const value = cleanConfigValue(model);
+  if (!value || LEGACY_VC_MODELS.has(value)) {
+    return DEFAULT_PERSONAL_TTS_MODEL;
+  }
+  return value;
+}
+
+function normalizePresetVoice(voice?: string | null): string {
+  const value = cleanConfigValue(voice);
+  if (!value || LEGACY_PRESET_VOICES.has(value)) {
+    return DEFAULT_PRESET_VOICE;
+  }
+  return value;
+}
+
+function isReferenceVoice(voice: string): boolean {
+  return voice.startsWith("ref:");
+}
+
+function isQwenPersonalVoice(voice: string): boolean {
+  return /^qwen-tts-vc-/i.test(voice);
+}
+
+function isRealtimeModel(model?: string | null): boolean {
+  return /-realtime(?:-|$)/i.test(cleanConfigValue(model));
+}
+
+function resolveRequestedModel(voice: string, requestedModel?: string): string {
+  if (isQwenPersonalVoice(voice)) {
+    return isRealtimeModel(requestedModel) ? cleanConfigValue(requestedModel) : VC_MODEL;
+  }
+  return normalizeStandardModel(requestedModel);
+}
+
 // TTS model for synthesis (known-working)
 const TTS_MODEL =
-  process.env.EXPO_PUBLIC_DASHSCOPE_TTS_MODEL?.trim() || "cosyvoice-v2";
+  normalizeStandardModel(process.env.EXPO_PUBLIC_DASHSCOPE_TTS_MODEL);
 
 // Voice-clone model for enrollment/training
 const VC_MODEL =
-  process.env.EXPO_PUBLIC_DASHSCOPE_VC_MODEL?.trim() || "cosyvoice-clone-v1";
+  normalizeVcModel(process.env.EXPO_PUBLIC_DASHSCOPE_VC_MODEL);
 
 // Default preset voice (fallback when no custom voice)
 const DEFAULT_VOICE =
-  process.env.EXPO_PUBLIC_DASHSCOPE_TTS_VOICE?.trim() || "longxiaochun_v2";
+  normalizePresetVoice(process.env.EXPO_PUBLIC_DASHSCOPE_TTS_VOICE);
 
 // Storage bucket for reference audio
 const VOICE_CLONE_BUCKET =
@@ -28,15 +81,16 @@ const VOICE_CLONE_BUCKET =
 const VOICE_CLONE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization";
 
-// ── Polling config ──
-const POLL_INTERVAL_MS = 2000;
-const MAX_POLL_ATTEMPTS = 60; // 2 min max
-
 function assertDashScopeConfigured() {
   if (!DASHSCOPE_API_KEY) {
     throw new Error("EXPO_PUBLIC_DASHSCOPE_API_KEY is not configured.");
   }
 }
+
+type VoiceEnrollmentOptions = {
+  transcript?: string;
+  language?: string;
+};
 
 // ─────────────────────────────────────────────────────────────
 // Voice Cloning: Create a personal voice from audio samples
@@ -53,6 +107,7 @@ function assertDashScopeConfigured() {
 export async function createPersonalVoice(
   samplesBase64: string[],
   speakerName: string,
+  options: VoiceEnrollmentOptions = {},
 ): Promise<{
   voiceId: string;
   convertedSamplesBase64: string[];
@@ -297,6 +352,7 @@ export async function createPersonalVoice(
       const dashScopeVoiceId = await registerVoiceWithDashScope(
         publicAudioUrl,
         speakerName,
+        options,
       );
 
       console.log(`[voice] DashScope voice registered: ${dashScopeVoiceId}`);
@@ -322,35 +378,39 @@ export async function createPersonalVoice(
 }
 
 // ─────────────────────────────────────────────────────────────
-// DashScope Voice Clone registration (async with polling)
+// DashScope Voice Clone registration (Qwen voice enrollment)
 // ─────────────────────────────────────────────────────────────
 async function registerVoiceWithDashScope(
   audioUrl: string,
   speakerName: string,
+  options: VoiceEnrollmentOptions = {},
 ): Promise<string> {
-  // CosyVoice voice clone API:
-  //   model = "voice-enrollment" (fixed)
-  //   target_model = TTS model (must match synthesis model)
-  //   url = publicly accessible audio URL
   const prefix = speakerName
     .replace(/[^a-z0-9]/gi, "")
     .toLowerCase()
     .slice(0, 10) || "voice";
+  const transcript = options.transcript?.trim();
+  const sampleLanguage = options.language?.trim() || "zh";
 
   const payload = {
-    model: "voice-enrollment",
+    model: "qwen-voice-enrollment",
     input: {
-      action: "create_voice",
-      target_model: TTS_MODEL, // e.g. "cosyvoice-v2"
-      prefix,
-      url: audioUrl,
+      action: "create",
+      target_model: VC_MODEL,
+      preferred_name: prefix,
+      audio: {
+        data: audioUrl,
+      },
+      language: sampleLanguage,
+      ...(transcript ? { text: transcript } : {}),
     },
   };
 
-  console.log(`[voice] Voice clone request: model=voice-enrollment, target_model=${TTS_MODEL}, prefix=${prefix}`);
+  console.log(`[voice] Voice clone request: model=qwen-voice-enrollment, target_model=${VC_MODEL}, preferred_name=${prefix}`);
   console.log(`[voice] Audio URL: ${audioUrl}`);
+  console.log(`[voice] Transcript attached: ${transcript ? "yes" : "no"}, sample language: ${sampleLanguage}`);
 
-  // Retry up to 3 times for transient 500 errors (e.g. "request asr failed")
+  // Retry up to 3 times for transient 5xx failures.
   const MAX_RETRIES = 3;
   let rawText = "";
   let response: Response | null = null;
@@ -386,72 +446,21 @@ async function registerVoiceWithDashScope(
     throw new Error("DashScope voice clone returned non-JSON response");
   }
 
-  const voiceId = data?.output?.voice_id;
+  const voiceId = data?.output?.voice || data?.output?.voice_id;
   if (!voiceId) {
-    throw new Error(`DashScope voice clone returned no voice_id: ${rawText}`);
+    throw new Error(`DashScope voice clone returned no voice identifier: ${rawText}`);
   }
 
-  console.log(`[voice] Voice created: ${voiceId}, polling status...`);
-
-  // Poll until voice status is "OK" (DEPLOYING → OK or UNDEPLOYED)
-  return pollVoiceStatus(voiceId);
-}
-
-async function pollVoiceStatus(voiceId: string): Promise<string> {
-  for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-
-    const payload = {
-      model: "voice-enrollment",
-      input: {
-        action: "query_voice",
-        voice_id: voiceId,
-      },
-    };
-
-    const res = await fetch(VOICE_CLONE_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`Voice status poll failed (${res.status}): ${errText}`);
-    }
-
-    const data = await res.json();
-    const voiceList = data?.output?.voice_list;
-    const status = voiceList?.[0]?.status || data?.output?.status;
-
-    console.log(`[voice] Poll ${i + 1}/${MAX_POLL_ATTEMPTS}: voice ${voiceId} status=${status}`);
-
-    if (status === "OK") {
-      return voiceId;
-    }
-
-    if (status === "UNDEPLOYED") {
-      throw new Error(
-        "Voice clone failed: audio did not pass quality check (UNDEPLOYED)",
-      );
-    }
-
-    // DEPLOYING → continue polling
-  }
-
-  throw new Error("Voice clone status polling timed out.");
+  console.log(`[voice] Voice created: ${voiceId}`);
+  return voiceId;
 }
 
 // ─────────────────────────────────────────────────────────────
-// TTS Synthesis: synthesize speech using cosyvoice-v2
+// TTS Synthesis: synthesize speech using Qwen TTS
 //
-// If voice is a registered DashScope voice → use directly.
-// If voice starts with "ref:" → zero-shot cloning with reference
-//   audio from Appwrite Storage (via Appwrite function).
-// Otherwise → treat as preset voice name.
+// If voice is a registered Qwen personal voice → use the VC realtime model.
+// If voice starts with "ref:" → fall back to the default preset voice.
+// Otherwise → treat as a preset/system voice and use qwen3-tts-flash.
 // ─────────────────────────────────────────────────────────────
 
 export async function synthesizePersonalVoice(
@@ -462,10 +471,10 @@ export async function synthesizePersonalVoice(
 ): Promise<{ audioBase64?: string; audioUrl?: string }> {
   assertDashScopeConfigured();
 
-  const resolvedVoice = voice || DEFAULT_VOICE;
+  const resolvedVoice = cleanConfigValue(voice) || DEFAULT_VOICE;
 
   // ── Reference-based (zero-shot) cloning via Appwrite function ──
-  if (resolvedVoice.startsWith("ref:")) {
+  if (isReferenceVoice(resolvedVoice)) {
     const storageFileId = resolvedVoice.slice(4);
     return synthesizeWithReference(text, storageFileId, model, language);
   }
@@ -481,14 +490,16 @@ async function synthesizeDirect(
   model: string,
   language?: string,
 ): Promise<{ audioBase64?: string; audioUrl?: string }> {
-  // Route through Appwrite function which uses WebSocket to call CosyVoice
+  const resolvedModel = resolveRequestedModel(voice, model);
+
+  // Route through Appwrite function which selects the correct Qwen backend.
   const requestBody: Record<string, any> = {
     mode: "synthesize",
     text,
-    model: model || TTS_MODEL,
+    model: resolvedModel,
     voice: voice || DEFAULT_VOICE,
     format: "mp3",
-    sampleRate: 22050,
+    sampleRate: isQwenPersonalVoice(voice) ? 24000 : 22050,
     rate: 0.9, // slightly slower for elderly users
   };
   if (language) requestBody.language = language;
@@ -541,7 +552,7 @@ async function synthesizeDirect(
 }
 
 // ── Zero-shot cloning fallback ──
-// CosyVoice WebSocket API doesn't support inline reference audio.
+// The Qwen TTS path doesn't support inline reference audio here.
 // Fall back to default voice for ref: voices.
 async function synthesizeWithReference(
   text: string,
@@ -549,7 +560,7 @@ async function synthesizeWithReference(
   model: string,
   language?: string,
 ): Promise<{ audioBase64?: string; audioUrl?: string }> {
-  console.warn("[voice] Reference-based TTS not supported via WebSocket, using default voice");
+  console.warn(`[voice] Reference-based TTS not supported for ${storageFileId}, using default voice`);
   return synthesizeDirect(text, DEFAULT_VOICE, model, language);
 }
 

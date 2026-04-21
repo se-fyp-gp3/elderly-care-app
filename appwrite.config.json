@@ -1263,6 +1263,15 @@
           "encrypt": false
         },
         {
+          "key": "voice_slot",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "default": "default",
+          "format": "enum",
+          "elements": ["default", "cantonese"]
+        },
+        {
           "key": "status",
           "type": "string",
           "required": true,

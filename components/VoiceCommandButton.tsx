@@ -1,6 +1,6 @@
 // components/VoiceCommandButton.tsx
 // Floating voice command button for elderly users
-// Records audio → Qwen3.5-audio (recognition + intent) → Execute → CosyVoice-v2 (TTS response)
+// Records audio → Qwen audio understanding → Execute → Qwen personal/system TTS response
 
 import { useAuth } from "@/lib/auth-context";
 import { getElderlyByUserId } from "@/lib/elderly";
@@ -265,7 +265,7 @@ export default function VoiceCommandButton() {
         }, 2000);
       }
 
-      // Synthesize response with family voice using CosyVoice-v2
+      // Synthesize the response using the saved family voice or the default Qwen voice
       setVoiceState("speaking");
       await playTTSResponse(commandResult.message);
       setVoiceState("idle");
@@ -288,7 +288,7 @@ export default function VoiceCommandButton() {
     }
   }, [voiceState, recorder, user, elderlyProfileId, router]);
 
-  // Play TTS response using CosyVoice-v2
+  // Play the synthesized TTS response
   const playTTSResponse = useCallback(
     async (message: string) => {
       if (!elderlyProfileId) return;
