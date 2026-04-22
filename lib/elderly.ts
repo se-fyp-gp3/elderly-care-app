@@ -21,8 +21,7 @@ import {
     SCHEDULE_TABLE_ID,
     tablesDB,
 } from "./appwrite";
-  import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
-  import { sendImmediateNotification } from "./notifications";
+import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
 
 /**
  * Calculate an elderly person's age from their birth date string.

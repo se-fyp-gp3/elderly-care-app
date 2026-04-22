@@ -1,4 +1,5 @@
-﻿import {
+﻿import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
+import {
     DisplayItem,
     NewTaskData,
     NewTaskModal,
@@ -8,7 +9,6 @@
     ScheduleMonthPicker,
     ScheduleSingleEventCard,
 } from "@/components/schedule";
-  import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {

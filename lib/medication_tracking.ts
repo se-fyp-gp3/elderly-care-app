@@ -13,9 +13,9 @@ import {
     MEDICATION_TABLE_ID,
     tablesDB,
 } from "./appwrite";
-  import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
+import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
 import { getElderlyByUserId } from "./elderly";
-  import { sendImmediateNotification } from "./notifications";
+import { sendImmediateNotification } from "./notifications";
 
 export async function checkAndMarkSkippedMedications(
   userId: string,

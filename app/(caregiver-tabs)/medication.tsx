@@ -1,12 +1,12 @@
 import { AddMedicationDialog, MedicationFormData } from "@/components/AddMedicationDialog";
 import ElderlyGroupSummary from "@/components/ElderlyGroupSummary";
-import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
 import {
     ConfirmMedicationDialog,
     ElderlyFilterDialog,
     StatusFilterDialog,
 } from "@/components/MedFilterDialogs";
 import { MedicationItem } from "@/components/MedicationCard";
+import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
 import MedStatsCard from "@/components/MedStatsCard";
 import TimeSlotCard from "@/components/TimeSlotCard";
 import { useAuth } from "@/lib/auth-context";

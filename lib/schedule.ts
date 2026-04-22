@@ -1,5 +1,4 @@
 import i18n from "@/lib/i18n";
-import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
 import {
     ElderlyMedication,
     Medication,
@@ -18,7 +17,8 @@ import {
     SCHEDULE_TABLE_ID,
     tablesDB,
 } from "./appwrite";
-  import { sendImmediateNotification } from "./notifications";
+import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
+import { sendImmediateNotification } from "./notifications";
 
 /** Translate a medication unit string (e.g. "tablet" → "片") using i18n. */
 export function translateUnit(unit: string): string {

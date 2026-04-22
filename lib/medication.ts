@@ -24,7 +24,7 @@ import {
     tablesDB,
 } from "./appwrite";
 import { getCaregiverByUserId, getLinkedElderly } from "./caregiver";
-  import { sendImmediateNotification } from "./notifications";
+import { sendImmediateNotification } from "./notifications";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

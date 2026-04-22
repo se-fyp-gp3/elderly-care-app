@@ -14,8 +14,8 @@
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
-import { enableStepBackgroundSync } from "../background-step-sync";
 import { useAuth } from "../auth-context";
+import { enableStepBackgroundSync } from "../background-step-sync";
 import { getElderlyByUserId } from "../elderly";
 import {
     DailyStepRecord,
@@ -23,7 +23,7 @@ import {
     getTodayStepRecord,
     performStepSync,
     requestHealthAuthorization,
-  STEP_SYNC_INTERVAL_MS,
+    STEP_SYNC_INTERVAL_MS,
     StepDataSource,
 } from "../step-sync";
 

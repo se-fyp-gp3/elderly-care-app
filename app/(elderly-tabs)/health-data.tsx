@@ -3,21 +3,21 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  useColorScheme,
-  View,
+    ActivityIndicator,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    useColorScheme,
+    View,
 } from "react-native";
 import {
-  Button,
-  Card,
-  Snackbar,
-  Text,
-  TouchableRipple,
-  useTheme,
+    Button,
+    Card,
+    Snackbar,
+    Text,
+    TouchableRipple,
+    useTheme,
 } from "react-native-paper";
 
 export default function ElderlyHealthData() {

@@ -1,3 +1,4 @@
+import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
 import {
     DATABASE_ID,
     MEDICATION_LOGS_TABLE_ID,
@@ -24,7 +25,6 @@ import {
     sendImmediateNotification,
 } from "@/lib/notifications";
 import { translateUnit } from "@/lib/schedule";
-import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
 import {
     Caregiver,
     ElderlyMedicationReminder,
