@@ -266,6 +266,7 @@ export default function ElderlySchedule() {
         typeName: newTask.typeName,
         categoryId: newTask.typeId || undefined,
         remindMinutes,
+        notifyConnectedCaregivers: true,
       });
 
       // Schedule a local notification at the remind datetime

@@ -8,6 +8,7 @@
     ScheduleMonthPicker,
     ScheduleSingleEventCard,
 } from "@/components/schedule";
+  import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
@@ -90,6 +91,11 @@ export default function SchedulePage() {
 
   // New Task Management
   const [newTaskVisible, setNewTaskVisible] = useState(false);
+  const [selectedMedicationDetails, setSelectedMedicationDetails] = useState<{
+    title: string;
+    subtitle?: string;
+    fields: MedicationDetailField[];
+  } | null>(null);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [newTaskDatePickerVisible, setNewTaskDatePickerVisible] =
     useState(false);
@@ -504,6 +510,25 @@ export default function SchedulePage() {
     }
   };
 
+  const openMedicationDetails = useCallback((event: ScheduleEvent) => {
+    const statusLabel =
+      String(event.status).toLowerCase() === ScheduleStatus.COMPLETED.toLowerCase()
+        ? t('common.completed')
+        : String(event.status).toLowerCase() === ScheduleStatus.MISSED.toLowerCase()
+          ? t('common.missed')
+          : t('common.pending');
+
+    setSelectedMedicationDetails({
+      title: event.title,
+      subtitle: `${event.elderlyName} · ${statusLabel}`,
+      fields: [
+        { label: "Dose", value: event.description },
+        { label: "Time", value: event.time },
+        { label: "Scheduled", value: new Date(event.rawDate).toLocaleString() },
+      ],
+    });
+  }, [t]);
+
   const handleSaveTask = async () => {
     if (!newTask.title || !newTask.elderlyId || !newTask.time) {
       Alert.alert(
@@ -567,6 +592,7 @@ export default function SchedulePage() {
         onTakeMedication={handleTakeMedication}
         onUndoMedication={handleUndoMedication}
         onRemindMedication={handleRemindMedication}
+        onShowDetails={openMedicationDetails}
       />
     );
   };
@@ -677,6 +703,14 @@ export default function SchedulePage() {
         color={theme.colors.onPrimary}
         onPress={() => setNewTaskVisible(true)}
         label={t('schedule.newTask')}
+      />
+
+      <MedicationDetailsModal
+        visible={!!selectedMedicationDetails}
+        title={selectedMedicationDetails?.title || ""}
+        subtitle={selectedMedicationDetails?.subtitle}
+        fields={selectedMedicationDetails?.fields || []}
+        onDismiss={() => setSelectedMedicationDetails(null)}
       />
 
       {/* Native Date Picker */}

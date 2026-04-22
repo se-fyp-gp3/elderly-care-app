@@ -1,6 +1,5 @@
 import { useStepSync } from "@/lib/hooks/useStepSync";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -43,12 +42,6 @@ export default function ElderlyHealthData() {
     manualSync,
     authorize,
   } = useStepSync();
-
-  useFocusEffect(
-    React.useCallback(() => {
-      manualSync();
-    }, [manualSync]),
-  );
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);

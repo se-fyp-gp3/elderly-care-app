@@ -23,6 +23,7 @@ interface ScheduleMedGroupCardProps {
   onTakeMedication: (event: ScheduleEvent) => void;
   onUndoMedication: (event: ScheduleEvent) => void;
   onRemindMedication: (event: ScheduleEvent) => void;
+  onShowDetails: (event: ScheduleEvent) => void;
 }
 
 export default function ScheduleMedGroupCard({
@@ -30,6 +31,7 @@ export default function ScheduleMedGroupCard({
   onTakeMedication,
   onUndoMedication,
   onRemindMedication,
+  onShowDetails,
 }: ScheduleMedGroupCardProps) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -208,36 +210,53 @@ export default function ScheduleMedGroupCard({
                   flex: 1,
                 }}
               >
-                <Avatar.Icon
-                  icon="pill"
-                  size={28}
-                  style={{
-                    backgroundColor:
-                      String(med.status).toLowerCase() ===
-                      ScheduleStatus.COMPLETED.toLowerCase()
-                        ? "#E8F5E9"
-                        : theme.colors.primaryContainer,
-                    marginRight: 8,
-                  }}
-                  color={
-                    String(med.status).toLowerCase() ===
-                    ScheduleStatus.COMPLETED.toLowerCase()
-                      ? "#4CAF50"
-                      : theme.colors.onPrimaryContainer
-                  }
-                />
-                <View style={{ flex: 1 }}>
-                  <Text variant="bodyLarge" style={{ fontWeight: "600" }}>
-                    {med.title}
-                  </Text>
-                  <Text
-                    variant="bodySmall"
-                    numberOfLines={1}
-                    style={{ color: theme.colors.outline }}
+                <Button
+                  mode="text"
+                  compact
+                  onPress={() => onShowDetails(med)}
+                  contentStyle={{ paddingHorizontal: 0 }}
+                  style={{ flex: 1, justifyContent: "flex-start" }}
+                  labelStyle={{ marginHorizontal: 0 }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      flex: 1,
+                    }}
                   >
-                    {med.description}
-                  </Text>
-                </View>
+                    <Avatar.Icon
+                      icon="pill"
+                      size={28}
+                      style={{
+                        backgroundColor:
+                          String(med.status).toLowerCase() ===
+                          ScheduleStatus.COMPLETED.toLowerCase()
+                            ? "#E8F5E9"
+                            : theme.colors.primaryContainer,
+                        marginRight: 8,
+                      }}
+                      color={
+                        String(med.status).toLowerCase() ===
+                        ScheduleStatus.COMPLETED.toLowerCase()
+                          ? "#4CAF50"
+                          : theme.colors.onPrimaryContainer
+                      }
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodyLarge" style={{ fontWeight: "600" }}>
+                        {med.title}
+                      </Text>
+                      <Text
+                        variant="bodySmall"
+                        numberOfLines={1}
+                        style={{ color: theme.colors.outline }}
+                      >
+                        {med.description}
+                      </Text>
+                    </View>
+                  </View>
+                </Button>
                 <View
                   style={{
                     backgroundColor:

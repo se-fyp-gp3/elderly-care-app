@@ -1,4 +1,5 @@
 import i18n from "@/lib/i18n";
+import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
 import {
     ElderlyMedication,
     Medication,
@@ -17,6 +18,7 @@ import {
     SCHEDULE_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+  import { sendImmediateNotification } from "./notifications";
 
 /** Translate a medication unit string (e.g. "tablet" → "片") using i18n. */
 export function translateUnit(unit: string): string {
@@ -671,8 +673,18 @@ export async function createScheduleTask(params: {
   typeName: string;
   categoryId?: string;
   remindMinutes?: number;
+  notifyConnectedCaregivers?: boolean;
 }): Promise<void> {
-  const { title, description, datetime, elderlyId, typeName, categoryId, remindMinutes } = params;
+  const {
+    title,
+    description,
+    datetime,
+    elderlyId,
+    typeName,
+    categoryId,
+    remindMinutes,
+    notifyConnectedCaregivers,
+  } = params;
   const data: Record<string, any> = {
     title,
     description,
@@ -684,10 +696,58 @@ export async function createScheduleTask(params: {
   if (categoryId) data.scheduleCategory = categoryId;
   if (remindMinutes != null) data.remind_minutes = remindMinutes;
 
-  await tablesDB.createRow({
-    databaseId: DATABASE_ID,
-    tableId: SCHEDULE_TABLE_ID,
-    rowId: ID.unique(),
-    data,
-  });
+  try {
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: SCHEDULE_TABLE_ID,
+      rowId: ID.unique(),
+      data,
+    });
+    if (notifyConnectedCaregivers) {
+      await emitCaregiverActivityAlerts({
+        elderlyId,
+        type: "cg_sched_add",
+        description: `${title} at ${datetime.toLocaleString()}`,
+      });
+    } else {
+      await sendImmediateNotification(
+        "Schedule added",
+        `${title} at ${datetime.toLocaleString()}`,
+        { type: "schedule_action" },
+      );
+    }
+  } catch (error: any) {
+    const errorMessage = error?.message || "";
+    const hasSchemaMismatch =
+      /Unknown attribute:\s*"remind_minutes"/i.test(errorMessage);
+
+    if (!hasSchemaMismatch) {
+      throw error;
+    }
+
+    console.warn(
+      "[Schedule] schedule.remind_minutes is missing on the server, retrying without reminder column.",
+    );
+
+    const { remind_minutes: _ignored, ...fallbackData } = data;
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: SCHEDULE_TABLE_ID,
+      rowId: ID.unique(),
+      data: fallbackData,
+    });
+    if (notifyConnectedCaregivers) {
+      await emitCaregiverActivityAlerts({
+        elderlyId,
+        type: "cg_sched_add",
+        description: `${title} at ${datetime.toLocaleString()}`,
+      });
+    } else {
+      await sendImmediateNotification(
+        "Schedule added",
+        `${title} at ${datetime.toLocaleString()}`,
+        { type: "schedule_action" },
+      );
+    }
+  }
 }

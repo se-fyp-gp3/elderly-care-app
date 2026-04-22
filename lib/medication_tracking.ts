@@ -13,7 +13,9 @@ import {
     MEDICATION_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+  import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
 import { getElderlyByUserId } from "./elderly";
+  import { sendImmediateNotification } from "./notifications";
 
 export async function checkAndMarkSkippedMedications(
   userId: string,
@@ -422,6 +424,8 @@ export async function deactivateMedicationReminder(
 ): Promise<void> {
   if (!ELDERLY_MEDICATION_REMINDER_TABLE_ID) return;
 
+  const profile = await getElderlyByUserId(userId);
+
   try {
     // 1. Deactivate Reminder
     await tablesDB.updateRow({
@@ -451,6 +455,15 @@ export async function deactivateMedicationReminder(
         data: {
           status: "skipped",
         },
+      });
+    }
+
+    if (profile?.$id) {
+      await emitCaregiverActivityAlerts({
+        elderlyId: profile.$id,
+        elderlyName: profile.name,
+        type: "cg_med_cancel",
+        description: "Cancelled a medication reminder.",
       });
     }
   } catch (error) {
@@ -759,4 +772,10 @@ export async function confirmCancelMedication(
       end_date: new Date().toISOString(),
     },
   });
+
+  await sendImmediateNotification(
+    "Medication removed",
+    "A cancelled medication was confirmed and removed",
+    { type: "medication_action" },
+  );
 }

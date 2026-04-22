@@ -71,6 +71,7 @@ export default function ElderlyHome() {
     lastSyncTime,
     source: stepSource,
     manualSync,
+    silentSync,
   } = useStepSync();
   const [refreshing, setRefreshing] = React.useState(false);
   const [elderlyProfile, setElderlyProfile] = React.useState<Elderly | null>(
@@ -142,6 +143,7 @@ export default function ElderlyHome() {
   useFocusEffect(
     React.useCallback(() => {
       fetchElderlyData();
+      void silentSync(true);
     }, [fetchElderlyData]),
   );
 

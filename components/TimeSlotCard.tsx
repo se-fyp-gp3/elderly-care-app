@@ -1,4 +1,5 @@
 import { MedicationItem } from "@/components/MedicationCard";
+import { MedicationDetailField } from "@/components/MedicationDetailsModal";
 import { translateFrequency } from "@/lib/schedule";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
@@ -23,6 +24,7 @@ interface TimeSlotCardProps {
   onConfirmTaking: (med: MedicationItem) => void;
   onUndoTaking: (med: MedicationItem) => void;
   setNoteText: (text: string) => void;
+  onShowDetails: (med: MedicationItem) => void;
 }
 
 export default function TimeSlotCard({
@@ -34,6 +36,7 @@ export default function TimeSlotCard({
   onConfirmTaking,
   onUndoTaking,
   setNoteText,
+  onShowDetails,
 }: TimeSlotCardProps) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -201,12 +204,14 @@ export default function TimeSlotCard({
                 borderTopColor: theme.colors.surfaceVariant,
               }}
             >
-              <View
+              <TouchableOpacity
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
                   flex: 1,
                 }}
+                activeOpacity={0.7}
+                onPress={() => onShowDetails(med)}
               >
                 <Avatar.Icon
                   icon="pill"
@@ -269,7 +274,7 @@ export default function TimeSlotCard({
                         : t('common.missed')}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               <View
                 style={{

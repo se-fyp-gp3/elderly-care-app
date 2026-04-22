@@ -14,6 +14,7 @@
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
+import { enableStepBackgroundSync } from "../background-step-sync";
 import { useAuth } from "../auth-context";
 import { getElderlyByUserId } from "../elderly";
 import {
@@ -22,11 +23,9 @@ import {
     getTodayStepRecord,
     performStepSync,
     requestHealthAuthorization,
+  STEP_SYNC_INTERVAL_MS,
     StepDataSource,
 } from "../step-sync";
-
-// Auto-sync interval: 30 minutes (in milliseconds)
-const AUTO_SYNC_INTERVAL_MS = 30 * 60 * 1000;
 
 export interface UseStepSyncReturn {
   /** Today's step count */
@@ -47,6 +46,8 @@ export interface UseStepSyncReturn {
   stepHistory: DailyStepRecord[];
   /** Manually trigger step sync (for button press) */
   manualSync: () => Promise<void>;
+  /** Silent sync for route/app lifecycle events */
+  silentSync: (force?: boolean) => Promise<void>;
   /** Request health API authorization */
   authorize: () => Promise<boolean>;
   /** Refresh step history */
@@ -159,6 +160,10 @@ export function useStepSync(): UseStepSyncReturn {
         );
       }
 
+      if (granted && elderlyId) {
+        await enableStepBackgroundSync(elderlyId);
+      }
+
       return granted;
     } catch (err: any) {
       console.error("[useStepSync] Authorization error:", err);
@@ -171,8 +176,14 @@ export function useStepSync(): UseStepSyncReturn {
   // ── Core Sync Logic ────────────────────────────────────────
 
   const doSync = useCallback(
-    async (silent: boolean = false) => {
-      if (!elderlyId || isSyncing) return;
+    async (
+      options: { silent?: boolean; force?: boolean } = {},
+    ) => {
+      const { silent = false, force = false } = options;
+
+      if (!elderlyId) return;
+      if (!silent && isSyncing) return;
+      if (!isAuthorized) return;
 
       if (!silent) {
         setIsSyncing(true);
@@ -180,16 +191,19 @@ export function useStepSync(): UseStepSyncReturn {
       }
 
       try {
-        const result = await performStepSync(elderlyId);
+        const result = await performStepSync(elderlyId, { force });
 
         if (result.success) {
           setTodaySteps(result.steps);
           setSource(result.source);
-          setLastSyncTime(new Date().toISOString());
+          if (result.lastUpdated) {
+            setLastSyncTime(result.lastUpdated);
+          }
           setError(null);
 
-          // Refresh history after sync
-          refreshHistory();
+          if (!result.skipped) {
+            refreshHistory();
+          }
         } else {
           if (!silent) {
             setError(result.error || "Step sync failed");
@@ -206,7 +220,7 @@ export function useStepSync(): UseStepSyncReturn {
         }
       }
     },
-    [elderlyId, isSyncing, refreshHistory],
+    [elderlyId, isAuthorized, isSyncing, refreshHistory],
   );
 
   // ── Manual Sync (with haptic feedback for elderly users) ──
@@ -225,7 +239,7 @@ export function useStepSync(): UseStepSyncReturn {
       if (!granted) return;
     }
 
-    await doSync(false);
+    await doSync({ silent: false, force: true });
 
     // Success haptic feedback
     try {
@@ -237,19 +251,26 @@ export function useStepSync(): UseStepSyncReturn {
     }
   }, [isAuthorized, authorize, doSync]);
 
-  // ── Auto-Sync Timer (every 30 minutes) ─────────────────────
+  const silentSync = useCallback(
+    async (force: boolean = false) => {
+      await doSync({ silent: true, force });
+    },
+    [doSync],
+  );
+
+  // ── Auto-Sync Timer (every 10 minutes) ─────────────────────
 
   useEffect(() => {
     if (!elderlyId || !isAuthorized) return;
 
     // Initial sync when first authorized
-    doSync(true);
+    doSync({ silent: true });
 
-    // Set up 30-minute interval
+    // Set up 10-minute interval
     syncTimerRef.current = setInterval(() => {
-      console.log("[useStepSync] Auto-sync triggered (30-min interval)");
-      doSync(true);
-    }, AUTO_SYNC_INTERVAL_MS);
+      console.log("[useStepSync] Auto-sync triggered (10-min interval)");
+      doSync({ silent: true });
+    }, STEP_SYNC_INTERVAL_MS);
 
     return () => {
       if (syncTimerRef.current) {
@@ -276,7 +297,7 @@ export function useStepSync(): UseStepSyncReturn {
           console.log(
             "[useStepSync] App returned to foreground → syncing steps",
           );
-          doSync(true);
+          doSync({ silent: true });
         }
         appStateRef.current = nextAppState;
       },
@@ -297,6 +318,7 @@ export function useStepSync(): UseStepSyncReturn {
     source,
     stepHistory,
     manualSync,
+    silentSync,
     authorize,
     refreshHistory,
   };

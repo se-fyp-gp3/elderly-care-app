@@ -21,6 +21,8 @@ import {
     SCHEDULE_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+  import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
+  import { sendImmediateNotification } from "./notifications";
 
 /**
  * Calculate an elderly person's age from their birth date string.
@@ -324,6 +326,13 @@ export async function createElderlyMedicationWithReminder(
       console.error("Error saving medication reminder metadata:", error);
     }
   }
+
+  await emitCaregiverActivityAlerts({
+    elderlyId: profile.$id,
+    elderlyName: profile.name,
+    type: "cg_med_add",
+    description: `${input.name} at ${approxTimes.join(", ")}`,
+  });
 
   return medicationRow as unknown as ElderlyMedication;
 }

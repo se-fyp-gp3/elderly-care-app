@@ -97,7 +97,8 @@
       ],
       "expo-sensors",
       "expo-task-manager",
-      "expo-localization"
+      "expo-localization",
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": true,

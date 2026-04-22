@@ -24,6 +24,7 @@ import {
     tablesDB,
 } from "./appwrite";
 import { getCaregiverByUserId, getLinkedElderly } from "./caregiver";
+  import { sendImmediateNotification } from "./notifications";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -583,6 +584,12 @@ export async function addMedication(data: AddMedicationData): Promise<void> {
       end_date: reminderEndDate.toISOString(),
     },
   });
+
+  await sendImmediateNotification(
+    "Medication added",
+    `${data.name} was added with reminders at ${approxTimes.join(", ")}`,
+    { type: "medication_action" },
+  );
 }
 
 /**
@@ -721,6 +728,12 @@ export async function confirmMedicationTaking(
       await checkAndFinishReminder(resolvedReminderId);
     }
 
+    await sendImmediateNotification(
+      "Medication taken",
+      `${medItem.name} was marked as taken`,
+      { type: "medication_action" },
+    );
+
     return { logId: resultLogId };
   } else {
     // It's an existing Log - update directly
@@ -733,6 +746,12 @@ export async function confirmMedicationTaking(
         taken_at: new Date().toISOString(),
       },
     });
+
+    await sendImmediateNotification(
+      "Medication taken",
+      `${medItem.name} was marked as taken`,
+      { type: "medication_action" },
+    );
 
     return { logId: undefined };
   }
@@ -766,4 +785,10 @@ export async function markMedicationProcessed(logId: string): Promise<void> {
       taken_at: new Date().toISOString(),
     },
   });
+
+  await sendImmediateNotification(
+    "Medication updated",
+    "A medication entry was marked as processed",
+    { type: "medication_action" },
+  );
 }

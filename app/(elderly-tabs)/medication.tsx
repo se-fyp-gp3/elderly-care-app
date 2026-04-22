@@ -24,6 +24,7 @@ import {
     sendImmediateNotification,
 } from "@/lib/notifications";
 import { translateUnit } from "@/lib/schedule";
+import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
 import {
     Caregiver,
     ElderlyMedicationReminder,
@@ -113,6 +114,11 @@ export default function ElderlyMedicationScreen() {
   const [modalVisible, setModalVisible] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [caregiverMenuVisible, setCaregiverMenuVisible] = React.useState(false);
+  const [selectedMedicationDetails, setSelectedMedicationDetails] = React.useState<{
+    title: string;
+    subtitle?: string;
+    fields: MedicationDetailField[];
+  } | null>(null);
 
   // --- AI Scan State ---
   const [isScanning, setIsScanning] = React.useState(false);
@@ -163,6 +169,72 @@ export default function ElderlyMedicationScreen() {
       console.error("Error fetching medication data:", err);
     }
   }, [user]);
+
+  const formatDateValue = React.useCallback((value?: string | null) => {
+    if (!value) return null;
+    try {
+      return new Date(value).toLocaleString();
+    } catch {
+      return value;
+    }
+  }, []);
+
+  const openReminderDetails = React.useCallback(
+    (
+      reminder: ElderlyMedicationReminder,
+      statusLabel: string,
+      extraFields: MedicationDetailField[] = [],
+    ) => {
+      const meds = Array.isArray(reminder.elderly_medication?.medication)
+        ? reminder.elderly_medication.medication
+        : [];
+      const medName = meds[0]?.name || "Medication";
+      const unitLabel = meds[0]?.unit ? translateUnit(meds[0].unit) : "dose";
+      const dosageLabel = `${reminder.elderly_medication?.dosage || 1} ${unitLabel}`;
+
+      setSelectedMedicationDetails({
+        title: medName,
+        subtitle: statusLabel,
+        fields: [
+          { label: "Dose", value: dosageLabel },
+          {
+            label: "Reminder times",
+            value: reminder.reminder_times?.join(", "),
+          },
+          {
+            label: "Take after meal",
+            value: reminder.after_meal ? "Yes" : "No",
+          },
+          { label: "Start date", value: formatDateValue(reminder.start_date) },
+          {
+            label: "Duration",
+            value: reminder.duration_days ? `${reminder.duration_days} days` : null,
+          },
+          { label: "End date", value: formatDateValue(reminder.end_date) },
+          ...extraFields,
+        ],
+      });
+    },
+    [formatDateValue],
+  );
+
+  const openTodoDetails = React.useCallback(
+    (item: TodoItem) => {
+      const statusLabel =
+        item.status === "taken"
+          ? t("common.taken")
+          : item.status === "missing"
+            ? t("common.missed")
+            : t("common.pending");
+
+      openReminderDetails(item.reminder, `${statusLabel} · ${item.time}`, [
+        { label: "Reminder time", value: item.time },
+        { label: "Scheduled at", value: formatDateValue(item.scheduledAt) },
+        { label: "Dose", value: item.dosage },
+      ]);
+    },
+    [formatDateValue, openReminderDetails, t],
+  );
 
   React.useEffect(() => {
     fetchData();
@@ -875,7 +947,16 @@ export default function ElderlyMedicationScreen() {
                     <View key={`${item.reminder.$id}-${item.time}-${index}`}>
                       {index > 0 && <Divider style={{ marginVertical: 8 }} />}
                       <View style={styles.groupItemRow}>
-                        <View
+                        <TouchableOpacity
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            flex: 1,
+                          }}
+                          activeOpacity={0.7}
+                          onPress={() => openTodoDetails(item)}
+                        >
+                          <View
                           style={[
                             styles.groupItemIcon,
                             {
@@ -892,42 +973,43 @@ export default function ElderlyMedicationScreen() {
                                     : "#EDE7F6",
                             },
                           ]}
-                        >
-                          <MaterialCommunityIcons
-                            name={
-                              isTaken
-                                ? "check-circle"
-                                : isMissing
-                                  ? "close-circle"
-                                  : "pill"
-                            }
-                            size={22}
-                            color={
-                              isTaken
-                                ? "#4CAF50"
-                                : isMissing
-                                  ? "#E53935"
-                                  : "#5E35B1"
-                            }
-                          />
-                        </View>
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text
-                            variant="titleSmall"
-                            style={{ fontWeight: "700" }}
                           >
-                            {item.medicationName}
-                          </Text>
-                          <Text
-                            variant="bodySmall"
-                            style={{
-                              color: theme.colors.onSurfaceVariant,
-                              marginTop: 1,
-                            }}
-                          >
-                            {item.dosage}
-                          </Text>
-                        </View>
+                            <MaterialCommunityIcons
+                              name={
+                                isTaken
+                                  ? "check-circle"
+                                  : isMissing
+                                    ? "close-circle"
+                                    : "pill"
+                              }
+                              size={22}
+                              color={
+                                isTaken
+                                  ? "#4CAF50"
+                                  : isMissing
+                                    ? "#E53935"
+                                    : "#5E35B1"
+                              }
+                            />
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text
+                              variant="titleSmall"
+                              style={{ fontWeight: "700" }}
+                            >
+                              {item.medicationName}
+                            </Text>
+                            <Text
+                              variant="bodySmall"
+                              style={{
+                                color: theme.colors.onSurfaceVariant,
+                                marginTop: 1,
+                              }}
+                            >
+                              {item.dosage}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
                         {/* Per-item action button */}
                         {isTaken ? (
                           <TouchableOpacity
@@ -1089,11 +1171,13 @@ export default function ElderlyMedicationScreen() {
 
               return (
                 <Swipeable key={r.$id} renderRightActions={renderRightActions}>
-                  <View
+                  <TouchableOpacity
                     style={[
                       styles.prescriptionItem,
                       { borderBottomColor: theme.colors.outlineVariant },
                     ]}
+                    activeOpacity={0.7}
+                    onPress={() => openReminderDetails(r, t("common.active"))}
                   >
                     <View
                       style={[
@@ -1134,7 +1218,7 @@ export default function ElderlyMedicationScreen() {
                       color={theme.colors.onSurfaceVariant}
                       style={{ marginRight: 4 }}
                     />
-                  </View>
+                  </TouchableOpacity>
                 </Swipeable>
               );
             })
@@ -1250,12 +1334,14 @@ export default function ElderlyMedicationScreen() {
                     : "—";
 
                   return (
-                    <View
+                    <TouchableOpacity
                       key={r.$id}
                       style={[
                         styles.finishedItem,
                         { borderBottomColor: theme.colors.outlineVariant },
                       ]}
+                      activeOpacity={0.7}
+                      onPress={() => openReminderDetails(r, t("common.completed"))}
                     >
                       <View
                         style={[
@@ -1324,7 +1410,7 @@ export default function ElderlyMedicationScreen() {
                           {t("common.completed")}
                         </Text>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </Card>
@@ -1392,6 +1478,14 @@ export default function ElderlyMedicationScreen() {
       />
 
       <Portal>
+        <MedicationDetailsModal
+          visible={!!selectedMedicationDetails}
+          title={selectedMedicationDetails?.title || ""}
+          subtitle={selectedMedicationDetails?.subtitle}
+          fields={selectedMedicationDetails?.fields || []}
+          onDismiss={() => setSelectedMedicationDetails(null)}
+        />
+
         <Modal
           visible={modalVisible}
           onDismiss={() => setModalVisible(false)}
