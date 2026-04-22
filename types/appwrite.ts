@@ -232,3 +232,14 @@ export type EmergencyAlert = Models.Row & {
     resolved_at: string | null;
     resolved_by: string | null;
 }
+
+export type ExpoPushToken = Models.Row & {
+    profile_id: string;
+    user_id: string;
+    role: string;
+    expo_push_token: string;
+    platform: string;
+    active: boolean;
+    last_seen_at: string | null;
+    updated_at: string | null;
+}

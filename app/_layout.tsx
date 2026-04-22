@@ -1,35 +1,44 @@
 import {
-    CAREGIVER_CONNECTIONS_TABLE_ID,
-    CAREGIVER_TABLE_ID,
-    DATABASE_ID,
-    DIRECT_MESSAGES_TABLE_ID,
-    ELDERLY_CONNECTIONS_TABLE_ID,
-    ELDERLY_TABLE_ID,
-    EMERGENCY_ALERTS_TABLE_ID,
-    GROUP_MEMBERS_TABLE_ID,
-    GROUP_MESSAGES_TABLE_ID,
-    GROUPS_TABLE_ID,
-    MOMENTS_TABLE_ID,
-    safeSubscribe,
-    tablesDB,
+  CAREGIVER_CONNECTIONS_TABLE_ID,
+  CAREGIVER_TABLE_ID,
+  DATABASE_ID,
+  DIRECT_MESSAGES_TABLE_ID,
+  ELDERLY_CONNECTIONS_TABLE_ID,
+  ELDERLY_TABLE_ID,
+  EMERGENCY_ALERTS_TABLE_ID,
+  GROUP_MEMBERS_TABLE_ID,
+  GROUP_MESSAGES_TABLE_ID,
+  GROUPS_TABLE_ID,
+  MOMENTS_TABLE_ID,
+  safeSubscribe,
+  tablesDB,
 } from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
+import "@/lib/background-chat-notifications";
+import {
+  disableChatBackgroundNotifications,
+  enableChatBackgroundNotifications,
+  markDirectMessageNotificationSeen,
+  markGroupMessageNotificationSeen,
+} from "@/lib/background-chat-notifications";
 import "@/lib/background-step-sync";
 import { disableStepBackgroundSync } from "@/lib/background-step-sync";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
-    getCaregiverActivityNotificationContent,
-    isCaregiverActivityAlertType,
+  getCaregiverActivityNotificationContent,
+  isCaregiverActivityAlertType,
 } from "@/lib/caregiver-activity-alerts";
 import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
+import { upsertExpoPushToken } from "@/lib/expo-push-tokens";
 import { FontSizeProvider, useFontSize } from "@/lib/font-size-context";
 import { getGroupsForUser } from "@/lib/groups";
 import { UnreadBadgeProvider, useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
 import { LanguageProvider } from "@/lib/language-context";
 import {
-    registerForPushNotificationsAsync,
-    sendImmediateNotification,
+  getExpoPushTokenAsync,
+  registerForPushNotificationsAsync,
+  sendImmediateNotification,
 } from "@/lib/notifications";
 import { CaregiverConnection, ElderlyConnections, EmergencyAlert } from "@/types/appwrite";
 import { DirectMessage, Group, GroupMember, GroupMessage } from "@/types/messaging";
@@ -39,19 +48,20 @@ import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    AppState,
-    useColorScheme,
-    View,
+  ActivityIndicator,
+  AppState,
+  Platform,
+  useColorScheme,
+  View,
 } from "react-native";
 import { Query } from "react-native-appwrite";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
-    configureFonts,
-    MD3DarkTheme,
-    MD3LightTheme,
-    MD3Theme,
-    PaperProvider,
+  configureFonts,
+  MD3DarkTheme,
+  MD3LightTheme,
+  MD3Theme,
+  PaperProvider,
 } from "react-native-paper";
 import { enGB, registerTranslation } from "react-native-paper-dates";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -117,6 +127,9 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   const appState = useRef(AppState.currentState);
 
   useEffect(() => {
+    if (!user?.$id) {
+      disableChatBackgroundNotifications().catch(() => {});
+    }
     if (user?.$id && role === "elderly") return;
     disableStepBackgroundSync().catch(() => {});
   }, [role, user?.$id]);
@@ -221,6 +234,26 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
       if (!myProfileId) return;
 
+      try {
+        const hasPushPermission = await registerForPushNotificationsAsync();
+        if (hasPushPermission) {
+          const expoPushToken = await getExpoPushTokenAsync();
+          if (expoPushToken && (Platform.OS === "android" || Platform.OS === "ios")) {
+            await upsertExpoPushToken({
+              profileId: myProfileId,
+              userId: user.$id,
+              role,
+              expoPushToken,
+              platform: Platform.OS,
+            });
+          }
+        }
+      } catch (error) {
+        console.warn("[Notifications] Failed to register Expo push token", error);
+      }
+
+      enableChatBackgroundNotifications(myProfileId).catch(() => {});
+
       await refreshRealtimeContext();
 
       subscribe(
@@ -241,6 +274,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
               contactRole: payload.sender_role,
             }
           );
+          await markDirectMessageNotificationSeen(payload.$id);
         }
         },
       );
@@ -267,6 +301,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
             groupId: payload.group_id,
             groupName,
           });
+          await markGroupMessageNotificationSeen(payload.$id);
         },
       );
 

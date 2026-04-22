@@ -3,6 +3,8 @@
 // Supports: Hong Kong Cantonese (yue), Mandarin (zh), English (en)
 
 import * as FileSystem from "expo-file-system/legacy";
+import { ExecutionMethod } from "react-native-appwrite";
+import { functions, VOICE_CLONE_FUNCTION_ID } from "./appwrite";
 
 const DASHSCOPE_API_KEY =
   process.env.EXPO_PUBLIC_DASHSCOPE_API_KEY?.trim() || "";
@@ -130,10 +132,84 @@ export interface VoiceRecognitionResult {
   raw?: string;
 }
 
+type RecognitionAudioFormat = "wav" | "mp3";
+
 function assertConfigured() {
   if (!DASHSCOPE_API_KEY) {
     throw new Error("EXPO_PUBLIC_DASHSCOPE_API_KEY is not configured.");
   }
+}
+
+function inferRecognitionAudioFormat(
+  mimeType: string,
+): RecognitionAudioFormat | null {
+  const normalized = mimeType.trim().toLowerCase();
+  if (normalized.includes("wav")) {
+    return "wav";
+  }
+  if (normalized.includes("mp3") || normalized.includes("mpeg")) {
+    return "mp3";
+  }
+  return null;
+}
+
+async function normalizeAudioForRecognition(
+  audioBase64: string,
+  mimeType: string,
+): Promise<{ audioBase64: string; format: RecognitionAudioFormat }> {
+  const strippedAudio = audioBase64.replace(/^data:[^;]+;base64,/, "");
+  const supportedFormat = inferRecognitionAudioFormat(mimeType);
+
+  if (supportedFormat) {
+    return {
+      audioBase64: strippedAudio,
+      format: supportedFormat,
+    };
+  }
+
+  const normalizeStart = Date.now();
+  const execution = await functions.createExecution({
+    functionId: VOICE_CLONE_FUNCTION_ID,
+    body: JSON.stringify({
+      mode: "clone",
+      speakerName: "voice_command_input",
+      samplesBase64: [strippedAudio],
+    }),
+    method: ExecutionMethod.POST,
+  });
+
+  let payload: any;
+  try {
+    payload = JSON.parse(execution.responseBody);
+  } catch {
+    throw new Error(
+      `Voice normalization returned invalid JSON: ${execution.responseBody}`,
+    );
+  }
+
+  if (!payload?.success) {
+    throw new Error(payload?.error || "Voice normalization failed.");
+  }
+
+  const convertedAudioBase64 = Array.isArray(payload?.convertedSamplesBase64)
+    ? payload.convertedSamplesBase64[0]
+    : null;
+  if (!convertedAudioBase64) {
+    throw new Error("Voice normalization returned no converted audio.");
+  }
+
+  const normalizedFormat =
+    inferRecognitionAudioFormat(String(payload?.mimeType || "audio/wav")) ||
+    "wav";
+
+  console.log(
+    `[AI-TIMING] Voice normalization: ${Date.now() - normalizeStart}ms (${mimeType} -> ${normalizedFormat})`,
+  );
+
+  return {
+    audioBase64: convertedAudioBase64,
+    format: normalizedFormat,
+  };
 }
 
 export interface ConversationTurn {
@@ -159,9 +235,10 @@ export async function recognizeVoiceCommand(
   assertConfigured();
 
   const systemPrompt = SYSTEM_PROMPTS[language];
-
-  // Build the audio data URI
-  const audioDataUri = `data:${mimeType};base64,${audioBase64}`;
+  const normalizedAudio = await normalizeAudioForRecognition(
+    audioBase64,
+    mimeType,
+  );
 
   // Use DashScope multimodal API (compatible mode) for Qwen audio model
   const apiUrl = `${process.env.EXPO_PUBLIC_DASHSCOPE_API_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1"}/chat/completions`;
@@ -189,12 +266,8 @@ export async function recognizeVoiceCommand(
       {
         type: "input_audio",
         input_audio: {
-          data: audioDataUri,
-          format: mimeType.includes("wav")
-            ? "wav"
-            : mimeType.includes("mp3")
-              ? "mp3"
-              : "m4a",
+          data: normalizedAudio.audioBase64,
+          format: normalizedAudio.format,
         },
       },
       {

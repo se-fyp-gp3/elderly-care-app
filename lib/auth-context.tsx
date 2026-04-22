@@ -5,13 +5,15 @@ import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import {
-  ExecutionMethod,
-  ID,
-  Models,
-  OAuthProvider,
+    ExecutionMethod,
+    ID,
+    Models,
+    OAuthProvider,
 } from "react-native-appwrite";
 import { UserPreferences } from "../types/user";
 import { account, accountWeb, functions } from "./appwrite";
+import { deactivateExpoPushToken } from "./expo-push-tokens";
+import { getExpoPushTokenAsync } from "./notifications";
 import { checkProfileExists, hasTrialLabel } from "./user";
 export class LoginError extends Error {
   constructor(message: string) {
@@ -291,6 +293,15 @@ export default function AuthProvider({
   };
 
   const signOut = async () => {
+    if (Platform.OS !== "web") {
+      try {
+        const expoPushToken = await getExpoPushTokenAsync();
+        await deactivateExpoPushToken(expoPushToken);
+      } catch (error) {
+        console.warn("Failed to deactivate Expo push token on sign out", error);
+      }
+    }
+
     try {
       if (Platform.OS === "web") {
         await accountWeb.deleteSession({ sessionId: "current" });

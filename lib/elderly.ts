@@ -395,8 +395,17 @@ export function buildMedicationSummary(
   return `Here is what you need to take today:\n${items.join("\n")}`;
 }
 
-export function buildScheduleSummary(schedules: Schedule[]): string {
+export function buildScheduleSummary(
+  schedules: Schedule[],
+  language: "yue" | "zh" | "en" = "en",
+): string {
   if (schedules.length === 0) {
+    if (language === "yue") {
+      return "我搵唔到你今日有行程，你今日似乎冇特別安排。";
+    }
+    if (language === "zh") {
+      return "我没有找到你今天的日程，今天看起来没有特别安排。";
+    }
     return "I couldn't find any schedules for today. Your schedule looks clear.";
   }
 
@@ -407,15 +416,36 @@ export function buildScheduleSummary(schedules: Schedule[]): string {
   });
 
   if (upcoming.length === 0) {
+    if (language === "yue") {
+      return "你今日冇未來行程。";
+    }
+    if (language === "zh") {
+      return "你今天没有接下来的日程。";
+    }
     return "You have no upcoming events for today.";
   }
 
   const items = upcoming.slice(0, 5).map((schedule) => {
-    const title = schedule.title || "Appointment";
-    const time = schedule.time ? ` at ${formatTime(schedule.time)}` : "";
-    return `• ${title}${time}`;
+    const title = schedule.title || (language === "zh" ? "行程" : language === "yue" ? "行程" : "Appointment");
+    const timeText = schedule.time ? formatTime(schedule.time) : "";
+    if (!timeText) {
+      return `• ${title}`;
+    }
+    if (language === "yue") {
+      return `• ${title}，時間 ${timeText}`;
+    }
+    if (language === "zh") {
+      return `• ${title}，时间 ${timeText}`;
+    }
+    return `• ${title} at ${timeText}`;
   });
 
+  if (language === "yue") {
+    return `你今日嘅行程如下：\n${items.join("\n")}`;
+  }
+  if (language === "zh") {
+    return `你今天的日程如下：\n${items.join("\n")}`;
+  }
   return `Here is your schedule for today:\n${items.join("\n")}`;
 }
 

@@ -100,6 +100,8 @@ interface AIAPIResponse {
   };
 }
 
+type ReplyLanguage = "yue" | "zh" | "en";
+
 export default function ElderlyChat() {
   const theme = useTheme();
   const colorScheme = useColorScheme();
@@ -125,6 +127,9 @@ export default function ElderlyChat() {
   const flatListRef = useRef<FlatList>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const aiVoicePlayerRef = useRef<AudioPlayer | null>(null);
+  const aiVoicePlaybackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const aiVoiceEnabled = preferences.aiVoiceEnabled === true;
   const voiceReplyLang = (
@@ -132,7 +137,7 @@ export default function ElderlyChat() {
       ? preferences.voiceReplyLang
       : "cantonese"
   ) as string;
-  const ttsReplyLang =
+  const ttsReplyLang: ReplyLanguage =
     voiceReplyLang === "cantonese"
       ? "yue"
       : voiceReplyLang === "mandarin"
@@ -144,6 +149,10 @@ export default function ElderlyChat() {
   );
 
   const stopAiVoicePlayback = useCallback(() => {
+    if (aiVoicePlaybackTimeoutRef.current) {
+      clearTimeout(aiVoicePlaybackTimeoutRef.current);
+      aiVoicePlaybackTimeoutRef.current = null;
+    }
     if (aiVoicePlayerRef.current) {
       try {
         aiVoicePlayerRef.current.pause();
@@ -197,16 +206,41 @@ export default function ElderlyChat() {
         await setAudioModeAsync({ playsInSilentMode: true });
         const player = createAudioPlayer(audioSourceUri);
         aiVoicePlayerRef.current = player;
+
+        const cleanupPlayback = () => {
+          if (aiVoicePlaybackTimeoutRef.current) {
+            clearTimeout(aiVoicePlaybackTimeoutRef.current);
+            aiVoicePlaybackTimeoutRef.current = null;
+          }
+          setIsVoiceSpeaking(false);
+          player.remove();
+          if (aiVoicePlayerRef.current === player) {
+            aiVoicePlayerRef.current = null;
+          }
+        };
+
         player.addListener("playbackStatusUpdate", (status) => {
-          if (status.didJustFinish) {
-            setIsVoiceSpeaking(false);
-            player.remove();
-            if (aiVoicePlayerRef.current === player) {
-              aiVoicePlayerRef.current = null;
-            }
+          if (
+            status.didJustFinish ||
+            (status.isLoaded &&
+              !status.playing &&
+              status.currentTime > 0 &&
+              status.duration > 0 &&
+              status.currentTime >= status.duration - 0.2)
+          ) {
+            cleanupPlayback();
+            return;
+          }
+
+          if (!aiVoicePlaybackTimeoutRef.current && status.duration > 0) {
+            aiVoicePlaybackTimeoutRef.current = setTimeout(
+              cleanupPlayback,
+              Math.ceil(status.duration * 1000) + 1500,
+            );
           }
         });
         player.play();
+        aiVoicePlaybackTimeoutRef.current = setTimeout(cleanupPlayback, 12000);
         setIsVoiceSpeaking(true);
       } catch (error) {
         console.warn("AI voice playback failed:", error);
@@ -352,7 +386,7 @@ export default function ElderlyChat() {
     })();
   }, []);
 
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const quickSuggestions = useMemo(
     () => [
@@ -364,34 +398,87 @@ export default function ElderlyChat() {
     [t],
   );
 
-  const tryHandleLocalDataRequest = async (userMessage: string) => {
-    const lower = userMessage.toLowerCase();
+  const resolveUiReplyLanguage = useCallback((): ReplyLanguage => {
+    const resolvedLanguage = i18n.resolvedLanguage || i18n.language;
+    if (resolvedLanguage === "zh-Hant") {
+      return "yue";
+    }
+    if (resolvedLanguage === "zh") {
+      return "zh";
+    }
+    return "en";
+  }, [i18n.language, i18n.resolvedLanguage]);
 
-    if (
-      lower.includes("medicine") ||
-      lower.includes("medication") ||
-      lower.includes("pill")
-    ) {
-      if (!user?.$id) return "I can't access your medication data right now.";
-      const lang =
-        voiceReplyLang === "cantonese"
-          ? "yue"
-          : voiceReplyLang === "mandarin"
-            ? "zh"
-            : "en";
+  const inferMessageReplyLanguage = useCallback(
+    (message: string): ReplyLanguage => {
+      const trimmed = message.trim();
+      if (!trimmed) {
+        return resolveUiReplyLanguage();
+      }
+
+      const hasCjk = /[\u3400-\u9FFF]/.test(trimmed);
+      const hasLatin = /[A-Za-z]/.test(trimmed);
+
+      if (!hasCjk) {
+        return hasLatin ? "en" : resolveUiReplyLanguage();
+      }
+
+      if (/(咩|啲|喺|嘅|咗|唔|冇|而家|點樣|邊個|乜|噉|嚟|呀|喇|咁|幫我|可唔可以)/.test(trimmed)) {
+        return "yue";
+      }
+
+      if (/(吗|呢|吧|这|那个|已经|还有|今天|现在|什么|請問)/.test(trimmed)) {
+        return "zh";
+      }
+
+      return resolveUiReplyLanguage();
+    },
+    [resolveUiReplyLanguage],
+  );
+
+  const getPreferredTextReplyLanguage = useCallback(
+    (message: string): ReplyLanguage => {
+      if (aiVoiceEnabled) {
+        return ttsReplyLang;
+      }
+      return inferMessageReplyLanguage(message);
+    },
+    [aiVoiceEnabled, inferMessageReplyLanguage, ttsReplyLang],
+  );
+
+  const tryHandleLocalDataRequest = async (userMessage: string) => {
+    const normalizedMessage = userMessage.replace(/\[[^\]]+\]/g, " ").trim();
+    const lower = normalizedMessage.toLowerCase();
+    const replyLanguage = getPreferredTextReplyLanguage(normalizedMessage);
+    const isMedicationRequest =
+      /(medicine|medication|pill|drug|today.*med|what.*med|take.*med|食咩藥|食什么药|吃什麼藥|吃什么药|今日.*藥|今日.*药|今天.*藥|今天.*药|有咩藥未食|有什么药没吃|仲有咩藥未食|還有什麼藥沒吃|服藥|服药|藥單|药单)/i.test(
+        normalizedMessage,
+      );
+    const isScheduleRequest =
+      /(schedule|appointment|event|calendar|today.*schedule|行程|日程|時間表|时间表|今日.*(行程|日程|安排|約|约)|今天.*(行程|日程|安排|約|约)|有咩行程|有什么安排|覆診|复诊)/i.test(
+        normalizedMessage,
+      );
+
+    if (isMedicationRequest) {
+      if (!user?.$id) {
+        if (replyLanguage === "yue") {
+          return "我而家攞唔到你今日嘅食藥資料。";
+        }
+        if (replyLanguage === "zh") {
+          return "我现在拿不到你今天的用药资料。";
+        }
+        return "I can't access your medication data right now.";
+      }
+
       return await getFormattedTodayMedicationSummary(
         user.$id,
-        lang as "yue" | "zh" | "en",
+        replyLanguage,
       );
     }
 
-    if (
-      lower.includes("schedule") ||
-      lower.includes("appointment") ||
-      lower.includes("event")
-    ) {
+    if (isScheduleRequest) {
       const schedules = await fetchElderlySchedulesForUser(user?.$id);
-      return buildScheduleSummary(schedules);
+      return buildScheduleSummary(schedules, replyLanguage);
     }
 
     return null;
@@ -405,10 +492,11 @@ export default function ElderlyChat() {
       content: msg.text,
     }));
 
+    const textReplyLanguage = getPreferredTextReplyLanguage(latestUserMessage);
     const langInstruction =
-      voiceReplyLang === "cantonese"
+      textReplyLanguage === "yue"
         ? "You MUST reply in 香港粵語 (Hong Kong Cantonese written Chinese). Use informal Cantonese written style."
-        : voiceReplyLang === "mandarin"
+        : textReplyLanguage === "zh"
           ? "You MUST reply in 普通話 (Mandarin Chinese, simplified or traditional)."
           : "You MUST reply in English.";
 
@@ -887,7 +975,9 @@ export default function ElderlyChat() {
         messageForAPI = userMessage.text;
       }
 
-      const localResponse = await tryHandleLocalDataRequest(messageForAPI);
+      const localResponse = selectedImage
+        ? null
+        : await tryHandleLocalDataRequest(userMessage.text);
 
       // Selective search: only search when toggle is on AND query looks like it needs web info
       let searchContext = "";

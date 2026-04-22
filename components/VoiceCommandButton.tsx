@@ -65,6 +65,16 @@ const MESSAGES_FOR_CANCEL: Record<string, string> = {
   en: "OK, cancelled.",
 };
 
+function inferAudioMimeTypeFromUri(uri: string): string {
+  const lowerUri = uri.toLowerCase();
+  if (lowerUri.endsWith(".wav")) return "audio/wav";
+  if (lowerUri.endsWith(".mp3")) return "audio/mpeg";
+  if (lowerUri.endsWith(".webm")) return "audio/webm";
+  if (lowerUri.endsWith(".3gp")) return "audio/3gpp";
+  if (lowerUri.endsWith(".caf")) return "audio/x-caf";
+  return "audio/m4a";
+}
+
 export default function VoiceCommandButton() {
   const theme = useTheme();
   const { user } = useAuth();
@@ -166,6 +176,7 @@ export default function VoiceCommandButton() {
       if (!uri) {
         throw new Error("No recording URI");
       }
+      const recordingMimeType = inferAudioMimeTypeFromUri(uri);
 
       // Read audio as base64
       const audioBase64 = await readAudioAsBase64(uri);
@@ -177,7 +188,7 @@ export default function VoiceCommandButton() {
       const recognitionResult = await recognizeVoiceCommand(
         audioBase64,
         language,
-        "audio/m4a",
+        recordingMimeType,
         conversationHistory.current,
       );
 
@@ -317,14 +328,40 @@ export default function VoiceCommandButton() {
           playerRef.current = player;
 
           await new Promise<void>((resolve) => {
+            let settled = false;
+            let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+            const finishPlayback = () => {
+              if (settled) return;
+              settled = true;
+              if (fallbackTimer) {
+                clearTimeout(fallbackTimer);
+              }
+              resolve();
+            };
+
             player.addListener("playbackStatusUpdate", (status: any) => {
-              if (status.didJustFinish) {
-                resolve();
+              if (
+                status.didJustFinish ||
+                (status.isLoaded &&
+                  !status.playing &&
+                  status.currentTime > 0 &&
+                  status.duration > 0 &&
+                  status.currentTime >= status.duration - 0.2)
+              ) {
+                finishPlayback();
+                return;
+              }
+
+              if (!fallbackTimer && status.duration > 0) {
+                fallbackTimer = setTimeout(
+                  finishPlayback,
+                  Math.ceil(status.duration * 1000) + 1500,
+                );
               }
             });
             player.play();
-            // Timeout fallback
-            setTimeout(resolve, 15000);
+            fallbackTimer = setTimeout(finishPlayback, 12000);
           });
 
           // Clean up
