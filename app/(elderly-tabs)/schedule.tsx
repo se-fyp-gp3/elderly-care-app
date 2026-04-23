@@ -1,9 +1,9 @@
 import { useAuth } from "@/lib/auth-context";
-import { getDateLocale } from "@/lib/i18n";
 import {
     fetchElderlySchedulesForUser,
     getElderlyByUserId,
 } from "@/lib/elderly";
+import { getDateLocale } from "@/lib/i18n";
 import {
     createScheduleTask,
     fetchScheduleCategories,

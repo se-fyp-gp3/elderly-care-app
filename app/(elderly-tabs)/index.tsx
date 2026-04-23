@@ -2,12 +2,12 @@ import SimplifiedHomeView from "@/components/SimplifiedHomeView";
 import VoiceCommandButton from "@/components/VoiceCommandButton";
 import { useAuth } from "@/lib/auth-context";
 import { Contact, getContactsForElderly } from "@/lib/contacts";
-import { getDateLocale } from "@/lib/i18n";
 import {
     fetchElderlySchedulesForUser,
     getElderlyByUserId,
 } from "@/lib/elderly";
 import { useStepSync } from "@/lib/hooks/useStepSync";
+import { getDateLocale } from "@/lib/i18n";
 import {
     checkAndMarkSkippedMedications,
     fetchActiveMedicationReminders,
