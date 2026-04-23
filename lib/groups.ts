@@ -8,6 +8,7 @@ import {
     storage,
     tablesDB,
 } from "./appwrite";
+import { triggerProfilePush } from "./chat-push";
 import { sendGroupMessage } from "./group-messaging";
 
 /**
@@ -69,6 +70,21 @@ export async function createGroup(input: {
       }),
     ),
   );
+
+  if (input.members.length > 0) {
+    triggerProfilePush({
+      mode: "profiles",
+      recipientProfileIds: input.members.map((member) => member.id),
+      title: "Group invitation",
+      body: `${input.creatorName} invited you to join ${input.name}`,
+      data: {
+        type: "group_invitation",
+        groupId: group.$id,
+        groupName: input.name,
+        actorName: input.creatorName,
+      },
+    });
+  }
 
   // Send system message announcing group creation
   await sendGroupMessage({

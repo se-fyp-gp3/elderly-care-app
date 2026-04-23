@@ -52,6 +52,7 @@ function GalleryVideoPage({
 
   const player = useVideoPlayer(uri, (p: VideoPlayer) => {
     p.loop = false;
+    p.keepScreenOnWhilePlaying = false;
   });
 
   useEffect(() => {

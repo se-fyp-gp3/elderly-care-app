@@ -203,6 +203,14 @@ export default function ElderlySchedule() {
     }
   };
 
+    const getCategoryIcon = (category: ScheduleCategory) => {
+      return (category.svg_icon || getTypeIcon(category.name?.toLowerCase())) as any;
+    };
+
+    const getCategoryColor = (category: ScheduleCategory) => {
+      return category.color_hex || theme.colors.secondary;
+    };
+
   const formatTime = (timeStr: string | null | undefined): string => {
     if (!timeStr) return "";
     try {
@@ -267,6 +275,7 @@ export default function ElderlySchedule() {
         categoryId: newTask.typeId || undefined,
         remindMinutes,
         notifyConnectedCaregivers: true,
+        notificationAudience: "caregivers",
       });
 
       // Schedule a local notification at the remind datetime
@@ -1082,7 +1091,7 @@ export default function ElderlySchedule() {
                 </Button>
               </ScrollView>
           ) : (
-            <View style={{ flex: 1 }}>
+            <View style={styles.typeSelectionContent}>
               <View
                 style={{
                   flexDirection: "row",
@@ -1100,7 +1109,11 @@ export default function ElderlySchedule() {
                   Select Type
                 </Text>
               </View>
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={styles.typeSelectionList}
+                contentContainerStyle={{ paddingBottom: 8 }}
+                showsVerticalScrollIndicator={false}
+              >
                 {categories.length > 0 ? (
                   categories.map((cat) => (
                     <TouchableOpacity
@@ -1124,9 +1137,9 @@ export default function ElderlySchedule() {
                       }}
                     >
                       <MaterialCommunityIcons
-                        name="calendar-check"
+                        name={getCategoryIcon(cat)}
                         size={24}
-                        color={theme.colors.secondary}
+                        color={getCategoryColor(cat)}
                         style={{ marginRight: 16 }}
                       />
                       <Text variant="titleMedium">
@@ -1349,7 +1362,10 @@ const styles = StyleSheet.create({
     margin: 20,
     padding: 20,
     borderRadius: 16,
-    maxHeight: "100%",
+    width: "90%",
+    maxHeight: "85%",
+    minHeight: 320,
+    alignSelf: "center",
   },
   input: {
     marginBottom: 10,
@@ -1362,6 +1378,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#ccc",
     borderRadius: 12,
+  },
+  typeSelectionContent: {
+    minHeight: 320,
+  },
+  typeSelectionList: {
+    flexGrow: 0,
   },
   pickerOverlay: {
     flex: 1,

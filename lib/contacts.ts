@@ -16,6 +16,7 @@ import {
     ELDERLY_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+  import { triggerProfilePush } from "./chat-push";
 
 export interface Contact {
   id: string;
@@ -393,6 +394,23 @@ export async function addElderlyConnection(
         created_at: new Date().toISOString(),
       },
     });
+
+    if (elderlyId1 !== elderlyId2) {
+      const senderName = await getContactNameByProfileId(elderlyId1);
+      triggerProfilePush({
+        mode: "profiles",
+        recipientProfileIds: [elderlyId2],
+        title: "New friend request",
+        body: `${senderName} sent you a friend request`,
+        data: {
+          type: "friend_request",
+          requestAction: "requested",
+          requestKind: "friend",
+          actorName: senderName,
+        },
+      });
+    }
+
     return true;
   } catch (error) {
     if (isMissingElderlyConnectionsTableError(error)) {
@@ -410,12 +428,34 @@ export async function acceptElderlyConnection(
   connectionDocId: string,
 ): Promise<void> {
   try {
+    const connection = await tablesDB.getRow<ElderlyConnections>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_CONNECTIONS_TABLE_ID,
+      rowId: connectionDocId,
+    });
+
     await tablesDB.updateRow({
       databaseId: DATABASE_ID,
       tableId: ELDERLY_CONNECTIONS_TABLE_ID,
       rowId: connectionDocId,
       data: { status: "active" },
     });
+
+    if (connection.elderly_id_1 !== connection.elderly_id_2) {
+      const receiverName = await getContactNameByProfileId(connection.elderly_id_2);
+      triggerProfilePush({
+        mode: "profiles",
+        recipientProfileIds: [connection.elderly_id_1],
+        title: "Friend request accepted",
+        body: `${receiverName} accepted your friend request`,
+        data: {
+          type: "friend_request",
+          requestAction: "accepted",
+          requestKind: "friend",
+          actorName: receiverName,
+        },
+      });
+    }
   } catch (error) {
     if (isMissingElderlyConnectionsTableError(error)) {
       return;
@@ -617,6 +657,23 @@ export async function addCaregiverConnection(
         created_at: new Date().toISOString(),
       },
     });
+
+    if (caregiverId1 !== caregiverId2) {
+      const senderName = await getContactNameByProfileId(caregiverId1);
+      triggerProfilePush({
+        mode: "profiles",
+        recipientProfileIds: [caregiverId2],
+        title: "New friend request",
+        body: `${senderName} sent you a chat request`,
+        data: {
+          type: "friend_request",
+          requestAction: "requested",
+          requestKind: "chat",
+          actorName: senderName,
+        },
+      });
+    }
+
     return true;
   } catch (error) {
     console.error("Error adding caregiver connection:", error);
@@ -704,12 +761,34 @@ export async function getPendingCaregiverConnections(
 export async function acceptCaregiverConnection(
   connectionDocId: string,
 ): Promise<void> {
+  const connection = await tablesDB.getRow<CaregiverConnection>({
+    databaseId: DATABASE_ID,
+    tableId: CAREGIVER_CONNECTIONS_TABLE_ID,
+    rowId: connectionDocId,
+  });
+
   await tablesDB.updateRow({
     databaseId: DATABASE_ID,
     tableId: CAREGIVER_CONNECTIONS_TABLE_ID,
     rowId: connectionDocId,
     data: { status: "active" },
   });
+
+  if (connection.caregiver_id_1 !== connection.caregiver_id_2) {
+    const receiverName = await getContactNameByProfileId(connection.caregiver_id_2);
+    triggerProfilePush({
+      mode: "profiles",
+      recipientProfileIds: [connection.caregiver_id_1],
+      title: "Friend request accepted",
+      body: `${receiverName} accepted your chat request`,
+      data: {
+        type: "friend_request",
+        requestAction: "accepted",
+        requestKind: "chat",
+        actorName: receiverName,
+      },
+    });
+  }
 }
 
 /**
@@ -813,5 +892,30 @@ export async function getCaregiverContacts(
   } catch (error) {
     console.error("Error fetching caregiver contacts:", error);
     return [];
+  }
+}
+
+async function getContactNameByProfileId(profileId: string): Promise<string> {
+  try {
+    const [caregiverResponse, elderlyResponse] = await Promise.all([
+      tablesDB.listRows<Caregiver>({
+        databaseId: DATABASE_ID,
+        tableId: CAREGIVER_TABLE_ID,
+        queries: [Query.equal("$id", [profileId]), Query.limit(1)],
+      }),
+      tablesDB.listRows<Elderly>({
+        databaseId: DATABASE_ID,
+        tableId: ELDERLY_TABLE_ID,
+        queries: [Query.equal("$id", [profileId]), Query.limit(1)],
+      }),
+    ]);
+
+    return (
+      caregiverResponse.rows[0]?.name ||
+      elderlyResponse.rows[0]?.name ||
+      "Someone"
+    );
+  } catch {
+    return "Someone";
   }
 }

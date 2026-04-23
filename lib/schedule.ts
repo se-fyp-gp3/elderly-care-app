@@ -17,8 +17,8 @@ import {
     SCHEDULE_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+  import { triggerProfilePush } from "./chat-push";
 import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
-import { sendImmediateNotification } from "./notifications";
 
 /** Translate a medication unit string (e.g. "tablet" → "片") using i18n. */
 export function translateUnit(unit: string): string {
@@ -674,6 +674,7 @@ export async function createScheduleTask(params: {
   categoryId?: string;
   remindMinutes?: number;
   notifyConnectedCaregivers?: boolean;
+  notificationAudience?: "caregivers" | "elderly" | "none";
 }): Promise<void> {
   const {
     title,
@@ -684,7 +685,11 @@ export async function createScheduleTask(params: {
     categoryId,
     remindMinutes,
     notifyConnectedCaregivers,
+    notificationAudience,
   } = params;
+  const resolvedAudience =
+    notificationAudience ?? (notifyConnectedCaregivers ? "caregivers" : "none");
+
   const data: Record<string, any> = {
     title,
     description,
@@ -696,6 +701,35 @@ export async function createScheduleTask(params: {
   if (categoryId) data.scheduleCategory = categoryId;
   if (remindMinutes != null) data.remind_minutes = remindMinutes;
 
+  const notifyAudience = async () => {
+    if (resolvedAudience === "caregivers") {
+      await emitCaregiverActivityAlerts({
+        elderlyId,
+        type: "cg_sched_add",
+        description: `${title} at ${datetime.toLocaleString()}`,
+        scheduleTitle: title,
+        scheduledAt: datetime.toISOString(),
+      });
+      return;
+    }
+
+    if (resolvedAudience === "elderly") {
+      triggerProfilePush({
+        mode: "profiles",
+        recipientProfileIds: [elderlyId],
+        title: "Schedule added",
+        body: `${title} at ${datetime.toLocaleString()}`,
+        data: {
+          type: "schedule_action",
+          screen: "schedule",
+          action: "added",
+          scheduleTitle: title,
+          scheduledAt: datetime.toISOString(),
+        },
+      });
+    }
+  };
+
   try {
     await tablesDB.createRow({
       databaseId: DATABASE_ID,
@@ -703,19 +737,7 @@ export async function createScheduleTask(params: {
       rowId: ID.unique(),
       data,
     });
-    if (notifyConnectedCaregivers) {
-      await emitCaregiverActivityAlerts({
-        elderlyId,
-        type: "cg_sched_add",
-        description: `${title} at ${datetime.toLocaleString()}`,
-      });
-    } else {
-      await sendImmediateNotification(
-        "Schedule added",
-        `${title} at ${datetime.toLocaleString()}`,
-        { type: "schedule_action" },
-      );
-    }
+    await notifyAudience();
   } catch (error: any) {
     const errorMessage = error?.message || "";
     const hasSchemaMismatch =
@@ -736,18 +758,6 @@ export async function createScheduleTask(params: {
       rowId: ID.unique(),
       data: fallbackData,
     });
-    if (notifyConnectedCaregivers) {
-      await emitCaregiverActivityAlerts({
-        elderlyId,
-        type: "cg_sched_add",
-        description: `${title} at ${datetime.toLocaleString()}`,
-      });
-    } else {
-      await sendImmediateNotification(
-        "Schedule added",
-        `${title} at ${datetime.toLocaleString()}`,
-        { type: "schedule_action" },
-      );
-    }
+    await notifyAudience();
   }
 }

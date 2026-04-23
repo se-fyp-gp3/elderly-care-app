@@ -13,6 +13,8 @@ import {
 import { UserPreferences } from "../types/user";
 import { account, accountWeb, functions } from "./appwrite";
 import { deactivateExpoPushToken } from "./expo-push-tokens";
+import { loadPersistedLanguage } from "./i18n";
+import { syncUserInterfaceLanguagePreference } from "./interface-language-preference";
 import { getExpoPushTokenAsync } from "./notifications";
 import { checkProfileExists, hasTrialLabel } from "./user";
 export class LoginError extends Error {
@@ -111,6 +113,16 @@ export default function AuthProvider({
     }
   };
 
+  const syncInterfaceLanguageForSession = async (
+    sessionPrefs?: Models.Preferences,
+  ) => {
+    const language = await loadPersistedLanguage();
+    await syncUserInterfaceLanguagePreference(
+      language,
+      (sessionPrefs as UserPreferences | undefined) ?? null,
+    );
+  };
+
   useEffect(() => {
     getUser();
   }, []);
@@ -139,6 +151,7 @@ export default function AuthProvider({
       if (session.prefs) {
         setPreferences(session.prefs as UserPreferences);
       }
+      void syncInterfaceLanguageForSession(session.prefs);
     } catch {
       // Session expired or not found — check if elderly user needs re-auth
       if (Platform.OS !== "web") {
@@ -188,6 +201,7 @@ export default function AuthProvider({
     if (user.prefs) {
       setPreferences(user.prefs as UserPreferences);
     }
+    void syncInterfaceLanguageForSession(user.prefs);
     return null;
   };
 
@@ -199,6 +213,7 @@ export default function AuthProvider({
     if (user.prefs) {
       setPreferences(user.prefs as UserPreferences);
     }
+    void syncInterfaceLanguageForSession(user.prefs);
     return null;
   };
 
@@ -284,6 +299,7 @@ export default function AuthProvider({
           setPreference("role", role);
         }
         setPreferences(user.prefs as UserPreferences);
+        void syncInterfaceLanguageForSession(user.prefs);
       } else {
         throw new LoginError("OAuth2 sign-in was cancelled or failed");
       }

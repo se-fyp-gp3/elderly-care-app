@@ -446,6 +446,95 @@ export default function ElderlyChat() {
     [aiVoiceEnabled, inferMessageReplyLanguage, ttsReplyLang],
   );
 
+  const decideIfNeedWebSearch = useCallback(
+    async (latestUserMessage: string): Promise<boolean> => {
+      const heuristicDecision = shouldSearch(latestUserMessage);
+      if (!heuristicDecision) {
+        return false;
+      }
+
+      if (!DASHSCOPE_API_KEY || !DASHSCOPE_API_URL || !DASHSCOPE_TEXT_MODEL) {
+        return heuristicDecision;
+      }
+
+      const recentConversation = messages
+        .slice(-4)
+        .map((msg) => {
+          const speaker = msg.isUser ? "User" : "Assistant";
+          return `${speaker}: ${msg.text.replace(/\s+/g, " ").trim().slice(0, 240)}`;
+        })
+        .join("\n");
+
+      const decisionController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        decisionController.abort();
+      }, 6000);
+
+      try {
+        const response = await fetch(`${DASHSCOPE_API_URL}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
+          },
+          signal: decisionController.signal,
+          body: JSON.stringify({
+            model: DASHSCOPE_TEXT_MODEL,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You decide whether a web search is needed before answering the user's latest message. Return exactly one token: SEARCH or NO_SEARCH. Choose SEARCH only when the latest message needs fresh or external factual information that is not already available in the recent conversation. Choose NO_SEARCH for small talk, subjective advice, app-local data, or follow-up questions already answerable from recent conversation.",
+              },
+              {
+                role: "user",
+                content: `Recent conversation:\n${recentConversation || "(none)"}\n\nLatest user message:\n${latestUserMessage}`,
+              },
+            ],
+            max_tokens: 4,
+            temperature: 0,
+            enable_thinking: false,
+          }),
+        });
+
+        const rawText = await response.text();
+        if (!response.ok) {
+          throw new Error(rawText || `Search decision failed: ${response.status}`);
+        }
+
+        const parsed: AIAPIResponse = rawText ? JSON.parse(rawText) : {};
+        const content = parsed.choices?.[0]?.message?.content;
+        const decisionText = typeof content === "string"
+          ? content
+          : Array.isArray(content)
+            ? content
+                .map((part) => (part.type === "text" ? part.text : ""))
+                .join(" ")
+            : "";
+        const normalizedDecision = decisionText.trim().toUpperCase();
+
+        if (normalizedDecision.startsWith("NO_SEARCH")) {
+          return false;
+        }
+        if (normalizedDecision.startsWith("SEARCH")) {
+          return true;
+        }
+      } catch (error) {
+        console.warn("Search decision check failed, falling back to heuristic:", error);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      return heuristicDecision;
+    },
+    [
+      DASHSCOPE_API_KEY,
+      DASHSCOPE_API_URL,
+      DASHSCOPE_TEXT_MODEL,
+      messages,
+    ],
+  );
+
   const tryHandleLocalDataRequest = async (userMessage: string) => {
     const normalizedMessage = userMessage.replace(/\[[^\]]+\]/g, " ").trim();
     const lower = normalizedMessage.toLowerCase();
@@ -979,16 +1068,20 @@ export default function ElderlyChat() {
         ? null
         : await tryHandleLocalDataRequest(userMessage.text);
 
-      // Selective search: only search when toggle is on AND query looks like it needs web info
+      // Selective search: the toggle only enables search; the model decides whether this turn needs it.
       let searchContext = "";
       let rawSearchResponse: Awaited<ReturnType<typeof searchWeb>> | null =
         null;
-      if (
+      const searchCandidate =
         searchEnabled &&
         !localResponse &&
         !selectedImage &&
-        shouldSearch(userMessage.text)
-      ) {
+        shouldSearch(userMessage.text);
+      const shouldUseWebSearch = searchCandidate
+        ? await decideIfNeedWebSearch(userMessage.text)
+        : false;
+
+      if (shouldUseWebSearch) {
         try {
           const searchStart = Date.now();
           rawSearchResponse = await searchWeb(userMessage.text);
@@ -1028,9 +1121,13 @@ export default function ElderlyChat() {
           "[Search] Formatted context for AI (full):\n",
           searchContext,
         );
-      } else if (searchEnabled && shouldSearch(userMessage.text)) {
+      } else if (shouldUseWebSearch) {
         console.log(
           "[Search] No search context produced — search may have returned empty results",
+        );
+      } else if (searchCandidate) {
+        console.log(
+          "[Search] Skipped web search after AI relevance check",
         );
       }
 

@@ -7,6 +7,8 @@ import {
   MOMENTS_TABLE_ID,
   storage,
 } from "@/lib/appwrite";
+import { triggerProfilePush } from "@/lib/chat-push";
+import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import i18n from "@/lib/i18n";
 import {
   MediaItem,
@@ -117,7 +119,41 @@ export async function createMoment(
       created.media_file_id,
     );
   }
+
+  const recipientProfileIds = await getMomentRecipientProfileIds(userId, userRole);
+  if (recipientProfileIds.length > 0) {
+    triggerProfilePush({
+      mode: "profiles",
+      recipientProfileIds,
+      title: userName || "New moment",
+      body: content.trim() || "Shared a new moment",
+      data: {
+        type: "moment_post",
+        momentId: created.$id,
+        actorName: userName || "Someone",
+        previewText: content.trim() || null,
+      },
+    });
+  }
+
   return created;
+}
+
+async function getMomentRecipientProfileIds(
+  authorId: string,
+  userRole: "elderly" | "caregiver",
+): Promise<string[]> {
+  const contacts = userRole === "caregiver"
+    ? await getContactsForCaregiver(authorId)
+    : await getContactsForElderly(authorId);
+
+  return Array.from(
+    new Set(
+      contacts
+        .map((contact) => contact.id)
+        .filter((contactId) => !!contactId && contactId !== authorId),
+    ),
+  );
 }
 
 interface UploadResult {
@@ -437,6 +473,32 @@ export async function addComment(
     });
   } catch {
     // Non-critical, count will be stale but functional
+  }
+
+  const recipientProfileIds = Array.from(
+    new Set(
+      [options?.momentAuthorId, options?.replyToUserId].filter(
+        (profileId): profileId is string => !!profileId && profileId !== userId,
+      ),
+    ),
+  );
+
+  if (recipientProfileIds.length > 0) {
+    const isReply =
+      !!options?.replyToUserId && options.replyToUserId !== options.momentAuthorId;
+    triggerProfilePush({
+      mode: "profiles",
+      recipientProfileIds,
+      title: isReply ? `${userName} replied to your comment` : `${userName} commented on your moment`,
+      body: content.trim() || "New comment on your moment",
+      data: {
+        type: "moment_comment",
+        momentId,
+        actorName: userName || "Someone",
+        previewText: content.trim() || null,
+        isReply,
+      },
+    });
   }
 
   return comment as unknown as MomentComment;

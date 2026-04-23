@@ -4,6 +4,7 @@ import i18n, {
     persistLanguage,
     SupportedLanguage,
 } from "./i18n/index";
+import { syncUserInterfaceLanguagePreference } from "./interface-language-preference";
 
 type LanguageContextType = {
   language: SupportedLanguage;
@@ -32,6 +33,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     setLanguageState(lang);
     await i18n.changeLanguage(lang);
     await persistLanguage(lang);
+    await syncUserInterfaceLanguagePreference(lang);
   }, []);
 
   if (!isReady) return null;

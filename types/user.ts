@@ -23,6 +23,7 @@ export enum UIVersion {
 
 export type UserPreferences = {
   role?: Role;
+  interfaceLanguage?: "en" | "zh" | "zh-Hant";
   fontSize?: FontSize;
   voiceTone?: VoiceTone;
   notifications?: boolean;

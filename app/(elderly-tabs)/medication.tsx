@@ -19,10 +19,7 @@ import {
     markPreviousDaysPendingAsMissing,
 } from "@/lib/medication_tracking";
 import {
-    cancelAllNotifications,
     registerForPushNotificationsAsync,
-    scheduleMedicationNotification,
-    sendImmediateNotification,
 } from "@/lib/notifications";
 import { translateUnit } from "@/lib/schedule";
 import {
@@ -34,6 +31,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker, {
     DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
+import * as Notifications from "expo-notifications";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
@@ -94,6 +92,83 @@ type TimeGroup = {
   items: TodoItem[];
 };
 
+const MEDICATION_NOTIFICATION_KEY_PREFIX = "elderly-medication";
+const MISSED_REMINDER_INTERVAL_MINUTES = 10;
+const MISSED_REMINDER_ATTEMPTS = 3;
+
+type DesiredMedicationNotification = {
+  key: string;
+  title: string;
+  body: string;
+  date: Date;
+  data: Record<string, unknown>;
+};
+
+function buildMedicationNotificationKey(
+  kind: "reminder" | "missed",
+  slotIsoDate: string,
+  attempt = 0,
+): string {
+  return `${MEDICATION_NOTIFICATION_KEY_PREFIX}:${kind}:${slotIsoDate}:${attempt}`;
+}
+
+function uniqueMedicationNames(items: TodoItem[]): string {
+  return Array.from(new Set(items.map((item) => item.medicationName))).join(", ");
+}
+
+async function syncManagedMedicationNotifications(
+  desiredNotifications: DesiredMedicationNotification[],
+): Promise<void> {
+  const scheduledNotifications =
+    await Notifications.getAllScheduledNotificationsAsync();
+
+  const existingManagedNotifications = new Map<string, string>();
+  scheduledNotifications.forEach((scheduled) => {
+    const data = scheduled.content.data as Record<string, unknown> | undefined;
+    const notificationKey =
+      typeof data?.notificationKey === "string" ? data.notificationKey : null;
+
+    if (
+      notificationKey &&
+      notificationKey.startsWith(`${MEDICATION_NOTIFICATION_KEY_PREFIX}:`)
+    ) {
+      existingManagedNotifications.set(notificationKey, scheduled.identifier);
+    }
+  });
+
+  const desiredKeys = new Set(desiredNotifications.map((item) => item.key));
+
+  await Promise.all(
+    Array.from(existingManagedNotifications.entries())
+      .filter(([key]) => !desiredKeys.has(key))
+      .map(([, identifier]) =>
+        Notifications.cancelScheduledNotificationAsync(identifier),
+      ),
+  );
+
+  for (const notification of desiredNotifications) {
+    if (existingManagedNotifications.has(notification.key)) {
+      continue;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: notification.title,
+        body: notification.body,
+        sound: true,
+        data: {
+          ...notification.data,
+          notificationKey: notification.key,
+        },
+      },
+      trigger: {
+        type: "date",
+        date: notification.date,
+      } as any,
+    });
+  }
+}
+
 export default function ElderlyMedicationScreen() {
   const { user } = useAuth();
   const theme = useTheme();
@@ -122,9 +197,6 @@ export default function ElderlyMedicationScreen() {
 
   // --- AI Scan State ---
   const [isScanning, setIsScanning] = React.useState(false);
-
-  // Track notified missing logs to avoid spam
-  const notifiedMissingLogs = React.useRef<Set<string>>(new Set());
 
   // Form State
   const [medicineName, setMedicineName] = React.useState("");
@@ -412,59 +484,67 @@ export default function ElderlyMedicationScreen() {
       const hasPerm = await registerForPushNotificationsAsync();
       if (!hasPerm) return;
 
-      // 1. Alert for newly detected 'missing' medications
-      const missingItems = todoList.filter((i) => i.status === "missing");
-      const newMissing = missingItems.filter((i) => {
-        // If we haven't notified about this specific instance/slot yet
-        // Key can be logId if exists, or schedule key
-        const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
-        return !notifiedMissingLogs.current.has(key);
-      });
+      const activeItems = todoList.filter((item) => item.status !== "taken");
+      const groupedByScheduledAt = new Map<string, TodoItem[]>();
 
-      if (newMissing.length > 0) {
-        // Summarize
-        const names = newMissing.map((i) => i.medicationName).join(", ");
-        const body = t("medication.missedMedAlertDesc", { medications: names });
-        await sendImmediateNotification(t("medication.missedMedAlert"), body);
-
-        // Mark as notified
-        newMissing.forEach((i) => {
-          const key = i.logId || `${i.reminder.$id}-${i.scheduledAt}`;
-          notifiedMissingLogs.current.add(key);
-        });
-      }
-
-      // 2. Reschedule future pending reminders
-      // We cancel everything first to ensure we sync with latest data (e.g. if time changed or taken)
-      await cancelAllNotifications();
-
-      const pendingItems = todoList.filter((i) => i.status === "pending");
-
-      // Group by Scheduled Time string (ISO)
-      const grouped: Record<string, string[]> = {};
-
-      pendingItems.forEach((i) => {
-        if (!grouped[i.scheduledAt]) {
-          grouped[i.scheduledAt] = [];
+      activeItems.forEach((item) => {
+        const group = groupedByScheduledAt.get(item.scheduledAt);
+        if (group) {
+          group.push(item);
+        } else {
+          groupedByScheduledAt.set(item.scheduledAt, [item]);
         }
-        grouped[i.scheduledAt].push(i.medicationName);
       });
 
-      // Schedule for each group
-      for (const [isoDate, names] of Object.entries(grouped)) {
-        const triggerDate = new Date(isoDate);
-        if (triggerDate.getTime() > Date.now()) {
-          const medList = names.join(", ");
-          await scheduleMedicationNotification(
-            t("medication.medicationReminder"),
-            t("medication.medReminder", { medications: medList }),
-            triggerDate,
+      const desiredNotifications: DesiredMedicationNotification[] = [];
+      const now = Date.now();
+
+      groupedByScheduledAt.forEach((items, slotIsoDate) => {
+        const slotDate = new Date(slotIsoDate);
+        const medicationNames = uniqueMedicationNames(items);
+
+        if (slotDate.getTime() > now) {
+          desiredNotifications.push({
+            key: buildMedicationNotificationKey("reminder", slotIsoDate),
+            title: t("medication.medicationReminder"),
+            body: t("medication.medReminder", { medications: medicationNames }),
+            date: slotDate,
+            data: {
+              type: "medication_reminder",
+              slotIsoDate,
+            },
+          });
+        }
+
+        for (let attempt = 1; attempt <= MISSED_REMINDER_ATTEMPTS; attempt += 1) {
+          const retryDate = new Date(
+            slotDate.getTime() + attempt * MISSED_REMINDER_INTERVAL_MINUTES * 60 * 1000,
           );
+
+          if (retryDate.getTime() <= now) {
+            continue;
+          }
+
+          desiredNotifications.push({
+            key: buildMedicationNotificationKey("missed", slotIsoDate, attempt),
+            title: t("medication.missedMedAlert"),
+            body: t("medication.missedMedAlertDesc", {
+              medications: medicationNames,
+            }),
+            date: retryDate,
+            data: {
+              type: "medication_missed_reminder",
+              slotIsoDate,
+              attempt,
+            },
+          });
         }
-      }
+      });
+
+      await syncManagedMedicationNotifications(desiredNotifications);
     };
 
-    manageNotifications();
+    void manageNotifications();
   }, [todoList]);
 
   // --- AI Image Processing ---
@@ -633,6 +713,7 @@ export default function ElderlyMedicationScreen() {
         item.reminder.$id,
         item.scheduledAt,
         newStatus,
+        item.medicationName,
       );
       await fetchData();
     } catch (error) {

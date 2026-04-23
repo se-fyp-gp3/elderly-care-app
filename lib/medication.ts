@@ -23,8 +23,8 @@ import {
     MEDICATION_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+  import { triggerProfilePush } from "./chat-push";
 import { getCaregiverByUserId, getLinkedElderly } from "./caregiver";
-import { sendImmediateNotification } from "./notifications";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -585,11 +585,60 @@ export async function addMedication(data: AddMedicationData): Promise<void> {
     },
   });
 
-  await sendImmediateNotification(
-    "Medication added",
-    `${data.name} was added with reminders at ${approxTimes.join(", ")}`,
-    { type: "medication_action" },
+  notifyElderlyMedicationAction(
+    {
+      elderlyProfileId: data.elderlyId,
+      action: "added",
+      medicationName: data.name,
+      reminderTimes: approxTimes,
+    },
   );
+}
+
+type MedicationActionKind = "added" | "taken" | "updated";
+
+function notifyElderlyMedicationAction(
+  params: {
+    elderlyProfileId: string | null | undefined;
+    action: MedicationActionKind;
+    medicationName?: string | null;
+    reminderTimes?: string[];
+  },
+): void {
+  const { elderlyProfileId, action, medicationName, reminderTimes } = params;
+  if (!elderlyProfileId) return;
+
+  const trimmedMedicationName = medicationName?.trim() || null;
+  const times = reminderTimes?.filter(Boolean) || [];
+
+  let title = "Medication updated";
+  let body = "A medication entry was updated.";
+
+  if (action === "added") {
+    title = "Medication added";
+    body = trimmedMedicationName
+      ? `${trimmedMedicationName} was added${times.length > 0 ? ` with reminders at ${times.join(", ")}` : ""}`
+      : "A medication was added.";
+  } else if (action === "taken") {
+    title = "Medication taken";
+    body = trimmedMedicationName
+      ? `${trimmedMedicationName} was marked as taken`
+      : "A medication was marked as taken.";
+  }
+
+  triggerProfilePush({
+    mode: "profiles",
+    recipientProfileIds: [elderlyProfileId],
+    title,
+    body,
+    data: {
+      type: "medication_action",
+      screen: "medication",
+      action,
+      medicationName: trimmedMedicationName,
+      reminderTimes: times,
+    },
+  });
 }
 
 /**
@@ -728,10 +777,12 @@ export async function confirmMedicationTaking(
       await checkAndFinishReminder(resolvedReminderId);
     }
 
-    await sendImmediateNotification(
-      "Medication taken",
-      `${medItem.name} was marked as taken`,
-      { type: "medication_action" },
+    notifyElderlyMedicationAction(
+      {
+        elderlyProfileId: elderlyId,
+        action: "taken",
+        medicationName: medItem.name,
+      },
     );
 
     return { logId: resultLogId };
@@ -747,10 +798,12 @@ export async function confirmMedicationTaking(
       },
     });
 
-    await sendImmediateNotification(
-      "Medication taken",
-      `${medItem.name} was marked as taken`,
-      { type: "medication_action" },
+    notifyElderlyMedicationAction(
+      {
+        elderlyProfileId: elderlyId,
+        action: "taken",
+        medicationName: medItem.name,
+      },
     );
 
     return { logId: undefined };
@@ -776,6 +829,12 @@ export async function undoMedicationTaking(logId: string): Promise<void> {
  * Mark a medication log entry as taken/processed.
  */
 export async function markMedicationProcessed(logId: string): Promise<void> {
+  const logRow = await tablesDB.getRow<any>({
+    databaseId: DATABASE_ID,
+    tableId: MEDICATION_LOGS_TABLE_ID,
+    rowId: logId,
+  });
+
   await tablesDB.updateRow({
     databaseId: DATABASE_ID,
     tableId: MEDICATION_LOGS_TABLE_ID,
@@ -786,9 +845,16 @@ export async function markMedicationProcessed(logId: string): Promise<void> {
     },
   });
 
-  await sendImmediateNotification(
-    "Medication updated",
-    "A medication entry was marked as processed",
-    { type: "medication_action" },
+  const elderlyRelation = logRow?.elderly;
+  const elderlyProfileId =
+    typeof elderlyRelation === "string"
+      ? elderlyRelation
+      : elderlyRelation?.$id;
+
+  notifyElderlyMedicationAction(
+    {
+      elderlyProfileId,
+      action: "updated",
+    },
   );
 }

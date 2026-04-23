@@ -13,7 +13,7 @@ import {
     fetchDailyMedicationLogs,
     logMedicationAction,
 } from "@/lib/medication_tracking";
-import { translateUnit } from "@/lib/schedule";
+import { markScheduleTaskCompleted, translateUnit } from "@/lib/schedule";
 import {
     Elderly,
     ElderlyMedicationReminder,
@@ -123,7 +123,14 @@ export default function ElderlyHome() {
             if (s.type === "medication") return false;
             if (!s.time) return false;
             const t = new Date(s.time);
-            return t >= todayStart && t < tomorrowEnd;
+            if (t < todayStart || t >= tomorrowEnd) return false;
+
+            const status = String(s.status || "");
+            if (status === "Completed") return false;
+
+            const isUpcoming = t >= now;
+            const isPastMissing = t < now && status === "Missed";
+            return isUpcoming || isPastMissing;
           });
           // Sort by time ascending
           nonMedSchedules.sort(
@@ -295,6 +302,7 @@ export default function ElderlyHome() {
         item.reminder.$id,
         item.scheduledAt,
         newStatus,
+        item.medicationName,
       );
       await fetchElderlyData();
     } catch (error) {
@@ -799,6 +807,26 @@ export default function ElderlyHome() {
                     >
                       {schedule.type}
                     </Chip>
+                  ) : null}
+                  <View style={{ flex: 1 }} />
+                  {!isCompleted ? (
+                    <Button
+                      mode="contained"
+                      compact
+                      icon="check"
+                      onPress={async () => {
+                        try {
+                          await markScheduleTaskCompleted(schedule.$id);
+                          await fetchElderlyData();
+                        } catch {
+                          Alert.alert("Error", "Failed to mark as completed");
+                        }
+                      }}
+                      style={{ borderRadius: 20 }}
+                      labelStyle={{ fontSize: 12 }}
+                    >
+                      Complete
+                    </Button>
                   ) : null}
                 </View>
               </View>

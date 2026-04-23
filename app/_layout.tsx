@@ -150,6 +150,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     let activeGroupIds = new Set<string>();
     const profileNameCache = new Map<string, string>();
     const groupNameCache = new Map<string, string>();
+    let hasSystemPushNotifications = false;
 
     const subscribe = (
       channel: string,
@@ -238,7 +239,12 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
         const hasPushPermission = await registerForPushNotificationsAsync();
         if (hasPushPermission) {
           const expoPushToken = await getExpoPushTokenAsync();
-          if (expoPushToken && (Platform.OS === "android" || Platform.OS === "ios")) {
+          if (
+            expoPushToken &&
+            (Platform.OS === "android" || Platform.OS === "ios") &&
+            (role === "elderly" || role === "caregiver")
+          ) {
+            hasSystemPushNotifications = true;
             await upsertExpoPushToken({
               profileId: myProfileId,
               userId: user.$id,
@@ -316,11 +322,13 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
           const groupName = await getGroupName(payload.group_id);
 
           if (payload.status === "invited" && isCreate) {
-            await sendImmediateNotification(
-              "Group invitation",
-              `You were invited to join ${groupName}`,
-              { type: "group_invitation" },
-            );
+            if (!hasSystemPushNotifications) {
+              await sendImmediateNotification(
+                "Group invitation",
+                `You were invited to join ${groupName}`,
+                { type: "group_invitation" },
+              );
+            }
           }
 
           if (payload.status === "active" && (isCreate || isUpdate)) {
@@ -345,11 +353,13 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
           if (!contactIds.has(payload.author_id)) return;
 
           incrementMomentUnread();
-          await sendImmediateNotification(
-            payload.author_name || "New moment",
-            payload.content?.trim() || "Shared a new moment",
-            { type: "moment_post" },
-          );
+          if (!hasSystemPushNotifications) {
+            await sendImmediateNotification(
+              payload.author_name || "New moment",
+              payload.content?.trim() || "Shared a new moment",
+              { type: "moment_post" },
+            );
+          }
         },
       );
 
@@ -362,20 +372,24 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
           if (isCreate && payload.status === "pending" && payload.elderly_id_2 === myProfileId) {
             const senderName = await getProfileName(payload.elderly_id_1);
-            await sendImmediateNotification(
-              "New friend request",
-              `${senderName} sent you a friend request`,
-              { type: "friend_request" },
-            );
+            if (!hasSystemPushNotifications) {
+              await sendImmediateNotification(
+                "New friend request",
+                `${senderName} sent you a friend request`,
+                { type: "friend_request" },
+              );
+            }
           }
 
           if (isUpdate && payload.status === "active" && payload.elderly_id_1 === myProfileId) {
             const senderName = await getProfileName(payload.elderly_id_2);
-            await sendImmediateNotification(
-              "Friend request accepted",
-              `${senderName} accepted your friend request`,
-              { type: "friend_request" },
-            );
+            if (!hasSystemPushNotifications) {
+              await sendImmediateNotification(
+                "Friend request accepted",
+                `${senderName} accepted your friend request`,
+                { type: "friend_request" },
+              );
+            }
           }
 
           if (
@@ -396,20 +410,24 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
           if (isCreate && payload.status === "pending" && payload.caregiver_id_2 === myProfileId) {
             const senderName = await getProfileName(payload.caregiver_id_1);
-            await sendImmediateNotification(
-              "New friend request",
-              `${senderName} sent you a chat request`,
-              { type: "friend_request" },
-            );
+            if (!hasSystemPushNotifications) {
+              await sendImmediateNotification(
+                "New friend request",
+                `${senderName} sent you a chat request`,
+                { type: "friend_request" },
+              );
+            }
           }
 
           if (isUpdate && payload.status === "active" && payload.caregiver_id_1 === myProfileId) {
             const senderName = await getProfileName(payload.caregiver_id_2);
-            await sendImmediateNotification(
-              "Friend request accepted",
-              `${senderName} accepted your chat request`,
-              { type: "friend_request" },
-            );
+            if (!hasSystemPushNotifications) {
+              await sendImmediateNotification(
+                "Friend request accepted",
+                `${senderName} accepted your chat request`,
+                { type: "friend_request" },
+              );
+            }
           }
 
           if (
@@ -433,11 +451,13 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
           const { title, body, screen } =
             getCaregiverActivityNotificationContent(payload);
 
-          await sendImmediateNotification(title, body, {
-            type: "caregiver_activity",
-            screen,
-            elderlyId: payload.elderly_id,
-          });
+          if (!hasSystemPushNotifications) {
+            await sendImmediateNotification(title, body, {
+              type: "caregiver_activity",
+              screen,
+              elderlyId: payload.elderly_id,
+            });
+          }
         },
       );
     };
@@ -492,6 +512,21 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
               ? "/(elderly-tabs)/messages"
               : "/(caregiver-tabs)/messages";
           router.push(targetPath);
+        } else if (rawData && rawData.type === "medication_action") {
+          const targetPath =
+            role === "elderly"
+              ? "/(elderly-tabs)/medication"
+              : "/(caregiver-tabs)/medication";
+          router.push(targetPath);
+        } else if (
+          rawData &&
+          (rawData.type === "schedule_action" || rawData.type === "schedule_reminder")
+        ) {
+          const targetPath =
+            role === "elderly"
+              ? "/(elderly-tabs)/schedule"
+              : "/(caregiver-tabs)/schedule";
+          router.push(targetPath);
         } else if (rawData && rawData.type === "caregiver_activity") {
           if (role !== "caregiver") return;
           const screen = rawData.screen as string | undefined;
@@ -500,6 +535,9 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
               ? "/(caregiver-tabs)/schedule"
               : "/(caregiver-tabs)/medication",
           );
+        } else if (rawData && rawData.type === "fall_alert") {
+          if (role !== "caregiver") return;
+          router.push("/(caregiver-tabs)/emergency");
         } else if (
           rawData &&
           (rawData.type === "moment_comment" || rawData.type === "moment_post")

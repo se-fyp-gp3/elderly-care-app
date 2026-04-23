@@ -13,9 +13,12 @@ import {
     MEDICATION_TABLE_ID,
     tablesDB,
 } from "./appwrite";
-import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
+import { triggerProfilePush } from "./chat-push";
+import {
+  emitCaregiverActivityAlerts,
+  pushToLinkedCaregiversForElderly,
+} from "./caregiver-activity-alerts";
 import { getElderlyByUserId } from "./elderly";
-import { sendImmediateNotification } from "./notifications";
 
 export async function checkAndMarkSkippedMedications(
   userId: string,
@@ -280,6 +283,7 @@ export async function logMedicationAction(
   reminderId: string,
   scheduledAt: string,
   status: "taken" | "skipped" | "pending",
+  medicationName?: string,
 ): Promise<void> {
   const profile = await getElderlyByUserId(userId);
   if (!profile?.$id) throw new Error("Elderly profile not found");
@@ -325,7 +329,78 @@ export async function logMedicationAction(
   // After logging "taken", check if the entire reminder is now finished
   if (status === "taken") {
     await checkAndFinishReminder(reminderId);
+
+    const resolvedMedicationName =
+      medicationName?.trim() || (await getMedicationNameForReminder(reminderId));
+
+    await pushToLinkedCaregiversForElderly({
+      elderlyId: profile.$id,
+      title: `${profile.name || "Elderly user"} took medication`,
+      body: resolvedMedicationName
+        ? `${resolvedMedicationName} was marked as taken.`
+        : "Marked a medication as taken.",
+      data: {
+        type: "medication_action",
+        screen: "medication",
+        elderlyId: profile.$id,
+        action: "taken",
+        actorName: profile.name || null,
+        medicationName: resolvedMedicationName,
+      },
+    });
   }
+}
+
+async function getMedicationNameForReminder(
+  reminderId: string,
+): Promise<string | null> {
+  if (!ELDERLY_MEDICATION_REMINDER_TABLE_ID) return null;
+
+  try {
+    const reminder = await tablesDB.getRow<any>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+      rowId: reminderId,
+    });
+
+    const elderlyMedication = reminder?.elderly_medication;
+    const elderlyMedicationId =
+      typeof elderlyMedication === "string"
+        ? elderlyMedication
+        : elderlyMedication?.$id;
+
+    if (!elderlyMedicationId || !ELDERLY_MEDICATION_TABLE_ID) {
+      return null;
+    }
+
+    const elderlyMedicationRow = await tablesDB.getRow<any>({
+      databaseId: DATABASE_ID,
+      tableId: ELDERLY_MEDICATION_TABLE_ID,
+      rowId: elderlyMedicationId,
+    });
+
+    const medicationRelation = elderlyMedicationRow?.medication;
+    if (Array.isArray(medicationRelation)) {
+      return medicationRelation[0]?.name ?? null;
+    }
+
+    if (medicationRelation && typeof medicationRelation === "object") {
+      return medicationRelation.name ?? null;
+    }
+
+    if (typeof medicationRelation === "string" && MEDICATION_TABLE_ID) {
+      const medicationRow = await tablesDB.getRow<any>({
+        databaseId: DATABASE_ID,
+        tableId: MEDICATION_TABLE_ID,
+        rowId: medicationRelation,
+      });
+      return medicationRow?.name ?? null;
+    }
+  } catch (error) {
+    console.warn("[MedicationTracking] Failed to resolve medication name for notification", error);
+  }
+
+  return null;
 }
 
 /**
@@ -459,11 +534,15 @@ export async function deactivateMedicationReminder(
     }
 
     if (profile?.$id) {
+      const cancelledMedicationName = await getMedicationNameForReminder(reminderId);
       await emitCaregiverActivityAlerts({
         elderlyId: profile.$id,
         elderlyName: profile.name,
         type: "cg_med_cancel",
-        description: "Cancelled a medication reminder.",
+        description: cancelledMedicationName
+          ? `${cancelledMedicationName} reminder was cancelled.`
+          : "Cancelled a medication reminder.",
+        medicationName: cancelledMedicationName ?? undefined,
       });
     }
   } catch (error) {
@@ -763,6 +842,14 @@ export async function confirmCancelMedication(
 ): Promise<void> {
   if (!ELDERLY_MEDICATION_REMINDER_TABLE_ID) return;
 
+  const removedMedicationName = await getMedicationNameForReminder(reminderId);
+
+  const reminderRow = await tablesDB.getRow<any>({
+    databaseId: DATABASE_ID,
+    tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+    rowId: reminderId,
+  });
+
   await tablesDB.updateRow({
     databaseId: DATABASE_ID,
     tableId: ELDERLY_MEDICATION_REMINDER_TABLE_ID,
@@ -773,9 +860,26 @@ export async function confirmCancelMedication(
     },
   });
 
-  await sendImmediateNotification(
-    "Medication removed",
-    "A cancelled medication was confirmed and removed",
-    { type: "medication_action" },
-  );
+  const elderlyRelation = reminderRow?.elderly;
+  const elderlyProfileId =
+    typeof elderlyRelation === "string"
+      ? elderlyRelation
+      : elderlyRelation?.$id;
+
+  if (elderlyProfileId) {
+    triggerProfilePush({
+      mode: "profiles",
+      recipientProfileIds: [elderlyProfileId],
+      title: "Medication removed",
+      body: removedMedicationName
+        ? `${removedMedicationName} was removed`
+        : "A cancelled medication was confirmed and removed",
+      data: {
+        type: "medication_action",
+        screen: "medication",
+        action: "removed",
+        medicationName: removedMedicationName,
+      },
+    });
+  }
 }

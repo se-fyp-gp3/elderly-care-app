@@ -593,6 +593,7 @@ export async function executePendingAction(
           datetime,
           elderlyId: pendingData.elderlyId,
           typeName: "appointment",
+          notificationAudience: "caregivers",
         });
 
         const schedMsg = language === "yue"
@@ -605,7 +606,13 @@ export async function executePendingAction(
       }
 
       case "record_medication": {
-        await logMedicationAction(userId, pendingData.reminderId, pendingData.scheduledAt, "taken");
+        await logMedicationAction(
+          userId,
+          pendingData.reminderId,
+          pendingData.scheduledAt,
+          "taken",
+          pendingData.medName,
+        );
         const medName = pendingData.medName || "";
         const takenMsg = language === "yue"
           ? `好嘅，已經幫你記錄咗${medName ? `「${medName}」` : ""}食藥。`

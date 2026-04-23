@@ -8,6 +8,7 @@ import {
     EMERGENCY_ALERTS_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+import { triggerUserPush } from "./chat-push";
 
 export type CaregiverActivityAlertType =
   | "cg_med_add"
@@ -84,6 +85,10 @@ export async function emitCaregiverActivityAlerts(params: {
   elderlyName?: string;
   type: CaregiverActivityAlertType;
   description: string;
+  medicationName?: string;
+  reminderTimes?: string[];
+  scheduleTitle?: string;
+  scheduledAt?: string;
 }): Promise<void> {
   try {
     const caregivers = await getLinkedCaregiversForElderly(params.elderlyId);
@@ -93,6 +98,36 @@ export async function emitCaregiverActivityAlerts(params: {
       params.elderlyId,
       params.elderlyName,
     );
+
+    const { title, body, screen } = buildCaregiverActivityNotificationContent({
+      elderlyName,
+      type: params.type,
+      description: params.description,
+    });
+
+    const caregiverUserIds = caregivers
+      .map((caregiver) => caregiver.user_id)
+      .filter((userId): userId is string => !!userId);
+
+    if (caregiverUserIds.length > 0) {
+      triggerUserPush({
+        mode: "users",
+        recipientUserIds: caregiverUserIds,
+        title,
+        body,
+        data: {
+          type: "caregiver_activity",
+          screen,
+          elderlyId: params.elderlyId,
+          elderlyName,
+          activityType: params.type,
+          medicationName: params.medicationName ?? null,
+          reminderTimes: params.reminderTimes ?? null,
+          scheduleTitle: params.scheduleTitle ?? null,
+          scheduledAt: params.scheduledAt ?? null,
+        },
+      });
+    }
 
     await Promise.all(
       caregivers
@@ -123,30 +158,74 @@ export async function emitCaregiverActivityAlerts(params: {
   }
 }
 
-export function getCaregiverActivityNotificationContent(alert: EmergencyAlert): {
+export async function pushToLinkedCaregiversForElderly(params: {
+  elderlyId: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    const caregivers = await getLinkedCaregiversForElderly(params.elderlyId);
+    const caregiverUserIds = caregivers
+      .map((caregiver) => caregiver.user_id)
+      .filter((userId): userId is string => !!userId);
+
+    if (caregiverUserIds.length === 0) {
+      return;
+    }
+
+    triggerUserPush({
+      mode: "users",
+      recipientUserIds: caregiverUserIds,
+      title: params.title,
+      body: params.body,
+      data: params.data,
+    });
+  } catch (error) {
+    console.warn("[CaregiverActivityAlerts] Failed to push caregiver notification", error);
+  }
+}
+
+function buildCaregiverActivityNotificationContent(params: {
+  elderlyName: string;
+  type: CaregiverActivityAlertType;
+  description?: string | null;
+}): {
   title: string;
   body: string;
   screen: "medication" | "schedule";
 } {
-  if (alert.type === "cg_sched_add") {
+  if (params.type === "cg_sched_add") {
     return {
-      title: `${alert.elderly_name} added a schedule`,
-      body: alert.description || "A new schedule was added.",
+      title: `${params.elderlyName} added a schedule`,
+      body: params.description || "A new schedule was added.",
       screen: "schedule",
     };
   }
 
-  if (alert.type === "cg_med_cancel") {
+  if (params.type === "cg_med_cancel") {
     return {
-      title: `${alert.elderly_name} cancelled a medication`,
-      body: alert.description || "A medication reminder was cancelled.",
+      title: `${params.elderlyName} cancelled a medication`,
+      body: params.description || "A medication reminder was cancelled.",
       screen: "medication",
     };
   }
 
   return {
-    title: `${alert.elderly_name} added a medication`,
-    body: alert.description || "A new medication was added.",
+    title: `${params.elderlyName} added a medication`,
+    body: params.description || "A new medication was added.",
     screen: "medication",
   };
+}
+
+export function getCaregiverActivityNotificationContent(alert: EmergencyAlert): {
+  title: string;
+  body: string;
+  screen: "medication" | "schedule";
+} {
+  return buildCaregiverActivityNotificationContent({
+    elderlyName: alert.elderly_name,
+    type: alert.type as CaregiverActivityAlertType,
+    description: alert.description,
+  });
 }

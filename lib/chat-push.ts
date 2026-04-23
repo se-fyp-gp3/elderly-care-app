@@ -21,7 +21,27 @@ type GroupChatPushPayload = {
   messageType: "text" | "voice" | "image" | "system";
 };
 
-type ChatPushPayload = DirectChatPushPayload | GroupChatPushPayload;
+type ProfilePushPayload = {
+  mode: "profiles";
+  recipientProfileIds: string[];
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+};
+
+type UserPushPayload = {
+  mode: "users";
+  recipientUserIds: string[];
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+};
+
+type ChatPushPayload =
+  | DirectChatPushPayload
+  | GroupChatPushPayload
+  | ProfilePushPayload
+  | UserPushPayload;
 
 async function executeChatPush(payload: ChatPushPayload): Promise<void> {
   if (!CHAT_PUSH_FUNCTION_ID) return;
@@ -53,5 +73,15 @@ export function triggerDirectChatPush(payload: DirectChatPushPayload): void {
 }
 
 export function triggerGroupChatPush(payload: GroupChatPushPayload): void {
+  void executeChatPush(payload);
+}
+
+export function triggerProfilePush(payload: ProfilePushPayload): void {
+  if (!payload.recipientProfileIds.length) return;
+  void executeChatPush(payload);
+}
+
+export function triggerUserPush(payload: UserPushPayload): void {
+  if (!payload.recipientUserIds.length) return;
   void executeChatPush(payload);
 }

@@ -105,12 +105,28 @@ const getTodayKey = () => {
   return now.toISOString().slice(0, 10);
 };
 
-const formatTime = (time?: string | null) => {
+const getTimeLocale = (language: "yue" | "zh" | "en") => {
+  if (language === "yue") {
+    return "zh-Hant-HK";
+  }
+  if (language === "zh") {
+    return "zh-Hans-CN";
+  }
+  return "en-HK";
+};
+
+const formatTime = (
+  time?: string | null,
+  language: "yue" | "zh" | "en" = "en",
+) => {
   if (!time) return "";
   try {
     const date = new Date(time);
     if (Number.isNaN(date.getTime())) return time;
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString(getTimeLocale(language), {
+      hour: "numeric",
+      minute: "2-digit",
+    });
   } catch {
     return time;
   }
@@ -331,6 +347,8 @@ export async function createElderlyMedicationWithReminder(
     elderlyName: profile.name,
     type: "cg_med_add",
     description: `${input.name} at ${approxTimes.join(", ")}`,
+    medicationName: input.name,
+    reminderTimes: approxTimes,
   });
 
   return medicationRow as unknown as ElderlyMedication;
@@ -427,7 +445,7 @@ export function buildScheduleSummary(
 
   const items = upcoming.slice(0, 5).map((schedule) => {
     const title = schedule.title || (language === "zh" ? "行程" : language === "yue" ? "行程" : "Appointment");
-    const timeText = schedule.time ? formatTime(schedule.time) : "";
+    const timeText = schedule.time ? formatTime(schedule.time, language) : "";
     if (!timeText) {
       return `• ${title}`;
     }

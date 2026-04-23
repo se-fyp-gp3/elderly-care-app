@@ -14,6 +14,11 @@
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
+import {
+  DATABASE_ID,
+  ELDERLY_DAILY_STEPS_TABLE_ID,
+  safeSubscribe,
+} from "../appwrite";
 import { useAuth } from "../auth-context";
 import { enableStepBackgroundSync } from "../background-step-sync";
 import { getElderlyByUserId } from "../elderly";
@@ -143,6 +148,25 @@ export function useStepSync(): UseStepSyncReturn {
       refreshHistory();
     }
   }, [elderlyId, refreshHistory]);
+
+  useEffect(() => {
+    if (!elderlyId) return;
+
+    const channel = `databases.${DATABASE_ID}.collections.${ELDERLY_DAILY_STEPS_TABLE_ID}.documents`;
+    const unsubscribe = safeSubscribe(channel, (response) => {
+      const payload = response.payload as Partial<DailyStepRecord> | undefined;
+      if (!payload || payload.elderlyId !== elderlyId) {
+        return;
+      }
+
+      void loadTodaySteps();
+      void refreshHistory();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [elderlyId, loadTodaySteps, refreshHistory]);
 
   // ── Health API Authorization ───────────────────────────────
 

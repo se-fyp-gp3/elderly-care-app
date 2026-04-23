@@ -8,7 +8,7 @@ import {
 } from "@/lib/moments";
 import { MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
     Alert,
@@ -50,16 +50,16 @@ interface CommentSheetProps {
 
 function CommentItem({
   comment,
+  depth,
   currentUserId,
-  allComments,
   onReply,
   onLike,
   onDelete,
   avatarFileId,
 }: {
   comment: MomentComment;
+  depth: number;
   currentUserId: string;
-  allComments: MomentComment[];
   onReply: (comment: MomentComment) => void;
   onLike: (comment: MomentComment) => void;
   onDelete: (commentId: string) => void;
@@ -72,9 +72,7 @@ function CommentItem({
   const isLiked = likes.includes(currentUserId);
   const longText = (comment.content?.length || 0) > 200;
   const isOwn = comment.author_id === currentUserId;
-  const parentComment = comment.reply_to_comment_id
-    ? allComments.find((c) => c.$id === comment.reply_to_comment_id)
-    : null;
+  const isReply = depth > 0;
 
   const handleDelete = () => {
     Alert.alert(
@@ -92,11 +90,16 @@ function CommentItem({
   };
 
   return (
-    <View style={styles.commentItem}>
+    <View
+      style={[
+        styles.commentItem,
+        isReply && styles.replyCommentItem,
+      ]}
+    >
       <UserAvatar
         avatarFileId={avatarFileId}
         name={comment.author_name}
-        size={32}
+        size={isReply ? 28 : 32}
         role={comment.author_role as "elderly" | "caregiver" | undefined}
       />
       <View style={styles.commentBody}>
@@ -124,32 +127,20 @@ function CommentItem({
             )}
           </View>
 
-          {/* Reply indicator with quoted parent */}
           {!!comment.reply_to_user_name && (
-            <View
-              style={[
-                styles.replyQuote,
-                {
-                  borderLeftColor: theme.colors.outlineVariant,
-                  backgroundColor: theme.colors.surfaceVariant,
-                },
-              ]}
-            >
+            <View style={styles.replyMetaRow}>
+              <View
+                style={[
+                  styles.replyMetaLine,
+                  { backgroundColor: theme.colors.outlineVariant },
+                ]}
+              />
               <Text
                 variant="labelSmall"
                 style={{ color: theme.colors.primary, fontWeight: "bold" }}
               >
-                ??@{comment.reply_to_user_name}
+                Replying to @{comment.reply_to_user_name}
               </Text>
-              {parentComment ? (
-                <Text
-                  variant="labelSmall"
-                  numberOfLines={2}
-                  style={{ color: theme.colors.onSurfaceVariant, marginTop: 1 }}
-                >
-                  {parentComment.content}
-                </Text>
-              ) : null}
             </View>
           )}
 
@@ -243,6 +234,41 @@ export default function CommentSheet({
   const inputRef = useRef<RNTextInput>(null);
   const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const { t } = useTranslation();
+
+  const threadedComments = useMemo(() => {
+    const commentById = new Map(comments.map((comment) => [comment.$id, comment]));
+    const childrenByParent = new Map<string, MomentComment[]>();
+    const roots: MomentComment[] = [];
+
+    const sortedComments = [...comments].sort(
+      (a, b) => new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime(),
+    );
+
+    sortedComments.forEach((comment) => {
+      const parentId = comment.reply_to_comment_id;
+      if (parentId && commentById.has(parentId)) {
+        const existingChildren = childrenByParent.get(parentId) || [];
+        existingChildren.push(comment);
+        childrenByParent.set(parentId, existingChildren);
+        return;
+      }
+
+      roots.push(comment);
+    });
+
+    const flattened: Array<{ comment: MomentComment; depth: number }> = [];
+
+    const appendThread = (comment: MomentComment, depth: number) => {
+      flattened.push({ comment, depth });
+      const children = [...(childrenByParent.get(comment.$id) || [])].sort(
+        (a, b) => new Date(a.$createdAt).getTime() - new Date(b.$createdAt).getTime(),
+      );
+      children.forEach((child) => appendThread(child, depth + 1));
+    };
+
+    roots.forEach((comment) => appendThread(comment, 0));
+    return flattened;
+  }, [comments]);
 
   const loadComments = useCallback(async () => {
     if (!momentId) return;
@@ -423,17 +449,17 @@ export default function CommentSheet({
             </View>
           ) : (
             <FlatList
-              data={comments}
-              keyExtractor={(item) => item.$id}
+              data={threadedComments}
+              keyExtractor={(item) => item.comment.$id}
               renderItem={({ item }) => (
                 <CommentItem
-                  comment={item}
+                  comment={item.comment}
+                  depth={item.depth}
                   currentUserId={currentUserId}
-                  allComments={comments}
                   onReply={handleReply}
                   onLike={handleLikeComment}
                   onDelete={handleDeleteComment}
-                  avatarFileId={avatarMap?.[item.author_id]}
+                  avatarFileId={avatarMap?.[item.comment.author_id]}
                 />
               )}
               contentContainerStyle={styles.listContent}
@@ -587,6 +613,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     alignItems: "flex-start",
   },
+  replyCommentItem: {
+    marginLeft: 26,
+  },
   commentBody: {
     flex: 1,
     marginLeft: 10,
@@ -594,13 +623,16 @@ const styles = StyleSheet.create({
   commentBubble: {
     flexShrink: 1,
   },
-  replyQuote: {
-    borderLeftWidth: 3,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  replyMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 4,
     marginBottom: 2,
+  },
+  replyMetaLine: {
+    width: 14,
+    height: StyleSheet.hairlineWidth,
+    marginRight: 6,
   },
   commentFooter: {
     flexDirection: "row",

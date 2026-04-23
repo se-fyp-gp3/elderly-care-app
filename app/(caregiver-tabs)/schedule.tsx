@@ -551,6 +551,7 @@ export default function SchedulePage() {
         elderlyId: newTask.elderlyId,
         typeName: newTask.type,
         categoryId: newTask.typeId,
+        notificationAudience: "elderly",
       });
 
       setNewTaskVisible(false);
