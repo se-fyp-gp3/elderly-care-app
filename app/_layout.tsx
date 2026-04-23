@@ -1,32 +1,32 @@
 import {
-  CAREGIVER_CONNECTIONS_TABLE_ID,
-  CAREGIVER_TABLE_ID,
-  DATABASE_ID,
-  DIRECT_MESSAGES_TABLE_ID,
-  ELDERLY_CONNECTIONS_TABLE_ID,
-  ELDERLY_TABLE_ID,
-  EMERGENCY_ALERTS_TABLE_ID,
-  GROUP_MEMBERS_TABLE_ID,
-  GROUP_MESSAGES_TABLE_ID,
-  GROUPS_TABLE_ID,
-  MOMENTS_TABLE_ID,
-  safeSubscribe,
-  tablesDB,
+    CAREGIVER_CONNECTIONS_TABLE_ID,
+    CAREGIVER_TABLE_ID,
+    DATABASE_ID,
+    DIRECT_MESSAGES_TABLE_ID,
+    ELDERLY_CONNECTIONS_TABLE_ID,
+    ELDERLY_TABLE_ID,
+    EMERGENCY_ALERTS_TABLE_ID,
+    GROUP_MEMBERS_TABLE_ID,
+    GROUP_MESSAGES_TABLE_ID,
+    GROUPS_TABLE_ID,
+    MOMENTS_TABLE_ID,
+    safeSubscribe,
+    tablesDB,
 } from "@/lib/appwrite";
 import AuthProvider, { useAuth } from "@/lib/auth-context";
 import "@/lib/background-chat-notifications";
 import {
-  disableChatBackgroundNotifications,
-  enableChatBackgroundNotifications,
-  markDirectMessageNotificationSeen,
-  markGroupMessageNotificationSeen,
+    disableChatBackgroundNotifications,
+    enableChatBackgroundNotifications,
+    markDirectMessageNotificationSeen,
+    markGroupMessageNotificationSeen,
 } from "@/lib/background-chat-notifications";
 import "@/lib/background-step-sync";
 import { disableStepBackgroundSync } from "@/lib/background-step-sync";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
-  getCaregiverActivityNotificationContent,
-  isCaregiverActivityAlertType,
+    getCaregiverActivityNotificationContent,
+    isCaregiverActivityAlertType,
 } from "@/lib/caregiver-activity-alerts";
 import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
@@ -36,9 +36,9 @@ import { getGroupsForUser } from "@/lib/groups";
 import { UnreadBadgeProvider, useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
 import { LanguageProvider } from "@/lib/language-context";
 import {
-  getExpoPushTokenAsync,
-  registerForPushNotificationsAsync,
-  sendImmediateNotification,
+    getExpoPushTokenAsync,
+    registerForPushNotificationsAsync,
+    sendImmediateNotification,
 } from "@/lib/notifications";
 import { CaregiverConnection, ElderlyConnections, EmergencyAlert } from "@/types/appwrite";
 import { DirectMessage, Group, GroupMember, GroupMessage } from "@/types/messaging";
@@ -48,20 +48,20 @@ import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  AppState,
-  Platform,
-  useColorScheme,
-  View,
+    ActivityIndicator,
+    AppState,
+    Platform,
+    useColorScheme,
+    View,
 } from "react-native";
 import { Query } from "react-native-appwrite";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
-  configureFonts,
-  MD3DarkTheme,
-  MD3LightTheme,
-  MD3Theme,
-  PaperProvider,
+    configureFonts,
+    MD3DarkTheme,
+    MD3LightTheme,
+    MD3Theme,
+    PaperProvider,
 } from "react-native-paper";
 import { enGB, registerTranslation } from "react-native-paper-dates";
 import { SafeAreaProvider } from "react-native-safe-area-context";

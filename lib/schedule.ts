@@ -17,8 +17,8 @@ import {
     SCHEDULE_TABLE_ID,
     tablesDB,
 } from "./appwrite";
-  import { triggerProfilePush } from "./chat-push";
 import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
+import { triggerProfilePush } from "./chat-push";
 
 /** Translate a medication unit string (e.g. "tablet" → "片") using i18n. */
 export function translateUnit(unit: string): string {

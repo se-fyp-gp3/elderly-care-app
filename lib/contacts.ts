@@ -16,7 +16,7 @@ import {
     ELDERLY_TABLE_ID,
     tablesDB,
 } from "./appwrite";
-  import { triggerProfilePush } from "./chat-push";
+import { triggerProfilePush } from "./chat-push";
 
 export interface Contact {
   id: string;

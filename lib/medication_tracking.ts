@@ -13,11 +13,11 @@ import {
     MEDICATION_TABLE_ID,
     tablesDB,
 } from "./appwrite";
-import { triggerProfilePush } from "./chat-push";
 import {
-  emitCaregiverActivityAlerts,
-  pushToLinkedCaregiversForElderly,
+    emitCaregiverActivityAlerts,
+    pushToLinkedCaregiversForElderly,
 } from "./caregiver-activity-alerts";
+import { triggerProfilePush } from "./chat-push";
 import { getElderlyByUserId } from "./elderly";
 
 export async function checkAndMarkSkippedMedications(

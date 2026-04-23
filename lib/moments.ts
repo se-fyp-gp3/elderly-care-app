@@ -1,20 +1,20 @@
 import { generateAIResponse } from "@/lib/ai";
 import {
-  clientReactNative,
-  DATABASE_ID,
-  MOMENTS_COMMENTS_TABLE_ID,
-  MOMENTS_MEDIA_BUCKET_ID,
-  MOMENTS_TABLE_ID,
-  storage,
+    clientReactNative,
+    DATABASE_ID,
+    MOMENTS_COMMENTS_TABLE_ID,
+    MOMENTS_MEDIA_BUCKET_ID,
+    MOMENTS_TABLE_ID,
+    storage,
 } from "@/lib/appwrite";
 import { triggerProfilePush } from "@/lib/chat-push";
 import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import i18n from "@/lib/i18n";
 import {
-  MediaItem,
-  Moment,
-  MomentComment,
-  MomentMediaInput,
+    MediaItem,
+    Moment,
+    MomentComment,
+    MomentMediaInput,
 } from "@/types/moments";
 import * as FileSystem from "expo-file-system";
 import * as VideoThumbnails from "expo-video-thumbnails";

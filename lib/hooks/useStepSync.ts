@@ -15,9 +15,9 @@ import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
 import {
-  DATABASE_ID,
-  ELDERLY_DAILY_STEPS_TABLE_ID,
-  safeSubscribe,
+    DATABASE_ID,
+    ELDERLY_DAILY_STEPS_TABLE_ID,
+    safeSubscribe,
 } from "../appwrite";
 import { useAuth } from "../auth-context";
 import { enableStepBackgroundSync } from "../background-step-sync";

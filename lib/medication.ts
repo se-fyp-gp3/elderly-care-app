@@ -23,8 +23,8 @@ import {
     MEDICATION_TABLE_ID,
     tablesDB,
 } from "./appwrite";
-  import { triggerProfilePush } from "./chat-push";
 import { getCaregiverByUserId, getLinkedElderly } from "./caregiver";
+import { triggerProfilePush } from "./chat-push";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

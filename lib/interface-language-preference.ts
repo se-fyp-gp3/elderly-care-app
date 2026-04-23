@@ -1,7 +1,7 @@
 import { UserPreferences } from "@/types/user";
 import { Platform } from "react-native";
-import type { SupportedLanguage } from "./i18n";
 import { account, accountWeb } from "./appwrite";
+import type { SupportedLanguage } from "./i18n";
 
 export async function syncUserInterfaceLanguagePreference(
   language: SupportedLanguage,
