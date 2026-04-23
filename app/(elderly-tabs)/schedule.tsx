@@ -1,4 +1,5 @@
 import { useAuth } from "@/lib/auth-context";
+import { getDateLocale } from "@/lib/i18n";
 import {
     fetchElderlySchedulesForUser,
     getElderlyByUserId,
@@ -44,7 +45,8 @@ export default function ElderlySchedule() {
   const theme = useTheme();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.resolvedLanguage || i18n.language);
   const [refreshing, setRefreshing] = React.useState(false);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
   const [elderlyProfileId, setElderlyProfileId] = React.useState<string>("");
@@ -76,6 +78,50 @@ export default function ElderlySchedule() {
   // Local state for text inputs to prevent IME (handwriting/pinyin) composition interruption
   const [localTitle, setLocalTitle] = React.useState("");
   const [localDescription, setLocalDescription] = React.useState("");
+
+  const translateScheduleStatus = React.useCallback(
+    (status?: string | null) => {
+      switch (status) {
+        case "Completed":
+          return t("schedule.statusCompleted");
+        case "Missed":
+          return t("schedule.statusMissed");
+        default:
+          return t("schedule.statusPending");
+      }
+    },
+    [t],
+  );
+
+  const translateScheduleType = React.useCallback(
+    (type?: string | null) => {
+      switch ((type || "").toLowerCase()) {
+        case "appointment":
+          return t("schedule.appointment");
+        case "meal":
+          return t("schedule.typeMeal");
+        case "checkup":
+          return t("schedule.typeCheckup");
+        case "activity":
+          return t("schedule.typeActivity");
+        default:
+          return type || t("schedule.typeActivity");
+      }
+    },
+    [t],
+  );
+
+  const groupLabelMap = React.useMemo(
+    () => ({
+      Today: t("common.today"),
+      Tomorrow: t("schedule.tomorrow"),
+      "This Week": t("schedule.thisWeek"),
+      "This Month": t("schedule.thisMonth"),
+      Later: t("schedule.later"),
+      "A Long Time Ago": t("schedule.longTimeAgo"),
+    }),
+    [t],
+  );
 
   // Sync local state when modal opens
   React.useEffect(() => {
@@ -177,7 +223,7 @@ export default function ElderlySchedule() {
     if (!timeStr) return "";
     try {
       const d = new Date(timeStr);
-      return d.toLocaleString([], {
+      return d.toLocaleString(dateLocale, {
         month: "short",
         day: "numeric",
         hour: "2-digit",
@@ -214,7 +260,7 @@ export default function ElderlySchedule() {
   const formatTime = (timeStr: string | null | undefined): string => {
     if (!timeStr) return "";
     try {
-      return new Date(timeStr).toLocaleTimeString([], {
+      return new Date(timeStr).toLocaleTimeString(dateLocale, {
         hour: "2-digit",
         minute: "2-digit",
       });
@@ -226,7 +272,7 @@ export default function ElderlySchedule() {
   const formatDate = (timeStr: string | null | undefined): string => {
     if (!timeStr) return "";
     try {
-      return new Date(timeStr).toLocaleDateString([], {
+      return new Date(timeStr).toLocaleDateString(dateLocale, {
         month: "short",
         day: "numeric",
       });
@@ -242,15 +288,15 @@ export default function ElderlySchedule() {
     setNewTask((prev) => ({ ...prev, title: finalTitle, description: finalDescription }));
 
     if (!finalTitle.trim()) {
-      Alert.alert("Missing Information", "Please enter a title.");
+      Alert.alert(t("schedule.missingInfo"), t("schedule.enterTitle"));
       return;
     }
     if (!newTask.time) {
-      Alert.alert("Missing Information", "Please select a time.");
+      Alert.alert(t("schedule.missingInfo"), t("schedule.selectTimePrompt"));
       return;
     }
     if (!elderlyProfileId) {
-      Alert.alert("Error", "Could not determine your profile.");
+      Alert.alert(t("common.error"), t("schedule.profileNotFound"));
       return;
     }
 
@@ -307,7 +353,7 @@ export default function ElderlySchedule() {
       await fetchSchedules();
     } catch (err) {
       console.error("Error creating task:", err);
-      Alert.alert("Error", "Failed to create task.");
+      Alert.alert(t("common.error"), t("schedule.failedCreateTask"));
     } finally {
       setSaving(false);
     }
@@ -548,7 +594,7 @@ export default function ElderlySchedule() {
                   { color: theme.colors.onSurfaceVariant },
                 ]}
               >
-                {group.label}
+                {groupLabelMap[group.label as keyof typeof groupLabelMap] || group.label}
               </Text>
               {group.items.map((schedule, index) => {
                 const accentColor = "#2196F3";
@@ -588,7 +634,7 @@ export default function ElderlySchedule() {
                           variant="titleMedium"
                           style={{ fontWeight: "700" }}
                         >
-                          {schedule.title || "Appointment"}
+                          {schedule.title || t("schedule.appointment")}
                         </Text>
                         {schedule.description ? (
                           <Text
@@ -654,7 +700,7 @@ export default function ElderlySchedule() {
                         style={{ backgroundColor: `${accentColor}18` }}
                         textStyle={{ color: accentColor, fontSize: 12 }}
                       >
-                        {schedule.status || "Pending"}
+                        {translateScheduleStatus(schedule.status)}
                       </Chip>
                       {schedule.type ? (
                         <Chip
@@ -668,7 +714,7 @@ export default function ElderlySchedule() {
                             textTransform: "capitalize",
                           }}
                         >
-                          {schedule.type}
+                          {translateScheduleType(schedule.type)}
                         </Chip>
                       ) : null}
                       <View style={{ flex: 1 }} />
@@ -681,13 +727,13 @@ export default function ElderlySchedule() {
                             await markScheduleTaskCompleted(schedule.$id);
                             await fetchSchedules();
                           } catch (e) {
-                            Alert.alert("Error", "Failed to mark as completed");
+                            Alert.alert(t("common.error"), t("schedule.couldNotMarkDone"));
                           }
                         }}
                         style={{ borderRadius: 20 }}
                         labelStyle={{ fontSize: 12 }}
                       >
-                        Complete
+                        {t("schedule.markDone")}
                       </Button>
                     </View>
                   </View>
@@ -729,7 +775,7 @@ export default function ElderlySchedule() {
                     { color: theme.colors.onSurfaceVariant },
                   ]}
                 >
-                  {group.label}
+                  {groupLabelMap[group.label as keyof typeof groupLabelMap] || group.label}
                 </Text>
                 {group.items.map((schedule, index) => {
                   const isCompleted = schedule.status === "Completed";
@@ -767,7 +813,7 @@ export default function ElderlySchedule() {
                             variant="titleMedium"
                             style={{ fontWeight: "700" }}
                           >
-                            {schedule.title || "Appointment"}
+                            {schedule.title || t("schedule.appointment")}
                           </Text>
                         </View>
                         {timeStr ? (
@@ -823,7 +869,7 @@ export default function ElderlySchedule() {
                           style={{ backgroundColor: `${accentColor}18` }}
                           textStyle={{ color: accentColor, fontSize: 12 }}
                         >
-                          {schedule.status}
+                          {translateScheduleStatus(schedule.status)}
                         </Chip>
                         {!isCompleted && (
                           <>
@@ -838,15 +884,15 @@ export default function ElderlySchedule() {
                                   await fetchSchedules();
                                 } catch (e) {
                                   Alert.alert(
-                                    "Error",
-                                    "Failed to mark as completed",
+                                    t("common.error"),
+                                    t("schedule.couldNotMarkDone"),
                                   );
                                 }
                               }}
                               style={{ borderRadius: 20 }}
                               labelStyle={{ fontSize: 12 }}
                             >
-                              Complete
+                              {t("schedule.markDone")}
                             </Button>
                           </>
                         )}
@@ -922,12 +968,12 @@ export default function ElderlySchedule() {
                   variant="headlineSmall"
                   style={{ marginBottom: 20, fontWeight: "bold" }}
                 >
-                  New Event
+                  {t("schedule.newTask")}
                 </Text>
 
                 <TextInput
                   mode="outlined"
-                  label="Title"
+                  label={t("schedule.title")}
                   value={localTitle}
                   onChangeText={setLocalTitle}
                   onBlur={() => setNewTask((prev) => ({ ...prev, title: localTitle }))}
@@ -936,7 +982,7 @@ export default function ElderlySchedule() {
 
                 <TextInput
                   mode="outlined"
-                  label="Description (optional)"
+                  label={t("schedule.descriptionLabel")}
                   value={localDescription}
                   onChangeText={setLocalDescription}
                   onBlur={() => setNewTask((prev) => ({ ...prev, description: localDescription }))}
@@ -959,8 +1005,8 @@ export default function ElderlySchedule() {
                   >
                     <TextInput
                       mode="outlined"
-                      label="Date"
-                      value={newTask.date.toLocaleDateString()}
+                      label={t("schedule.date")}
+                      value={newTask.date.toLocaleDateString(dateLocale)}
                       editable={false}
                       style={styles.input}
                       right={
@@ -983,7 +1029,7 @@ export default function ElderlySchedule() {
                   >
                     <TextInput
                       mode="outlined"
-                      label="Time"
+                      label={t("schedule.time")}
                       value={newTask.time || "08:00"}
                       editable={false}
                       style={styles.input}
@@ -1003,8 +1049,8 @@ export default function ElderlySchedule() {
                 <TouchableOpacity onPress={() => setSelectingType(true)}>
                   <TextInput
                     mode="outlined"
-                    label="Type"
-                    value={newTask.typeName}
+                    label={t("schedule.typeLabel")}
+                    value={translateScheduleType(newTask.typeName)}
                     editable={false}
                     style={styles.input}
                     right={
@@ -1057,7 +1103,7 @@ export default function ElderlySchedule() {
                     <TextInput
                       mode="outlined"
                       label={t("schedule.reminderTime")}
-                      value={newTask.remindAt.toLocaleString([], {
+                      value={newTask.remindAt.toLocaleString(dateLocale, {
                         year: "numeric",
                         month: "2-digit",
                         day: "2-digit",
@@ -1087,7 +1133,7 @@ export default function ElderlySchedule() {
                   loading={saving}
                   disabled={saving}
                 >
-                  Save Event
+                  {t("schedule.saveTask")}
                 </Button>
               </ScrollView>
           ) : (
@@ -1103,10 +1149,10 @@ export default function ElderlySchedule() {
                   icon="arrow-left"
                   onPress={() => setSelectingType(false)}
                 >
-                  Back
+                  {t("common.back")}
                 </Button>
                 <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-                  Select Type
+                  {t("schedule.selectType")}
                 </Text>
               </View>
               <ScrollView
@@ -1143,7 +1189,7 @@ export default function ElderlySchedule() {
                         style={{ marginRight: 16 }}
                       />
                       <Text variant="titleMedium">
-                        {cat.name || "Activity"}
+                        {translateScheduleType(cat.name || "activity")}
                       </Text>
                       {newTask.typeId === cat.$id && (
                         <MaterialCommunityIcons
@@ -1157,13 +1203,13 @@ export default function ElderlySchedule() {
                   ))
                 ) : (
                   <View style={{ padding: 20, alignItems: "center" }}>
-                    <Text>No categories found.</Text>
+                    <Text>{t("schedule.noCategoriesFound")}</Text>
                     <Button
                       mode="outlined"
                       onPress={loadCategories}
                       style={{ marginTop: 8 }}
                     >
-                      Retry
+                      {t("schedule.retryLoading")}
                     </Button>
                   </View>
                 )}

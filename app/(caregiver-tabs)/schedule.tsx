@@ -11,6 +11,7 @@ import {
 } from "@/components/schedule";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
+import { getDateLocale } from "@/lib/i18n";
 import {
     createScheduleTask,
     fetchDayMedicationEvents,
@@ -61,6 +62,7 @@ export default function SchedulePage() {
   const navigation = useNavigation();
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.resolvedLanguage || i18n.language);
 
   // Data State
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
@@ -513,21 +515,24 @@ export default function SchedulePage() {
   const openMedicationDetails = useCallback((event: ScheduleEvent) => {
     const statusLabel =
       String(event.status).toLowerCase() === ScheduleStatus.COMPLETED.toLowerCase()
-        ? t('common.completed')
+        ? t('schedule.statusCompleted')
         : String(event.status).toLowerCase() === ScheduleStatus.MISSED.toLowerCase()
-          ? t('common.missed')
-          : t('common.pending');
+          ? t('schedule.statusMissed')
+          : t('schedule.statusPending');
 
     setSelectedMedicationDetails({
       title: event.title,
       subtitle: `${event.elderlyName} · ${statusLabel}`,
       fields: [
-        { label: "Dose", value: event.description },
-        { label: "Time", value: event.time },
-        { label: "Scheduled", value: new Date(event.rawDate).toLocaleString() },
+        { label: t('schedule.dose'), value: event.description },
+        { label: t('schedule.time'), value: event.time },
+        {
+          label: t('schedule.scheduled'),
+          value: new Date(event.rawDate).toLocaleString(dateLocale),
+        },
       ],
     });
-  }, [t]);
+  }, [dateLocale, t]);
 
   const handleSaveTask = async () => {
     if (!newTask.title || !newTask.elderlyId || !newTask.time) {

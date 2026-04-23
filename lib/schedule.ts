@@ -80,6 +80,15 @@ export type ScheduleEvent = {
  */
 export function getRelationshipId(val: unknown): string | null {
   if (!val) return null;
+  if (Array.isArray(val)) {
+    if (val.length === 0) return null;
+    const item = val[0];
+    if (typeof item === "string") return item;
+    if (typeof item === "object" && item !== null && "$id" in item) {
+      return (item as { $id: string }).$id;
+    }
+    return null;
+  }
   if (typeof val === "string") return val;
   if (typeof val === "object" && val !== null && "$id" in val)
     return (val as { $id: string }).$id;
@@ -281,13 +290,22 @@ export async function fetchDayMedicationEvents(
 
   const medicationById = new Map<string, Medication>();
   if (medicationIds.size > 0) {
-    const medicationsResponse = await tablesDB.listRows<Medication>({
-      databaseId: DATABASE_ID,
-      tableId: MEDICATION_TABLE_ID,
-      queries: [Query.equal("$id", Array.from(medicationIds))],
-    });
-    medicationsResponse.rows.forEach((medication) =>
-      medicationById.set(medication.$id, medication),
+    await Promise.all(
+      Array.from(medicationIds).map(async (medicationId) => {
+        try {
+          const medication = await tablesDB.getRow<Medication>({
+            databaseId: DATABASE_ID,
+            tableId: MEDICATION_TABLE_ID,
+            rowId: medicationId,
+          });
+          medicationById.set(medication.$id, medication);
+        } catch (error) {
+          console.warn("Failed to load medication for schedule event", {
+            medicationId,
+            error,
+          });
+        }
+      }),
     );
   }
 
@@ -714,7 +732,7 @@ export async function createScheduleTask(params: {
     }
 
     if (resolvedAudience === "elderly") {
-      triggerProfilePush({
+      await triggerProfilePush({
         mode: "profiles",
         recipientProfileIds: [elderlyId],
         title: "Schedule added",

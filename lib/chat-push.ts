@@ -68,20 +68,24 @@ async function executeChatPush(payload: ChatPushPayload): Promise<void> {
   }
 }
 
-export function triggerDirectChatPush(payload: DirectChatPushPayload): void {
-  void executeChatPush(payload);
+export function triggerDirectChatPush(
+  payload: DirectChatPushPayload,
+): Promise<void> {
+  return executeChatPush(payload);
 }
 
-export function triggerGroupChatPush(payload: GroupChatPushPayload): void {
-  void executeChatPush(payload);
+export function triggerGroupChatPush(
+  payload: GroupChatPushPayload,
+): Promise<void> {
+  return executeChatPush(payload);
 }
 
-export function triggerProfilePush(payload: ProfilePushPayload): void {
-  if (!payload.recipientProfileIds.length) return;
-  void executeChatPush(payload);
+export function triggerProfilePush(payload: ProfilePushPayload): Promise<void> {
+  if (!payload.recipientProfileIds.length) return Promise.resolve();
+  return executeChatPush(payload);
 }
 
-export function triggerUserPush(payload: UserPushPayload): void {
-  if (!payload.recipientUserIds.length) return;
-  void executeChatPush(payload);
+export function triggerUserPush(payload: UserPushPayload): Promise<void> {
+  if (!payload.recipientUserIds.length) return Promise.resolve();
+  return executeChatPush(payload);
 }

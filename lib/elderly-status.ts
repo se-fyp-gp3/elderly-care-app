@@ -57,6 +57,7 @@ function resolveRelationId(field: unknown): string | null {
  */
 export async function computeElderlyStatus(
   elderlyId: string,
+  caregiverUserId?: string,
 ): Promise<ElderlyStatusInfo> {
   const reasons: string[] = [];
   let status: ElderlyStatus = ElderlyStatus.NORMAL;
@@ -406,15 +407,21 @@ export async function computeElderlyStatus(
     // ── 5. Recent emergency alerts ──────────────────────────────────
     try {
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const alertQueries = [
+        Query.equal("elderly_id", elderlyId),
+        Query.greaterThan("$createdAt", oneDayAgo),
+        Query.orderDesc("$createdAt"),
+        Query.limit(5),
+      ];
+
+      if (caregiverUserId) {
+        alertQueries.unshift(Query.equal("caregiver_user_id", caregiverUserId));
+      }
+
       const alertsRes = await tablesDB.listRows<EmergencyAlert>({
         databaseId: DATABASE_ID,
         tableId: EMERGENCY_ALERTS_TABLE_ID,
-        queries: [
-          Query.equal("elderly_id", elderlyId),
-          Query.greaterThan("$createdAt", oneDayAgo),
-          Query.orderDesc("$createdAt"),
-          Query.limit(5),
-        ],
+        queries: alertQueries,
       });
       recentAlerts = alertsRes.rows;
 

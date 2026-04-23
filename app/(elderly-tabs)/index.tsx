@@ -2,6 +2,7 @@ import SimplifiedHomeView from "@/components/SimplifiedHomeView";
 import VoiceCommandButton from "@/components/VoiceCommandButton";
 import { useAuth } from "@/lib/auth-context";
 import { Contact, getContactsForElderly } from "@/lib/contacts";
+import { getDateLocale } from "@/lib/i18n";
 import {
     fetchElderlySchedulesForUser,
     getElderlyByUserId,
@@ -61,7 +62,8 @@ export default function ElderlyHome() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.resolvedLanguage || i18n.language);
   const uiVersion = (preferences.uiVersion as UIVersion) || UIVersion.Default;
   const isAccessible = uiVersion === UIVersion.Accessible;
   const {
@@ -82,6 +84,38 @@ export default function ElderlyHome() {
   );
   const [todayLogs, setTodayLogs] = React.useState<MedicationLogs[]>([]);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
+
+  const translateScheduleStatus = React.useCallback(
+    (status?: string | null) => {
+      switch (status) {
+        case "Completed":
+          return t("schedule.statusCompleted");
+        case "Missed":
+          return t("schedule.statusMissed");
+        default:
+          return t("schedule.statusPending");
+      }
+    },
+    [t],
+  );
+
+  const translateScheduleType = React.useCallback(
+    (type?: string | null) => {
+      switch ((type || "").toLowerCase()) {
+        case "appointment":
+          return t("schedule.appointment");
+        case "meal":
+          return t("schedule.typeMeal");
+        case "checkup":
+          return t("schedule.typeCheckup");
+        case "activity":
+          return t("schedule.typeActivity");
+        default:
+          return type || t("schedule.appointment");
+      }
+    },
+    [t],
+  );
 
   const fetchElderlyData = React.useCallback(async () => {
     if (!user) return;
@@ -672,7 +706,7 @@ export default function ElderlyHome() {
               if (!schedule.time) return "";
               try {
                 const d = new Date(schedule.time);
-                return d.toLocaleTimeString([], {
+                    return d.toLocaleTimeString(dateLocale, {
                   hour: "2-digit",
                   minute: "2-digit",
                 });
@@ -684,7 +718,7 @@ export default function ElderlyHome() {
               if (!schedule.time) return "";
               try {
                 const d = new Date(schedule.time);
-                return d.toLocaleDateString([], {
+                    return d.toLocaleDateString(dateLocale, {
                   month: "short",
                   day: "numeric",
                 });
@@ -727,7 +761,7 @@ export default function ElderlyHome() {
                   </View>
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text variant="titleMedium" style={{ fontWeight: "700" }}>
-                      {schedule.title || t("home.appointment")}
+                      {schedule.title || t("schedule.appointment")}
                     </Text>
                     {schedule.description ? (
                       <Text
@@ -793,7 +827,7 @@ export default function ElderlyHome() {
                     style={{ backgroundColor: `${accentColor}18` }}
                     textStyle={{ color: accentColor, fontSize: 12 }}
                   >
-                    {schedule.status || t("common.pending")}
+                    {translateScheduleStatus(schedule.status)}
                   </Chip>
                   {schedule.type ? (
                     <Chip
@@ -805,7 +839,7 @@ export default function ElderlyHome() {
                         textTransform: "capitalize",
                       }}
                     >
-                      {schedule.type}
+                      {translateScheduleType(schedule.type)}
                     </Chip>
                   ) : null}
                   <View style={{ flex: 1 }} />
@@ -819,13 +853,13 @@ export default function ElderlyHome() {
                           await markScheduleTaskCompleted(schedule.$id);
                           await fetchElderlyData();
                         } catch {
-                          Alert.alert("Error", "Failed to mark as completed");
+                          Alert.alert(t("common.error"), t("schedule.couldNotMarkDone"));
                         }
                       }}
                       style={{ borderRadius: 20 }}
                       labelStyle={{ fontSize: 12 }}
                     >
-                      Complete
+                      {t("schedule.markDone")}
                     </Button>
                   ) : null}
                 </View>
@@ -915,7 +949,7 @@ export default function ElderlyHome() {
                 >
                   {lastSyncTime
                     ? t("home.updated", {
-                        time: new Date(lastSyncTime).toLocaleTimeString([], {
+                        time: new Date(lastSyncTime).toLocaleTimeString(dateLocale, {
                           hour: "2-digit",
                           minute: "2-digit",
                         }),

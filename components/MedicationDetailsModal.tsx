@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Button, Divider, Modal, Portal, Text, useTheme } from "react-native-paper";
 
@@ -24,6 +25,7 @@ export default function MedicationDetailsModal({
   onDismiss,
 }: MedicationDetailsModalProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const displayFields = fields.filter((field) => {
     if (field.value == null) return false;
     return String(field.value).trim().length > 0;
@@ -86,7 +88,7 @@ export default function MedicationDetailsModal({
           ))}
 
           <Button mode="contained" onPress={onDismiss} style={styles.closeButton}>
-            Close
+            {t("common.close")}
           </Button>
         </ScrollView>
       </Modal>

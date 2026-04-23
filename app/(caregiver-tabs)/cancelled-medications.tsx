@@ -1,4 +1,5 @@
 import { useAuth } from "@/lib/auth-context";
+import { getDateLocale } from "@/lib/i18n";
 import {
     fetchCaregiverPendingCancelReminders,
     type PendingCancelReminder,
@@ -9,6 +10,7 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useLayoutEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     Alert,
     RefreshControl,
@@ -36,6 +38,8 @@ export default function CancelledMedicationsPage() {
   const router = useRouter();
   const navigation = useNavigation();
   const { user } = useAuth();
+  const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.resolvedLanguage || i18n.language);
   const [items, setItems] = useState<PendingCancelReminder[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,13 +51,23 @@ export default function CancelledMedicationsPage() {
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [elderlyMenuVisible, setElderlyMenuVisible] = useState(false);
 
+  const sortLabel = useMemo<Record<SortMode, string>>(
+    () => ({
+      newest: t("cancelledMedications.sortNewest"),
+      oldest: t("cancelledMedications.sortOldest"),
+      elderly: t("cancelledMedications.sortElderly"),
+      medication: t("cancelledMedications.sortMedication"),
+    }),
+    [t],
+  );
+
   // Header
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: "",
       headerLeft: () => (
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => router.replace("/(caregiver-tabs)/medication")}
           style={{ marginLeft: 10, flexDirection: "row", alignItems: "center" }}
         >
           <MaterialCommunityIcons
@@ -61,11 +75,11 @@ export default function CancelledMedicationsPage() {
             size={28}
             color={theme.colors.onSurface}
           />
-          <Text style={{ marginLeft: 5, fontSize: 16 }}>Back</Text>
+          <Text style={{ marginLeft: 5, fontSize: 16 }}>{t("common.back")}</Text>
         </TouchableOpacity>
       ),
     });
-  }, [navigation, router, theme]);
+  }, [navigation, router, t, theme.colors.onSurface]);
 
   const loadData = useCallback(async () => {
     if (!user?.$id) return;
@@ -76,12 +90,12 @@ export default function CancelledMedicationsPage() {
       setItems(result);
     } catch (error) {
       console.error("Failed to load cancelled medications", error);
-      Alert.alert("Error", "Failed to load cancelled medications.");
+      Alert.alert(t("common.error"), t("cancelledMedications.loadError"));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.$id]);
+  }, [t, user?.$id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -141,12 +155,15 @@ export default function CancelledMedicationsPage() {
 
   const handleConfirm = useCallback((item: PendingCancelReminder) => {
     Alert.alert(
-      "Confirm Cancel",
-      `Confirm that ${item.elderlyName}'s "${item.medicationName}" is cancelled?`,
+      t("cancelledMedications.confirmCancelTitle"),
+      t("cancelledMedications.confirmCancelMessage", {
+        elderlyName: item.elderlyName,
+        medicationName: item.medicationName,
+      }),
       [
-        { text: "No", style: "cancel" },
+        { text: t("cancelledMedications.confirmNo"), style: "cancel" },
         {
-          text: "Yes, Confirm",
+          text: t("cancelledMedications.confirmYes"),
           style: "destructive",
           onPress: async () => {
             try {
@@ -154,23 +171,23 @@ export default function CancelledMedicationsPage() {
               setItems((prev) => prev.filter((entry) => entry.reminderId !== item.reminderId));
             } catch (error) {
               console.error("Failed to confirm cancelled medication", error);
-              Alert.alert("Error", "Failed to confirm cancellation.");
+              Alert.alert(t("common.error"), t("cancelledMedications.confirmError"));
             }
           },
         },
       ],
     );
-  }, []);
+  }, [t]);
 
   const handleConfirmAll = useCallback(() => {
     if (displayItems.length === 0) return;
     Alert.alert(
-      "Confirm All",
-      `Confirm all ${displayItems.length} cancellation(s)?`,
+      t("cancelledMedications.confirmAllTitle"),
+      t("cancelledMedications.confirmAllMessage", { count: displayItems.length }),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Confirm All",
+          text: t("cancelledMedications.confirmAllAction"),
           style: "destructive",
           onPress: async () => {
             try {
@@ -179,33 +196,26 @@ export default function CancelledMedicationsPage() {
                 prev.filter((entry) => !displayItems.some((d) => d.reminderId === entry.reminderId)),
               );
             } catch (error) {
-              Alert.alert("Error", "Some confirmations failed.");
+              Alert.alert(t("common.error"), t("cancelledMedications.confirmSomeError"));
             }
           },
         },
       ],
     );
-  }, [displayItems]);
-
-  const sortLabel: Record<SortMode, string> = {
-    newest: "Newest First",
-    oldest: "Oldest First",
-    elderly: "By Elderly",
-    medication: "By Medication",
-  };
+  }, [displayItems, t]);
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
     const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return "Just now";
-    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffMin < 1) return t("common.justNow");
+    if (diffMin < 60) return t("common.minutesAgo", { minutes: diffMin });
     const diffHour = Math.floor(diffMin / 60);
-    if (diffHour < 24) return `${diffHour}h ago`;
+    if (diffHour < 24) return t("common.hoursAgo", { hours: diffHour });
     const diffDay = Math.floor(diffHour / 24);
-    if (diffDay < 7) return `${diffDay}d ago`;
-    return d.toLocaleDateString([], { month: "short", day: "numeric" });
+    if (diffDay < 7) return t("common.daysAgo", { days: diffDay });
+    return d.toLocaleDateString(dateLocale, { month: "short", day: "numeric" });
   };
 
   return (
@@ -222,12 +232,12 @@ export default function CancelledMedicationsPage() {
             <MaterialCommunityIcons name="pill-off" size={40} color={theme.colors.onSecondaryContainer} />
             <View style={{ marginLeft: 16, flex: 1 }}>
               <Text variant="titleLarge" style={{ fontWeight: "bold", color: theme.colors.onSecondaryContainer }}>
-                Cancelled Medications
+                {t("cancelledMedications.title")}
               </Text>
               <Text variant="bodyMedium" style={{ color: theme.colors.onSecondaryContainer }}>
                 {items.length === 0
-                  ? "No pending cancellations."
-                  : `${items.length} cancellation${items.length > 1 ? "s" : ""} waiting for review.`}
+                  ? t("cancelledMedications.noPending")
+                  : t("cancelledMedications.waitingReview", { count: items.length })}
               </Text>
             </View>
           </View>
@@ -235,7 +245,7 @@ export default function CancelledMedicationsPage() {
 
         {/* Search Bar */}
         <Searchbar
-          placeholder="Search medication or elderly..."
+          placeholder={t("cancelledMedications.searchPlaceholder")}
           value={searchQuery}
           onChangeText={setSearchQuery}
           style={styles.searchBar}
@@ -255,14 +265,14 @@ export default function CancelledMedicationsPage() {
                 onPress={() => setElderlyMenuVisible(true)}
                 style={styles.filterChip}
               >
-                {selectedElderly === "All" ? "All Elderly" : selectedElderly}
+                {selectedElderly === "All" ? t("cancelledMedications.allElderly") : selectedElderly}
               </Chip>
             }
           >
             {elderlyNames.map((name) => (
               <Menu.Item
                 key={name}
-                title={name === "All" ? "All Elderly" : name}
+                title={name === "All" ? t("cancelledMedications.allElderly") : name}
                 leadingIcon={selectedElderly === name ? "check" : undefined}
                 onPress={() => {
                   setSelectedElderly(name);
@@ -309,7 +319,7 @@ export default function CancelledMedicationsPage() {
               textColor={theme.colors.error}
               style={{ marginLeft: "auto" }}
             >
-              Confirm All
+              {t("cancelledMedications.confirmAll")}
             </Button>
           )}
         </View>
@@ -321,7 +331,7 @@ export default function CancelledMedicationsPage() {
           <View style={styles.loadingState}>
             <ActivityIndicator size="large" />
             <Text variant="bodyMedium" style={{ marginTop: 12, color: theme.colors.outline }}>
-              Loading...
+              {t("common.loading")}
             </Text>
           </View>
         ) : displayItems.length === 0 ? (
@@ -329,13 +339,13 @@ export default function CancelledMedicationsPage() {
             <MaterialCommunityIcons name="check-circle-outline" size={64} color={theme.colors.outline} />
             <Text variant="titleMedium" style={{ marginTop: 12 }}>
               {searchQuery || selectedElderly !== "All"
-                ? "No matching results"
-                : "All caught up!"}
+                ? t("cancelledMedications.noMatchingResults")
+                : t("cancelledMedications.allCaughtUp")}
             </Text>
             <Text variant="bodyMedium" style={{ color: theme.colors.outline, marginTop: 4, textAlign: "center" }}>
               {searchQuery || selectedElderly !== "All"
-                ? "Try adjusting your search or filter."
-                : "All cancelled medication reminders have been confirmed."}
+                ? t("cancelledMedications.adjustSearch")
+                : t("cancelledMedications.allConfirmed")}
             </Text>
           </View>
         ) : (
@@ -360,7 +370,7 @@ export default function CancelledMedicationsPage() {
                     style={{ backgroundColor: theme.colors.errorContainer }}
                     textStyle={{ color: theme.colors.onErrorContainer, fontSize: 11 }}
                   >
-                    Cancelled
+                    {t("cancelledMedications.cancelled")}
                   </Chip>
                 </View>
 
@@ -399,7 +409,7 @@ export default function CancelledMedicationsPage() {
                   icon="check"
                   onPress={() => handleConfirm(item)}
                 >
-                  Confirm Cancellation
+                  {t("cancelledMedications.confirmCancellation")}
                 </Button>
               </View>
             </Surface>

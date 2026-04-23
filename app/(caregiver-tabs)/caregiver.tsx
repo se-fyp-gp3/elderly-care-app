@@ -50,6 +50,15 @@ export default function CaregiverDashboard() {
   const [elderlyList, setElderlyList] = React.useState<ElderlyListItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const needsAttentionCount = React.useMemo(
+    () =>
+      elderlyList.filter(
+        (elderly) =>
+          elderly.status === ElderlyStatus.WARNING ||
+          elderly.status === ElderlyStatus.DANGER,
+      ).length,
+    [elderlyList],
+  );
 
   const fetchElderlyData = React.useCallback(async () => {
     try {
@@ -80,7 +89,7 @@ export default function CaregiverDashboard() {
 
       // Fetch real statuses for every elderly person in parallel
       const statusResults = await Promise.all(
-        linkedElderly.map((elderly) => computeElderlyStatus(elderly.$id)),
+        linkedElderly.map((elderly) => computeElderlyStatus(elderly.$id, user.$id)),
       );
 
       const elderlyListWithStatus: ElderlyListItem[] = linkedElderly.map(
@@ -107,7 +116,7 @@ export default function CaregiverDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [t, user]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -246,11 +255,7 @@ export default function CaregiverDashboard() {
               </View>
               <View style={styles.statItem}>
                 <Text variant="headlineSmall" style={styles.statNumber}>
-                  {
-                    elderlyList.filter(
-                      (e) => e.status === ElderlyStatus.WARNING,
-                    ).length
-                  }
+                  {needsAttentionCount}
                 </Text>
                 <Text variant="bodyMedium">{t('caregiverPanel.needsAttention')}</Text>
               </View>
@@ -328,8 +333,7 @@ export default function CaregiverDashboard() {
             <Text variant="titleLarge" style={styles.sectionTitle}>
               {t('caregiverPanel.responsibleElderly')}
             </Text>
-            {elderlyList.filter((e) => e.status === ElderlyStatus.WARNING)
-              .length > 0 && (
+            {needsAttentionCount > 0 && (
               <View
                 style={{
                   backgroundColor: "#FF9800",
@@ -342,11 +346,7 @@ export default function CaregiverDashboard() {
                 <Text
                   style={{ color: "#fff", fontWeight: "bold", fontSize: 13 }}
                 >
-                  {
-                    elderlyList.filter(
-                      (e) => e.status === ElderlyStatus.WARNING,
-                    ).length
-                  }{" "}
+                  {needsAttentionCount}{" "}
                   {t('caregiverPanel.needsAttention').toLowerCase()}
                 </Text>
               </View>
