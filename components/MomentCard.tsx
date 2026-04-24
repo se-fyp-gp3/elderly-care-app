@@ -21,7 +21,6 @@ import {
     View,
 } from "react-native";
 import {
-    ActivityIndicator,
     Divider,
     Text,
     useTheme
@@ -32,11 +31,6 @@ interface MomentCardProps {
   currentUserId: string;
   onLike: (id: string) => void;
   onComment: (id: string) => void;
-  onAIRequest: (
-    id: string,
-    content: string,
-    imageUrl?: string,
-  ) => Promise<MomentComment>;
   onDelete?: (id: string) => void;
   latestComments?: MomentComment[];
   authorAvatarFileId?: string;
@@ -58,6 +52,7 @@ function GalleryVideoPage({
 
   const player = useVideoPlayer(uri, (p: VideoPlayer) => {
     p.loop = false;
+    p.keepScreenOnWhilePlaying = false;
   });
 
   useEffect(() => {
@@ -542,7 +537,6 @@ export default function MomentCard({
   currentUserId,
   onLike,
   onComment,
-  onAIRequest,
   onDelete,
   latestComments,
   authorAvatarFileId,
@@ -553,8 +547,6 @@ export default function MomentCard({
     moment.likes?.includes(currentUserId) || false,
   );
   const [likesCount, setLikesCount] = useState(moment.likes?.length || 0);
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [aiComment, setAIComment] = useState<MomentComment | null>(null);
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
 
   const mediaItems = moment.parsedMediaItems || [];
@@ -564,21 +556,6 @@ export default function MomentCard({
     setLiked(newLiked);
     setLikesCount((prev) => (newLiked ? prev + 1 : prev - 1));
     onLike(moment.$id);
-  };
-
-  const handleAI = async () => {
-    if (loadingAI || aiComment) return;
-    setLoadingAI(true);
-    try {
-      const imageUrl =
-        moment.media_type === "image" ? moment.media_url : undefined;
-      const comment = await onAIRequest(moment.$id, moment.content, imageUrl);
-      setAIComment(comment);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoadingAI(false);
-    }
   };
 
   const handlePressMedia = (index: number) => {
@@ -656,63 +633,6 @@ export default function MomentCard({
       {/* Multi-media grid */}
       <MediaGrid items={mediaItems} onPressMedia={handlePressMedia} />
 
-      {/* AI Response Section */}
-      {loadingAI && (
-        <View
-          style={[
-            styles.aiLoading,
-            { backgroundColor: theme.colors.surfaceVariant },
-          ]}
-        >
-          <ActivityIndicator size="small" color={theme.colors.tertiary} />
-          <Text
-            variant="bodySmall"
-            style={{ marginLeft: 8, color: theme.colors.tertiary }}
-          >
-            {t("moments.aiThinking")}
-          </Text>
-        </View>
-      )}
-
-      {aiComment && (
-        <View
-          style={[
-            styles.aiResponse,
-            { backgroundColor: theme.colors.tertiaryContainer },
-          ]}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginBottom: 4,
-            }}
-          >
-            <MaterialCommunityIcons
-              name="robot"
-              size={16}
-              color={theme.colors.onTertiaryContainer}
-            />
-            <Text
-              variant="labelSmall"
-              style={{
-                marginLeft: 4,
-                color: theme.colors.onTertiaryContainer,
-                fontWeight: "bold",
-              }}
-            >
-              {t("moments.aiInsight")}
-            </Text>
-          </View>
-          <Text
-            variant="bodyMedium"
-            style={{ color: theme.colors.onTertiaryContainer }}
-          >
-            {aiComment.content}
-          </Text>
-        </View>
-      )}
-
       <Divider style={{ marginVertical: 12 }} />
 
       <View style={styles.actions}>
@@ -746,28 +666,6 @@ export default function MomentCard({
             {moment.comments_count > 0
               ? moment.comments_count
               : t("moments.comment")}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionBtn, { marginLeft: "auto" }]}
-          onPress={handleAI}
-          disabled={loadingAI || !!aiComment}
-        >
-          <MaterialCommunityIcons
-            name="creation"
-            size={20}
-            color={theme.colors.tertiary}
-          />
-          <Text
-            variant="bodyMedium"
-            style={{
-              marginLeft: 6,
-              color: theme.colors.tertiary,
-              fontWeight: "600",
-            }}
-          >
-            {t("moments.aiDiscuss")}
           </Text>
         </TouchableOpacity>
       </View>
@@ -808,19 +706,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 4,
-  },
-  aiLoading: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  aiResponse: {
-    padding: 12,
-    borderRadius: 12,
-    marginTop: 8,
   },
   // Media grid
   mediaGridWrap: {

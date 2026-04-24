@@ -5,7 +5,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Platform, Modal as RNModal, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import {
     Avatar,
     Button,
@@ -64,26 +64,71 @@ export function AddMedicationDialog({
 }: AddMedicationDialogProps) {
   const theme = useTheme();
   const { t } = useTranslation();
+
+  // Local state for text inputs to prevent IME composition interruption
+  const [localName, setLocalName] = React.useState(formData.name);
+  const [localUnit, setLocalUnit] = React.useState(formData.unit);
+
+  // Sync local state when dialog opens or formData resets externally
+  React.useEffect(() => {
+    if (visible) {
+      setLocalName(formData.name);
+      setLocalUnit(formData.unit);
+    }
+  }, [visible]);
+
+  // Temp state for iOS spinner picker
+  const [tempTime, setTempTime] = React.useState<Date>(new Date());
+
+  // Initialize temp time when picker opens
+  React.useEffect(() => {
+    if (showTimePicker) {
+      setTempTime(
+        editingTimeIndex !== null && editingTimeIndex >= 0
+          ? formData.times[editingTimeIndex]
+          : new Date()
+      );
+    }
+  }, [showTimePicker]);
+
+  const applyTimeSelection = (selectedDate: Date) => {
+    if (editingTimeIndex === -1) {
+      onFormDataChange((prev) => ({
+        ...prev,
+        times: [...prev.times, selectedDate],
+      }));
+    } else if (editingTimeIndex !== null) {
+      onFormDataChange((prev) => {
+        const newTimes = [...prev.times];
+        newTimes[editingTimeIndex] = selectedDate;
+        return { ...prev, times: newTimes };
+      });
+    }
+    onEditingTimeIndexChange(null);
+  };
+
   const handleTimePickerChange = (
     _event: DateTimePickerEvent,
     selectedDate?: Date,
   ) => {
-    onShowTimePicker(false);
-    if (selectedDate) {
-      if (editingTimeIndex === -1) {
-        onFormDataChange((prev) => ({
-          ...prev,
-          times: [...prev.times, selectedDate],
-        }));
-      } else if (editingTimeIndex !== null) {
-        onFormDataChange((prev) => {
-          const newTimes = [...prev.times];
-          newTimes[editingTimeIndex] = selectedDate;
-          return { ...prev, times: newTimes };
-        });
-      }
+    if (Platform.OS === "ios") {
+      if (selectedDate) setTempTime(selectedDate);
+      return;
     }
-    onEditingTimeIndexChange(null);
+    onShowTimePicker(false);
+    if (selectedDate) applyTimeSelection(selectedDate);
+  };
+
+  const handleTimePickerDone = () => {
+    onShowTimePicker(false);
+    applyTimeSelection(tempTime);
+  };
+
+  const handleSave = () => {
+    // Sync local text state to parent before saving
+    onFormDataChange((prev) => ({ ...prev, name: localName, unit: localUnit }));
+    // Use setTimeout to ensure state update is applied before save callback
+    setTimeout(onSave, 0);
   };
 
   return (
@@ -121,10 +166,9 @@ export function AddMedicationDialog({
 
                 <TextInput
                   label={t('medication.medicationName')}
-                  value={formData.name}
-                  onChangeText={(val) =>
-                    onFormDataChange((prev) => ({ ...prev, name: val }))
-                  }
+                  value={localName}
+                  onChangeText={setLocalName}
+                  onBlur={() => onFormDataChange((prev) => ({ ...prev, name: localName }))}
                   style={{ marginBottom: 10 }}
                   mode="outlined"
                 />
@@ -143,10 +187,9 @@ export function AddMedicationDialog({
                   />
                   <TextInput
                     label={t('medication.unit')}
-                    value={formData.unit}
-                    onChangeText={(val) =>
-                      onFormDataChange((prev) => ({ ...prev, unit: val }))
-                    }
+                    value={localUnit}
+                    onChangeText={setLocalUnit}
+                    onBlur={() => onFormDataChange((prev) => ({ ...prev, unit: localUnit }))}
                     style={{ flex: 1 }}
                     mode="outlined"
                   />
@@ -207,7 +250,7 @@ export function AddMedicationDialog({
             </Dialog.ScrollArea>
             <Dialog.Actions>
               <Button onPress={onDismiss}>{t('common.cancel')}</Button>
-              <Button onPress={onSave}>{t('common.save')}</Button>
+              <Button onPress={handleSave}>{t('common.save')}</Button>
             </Dialog.Actions>
           </View>
         ) : (
@@ -333,7 +376,25 @@ export function AddMedicationDialog({
         )}
       </Dialog>
 
-      {showTimePicker && (
+      {showTimePicker && Platform.OS === "ios" ? (
+        <RNModal visible transparent animationType="slide">
+          <View style={styles.pickerOverlay}>
+            <View style={styles.pickerSheet}>
+              <View style={styles.pickerHeader}>
+                <Button onPress={() => { onShowTimePicker(false); onEditingTimeIndexChange(null); }}>{t('common.cancel')}</Button>
+                <Button onPress={handleTimePickerDone}>{t('common.done')}</Button>
+              </View>
+              <DateTimePicker
+                value={tempTime}
+                mode="time"
+                display="spinner"
+                onChange={handleTimePickerChange}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        </RNModal>
+      ) : showTimePicker ? (
         <DateTimePicker
           value={
             editingTimeIndex !== null && editingTimeIndex >= 0
@@ -344,7 +405,7 @@ export function AddMedicationDialog({
           display="default"
           onChange={handleTimePickerChange}
         />
-      )}
+      ) : null}
     </>
   );
 }
@@ -356,5 +417,23 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderRadius: 8,
+  },
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  pickerSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 30,
+    alignItems: "center",
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignSelf: "stretch",
+    padding: 8,
   },
 });

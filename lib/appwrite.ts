@@ -72,6 +72,8 @@ export const CAREGIVER_CONNECTIONS_TABLE_ID =
 export const MOMENTS_TABLE_ID = process.env.EXPO_PUBLIC_MOMENTS_TABLE_ID || "moments";
 export const MOMENTS_COMMENTS_TABLE_ID = process.env.EXPO_PUBLIC_MOMENTS_COMMENTS_TABLE_ID || "moments_comments";
 export const EMERGENCY_ALERTS_TABLE_ID = process.env.EXPO_PUBLIC_EMERGENCY_ALERTS_TABLE_ID || "emergency_alerts";
+export const EXPO_PUSH_TOKENS_TABLE_ID =
+  process.env.EXPO_PUBLIC_EXPO_PUSH_TOKENS_TABLE_ID || "";
 
 export const GROUPS_TABLE_ID = process.env.EXPO_PUBLIC_GROUPS_TABLE_ID || "groups";
 export const GROUP_MEMBERS_TABLE_ID = process.env.EXPO_PUBLIC_GROUP_MEMBERS_TABLE_ID || "group_members";
@@ -83,6 +85,8 @@ export const ROLE_MANAGEMENT_FUNCTION_ID =
   process.env.EXPO_PUBLIC_ROLE_MANAGEMENT_FUNCTION_ID!;
 export const VOICE_CLONE_FUNCTION_ID =
   process.env.EXPO_PUBLIC_VOICE_CLONE_FUNCTION_ID!;
+export const CHAT_PUSH_FUNCTION_ID =
+  process.env.EXPO_PUBLIC_CHAT_PUSH_FUNCTION_ID || "";
 
 export interface RealtimeResponse {
   events: string[];

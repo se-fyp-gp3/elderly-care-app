@@ -10,8 +10,10 @@ import {
     updateAlertStatus,
 } from "@/lib/emergency";
 import i18n from "@/lib/i18n";
+import { useLanguage } from "@/lib/language-context";
 import type { EmergencyAlert } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Location from "expo-location";
 import { useNavigation, useRouter } from "expo-router";
 import React, {
     useCallback,
@@ -35,7 +37,6 @@ import {
 } from "react-native";
 import {
     Button,
-    Card,
     Chip,
     Dialog,
     Divider,
@@ -48,6 +49,597 @@ import {
 } from "react-native-paper";
 
 /* ── Helpers ────────────────────────────────────────────── */
+
+type AppLanguage = "en" | "zh" | "zh-Hant";
+
+type LocalizedPlaceName = Record<AppLanguage, string>;
+
+const HONG_KONG_LOCATION_TRANSLATIONS: Record<string, LocalizedPlaceName> = {
+  "hong kong": { en: "Hong Kong", zh: "香港", "zh-Hant": "香港" },
+  "香港": { en: "Hong Kong", zh: "香港", "zh-Hant": "香港" },
+  "香港特别行政区": { en: "Hong Kong", zh: "香港", "zh-Hant": "香港" },
+  "香港特別行政區": { en: "Hong Kong", zh: "香港", "zh-Hant": "香港" },
+  "hong kong island": {
+    en: "Hong Kong Island",
+    zh: "香港岛",
+    "zh-Hant": "香港島",
+  },
+  "香港岛": { en: "Hong Kong Island", zh: "香港岛", "zh-Hant": "香港島" },
+  "香港島": { en: "Hong Kong Island", zh: "香港岛", "zh-Hant": "香港島" },
+  kowloon: { en: "Kowloon", zh: "九龙", "zh-Hant": "九龍" },
+  "九龙": { en: "Kowloon", zh: "九龙", "zh-Hant": "九龍" },
+  "九龍": { en: "Kowloon", zh: "九龙", "zh-Hant": "九龍" },
+  "new territories": {
+    en: "New Territories",
+    zh: "新界",
+    "zh-Hant": "新界",
+  },
+  "中西区": {
+    en: "Central and Western District",
+    zh: "中西区",
+    "zh-Hant": "中西區",
+  },
+  "中西區": {
+    en: "Central and Western District",
+    zh: "中西区",
+    "zh-Hant": "中西區",
+  },
+  "central and western": {
+    en: "Central and Western District",
+    zh: "中西区",
+    "zh-Hant": "中西區",
+  },
+  "central and western district": {
+    en: "Central and Western District",
+    zh: "中西区",
+    "zh-Hant": "中西區",
+  },
+  "central & western": {
+    en: "Central and Western District",
+    zh: "中西区",
+    "zh-Hant": "中西區",
+  },
+  "wan chai": { en: "Wan Chai District", zh: "湾仔区", "zh-Hant": "灣仔區" },
+  "wan chai district": {
+    en: "Wan Chai District",
+    zh: "湾仔区",
+    "zh-Hant": "灣仔區",
+  },
+  "湾仔区": { en: "Wan Chai District", zh: "湾仔区", "zh-Hant": "灣仔區" },
+  "灣仔區": { en: "Wan Chai District", zh: "湾仔区", "zh-Hant": "灣仔區" },
+  eastern: { en: "Eastern District", zh: "东区", "zh-Hant": "東區" },
+  "eastern district": { en: "Eastern District", zh: "东区", "zh-Hant": "東區" },
+  "东区": { en: "Eastern District", zh: "东区", "zh-Hant": "東區" },
+  "東區": { en: "Eastern District", zh: "东区", "zh-Hant": "東區" },
+  southern: { en: "Southern District", zh: "南区", "zh-Hant": "南區" },
+  "southern district": {
+    en: "Southern District",
+    zh: "南区",
+    "zh-Hant": "南區",
+  },
+  "南区": { en: "Southern District", zh: "南区", "zh-Hant": "南區" },
+  "南區": { en: "Southern District", zh: "南区", "zh-Hant": "南區" },
+  "yau tsim mong": {
+    en: "Yau Tsim Mong District",
+    zh: "油尖旺区",
+    "zh-Hant": "油尖旺區",
+  },
+  "yau tsim mong district": {
+    en: "Yau Tsim Mong District",
+    zh: "油尖旺区",
+    "zh-Hant": "油尖旺區",
+  },
+  "油尖旺区": {
+    en: "Yau Tsim Mong District",
+    zh: "油尖旺区",
+    "zh-Hant": "油尖旺區",
+  },
+  "油尖旺區": {
+    en: "Yau Tsim Mong District",
+    zh: "油尖旺区",
+    "zh-Hant": "油尖旺區",
+  },
+  "sham shui po": {
+    en: "Sham Shui Po District",
+    zh: "深水埗区",
+    "zh-Hant": "深水埗區",
+  },
+  "sham shui po district": {
+    en: "Sham Shui Po District",
+    zh: "深水埗区",
+    "zh-Hant": "深水埗區",
+  },
+  "深水埗区": {
+    en: "Sham Shui Po District",
+    zh: "深水埗区",
+    "zh-Hant": "深水埗區",
+  },
+  "深水埗區": {
+    en: "Sham Shui Po District",
+    zh: "深水埗区",
+    "zh-Hant": "深水埗區",
+  },
+  "kowloon city": {
+    en: "Kowloon City District",
+    zh: "九龙城区",
+    "zh-Hant": "九龍城區",
+  },
+  "kowloon city district": {
+    en: "Kowloon City District",
+    zh: "九龙城区",
+    "zh-Hant": "九龍城區",
+  },
+  "九龙城区": {
+    en: "Kowloon City District",
+    zh: "九龙城区",
+    "zh-Hant": "九龍城區",
+  },
+  "九龍城區": {
+    en: "Kowloon City District",
+    zh: "九龙城区",
+    "zh-Hant": "九龍城區",
+  },
+  "wong tai sin": {
+    en: "Wong Tai Sin District",
+    zh: "黄大仙区",
+    "zh-Hant": "黃大仙區",
+  },
+  "wong tai sin district": {
+    en: "Wong Tai Sin District",
+    zh: "黄大仙区",
+    "zh-Hant": "黃大仙區",
+  },
+  "黄大仙区": {
+    en: "Wong Tai Sin District",
+    zh: "黄大仙区",
+    "zh-Hant": "黃大仙區",
+  },
+  "黃大仙區": {
+    en: "Wong Tai Sin District",
+    zh: "黄大仙区",
+    "zh-Hant": "黃大仙區",
+  },
+  "kwun tong": {
+    en: "Kwun Tong District",
+    zh: "观塘区",
+    "zh-Hant": "觀塘區",
+  },
+  "kwun tong district": {
+    en: "Kwun Tong District",
+    zh: "观塘区",
+    "zh-Hant": "觀塘區",
+  },
+  "观塘区": {
+    en: "Kwun Tong District",
+    zh: "观塘区",
+    "zh-Hant": "觀塘區",
+  },
+  "觀塘區": {
+    en: "Kwun Tong District",
+    zh: "观塘区",
+    "zh-Hant": "觀塘區",
+  },
+  "tsuen wan": {
+    en: "Tsuen Wan District",
+    zh: "荃湾区",
+    "zh-Hant": "荃灣區",
+  },
+  "tsuen wan district": {
+    en: "Tsuen Wan District",
+    zh: "荃湾区",
+    "zh-Hant": "荃灣區",
+  },
+  "荃湾区": {
+    en: "Tsuen Wan District",
+    zh: "荃湾区",
+    "zh-Hant": "荃灣區",
+  },
+  "荃灣區": {
+    en: "Tsuen Wan District",
+    zh: "荃湾区",
+    "zh-Hant": "荃灣區",
+  },
+  "tuen mun": {
+    en: "Tuen Mun District",
+    zh: "屯门区",
+    "zh-Hant": "屯門區",
+  },
+  "tuen mun district": {
+    en: "Tuen Mun District",
+    zh: "屯门区",
+    "zh-Hant": "屯門區",
+  },
+  "屯门区": {
+    en: "Tuen Mun District",
+    zh: "屯门区",
+    "zh-Hant": "屯門區",
+  },
+  "屯門區": {
+    en: "Tuen Mun District",
+    zh: "屯门区",
+    "zh-Hant": "屯門區",
+  },
+  "yuen long": {
+    en: "Yuen Long District",
+    zh: "元朗区",
+    "zh-Hant": "元朗區",
+  },
+  "yuen long district": {
+    en: "Yuen Long District",
+    zh: "元朗区",
+    "zh-Hant": "元朗區",
+  },
+  "元朗区": {
+    en: "Yuen Long District",
+    zh: "元朗区",
+    "zh-Hant": "元朗區",
+  },
+  "元朗區": {
+    en: "Yuen Long District",
+    zh: "元朗区",
+    "zh-Hant": "元朗區",
+  },
+  north: { en: "North District", zh: "北区", "zh-Hant": "北區" },
+  "north district": { en: "North District", zh: "北区", "zh-Hant": "北區" },
+  "北区": { en: "North District", zh: "北区", "zh-Hant": "北區" },
+  "北區": { en: "North District", zh: "北区", "zh-Hant": "北區" },
+  "tai po": { en: "Tai Po District", zh: "大埔区", "zh-Hant": "大埔區" },
+  "tai po district": {
+    en: "Tai Po District",
+    zh: "大埔区",
+    "zh-Hant": "大埔區",
+  },
+  "大埔区": { en: "Tai Po District", zh: "大埔区", "zh-Hant": "大埔區" },
+  "大埔區": { en: "Tai Po District", zh: "大埔区", "zh-Hant": "大埔區" },
+  "sai kung": { en: "Sai Kung District", zh: "西贡区", "zh-Hant": "西貢區" },
+  "sai kung district": {
+    en: "Sai Kung District",
+    zh: "西贡区",
+    "zh-Hant": "西貢區",
+  },
+  "西贡区": { en: "Sai Kung District", zh: "西贡区", "zh-Hant": "西貢區" },
+  "西貢區": { en: "Sai Kung District", zh: "西贡区", "zh-Hant": "西貢區" },
+  "sha tin": { en: "Sha Tin District", zh: "沙田区", "zh-Hant": "沙田區" },
+  "sha tin district": {
+    en: "Sha Tin District",
+    zh: "沙田区",
+    "zh-Hant": "沙田區",
+  },
+  "沙田区": { en: "Sha Tin District", zh: "沙田区", "zh-Hant": "沙田區" },
+  "沙田區": { en: "Sha Tin District", zh: "沙田区", "zh-Hant": "沙田區" },
+  "kwai tsing": {
+    en: "Kwai Tsing District",
+    zh: "葵青区",
+    "zh-Hant": "葵青區",
+  },
+  "kwai tsing district": {
+    en: "Kwai Tsing District",
+    zh: "葵青区",
+    "zh-Hant": "葵青區",
+  },
+  "葵青区": {
+    en: "Kwai Tsing District",
+    zh: "葵青区",
+    "zh-Hant": "葵青區",
+  },
+  "葵青區": {
+    en: "Kwai Tsing District",
+    zh: "葵青区",
+    "zh-Hant": "葵青區",
+  },
+  islands: { en: "Islands District", zh: "离岛区", "zh-Hant": "離島區" },
+  "islands district": {
+    en: "Islands District",
+    zh: "离岛区",
+    "zh-Hant": "離島區",
+  },
+  "离岛区": { en: "Islands District", zh: "离岛区", "zh-Hant": "離島區" },
+  "離島區": { en: "Islands District", zh: "离岛区", "zh-Hant": "離島區" },
+  "garden road": { en: "Garden Road", zh: "花园道", "zh-Hant": "花園道" },
+  "花园道": { en: "Garden Road", zh: "花园道", "zh-Hant": "花園道" },
+  "花園道": { en: "Garden Road", zh: "花园道", "zh-Hant": "花園道" },
+  "waterfall bay road": {
+    en: "Waterfall Bay Road",
+    zh: "瀑布湾道",
+    "zh-Hant": "瀑布灣道",
+  },
+  "瀑布湾道": {
+    en: "Waterfall Bay Road",
+    zh: "瀑布湾道",
+    "zh-Hant": "瀑布灣道",
+  },
+  "瀑布灣道": {
+    en: "Waterfall Bay Road",
+    zh: "瀑布湾道",
+    "zh-Hant": "瀑布灣道",
+  },
+};
+
+const TRADITIONAL_TO_SIMPLIFIED_CHAR_MAP: Record<string, string> = {
+  灣: "湾",
+  區: "区",
+  園: "园",
+  島: "岛",
+  龍: "龙",
+  門: "门",
+  東: "东",
+  觀: "观",
+  黃: "黄",
+  荃: "荃",
+  貢: "贡",
+  離: "离",
+  頭: "头",
+  馬: "马",
+  廣: "广",
+  華: "华",
+  樂: "乐",
+  麗: "丽",
+  寶: "宝",
+  將: "将",
+  軍: "军",
+  業: "业",
+  環: "环",
+  徑: "径",
+  國: "国",
+  際: "际",
+  號: "号",
+  樓: "楼",
+  臺: "台",
+  滙: "汇",
+  豐: "丰",
+  鳳: "凤",
+  務: "务",
+  廈: "厦",
+  寧: "宁",
+  醫: "医",
+  專: "专",
+  綫: "线",
+  莊: "庄",
+  錦: "锦",
+  銅: "铜",
+  鑼: "锣",
+  體: "体",
+  會: "会",
+  亞: "亚",
+  鄉: "乡",
+  廠: "厂",
+  舖: "铺",
+};
+
+const SIMPLIFIED_TO_TRADITIONAL_CHAR_MAP = Object.fromEntries(
+  Object.entries(TRADITIONAL_TO_SIMPLIFIED_CHAR_MAP).map(
+    ([traditional, simplified]) => [simplified, traditional],
+  ),
+) as Record<string, string>;
+
+const caregiverReverseGeocodeCache = new Map<
+  string,
+  Promise<Location.LocationGeocodedAddress | null>
+>();
+
+function normalizeLocationLanguage(language: string): AppLanguage {
+  return language === "zh" || language === "zh-Hant" ? language : "en";
+}
+
+function normalizePlaceKey(value: string): string {
+  return value
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase()
+    .replace(/[，、]/g, ",")
+    .replace(/\s+/g, " ")
+    .replace(/hong kong special administrative region/g, "hong kong")
+    .replace(/hong kong sar/g, "hong kong")
+    .replace(/香港特别行政区/g, "香港")
+    .replace(/香港特別行政區/g, "香港");
+}
+
+function hasCjkCharacters(value: string): boolean {
+  return /[\u3400-\u9FFF]/.test(value);
+}
+
+function hasLatinCharacters(value: string): boolean {
+  return /[A-Za-z]/.test(value);
+}
+
+function convertByCharacterMap(
+  value: string,
+  characterMap: Record<string, string>,
+): string {
+  return Array.from(value)
+    .map((character) => characterMap[character] ?? character)
+    .join("");
+}
+
+function convertChineseScript(value: string, language: AppLanguage): string {
+  if (language === "zh") {
+    return convertByCharacterMap(value, TRADITIONAL_TO_SIMPLIFIED_CHAR_MAP);
+  }
+
+  if (language === "zh-Hant") {
+    return convertByCharacterMap(value, SIMPLIFIED_TO_TRADITIONAL_CHAR_MAP);
+  }
+
+  return value;
+}
+
+function dedupeLocationParts(parts: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+
+  return parts.filter((part): part is string => {
+    const trimmed = part?.trim();
+    if (!trimmed) return false;
+
+    const key = normalizePlaceKey(trimmed);
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function translatePlacePart(
+  value: string | null | undefined,
+  language: AppLanguage,
+): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+
+  const translated = HONG_KONG_LOCATION_TRANSLATIONS[normalizePlaceKey(trimmed)];
+  if (translated) {
+    return translated[language];
+  }
+
+  if (hasCjkCharacters(trimmed)) {
+    return language === "en" ? null : convertChineseScript(trimmed, language);
+  }
+
+  if (hasLatinCharacters(trimmed)) {
+    return language === "en" ? trimmed : null;
+  }
+
+  return trimmed;
+}
+
+function translateStreetPart(
+  value: string | null | undefined,
+  language: AppLanguage,
+): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+
+  const translated = HONG_KONG_LOCATION_TRANSLATIONS[normalizePlaceKey(trimmed)];
+  if (translated) {
+    return translated[language];
+  }
+
+  if (hasCjkCharacters(trimmed)) {
+    return language === "en" ? null : convertChineseScript(trimmed, language);
+  }
+
+  if (hasLatinCharacters(trimmed)) {
+    return language === "en" ? trimmed : null;
+  }
+
+  return language === "en" ? trimmed : null;
+}
+
+function formatAlertCoordinates(alert: EmergencyAlert): string | null {
+  if (alert.latitude != null && alert.longitude != null) {
+    return `${alert.latitude.toFixed(5)}, ${alert.longitude.toFixed(5)}`;
+  }
+
+  return null;
+}
+
+function localizeStoredLocationName(
+  locationName: string | null | undefined,
+  language: AppLanguage,
+): string | null {
+  const trimmed = locationName?.trim();
+  if (!trimmed) return null;
+
+  const localizedParts = dedupeLocationParts(
+    trimmed.split(/[，,]/).map((part) => translatePlacePart(part, language)),
+  );
+
+  if (localizedParts.length > 0) {
+    return localizedParts.join(", ");
+  }
+
+  if (language === "en") {
+    return hasLatinCharacters(trimmed) ? trimmed : null;
+  }
+
+  return convertChineseScript(trimmed, language);
+}
+
+function buildLocalizedLocationFromAddress(
+  address: Location.LocationGeocodedAddress,
+  alert: EmergencyAlert,
+  language: AppLanguage,
+): string | null {
+  const streetBase = address.street?.trim() || address.name?.trim() || null;
+  const streetPart = streetBase
+    ? address.streetNumber?.trim()
+      ? translateStreetPart(`${address.streetNumber.trim()} ${streetBase}`, language)
+      : translateStreetPart(streetBase, language)
+    : null;
+
+  const parts = dedupeLocationParts([
+    streetPart,
+    translatePlacePart(address.district, language),
+    translatePlacePart(address.subregion, language),
+    translatePlacePart(address.city, language),
+    translatePlacePart(address.region, language),
+    translatePlacePart(
+      address.country ?? (address.isoCountryCode === "HK" ? "Hong Kong" : null),
+      language,
+    ),
+  ]);
+
+  if (parts.length > 0) {
+    return parts.join(", ");
+  }
+
+  return localizeStoredLocationName(alert.location_name, language) ?? formatAlertCoordinates(alert);
+}
+
+async function reverseGeocodeForAlert(
+  alert: EmergencyAlert,
+): Promise<Location.LocationGeocodedAddress | null> {
+  if (alert.latitude == null || alert.longitude == null) {
+    return null;
+  }
+
+  const cacheKey = `${alert.latitude.toFixed(6)},${alert.longitude.toFixed(6)}`;
+  const cachedPromise = caregiverReverseGeocodeCache.get(cacheKey);
+  if (cachedPromise) {
+    return cachedPromise;
+  }
+
+  const lookupPromise = Location.reverseGeocodeAsync({
+    latitude: alert.latitude,
+    longitude: alert.longitude,
+  })
+    .then((results) => results[0] ?? null)
+    .catch(() => null);
+
+  caregiverReverseGeocodeCache.set(cacheKey, lookupPromise);
+  return lookupPromise;
+}
+
+async function resolveLocalizedAlertLocation(
+  alert: EmergencyAlert,
+  language: AppLanguage,
+): Promise<string | null> {
+  const fallbackLocation =
+    localizeStoredLocationName(alert.location_name, language) ??
+    formatAlertCoordinates(alert);
+
+  if (alert.latitude == null || alert.longitude == null) {
+    return fallbackLocation;
+  }
+
+  const address = await reverseGeocodeForAlert(alert);
+  if (!address) {
+    return fallbackLocation;
+  }
+
+  return buildLocalizedLocationFromAddress(address, alert, language);
+}
+
+function getLocationFallback(
+  alert: EmergencyAlert,
+  language: AppLanguage,
+): string | null {
+  return (
+    localizeStoredLocationName(alert.location_name, language) ??
+    formatAlertCoordinates(alert)
+  );
+}
 
 function getTypeConfig(type: string) {
   switch (type) {
@@ -95,11 +687,19 @@ export default function EmergencyPage() {
   const router = useRouter();
   const navigation = useNavigation();
   const { user } = useAuth();
+  const { language } = useLanguage();
   const { t } = useTranslation();
+  const locationLanguage = useMemo(
+    () => normalizeLocationLanguage(language),
+    [language],
+  );
 
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [localizedAlertLocations, setLocalizedAlertLocations] = useState<
+    Record<string, string | null>
+  >({});
   const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(
     null,
   );
@@ -134,6 +734,58 @@ export default function EmergencyPage() {
     });
     return () => unsub?.();
   }, [user, loadAlerts]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fallbackLocations = Object.fromEntries(
+      alerts.map((alert) => [alert.$id, getLocationFallback(alert, locationLanguage)]),
+    ) as Record<string, string | null>;
+
+    setLocalizedAlertLocations(fallbackLocations);
+
+    const alertsWithCoordinates = alerts.filter(
+      (alert) => alert.latitude != null && alert.longitude != null,
+    );
+
+    if (alertsWithCoordinates.length === 0) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      const resolvedEntries = await Promise.all(
+        alertsWithCoordinates.map(async (alert) => [
+          alert.$id,
+          await resolveLocalizedAlertLocation(alert, locationLanguage),
+        ] as const),
+      );
+
+      if (cancelled) {
+        return;
+      }
+
+      setLocalizedAlertLocations((current) => {
+        const next = { ...fallbackLocations, ...current };
+        for (const [alertId, locationText] of resolvedEntries) {
+          next[alertId] = locationText;
+        }
+        return next;
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [alerts, locationLanguage]);
+
+  const getAlertLocationText = useCallback(
+    (alert: EmergencyAlert) =>
+      localizedAlertLocations[alert.$id] ??
+      getLocationFallback(alert, locationLanguage),
+    [localizedAlertLocations, locationLanguage],
+  );
 
   /* ── Header ── */
   useLayoutEffect(() => {
@@ -178,15 +830,20 @@ export default function EmergencyPage() {
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
-        (a) =>
-          a.elderly_name.toLowerCase().includes(q) ||
-          a.type.toLowerCase().includes(q) ||
-          (a.location_name ?? "").toLowerCase().includes(q) ||
-          (a.description ?? "").toLowerCase().includes(q),
+        (a) => {
+          const locationText = getAlertLocationText(a)?.toLowerCase() ?? "";
+          return (
+            a.elderly_name.toLowerCase().includes(q) ||
+            a.type.toLowerCase().includes(q) ||
+            locationText.includes(q) ||
+            (a.location_name ?? "").toLowerCase().includes(q) ||
+            (a.description ?? "").toLowerCase().includes(q)
+          );
+        },
       );
     }
     return list;
-  }, [alerts, filterStatus, search]);
+  }, [alerts, filterStatus, getAlertLocationText, search]);
 
   const activeCount = useMemo(
     () =>
@@ -286,6 +943,7 @@ export default function EmergencyPage() {
 
   const renderLogItem = ({ item }: { item: EmergencyAlert }) => {
     const config = getTypeConfig(item.type);
+    const locationText = getAlertLocationText(item);
     return (
       <Surface
         style={[styles.logCard, { borderLeftColor: config.color }]}
@@ -342,7 +1000,7 @@ export default function EmergencyPage() {
               >
                 {formatRelativeTime(item.$createdAt)}
               </Text>
-              {item.location_name && (
+              {locationText && (
                 <>
                   <MaterialCommunityIcons
                     name="map-marker-outline"
@@ -356,7 +1014,7 @@ export default function EmergencyPage() {
                       marginLeft: 4,
                     }}
                   >
-                    {item.location_name}
+                    {locationText}
                   </Text>
                 </>
               )}
@@ -470,63 +1128,6 @@ export default function EmergencyPage() {
           )}
         </Surface>
 
-        {/* Quick Actions Grid */}
-        <View style={styles.sectionHeader}>
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            {t("emergency.emergencyResponse")}
-          </Text>
-        </View>
-        <View style={styles.grid}>
-          <Card
-            style={[styles.gridCard, { backgroundColor: "#FFEBEE" }]}
-            onPress={() => handleCallEmergency("999")}
-          >
-            <Card.Content style={styles.gridContent}>
-              <MaterialCommunityIcons
-                name="ambulance"
-                size={32}
-                color="#D32F2F"
-              />
-              <Text style={[styles.gridLabel, { color: "#D32F2F" }]}>
-                {t("emergency.call999")}
-              </Text>
-            </Card.Content>
-          </Card>
-          <Card
-            style={[styles.gridCard, { backgroundColor: "#E3F2FD" }]}
-            onPress={() => handleCallEmergency("110")}
-          >
-            <Card.Content style={styles.gridContent}>
-              <MaterialCommunityIcons
-                name="police-badge"
-                size={32}
-                color="#1976D2"
-              />
-              <Text style={[styles.gridLabel, { color: "#1976D2" }]}>
-                {t("emergency.police")}
-              </Text>
-            </Card.Content>
-          </Card>
-          <Card
-            style={[styles.gridCard, { backgroundColor: "#fff" }]}
-            onPress={() =>
-              Alert.alert(
-                t("emergency.broadcast"),
-                t("emergency.broadcastDesc"),
-              )
-            }
-          >
-            <Card.Content style={styles.gridContent}>
-              <MaterialCommunityIcons
-                name="bullhorn-outline"
-                size={32}
-                color={theme.colors.primary}
-              />
-              <Text style={styles.gridLabel}>{t("emergency.broadcast")}</Text>
-            </Card.Content>
-          </Card>
-        </View>
-
         {/* Search & Filter */}
         <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
           <Searchbar
@@ -626,6 +1227,9 @@ export default function EmergencyPage() {
           <Dialog.Content>
             {selectedAlert && (
               <View>
+                {(() => {
+                  const locationText = getAlertLocationText(selectedAlert);
+                  return (
                 <Surface style={styles.detailBox} elevation={0}>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>
@@ -648,7 +1252,7 @@ export default function EmergencyPage() {
                       {t("emergency.location")}
                     </Text>
                     <Text style={styles.detailValue}>
-                      {selectedAlert.location_name ?? "Unknown"}
+                      {locationText ?? "-"}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
@@ -670,6 +1274,8 @@ export default function EmergencyPage() {
                       </View>
                     )}
                 </Surface>
+                  );
+                })()}
 
                 <Text
                   variant="titleMedium"
@@ -766,25 +1372,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontWeight: "bold",
   },
-  grid: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    gap: 10,
-    marginBottom: 20,
-  },
-  gridCard: {
-    flex: 1,
-    borderRadius: 12,
-  },
-  gridContent: {
-    alignItems: "center",
-    paddingVertical: 16,
-  },
-  gridLabel: {
-    marginTop: 8,
-    fontWeight: "600",
-    fontSize: 12,
-  },
+
   logCard: {
     backgroundColor: "white",
     borderRadius: 12,

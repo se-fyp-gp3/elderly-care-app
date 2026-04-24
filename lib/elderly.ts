@@ -21,6 +21,7 @@ import {
     SCHEDULE_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
 
 /**
  * Calculate an elderly person's age from their birth date string.
@@ -104,12 +105,28 @@ const getTodayKey = () => {
   return now.toISOString().slice(0, 10);
 };
 
-const formatTime = (time?: string | null) => {
+const getTimeLocale = (language: "yue" | "zh" | "en") => {
+  if (language === "yue") {
+    return "zh-Hant-HK";
+  }
+  if (language === "zh") {
+    return "zh-Hans-CN";
+  }
+  return "en-HK";
+};
+
+const formatTime = (
+  time?: string | null,
+  language: "yue" | "zh" | "en" = "en",
+) => {
   if (!time) return "";
   try {
     const date = new Date(time);
     if (Number.isNaN(date.getTime())) return time;
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString(getTimeLocale(language), {
+      hour: "numeric",
+      minute: "2-digit",
+    });
   } catch {
     return time;
   }
@@ -325,6 +342,15 @@ export async function createElderlyMedicationWithReminder(
     }
   }
 
+  await emitCaregiverActivityAlerts({
+    elderlyId: profile.$id,
+    elderlyName: profile.name,
+    type: "cg_med_add",
+    description: `${input.name} at ${approxTimes.join(", ")}`,
+    medicationName: input.name,
+    reminderTimes: approxTimes,
+  });
+
   return medicationRow as unknown as ElderlyMedication;
 }
 
@@ -387,8 +413,17 @@ export function buildMedicationSummary(
   return `Here is what you need to take today:\n${items.join("\n")}`;
 }
 
-export function buildScheduleSummary(schedules: Schedule[]): string {
+export function buildScheduleSummary(
+  schedules: Schedule[],
+  language: "yue" | "zh" | "en" = "en",
+): string {
   if (schedules.length === 0) {
+    if (language === "yue") {
+      return "我搵唔到你今日有行程，你今日似乎冇特別安排。";
+    }
+    if (language === "zh") {
+      return "我没有找到你今天的日程，今天看起来没有特别安排。";
+    }
     return "I couldn't find any schedules for today. Your schedule looks clear.";
   }
 
@@ -399,15 +434,36 @@ export function buildScheduleSummary(schedules: Schedule[]): string {
   });
 
   if (upcoming.length === 0) {
+    if (language === "yue") {
+      return "你今日冇未來行程。";
+    }
+    if (language === "zh") {
+      return "你今天没有接下来的日程。";
+    }
     return "You have no upcoming events for today.";
   }
 
   const items = upcoming.slice(0, 5).map((schedule) => {
-    const title = schedule.title || "Appointment";
-    const time = schedule.time ? ` at ${formatTime(schedule.time)}` : "";
-    return `• ${title}${time}`;
+    const title = schedule.title || (language === "zh" ? "行程" : language === "yue" ? "行程" : "Appointment");
+    const timeText = schedule.time ? formatTime(schedule.time, language) : "";
+    if (!timeText) {
+      return `• ${title}`;
+    }
+    if (language === "yue") {
+      return `• ${title}，時間 ${timeText}`;
+    }
+    if (language === "zh") {
+      return `• ${title}，时间 ${timeText}`;
+    }
+    return `• ${title} at ${timeText}`;
   });
 
+  if (language === "yue") {
+    return `你今日嘅行程如下：\n${items.join("\n")}`;
+  }
+  if (language === "zh") {
+    return `你今天的日程如下：\n${items.join("\n")}`;
+  }
   return `Here is your schedule for today:\n${items.join("\n")}`;
 }
 

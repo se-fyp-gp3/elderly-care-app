@@ -7,6 +7,7 @@ import {
     safeSubscribe,
     tablesDB
 } from "./appwrite";
+import { triggerGroupChatPush } from "./chat-push";
 
 /**
  * Send a message in a group chat.
@@ -43,6 +44,17 @@ export async function sendGroupMessage(input: {
     rowId: ID.unique(),
     data: data as any,
   });
+
+  triggerGroupChatPush({
+    mode: "group",
+    groupId: input.groupId,
+    senderId: input.senderId,
+    senderName: input.senderName,
+    senderRole: input.senderRole,
+    body: input.body,
+    messageType: input.messageType ?? "text",
+  });
+
   return doc as unknown as GroupMessage;
 }
 

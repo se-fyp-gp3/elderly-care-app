@@ -14,9 +14,9 @@
 import { PermissionsAndroid, Platform } from "react-native";
 import { ID, Query } from "react-native-appwrite";
 import {
-  DATABASE_ID,
-  ELDERLY_DAILY_STEPS_TABLE_ID,
-  tablesDB,
+    DATABASE_ID,
+    ELDERLY_DAILY_STEPS_TABLE_ID,
+    tablesDB,
 } from "./appwrite";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -28,6 +28,8 @@ export interface StepSyncResult {
   steps: number;
   source: StepDataSource;
   error?: string;
+  lastUpdated?: string;
+  skipped?: boolean;
 }
 
 export interface DailyStepRecord {
@@ -40,6 +42,11 @@ export interface DailyStepRecord {
   $createdAt: string;
   $updatedAt: string;
 }
+
+export const STEP_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+
+const inFlightSyncs = new Map<string, Promise<StepSyncResult>>();
+const lastCompletedSyncAt = new Map<string, number>();
 
 // ── Date Helpers ───────────────────────────────────────────────────────
 
@@ -57,6 +64,16 @@ function getStartOfToday(): Date {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   return now;
+}
+
+function getDefaultStepSource(): StepDataSource {
+  return Platform.OS === "android" ? "health_connect" : "apple_healthkit";
+}
+
+function parseTimestamp(value?: string | null): number {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 // ── Native Health API Integration ──────────────────────────────────────
@@ -443,31 +460,80 @@ export async function syncStepsToAppwrite(
  */
 export async function performStepSync(
   elderlyId: string,
+  options: { force?: boolean; minIntervalMs?: number } = {},
 ): Promise<StepSyncResult> {
-  try {
-    // 1. Fetch today's steps from the native health API
-    const { steps, source } = await fetchTodaySteps();
+  const existingSync = inFlightSyncs.get(elderlyId);
+  if (existingSync) {
+    return existingSync;
+  }
 
-    // 2. Sync to Appwrite (upsert)
-    const record = await syncStepsToAppwrite(elderlyId, steps, source);
+  const syncPromise = (async (): Promise<StepSyncResult> => {
+    let existingRecord: DailyStepRecord | null = null;
 
-    if (record) {
-      return { success: true, steps, source };
-    } else {
+    try {
+      const minIntervalMs = options.force
+        ? 0
+        : (options.minIntervalMs ?? STEP_SYNC_INTERVAL_MS);
+
+      existingRecord = await getTodayStepRecord(elderlyId);
+
+      const mostRecentSyncAt = Math.max(
+        parseTimestamp(existingRecord?.lastUpdated),
+        lastCompletedSyncAt.get(elderlyId) ?? 0,
+      );
+
+      if (
+        minIntervalMs > 0 &&
+        mostRecentSyncAt > 0 &&
+        Date.now() - mostRecentSyncAt < minIntervalMs
+      ) {
+        console.log("[StepSync] Skipping sync within 10-minute window");
+        return {
+          success: true,
+          steps: existingRecord?.steps ?? 0,
+          source: (existingRecord?.source as StepDataSource) ?? getDefaultStepSource(),
+          lastUpdated: existingRecord?.lastUpdated,
+          skipped: true,
+        };
+      }
+
+      // 1. Fetch today's steps from the native health API
+      const { steps, source } = await fetchTodaySteps();
+
+      // 2. Sync to Appwrite (upsert)
+      const record = await syncStepsToAppwrite(elderlyId, steps, source);
+
+      if (record) {
+        lastCompletedSyncAt.set(elderlyId, parseTimestamp(record.lastUpdated));
+        return {
+          success: true,
+          steps,
+          source,
+          lastUpdated: record.lastUpdated,
+        };
+      }
+
       return {
         success: false,
         steps: 0,
         source,
+        lastUpdated: existingRecord?.lastUpdated,
         error: "Failed to save steps to database",
       };
+    } catch (error: any) {
+      console.error("[StepSync] Full sync error:", error);
+      return {
+        success: false,
+        steps: existingRecord?.steps ?? 0,
+        source: (existingRecord?.source as StepDataSource) ?? getDefaultStepSource(),
+        lastUpdated: existingRecord?.lastUpdated,
+        error: error.message || "Unknown error during step sync",
+      };
+    } finally {
+      inFlightSyncs.delete(elderlyId);
     }
-  } catch (error: any) {
-    console.error("[StepSync] Full sync error:", error);
-    return {
-      success: false,
-      steps: 0,
-      source: Platform.OS === "android" ? "health_connect" : "apple_healthkit",
-      error: error.message || "Unknown error during step sync",
-    };
-  }
+  })();
+
+  inFlightSyncs.set(elderlyId, syncPromise);
+  return syncPromise;
 }

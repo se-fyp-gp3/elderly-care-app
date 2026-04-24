@@ -6,6 +6,7 @@
  */
 
 import { MedicationItem } from "@/components/MedicationCard";
+import { checkAndFinishReminder } from "@/lib/medication_tracking";
 import { translateFrequency, translateUnit } from "@/lib/schedule";
 import {
     Elderly,
@@ -23,6 +24,7 @@ import {
     tablesDB,
 } from "./appwrite";
 import { getCaregiverByUserId, getLinkedElderly } from "./caregiver";
+import { triggerProfilePush } from "./chat-push";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -286,6 +288,10 @@ export async function fetchCaregiverMedicationData(
               if (scheduledHkDateStr < startHkDateStr) {
                 return;
               }
+              // On the same calendar day, also skip slots chronologically before the exact start_date time
+              if (scheduledHkDateStr === startHkDateStr && scheduledUtcMs < startDateMs) {
+                return;
+              }
 
               // Skip slots beyond duration_days
               if (reminder.duration_days) {
@@ -353,11 +359,9 @@ export async function fetchCaregiverMedicationData(
 
             if (status === "pending") {
               const now = new Date();
-              const endOfTargetDay = new Date(baseDate);
-              endOfTargetDay.setHours(23, 59, 59, 999);
-              if (now > slot.timeObj && now > endOfTargetDay) {
-                status = "missed";
-              } else if (now > slot.timeObj) {
+              const graceMs = 10 * 60 * 1000; // 10-minute grace period
+              const deadlineMs = slot.timeObj.getTime() + graceMs;
+              if (now.getTime() > deadlineMs) {
                 status = "missed";
               }
             }
@@ -580,6 +584,61 @@ export async function addMedication(data: AddMedicationData): Promise<void> {
       end_date: reminderEndDate.toISOString(),
     },
   });
+
+  notifyElderlyMedicationAction(
+    {
+      elderlyProfileId: data.elderlyId,
+      action: "added",
+      medicationName: data.name,
+      reminderTimes: approxTimes,
+    },
+  );
+}
+
+type MedicationActionKind = "added" | "taken" | "updated";
+
+function notifyElderlyMedicationAction(
+  params: {
+    elderlyProfileId: string | null | undefined;
+    action: MedicationActionKind;
+    medicationName?: string | null;
+    reminderTimes?: string[];
+  },
+): void {
+  const { elderlyProfileId, action, medicationName, reminderTimes } = params;
+  if (!elderlyProfileId) return;
+
+  const trimmedMedicationName = medicationName?.trim() || null;
+  const times = reminderTimes?.filter(Boolean) || [];
+
+  let title = "Medication updated";
+  let body = "A medication entry was updated.";
+
+  if (action === "added") {
+    title = "Medication added";
+    body = trimmedMedicationName
+      ? `${trimmedMedicationName} was added${times.length > 0 ? ` with reminders at ${times.join(", ")}` : ""}`
+      : "A medication was added.";
+  } else if (action === "taken") {
+    title = "Medication taken";
+    body = trimmedMedicationName
+      ? `${trimmedMedicationName} was marked as taken`
+      : "A medication was marked as taken.";
+  }
+
+  triggerProfilePush({
+    mode: "profiles",
+    recipientProfileIds: [elderlyProfileId],
+    title,
+    body,
+    data: {
+      type: "medication_action",
+      screen: "medication",
+      action,
+      medicationName: trimmedMedicationName,
+      reminderTimes: times,
+    },
+  });
 }
 
 /**
@@ -713,6 +772,19 @@ export async function confirmMedicationTaking(
       },
     });
 
+    // Check if all logs for this reminder are now taken → auto-finish reminder
+    if (resolvedReminderId) {
+      await checkAndFinishReminder(resolvedReminderId);
+    }
+
+    notifyElderlyMedicationAction(
+      {
+        elderlyProfileId: elderlyId,
+        action: "taken",
+        medicationName: medItem.name,
+      },
+    );
+
     return { logId: resultLogId };
   } else {
     // It's an existing Log - update directly
@@ -725,6 +797,14 @@ export async function confirmMedicationTaking(
         taken_at: new Date().toISOString(),
       },
     });
+
+    notifyElderlyMedicationAction(
+      {
+        elderlyProfileId: elderlyId,
+        action: "taken",
+        medicationName: medItem.name,
+      },
+    );
 
     return { logId: undefined };
   }
@@ -749,6 +829,12 @@ export async function undoMedicationTaking(logId: string): Promise<void> {
  * Mark a medication log entry as taken/processed.
  */
 export async function markMedicationProcessed(logId: string): Promise<void> {
+  const logRow = await tablesDB.getRow<any>({
+    databaseId: DATABASE_ID,
+    tableId: MEDICATION_LOGS_TABLE_ID,
+    rowId: logId,
+  });
+
   await tablesDB.updateRow({
     databaseId: DATABASE_ID,
     tableId: MEDICATION_LOGS_TABLE_ID,
@@ -758,4 +844,17 @@ export async function markMedicationProcessed(logId: string): Promise<void> {
       taken_at: new Date().toISOString(),
     },
   });
+
+  const elderlyRelation = logRow?.elderly;
+  const elderlyProfileId =
+    typeof elderlyRelation === "string"
+      ? elderlyRelation
+      : elderlyRelation?.$id;
+
+  notifyElderlyMedicationAction(
+    {
+      elderlyProfileId,
+      action: "updated",
+    },
+  );
 }

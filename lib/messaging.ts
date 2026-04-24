@@ -6,6 +6,7 @@ import {
     safeSubscribe,
     tablesDB,
 } from "./appwrite";
+import { triggerDirectChatPush } from "./chat-push";
 import { updatePresence } from "./presence";
 
 /**
@@ -60,6 +61,16 @@ export async function sendDirectMessage(input: {
 
   // Update sender's presence so they appear online after sending a message
   updatePresence(input.senderId, input.senderRole).catch(() => {});
+
+  triggerDirectChatPush({
+    mode: "direct",
+    receiverProfileId: input.receiverId,
+    senderId: input.senderId,
+    senderName: input.senderName,
+    senderRole: input.senderRole,
+    body: input.body,
+    messageType: input.messageType ?? "text",
+  });
 
   return doc as unknown as DirectMessage;
 }

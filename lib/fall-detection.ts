@@ -10,9 +10,10 @@
  */
 
 import * as Location from "expo-location";
+import * as Notifications from "expo-notifications";
 import { Accelerometer, Gyroscope } from "expo-sensors";
 import * as TaskManager from "expo-task-manager";
-import { AppState, Platform } from "react-native";
+import { AppState, type AppStateStatus, Linking, Platform } from "react-native";
 
 const BACKGROUND_LOCATION_TASK = "FALL_DETECTION_BG_LOCATION";
 
@@ -77,6 +78,7 @@ let accelerometerAvailable = true;
 let gyroscopeAvailable = true;
 let activeProfile: FallDetectionProfile = DEFAULT_PROFILE;
 let activeDeviceModel = "unknown";
+let currentAppState: AppStateStatus = AppState.currentState;
 
 // Freefall state
 let freefallStart = 0;
@@ -118,6 +120,42 @@ function selectFallDetectionProfile(): FallDetectionProfile {
 }
 
 /* ── Core ───────────────────────────────────────────────── */
+
+/**
+ * Trigger the fall callback. If the app is in the background / inactive,
+ * fire a high-priority notification to wake the screen and bring the app
+ * to the foreground so the countdown overlay becomes visible.
+ */
+async function triggerFallCallback() {
+  // Always send a notification so the user is alerted even on lock screen
+  if (currentAppState !== "active") {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "🚨 跌倒偵測！Fall Detected!",
+          body: "偵測到可能跌倒，請立即查看。Possible fall detected – tap to respond.",
+          sound: "default",
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          data: { type: "fall_detected" },
+        },
+        trigger: null, // immediate
+      });
+    } catch {
+      // notification send failed, still trigger callback
+    }
+
+    // On Android, try to bring the app to the foreground via deep link
+    if (Platform.OS === "android") {
+      try {
+        await Linking.openURL("appwrite-callback-elderly-care-app://fall-detected");
+      } catch {
+        // deep link failed – the notification will still alert the user
+      }
+    }
+  }
+
+  onFallDetected?.();
+}
 
 function reset() {
   spikeTime = 0;
@@ -185,7 +223,7 @@ function handleAccelData(data: { x: number; y: number; z: number }) {
         if (now - lastTriggerTime > COOLDOWN_MS) {
           lastTriggerTime = now;
           reset();
-          onFallDetected?.();
+          triggerFallCallback();
         } else {
           reset();
         }
@@ -296,7 +334,7 @@ export async function getFallDetectionDiagnostics() {
 }
 
 export function triggerFallDetectionTest() {
-  onFallDetected?.();
+  triggerFallCallback();
 }
 
 export async function startFallDetection(
@@ -330,9 +368,21 @@ export async function startFallDetection(
   await startBackgroundService();
 
   // Re-attach sensors when app returns to foreground (Android may suspend them)
+  // Also track AppState for background fall detection handling
   appStateSubscription = AppState.addEventListener("change", (state) => {
+    currentAppState = state;
     if (state === "active" && isRunning) {
       // Re-ensure sensors are attached
+      if (!accelSub) {
+        Accelerometer.setUpdateInterval(activeProfile.sensorIntervalMs);
+        accelSub = Accelerometer.addListener(handleAccelData);
+      }
+      if (gyroscopeAvailable && !gyroSub) {
+        Gyroscope.setUpdateInterval(activeProfile.sensorIntervalMs);
+        gyroSub = Gyroscope.addListener(handleGyroData);
+      }
+    } else if (state === "background" && isRunning) {
+      // Ensure sensors stay attached in background (re-attach if removed by OS)
       if (!accelSub) {
         Accelerometer.setUpdateInterval(activeProfile.sensorIntervalMs);
         accelSub = Accelerometer.addListener(handleAccelData);

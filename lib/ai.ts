@@ -52,7 +52,7 @@ async function buildDashScopeImageUrl(imageUrl: string): Promise<string> {
 
   if (imageUrl.startsWith("file:")) {
     const base64 = await FileSystem.readAsStringAsync(imageUrl, {
-      encoding: FileSystem.EncodingType.Base64,
+      encoding: "base64" as any,
     });
     return buildBase64DataUrl(base64);
   }
@@ -77,7 +77,7 @@ async function buildDashScopeImageUrl(imageUrl: string): Promise<string> {
 
   try {
     const base64 = await FileSystem.readAsStringAsync(downloaded.uri, {
-      encoding: FileSystem.EncodingType.Base64,
+      encoding: "base64" as any,
     });
     return buildBase64DataUrl(base64);
   } finally {
@@ -122,6 +122,7 @@ export async function generateAIResponse(
     ],
     max_tokens: 200,
     temperature: 0.7,
+    enable_thinking: false,
   };
 
   try {

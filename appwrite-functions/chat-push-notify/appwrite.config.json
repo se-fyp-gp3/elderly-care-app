@@ -1,0 +1,17 @@
+{
+  "projectId": "elderly-care-app",
+  "functions": [
+    {
+      "$id": "chat_push_notify",
+      "name": "chat-push-notify",
+      "runtime": "node-22",
+      "execute": ["any"],
+      "enabled": true,
+      "logging": true,
+      "timeout": 60,
+      "entrypoint": "src/main.js",
+      "commands": "npm install",
+      "path": "."
+    }
+  ]
+}

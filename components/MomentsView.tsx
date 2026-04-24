@@ -29,6 +29,7 @@ import {
     Platform,
     ScrollView,
     StyleSheet,
+    Switch,
     TouchableOpacity,
     TouchableWithoutFeedback,
     View,
@@ -58,6 +59,7 @@ export default function MomentsView() {
     MomentMediaInput[]
   >([]);
   const [posting, setPosting] = useState(false);
+  const [enableAI, setEnableAI] = useState(true);
   const [currentUserName, setCurrentUserName] = useState("");
   const [currentUserAvatarFileId, setCurrentUserAvatarFileId] = useState<string | undefined>();
   const [avatarMap, setAvatarMap] = useState<Record<string, string>>({});
@@ -151,8 +153,9 @@ export default function MomentsView() {
     if (!newPostContent.trim() && selectedMediaList.length === 0) return;
     setPosting(true);
     try {
+      const postContent = newPostContent.trim();
       const newMoment = await createMoment(
-        newPostContent.trim(),
+        postContent,
         user?.$id || "anon",
         currentUserName || user?.name || "Anonymous",
         (preferences.role as "elderly" | "caregiver") || "caregiver",
@@ -162,6 +165,23 @@ export default function MomentsView() {
       setNewPostContent("");
       setSelectedMediaList([]);
       setCreateModalVisible(false);
+
+      // Auto-generate AI comment in background if enabled
+      if (enableAI) {
+        const imageUrl =
+          newMoment.media_type === "image" ? newMoment.media_url : undefined;
+        addAIResponse(newMoment.$id, postContent, imageUrl)
+          .then((comment) => {
+            setMoments((prev) =>
+              prev.map((m) =>
+                m.$id === newMoment.$id
+                  ? { ...m, comments_count: (m.comments_count || 0) + 1 }
+                  : m,
+              ),
+            );
+          })
+          .catch((err) => console.error("Auto AI comment failed:", err));
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to post moment";
@@ -178,23 +198,6 @@ export default function MomentsView() {
     if (moment && user) {
       await likeMoment(momentId, user.$id, moment.likes || []);
     }
-  };
-
-  const handleAIRequest = async (
-    momentId: string,
-    content: string,
-    imageUrl?: string,
-  ): Promise<MomentComment> => {
-    const comment = await addAIResponse(momentId, content, imageUrl);
-    // Increment local comments_count
-    setMoments((prev) =>
-      prev.map((m) =>
-        m.$id === momentId
-          ? { ...m, comments_count: (m.comments_count || 0) + 1 }
-          : m,
-      ),
-    );
-    return comment;
   };
 
   const handleComment = (momentId: string) => {
@@ -336,7 +339,6 @@ export default function MomentsView() {
               currentUserId={user?.$id || ""}
               onLike={handleLike}
               onComment={handleComment}
-              onAIRequest={handleAIRequest}
               latestComments={latestCommentsMap[item.$id]}
               onDelete={handleDeleteMoment}
               authorAvatarFileId={avatarMap[item.author_id]}
@@ -487,6 +489,25 @@ export default function MomentsView() {
                   </ScrollView>
                 )}
 
+                <View style={styles.aiToggleRow}>
+                  <MaterialCommunityIcons
+                    name="robot-outline"
+                    size={20}
+                    color={theme.colors.tertiary}
+                  />
+                  <Text
+                    variant="bodyMedium"
+                    style={{ marginLeft: 8, flex: 1, color: theme.colors.onSurface }}
+                  >
+                    {t("moments.enableAIDiscuss")}
+                  </Text>
+                  <Switch
+                    value={enableAI}
+                    onValueChange={setEnableAI}
+                    trackColor={{ true: theme.colors.tertiary }}
+                  />
+                </View>
+
                 <View style={styles.modalActions}>
                   <Button onPress={closeCreateModal} style={{ marginRight: 8 }}>
                     {t("common.cancel")}
@@ -556,6 +577,12 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
+  },
+  aiToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    paddingVertical: 4,
   },
   mediaRow: {
     flexDirection: "row",

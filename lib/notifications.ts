@@ -1,5 +1,23 @@
+import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+
+let hasLoggedPushSetupNotice = false;
+
+function logPushSetupNotice(message: string) {
+  if (hasLoggedPushSetupNotice) return;
+  hasLoggedPushSetupNotice = true;
+  console.log(`[Notifications] ${message}`);
+}
+
+function hasAndroidFirebasePushConfig(): boolean {
+  const androidConfig = Constants.expoConfig?.android as
+    | { googleServicesFile?: string }
+    | undefined;
+  return typeof androidConfig?.googleServicesFile === "string"
+    ? androidConfig.googleServicesFile.trim().length > 0
+    : false;
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -46,6 +64,64 @@ export async function registerForPushNotificationsAsync() {
     return false;
   }
   return true;
+}
+
+export function getExpoProjectId(): string | null {
+  const expoProjectId =
+    Constants.expoConfig?.extra?.eas?.projectId ||
+    Constants.easConfig?.projectId ||
+    null;
+
+  return typeof expoProjectId === "string" && expoProjectId.trim().length > 0
+    ? expoProjectId.trim()
+    : null;
+}
+
+export async function getExpoPushTokenAsync(): Promise<string | null> {
+  if (Platform.OS === "web") return null;
+
+  if (Platform.OS === "android") {
+    if (Constants.executionEnvironment === "storeClient") {
+      logPushSetupNotice(
+        "Skipping Expo push token in Expo Go. Use a development build or release build for Android push notifications.",
+      );
+      return null;
+    }
+
+    if (!hasAndroidFirebasePushConfig()) {
+      logPushSetupNotice(
+        "Skipping Android Expo push token because app.json has no android.googleServicesFile. Add your Firebase google-services.json and rebuild the app.",
+      );
+      return null;
+    }
+  }
+
+  const projectId = getExpoProjectId();
+  if (!projectId) {
+    console.warn("[Notifications] Missing Expo project ID for push token");
+    return null;
+  }
+
+  try {
+    const tokenResponse = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    });
+    return tokenResponse.data || null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      Platform.OS === "android" &&
+      /FirebaseApp is not initialized|fcm-credentials/i.test(message)
+    ) {
+      logPushSetupNotice(
+        "Android Expo push token is unavailable because Firebase/FCM is not configured yet. Add google-services.json, set android.googleServicesFile in app.json, then rebuild with expo run:android or EAS Build.",
+      );
+      return null;
+    }
+
+    console.warn("[Notifications] Failed to get Expo push token", error);
+    return null;
+  }
 }
 
 export async function scheduleMedicationNotification(

@@ -5,12 +5,12 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { TouchableOpacity, View } from "react-native";
 import {
-  Avatar,
-  Button,
-  Card,
-  IconButton,
-  Text,
-  useTheme,
+    Avatar,
+    Button,
+    Card,
+    IconButton,
+    Text,
+    useTheme,
 } from "react-native-paper";
 
 interface TimeSlotCardProps {
@@ -23,6 +23,7 @@ interface TimeSlotCardProps {
   onConfirmTaking: (med: MedicationItem) => void;
   onUndoTaking: (med: MedicationItem) => void;
   setNoteText: (text: string) => void;
+  onShowDetails: (med: MedicationItem) => void;
 }
 
 export default function TimeSlotCard({
@@ -34,6 +35,7 @@ export default function TimeSlotCard({
   onConfirmTaking,
   onUndoTaking,
   setNoteText,
+  onShowDetails,
 }: TimeSlotCardProps) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -201,12 +203,14 @@ export default function TimeSlotCard({
                 borderTopColor: theme.colors.surfaceVariant,
               }}
             >
-              <View
+              <TouchableOpacity
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
                   flex: 1,
                 }}
+                activeOpacity={0.7}
+                onPress={() => onShowDetails(med)}
               >
                 <Avatar.Icon
                   icon="pill"
@@ -269,7 +273,7 @@ export default function TimeSlotCard({
                         : t('common.missed')}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               <View
                 style={{

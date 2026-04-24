@@ -1,4 +1,5 @@
-﻿import {
+﻿import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
+import {
     DisplayItem,
     NewTaskData,
     NewTaskModal,
@@ -10,6 +11,7 @@
 } from "@/components/schedule";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
+import { getDateLocale } from "@/lib/i18n";
 import {
     createScheduleTask,
     fetchDayMedicationEvents,
@@ -37,6 +39,8 @@ import React, {
 import {
     Alert,
     FlatList,
+    Modal,
+    Platform,
     RefreshControl,
     StyleSheet,
     TouchableOpacity,
@@ -58,6 +62,7 @@ export default function SchedulePage() {
   const navigation = useNavigation();
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
+  const dateLocale = getDateLocale(i18n.resolvedLanguage || i18n.language);
 
   // Data State
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
@@ -88,9 +93,18 @@ export default function SchedulePage() {
 
   // New Task Management
   const [newTaskVisible, setNewTaskVisible] = useState(false);
+  const [selectedMedicationDetails, setSelectedMedicationDetails] = useState<{
+    title: string;
+    subtitle?: string;
+    fields: MedicationDetailField[];
+  } | null>(null);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [newTaskDatePickerVisible, setNewTaskDatePickerVisible] =
     useState(false);
+  // Temp state for iOS spinner pickers (spinner fires onChange on every spin)
+  const [tempPickerDate, setTempPickerDate] = useState(new Date());
+  const [tempPickerTime, setTempPickerTime] = useState(new Date());
+  const [tempNewTaskDate, setTempNewTaskDate] = useState(new Date());
   const [newTask, setNewTask] = useState<NewTaskData>({
     title: "",
     description: "",
@@ -241,6 +255,14 @@ export default function SchedulePage() {
     fetchData();
   }, [fetchData]);
 
+  // Poll every 60s so overdue PENDING items get auto-marked MISSED
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData();
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
   useFocusEffect(
     useCallback(() => {
       fetchData();
@@ -266,28 +288,59 @@ export default function SchedulePage() {
   });
 
   const onConfirmDate = (event: any, selectedDate?: Date) => {
-    setDatePickerVisible(false);
+    if (Platform.OS !== "ios") setDatePickerVisible(false);
     if (selectedDate) {
-      setReferenceDate(selectedDate);
-      setSelectedDate(selectedDate);
+      if (Platform.OS === "ios") {
+        setTempPickerDate(selectedDate);
+      } else {
+        setReferenceDate(selectedDate);
+        setSelectedDate(selectedDate);
+      }
     }
+  };
+
+  const onConfirmDateDone = () => {
+    setDatePickerVisible(false);
+    setReferenceDate(tempPickerDate);
+    setSelectedDate(tempPickerDate);
   };
 
   const onConfirmTime = (event: any, selectedDate?: Date) => {
-    setTimePickerVisible(false);
+    if (Platform.OS !== "ios") setTimePickerVisible(false);
     if (selectedDate) {
-      const hours = selectedDate.getHours();
-      const minutes = selectedDate.getMinutes();
-      const timeString = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-      setNewTask((prev) => ({ ...prev, time: timeString }));
+      if (Platform.OS === "ios") {
+        setTempPickerTime(selectedDate);
+      } else {
+        const hours = selectedDate.getHours();
+        const minutes = selectedDate.getMinutes();
+        const timeString = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+        setNewTask((prev) => ({ ...prev, time: timeString }));
+      }
     }
   };
 
+  const onConfirmTimeDone = () => {
+    setTimePickerVisible(false);
+    const hours = tempPickerTime.getHours();
+    const minutes = tempPickerTime.getMinutes();
+    const timeString = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+    setNewTask((prev) => ({ ...prev, time: timeString }));
+  };
+
   const onConfirmNewTaskDate = (event: any, selectedDate?: Date) => {
-    setNewTaskDatePickerVisible(false);
+    if (Platform.OS !== "ios") setNewTaskDatePickerVisible(false);
     if (selectedDate) {
-      setNewTask((prev) => ({ ...prev, date: selectedDate }));
+      if (Platform.OS === "ios") {
+        setTempNewTaskDate(selectedDate);
+      } else {
+        setNewTask((prev) => ({ ...prev, date: selectedDate }));
+      }
     }
+  };
+
+  const onConfirmNewTaskDateDone = () => {
+    setNewTaskDatePickerVisible(false);
+    setNewTask((prev) => ({ ...prev, date: tempNewTaskDate }));
   };
 
   const handleMonthSelect = (monthIndex: number) => {
@@ -317,7 +370,10 @@ export default function SchedulePage() {
         <View style={{ marginRight: 10 }}>
           <Chip
             icon="calendar-month"
-            onPress={() => setDatePickerVisible(true)}
+            onPress={() => {
+              setTempPickerDate(referenceDate);
+              setDatePickerVisible(true);
+            }}
           >
             {t('schedule.calendar')}
           </Chip>
@@ -456,6 +512,28 @@ export default function SchedulePage() {
     }
   };
 
+  const openMedicationDetails = useCallback((event: ScheduleEvent) => {
+    const statusLabel =
+      String(event.status).toLowerCase() === ScheduleStatus.COMPLETED.toLowerCase()
+        ? t('schedule.statusCompleted')
+        : String(event.status).toLowerCase() === ScheduleStatus.MISSED.toLowerCase()
+          ? t('schedule.statusMissed')
+          : t('schedule.statusPending');
+
+    setSelectedMedicationDetails({
+      title: event.title,
+      subtitle: `${event.elderlyName} · ${statusLabel}`,
+      fields: [
+        { label: t('schedule.dose'), value: event.description },
+        { label: t('schedule.time'), value: event.time },
+        {
+          label: t('schedule.scheduled'),
+          value: new Date(event.rawDate).toLocaleString(dateLocale),
+        },
+      ],
+    });
+  }, [dateLocale, t]);
+
   const handleSaveTask = async () => {
     if (!newTask.title || !newTask.elderlyId || !newTask.time) {
       Alert.alert(
@@ -478,6 +556,7 @@ export default function SchedulePage() {
         elderlyId: newTask.elderlyId,
         typeName: newTask.type,
         categoryId: newTask.typeId,
+        notificationAudience: "elderly",
       });
 
       setNewTaskVisible(false);
@@ -519,6 +598,7 @@ export default function SchedulePage() {
         onTakeMedication={handleTakeMedication}
         onUndoMedication={handleUndoMedication}
         onRemindMedication={handleRemindMedication}
+        onShowDetails={openMedicationDetails}
       />
     );
   };
@@ -631,34 +711,102 @@ export default function SchedulePage() {
         label={t('schedule.newTask')}
       />
 
+      <MedicationDetailsModal
+        visible={!!selectedMedicationDetails}
+        title={selectedMedicationDetails?.title || ""}
+        subtitle={selectedMedicationDetails?.subtitle}
+        fields={selectedMedicationDetails?.fields || []}
+        onDismiss={() => setSelectedMedicationDetails(null)}
+      />
+
       {/* Native Date Picker */}
-      {datePickerVisible && (
-        <DateTimePicker
-          value={referenceDate}
-          mode="date"
-          display="default"
-          onChange={onConfirmDate}
-        />
+      {Platform.OS === "ios" ? (
+        <Modal visible={datePickerVisible} transparent animationType="slide">
+          <View style={styles.pickerOverlay}>
+            <View style={[styles.pickerSheet, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.pickerHeader}>
+                <Button onPress={() => setDatePickerVisible(false)}>{t('common.cancel')}</Button>
+                <Button onPress={onConfirmDateDone}>{t('common.done')}</Button>
+              </View>
+              <DateTimePicker
+                value={tempPickerDate}
+                mode="date"
+                display="spinner"
+                onChange={onConfirmDate}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        datePickerVisible && (
+          <DateTimePicker
+            value={referenceDate}
+            mode="date"
+            display="default"
+            onChange={onConfirmDate}
+          />
+        )
       )}
 
       {/* Native Time Picker for New Task */}
-      {timePickerVisible && (
-        <DateTimePicker
-          value={new Date()}
-          mode="time"
-          display="default"
-          onChange={onConfirmTime}
-        />
+      {Platform.OS === "ios" ? (
+        <Modal visible={timePickerVisible} transparent animationType="slide">
+          <View style={styles.pickerOverlay}>
+            <View style={[styles.pickerSheet, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.pickerHeader}>
+                <Button onPress={() => setTimePickerVisible(false)}>{t('common.cancel')}</Button>
+                <Button onPress={onConfirmTimeDone}>{t('common.done')}</Button>
+              </View>
+              <DateTimePicker
+                value={tempPickerTime}
+                mode="time"
+                display="spinner"
+                onChange={onConfirmTime}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        timePickerVisible && (
+          <DateTimePicker
+            value={new Date()}
+            mode="time"
+            display="default"
+            onChange={onConfirmTime}
+          />
+        )
       )}
 
       {/* Native Date Picker for New Task */}
-      {newTaskDatePickerVisible && (
-        <DateTimePicker
-          value={newTask.date}
-          mode="date"
-          display="default"
-          onChange={onConfirmNewTaskDate}
-        />
+      {Platform.OS === "ios" ? (
+        <Modal visible={newTaskDatePickerVisible} transparent animationType="slide">
+          <View style={styles.pickerOverlay}>
+            <View style={[styles.pickerSheet, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.pickerHeader}>
+                <Button onPress={() => setNewTaskDatePickerVisible(false)}>{t('common.cancel')}</Button>
+                <Button onPress={onConfirmNewTaskDateDone}>{t('common.done')}</Button>
+              </View>
+              <DateTimePicker
+                value={tempNewTaskDate}
+                mode="date"
+                display="spinner"
+                onChange={onConfirmNewTaskDate}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        newTaskDatePickerVisible && (
+          <DateTimePicker
+            value={newTask.date}
+            mode="date"
+            display="default"
+            onChange={onConfirmNewTaskDate}
+          />
+        )
       )}
 
       {/* Custom Month Picker Dialog */}
@@ -688,8 +836,14 @@ export default function SchedulePage() {
         onSearchChange={setSearchQuery}
         loading={loading}
         onSave={handleSaveTask}
-        onOpenDatePicker={() => setNewTaskDatePickerVisible(true)}
-        onOpenTimePicker={() => setTimePickerVisible(true)}
+        onOpenDatePicker={() => {
+          setTempNewTaskDate(newTask.date);
+          setNewTaskDatePickerVisible(true);
+        }}
+        onOpenTimePicker={() => {
+          setTempPickerTime(new Date());
+          setTimePickerVisible(true);
+        }}
         onRetryCategories={fetchCategories}
       />
     </View>
@@ -713,5 +867,23 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
+  },
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  pickerSheet: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 30,
+    alignItems: "center",
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignSelf: "stretch",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
 });

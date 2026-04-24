@@ -5,6 +5,9 @@ import {
     EMERGENCY_ALERTS_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+import { triggerUserPush } from "./chat-push";
+
+type LocalizedLocationMap = Partial<Record<"en" | "zh" | "zh-Hant", string>>;
 
 export async function createEmergencyAlert(data: {
   type: string;
@@ -14,6 +17,7 @@ export async function createEmergencyAlert(data: {
   latitude?: number;
   longitude?: number;
   location_name?: string;
+  location_localizations?: LocalizedLocationMap;
   description?: string;
 }): Promise<EmergencyAlert> {
   const row = await tablesDB.createRow<EmergencyAlert>({
@@ -34,6 +38,28 @@ export async function createEmergencyAlert(data: {
       resolved_by: null,
     },
   });
+
+  if (data.type === "fall" && data.caregiver_user_id) {
+    triggerUserPush({
+      mode: "users",
+      recipientUserIds: [data.caregiver_user_id],
+      title: `${data.elderly_name} may have fallen`,
+      body:
+        data.location_name?.trim()
+          ? `${data.description ?? "Possible fall detected."} Location: ${data.location_name}`
+          : data.description ?? "Possible fall detected.",
+      data: {
+        type: "fall_alert",
+        elderlyId: data.elderly_id,
+        elderlyName: data.elderly_name,
+        emergencyType: data.type,
+        description: data.description ?? null,
+        locationName: data.location_name ?? null,
+        locationLocalizations: data.location_localizations ?? null,
+      },
+    });
+  }
+
   return row;
 }
 
@@ -78,4 +104,24 @@ export async function updateAlertStatus(
     rowId: alertId,
     data: { status },
   });
+}
+
+/**
+ * Fetch recent emergency alerts for a specific elderly person.
+ * Returns latest alerts (active/investigating first, then resolved).
+ */
+export async function fetchAlertsByElderlyId(
+  elderlyId: string,
+  limit = 5,
+): Promise<EmergencyAlert[]> {
+  const response = await tablesDB.listRows<EmergencyAlert>({
+    databaseId: DATABASE_ID,
+    tableId: EMERGENCY_ALERTS_TABLE_ID,
+    queries: [
+      Query.equal("elderly_id", elderlyId),
+      Query.orderDesc("$createdAt"),
+      Query.limit(limit),
+    ],
+  });
+  return response.rows;
 }

@@ -6,6 +6,7 @@ import {
     StatusFilterDialog,
 } from "@/components/MedFilterDialogs";
 import { MedicationItem } from "@/components/MedicationCard";
+import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
 import MedStatsCard from "@/components/MedStatsCard";
 import TimeSlotCard from "@/components/TimeSlotCard";
 import { useAuth } from "@/lib/auth-context";
@@ -80,6 +81,11 @@ export default function MedicationManagement() {
   const [viewingYesterday, setViewingYesterday] = useState(false);
   const [undoVisible, setUndoVisible] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(null);
+  const [selectedMedicationDetails, setSelectedMedicationDetails] = useState<{
+    title: string;
+    subtitle?: string;
+    fields: MedicationDetailField[];
+  } | null>(null);
 
   // Pending cancel reminders (active=false, is_finished=false)
   const [pendingCancels, setPendingCancels] = useState<PendingCancelReminder[]>([]);
@@ -418,6 +424,27 @@ export default function MedicationManagement() {
     }
   };
 
+  const openMedicationDetails = useCallback((med: MedicationItem) => {
+    const statusLabel =
+      med.status === "completed"
+        ? t('common.completed')
+        : med.status === "missed"
+          ? t('common.missed')
+          : t('common.pending');
+
+    setSelectedMedicationDetails({
+      title: med.name,
+      subtitle: `${med.elderly} · ${statusLabel}`,
+      fields: [
+        { label: "Dose", value: med.dosage },
+        { label: "Frequency", value: med.frequency },
+        { label: "Time", value: med.time },
+        { label: "Last taken", value: med.lastTaken },
+        { label: "Notes", value: med.notes },
+      ],
+    });
+  }, [t]);
+
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
@@ -587,6 +614,7 @@ export default function MedicationManagement() {
                           }}
                           onUndoTaking={onUndoTaking}
                           setNoteText={setNoteText}
+                          onShowDetails={openMedicationDetails}
                         />
                       );
                     })
@@ -656,6 +684,14 @@ export default function MedicationManagement() {
           onShowTimePicker={setShowTimePicker}
           editingTimeIndex={editingTimeIndex}
           onEditingTimeIndexChange={setEditingTimeIndex}
+        />
+
+        <MedicationDetailsModal
+          visible={!!selectedMedicationDetails}
+          title={selectedMedicationDetails?.title || ""}
+          subtitle={selectedMedicationDetails?.subtitle}
+          fields={selectedMedicationDetails?.fields || []}
+          onDismiss={() => setSelectedMedicationDetails(null)}
         />
       </Portal>
 

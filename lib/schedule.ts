@@ -17,6 +17,8 @@ import {
     SCHEDULE_TABLE_ID,
     tablesDB,
 } from "./appwrite";
+import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
+import { triggerProfilePush } from "./chat-push";
 
 /** Translate a medication unit string (e.g. "tablet" → "片") using i18n. */
 export function translateUnit(unit: string): string {
@@ -78,6 +80,15 @@ export type ScheduleEvent = {
  */
 export function getRelationshipId(val: unknown): string | null {
   if (!val) return null;
+  if (Array.isArray(val)) {
+    if (val.length === 0) return null;
+    const item = val[0];
+    if (typeof item === "string") return item;
+    if (typeof item === "object" && item !== null && "$id" in item) {
+      return (item as { $id: string }).$id;
+    }
+    return null;
+  }
   if (typeof val === "string") return val;
   if (typeof val === "object" && val !== null && "$id" in val)
     return (val as { $id: string }).$id;
@@ -279,13 +290,22 @@ export async function fetchDayMedicationEvents(
 
   const medicationById = new Map<string, Medication>();
   if (medicationIds.size > 0) {
-    const medicationsResponse = await tablesDB.listRows<Medication>({
-      databaseId: DATABASE_ID,
-      tableId: MEDICATION_TABLE_ID,
-      queries: [Query.equal("$id", Array.from(medicationIds))],
-    });
-    medicationsResponse.rows.forEach((medication) =>
-      medicationById.set(medication.$id, medication),
+    await Promise.all(
+      Array.from(medicationIds).map(async (medicationId) => {
+        try {
+          const medication = await tablesDB.getRow<Medication>({
+            databaseId: DATABASE_ID,
+            tableId: MEDICATION_TABLE_ID,
+            rowId: medicationId,
+          });
+          medicationById.set(medication.$id, medication);
+        } catch (error) {
+          console.warn("Failed to load medication for schedule event", {
+            medicationId,
+            error,
+          });
+        }
+      }),
     );
   }
 
@@ -633,6 +653,33 @@ export async function undoMedicationTaken(logId: string): Promise<void> {
 }
 
 /**
+ * Mark all overdue PENDING schedule items as MISSED in-place.
+ * Returns the updated array (mutates status on each item).
+ */
+export function markOverdueSchedulesAsMissed(schedules: Schedule[]): Schedule[] {
+  const now = new Date();
+  for (const s of schedules) {
+    if (s.status === ScheduleStatus.PENDING && s.time) {
+      const taskTime = new Date(s.time);
+      if (taskTime < now) {
+        s.status = ScheduleStatus.MISSED;
+        tablesDB
+          .updateRow({
+            databaseId: DATABASE_ID,
+            tableId: SCHEDULE_TABLE_ID,
+            rowId: s.$id,
+            data: { status: ScheduleStatus.MISSED },
+          })
+          .catch((err) =>
+            console.error("Failed to auto-mark schedule as MISSED:", s.$id, err),
+          );
+      }
+    }
+  }
+  return schedules;
+}
+
+/**
  * Persist a new generic schedule task to the database.
  */
 export async function createScheduleTask(params: {
@@ -643,8 +690,24 @@ export async function createScheduleTask(params: {
   elderlyId: string;
   typeName: string;
   categoryId?: string;
+  remindMinutes?: number;
+  notifyConnectedCaregivers?: boolean;
+  notificationAudience?: "caregivers" | "elderly" | "none";
 }): Promise<void> {
-  const { title, description, datetime, elderlyId, typeName, categoryId } = params;
+  const {
+    title,
+    description,
+    datetime,
+    elderlyId,
+    typeName,
+    categoryId,
+    remindMinutes,
+    notifyConnectedCaregivers,
+    notificationAudience,
+  } = params;
+  const resolvedAudience =
+    notificationAudience ?? (notifyConnectedCaregivers ? "caregivers" : "none");
+
   const data: Record<string, any> = {
     title,
     description,
@@ -654,11 +717,65 @@ export async function createScheduleTask(params: {
     type: typeName.toLowerCase(),
   };
   if (categoryId) data.scheduleCategory = categoryId;
+  if (remindMinutes != null) data.remind_minutes = remindMinutes;
 
-  await tablesDB.createRow({
-    databaseId: DATABASE_ID,
-    tableId: SCHEDULE_TABLE_ID,
-    rowId: ID.unique(),
-    data,
-  });
+  const notifyAudience = async () => {
+    if (resolvedAudience === "caregivers") {
+      await emitCaregiverActivityAlerts({
+        elderlyId,
+        type: "cg_sched_add",
+        description: `${title} at ${datetime.toLocaleString()}`,
+        scheduleTitle: title,
+        scheduledAt: datetime.toISOString(),
+      });
+      return;
+    }
+
+    if (resolvedAudience === "elderly") {
+      await triggerProfilePush({
+        mode: "profiles",
+        recipientProfileIds: [elderlyId],
+        title: "Schedule added",
+        body: `${title} at ${datetime.toLocaleString()}`,
+        data: {
+          type: "schedule_action",
+          screen: "schedule",
+          action: "added",
+          scheduleTitle: title,
+          scheduledAt: datetime.toISOString(),
+        },
+      });
+    }
+  };
+
+  try {
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: SCHEDULE_TABLE_ID,
+      rowId: ID.unique(),
+      data,
+    });
+    await notifyAudience();
+  } catch (error: any) {
+    const errorMessage = error?.message || "";
+    const hasSchemaMismatch =
+      /Unknown attribute:\s*"remind_minutes"/i.test(errorMessage);
+
+    if (!hasSchemaMismatch) {
+      throw error;
+    }
+
+    console.warn(
+      "[Schedule] schedule.remind_minutes is missing on the server, retrying without reminder column.",
+    );
+
+    const { remind_minutes: _ignored, ...fallbackData } = data;
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: SCHEDULE_TABLE_ID,
+      rowId: ID.unique(),
+      data: fallbackData,
+    });
+    await notifyAudience();
+  }
 }

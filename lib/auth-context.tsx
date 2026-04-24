@@ -5,13 +5,17 @@ import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import {
-  ExecutionMethod,
-  ID,
-  Models,
-  OAuthProvider,
+    ExecutionMethod,
+    ID,
+    Models,
+    OAuthProvider,
 } from "react-native-appwrite";
 import { UserPreferences } from "../types/user";
 import { account, accountWeb, functions } from "./appwrite";
+import { deactivateExpoPushToken } from "./expo-push-tokens";
+import { loadPersistedLanguage } from "./i18n";
+import { syncUserInterfaceLanguagePreference } from "./interface-language-preference";
+import { getExpoPushTokenAsync } from "./notifications";
 import { checkProfileExists, hasTrialLabel } from "./user";
 export class LoginError extends Error {
   constructor(message: string) {
@@ -109,6 +113,16 @@ export default function AuthProvider({
     }
   };
 
+  const syncInterfaceLanguageForSession = async (
+    sessionPrefs?: Models.Preferences,
+  ) => {
+    const language = await loadPersistedLanguage();
+    await syncUserInterfaceLanguagePreference(
+      language,
+      (sessionPrefs as UserPreferences | undefined) ?? null,
+    );
+  };
+
   useEffect(() => {
     getUser();
   }, []);
@@ -137,6 +151,7 @@ export default function AuthProvider({
       if (session.prefs) {
         setPreferences(session.prefs as UserPreferences);
       }
+      void syncInterfaceLanguageForSession(session.prefs);
     } catch {
       // Session expired or not found — check if elderly user needs re-auth
       if (Platform.OS !== "web") {
@@ -186,6 +201,7 @@ export default function AuthProvider({
     if (user.prefs) {
       setPreferences(user.prefs as UserPreferences);
     }
+    void syncInterfaceLanguageForSession(user.prefs);
     return null;
   };
 
@@ -197,6 +213,7 @@ export default function AuthProvider({
     if (user.prefs) {
       setPreferences(user.prefs as UserPreferences);
     }
+    void syncInterfaceLanguageForSession(user.prefs);
     return null;
   };
 
@@ -282,6 +299,7 @@ export default function AuthProvider({
           setPreference("role", role);
         }
         setPreferences(user.prefs as UserPreferences);
+        void syncInterfaceLanguageForSession(user.prefs);
       } else {
         throw new LoginError("OAuth2 sign-in was cancelled or failed");
       }
@@ -291,6 +309,15 @@ export default function AuthProvider({
   };
 
   const signOut = async () => {
+    if (Platform.OS !== "web") {
+      try {
+        const expoPushToken = await getExpoPushTokenAsync();
+        await deactivateExpoPushToken(expoPushToken);
+      } catch (error) {
+        console.warn("Failed to deactivate Expo push token on sign out", error);
+      }
+    }
+
     try {
       if (Platform.OS === "web") {
         await accountWeb.deleteSession({ sessionId: "current" });
@@ -314,22 +341,18 @@ export default function AuthProvider({
       await account.updatePrefs({ prefs: newPreferences });
       const updatedUser = await account.get();
       setUser(updatedUser);
-      setPreferences(newPreferences);
+      setPreferences((updatedUser.prefs as UserPreferences) ?? newPreferences);
+      return null;
     } catch (error) {
       console.error("Error updating preferences:", error);
+      return error instanceof Error
+        ? error.message
+        : "Failed to update preferences.";
     }
-    return null;
   };
 
   const setPreference = async (key: string, value: any) => {
-    const newPrefs = { ...preferences, [key]: value };
-    try {
-      await account.updatePrefs({ prefs: newPrefs });
-      setPreferences(newPrefs);
-    } catch (error) {
-      console.error("Error updating preference:", error);
-    }
-    return null;
+    return updatePreferences({ ...preferences, [key]: value });
   };
 
   return (

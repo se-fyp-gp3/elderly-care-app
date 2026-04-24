@@ -5,6 +5,7 @@ import {
     listChatSessionsForUser,
     updateChatSession,
 } from "@/lib/chat";
+import { resolvePreferredAiVoiceId } from "@/lib/custom-voice";
 import {
     buildScheduleSummary,
     fetchElderlySchedulesForUser,
@@ -99,6 +100,8 @@ interface AIAPIResponse {
   };
 }
 
+type ReplyLanguage = "yue" | "zh" | "en";
+
 export default function ElderlyChat() {
   const theme = useTheme();
   const colorScheme = useColorScheme();
@@ -124,12 +127,32 @@ export default function ElderlyChat() {
   const flatListRef = useRef<FlatList>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const aiVoicePlayerRef = useRef<AudioPlayer | null>(null);
+  const aiVoicePlaybackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const aiVoiceEnabled = preferences.aiVoiceEnabled === true;
-  const selectedVoiceId =
-    typeof preferences.aiVoiceId === "string" ? preferences.aiVoiceId : "";
+  const voiceReplyLang = (
+    typeof preferences.voiceReplyLang === "string"
+      ? preferences.voiceReplyLang
+      : "cantonese"
+  ) as string;
+  const ttsReplyLang: ReplyLanguage =
+    voiceReplyLang === "cantonese"
+      ? "yue"
+      : voiceReplyLang === "mandarin"
+        ? "zh"
+        : "en";
+  const selectedVoiceId = resolvePreferredAiVoiceId(
+    preferences,
+    voiceReplyLang,
+  );
 
   const stopAiVoicePlayback = useCallback(() => {
+    if (aiVoicePlaybackTimeoutRef.current) {
+      clearTimeout(aiVoicePlaybackTimeoutRef.current);
+      aiVoicePlaybackTimeoutRef.current = null;
+    }
     if (aiVoicePlayerRef.current) {
       try {
         aiVoicePlayerRef.current.pause();
@@ -156,6 +179,8 @@ export default function ElderlyChat() {
         const synthesized = await synthesizePersonalVoice(
           plainText,
           selectedVoiceId,
+          undefined,
+          ttsReplyLang,
         );
 
         let audioSourceUri: string | null = null;
@@ -168,7 +193,7 @@ export default function ElderlyChat() {
             tempUri,
             synthesized.audioBase64,
             {
-              encoding: FileSystem.EncodingType.Base64,
+              encoding: "base64" as any,
             },
           );
           audioSourceUri = tempUri;
@@ -181,16 +206,41 @@ export default function ElderlyChat() {
         await setAudioModeAsync({ playsInSilentMode: true });
         const player = createAudioPlayer(audioSourceUri);
         aiVoicePlayerRef.current = player;
+
+        const cleanupPlayback = () => {
+          if (aiVoicePlaybackTimeoutRef.current) {
+            clearTimeout(aiVoicePlaybackTimeoutRef.current);
+            aiVoicePlaybackTimeoutRef.current = null;
+          }
+          setIsVoiceSpeaking(false);
+          player.remove();
+          if (aiVoicePlayerRef.current === player) {
+            aiVoicePlayerRef.current = null;
+          }
+        };
+
         player.addListener("playbackStatusUpdate", (status) => {
-          if (status.didJustFinish) {
-            setIsVoiceSpeaking(false);
-            player.remove();
-            if (aiVoicePlayerRef.current === player) {
-              aiVoicePlayerRef.current = null;
-            }
+          if (
+            status.didJustFinish ||
+            (status.isLoaded &&
+              !status.playing &&
+              status.currentTime > 0 &&
+              status.duration > 0 &&
+              status.currentTime >= status.duration - 0.2)
+          ) {
+            cleanupPlayback();
+            return;
+          }
+
+          if (!aiVoicePlaybackTimeoutRef.current && status.duration > 0) {
+            aiVoicePlaybackTimeoutRef.current = setTimeout(
+              cleanupPlayback,
+              Math.ceil(status.duration * 1000) + 1500,
+            );
           }
         });
         player.play();
+        aiVoicePlaybackTimeoutRef.current = setTimeout(cleanupPlayback, 12000);
         setIsVoiceSpeaking(true);
       } catch (error) {
         console.warn("AI voice playback failed:", error);
@@ -204,7 +254,7 @@ export default function ElderlyChat() {
         setIsVoiceSynthesizing(false);
       }
     },
-    [aiVoiceEnabled, selectedVoiceId, stopAiVoicePlayback],
+    [aiVoiceEnabled, selectedVoiceId, stopAiVoicePlayback, ttsReplyLang],
   );
 
   const handleToggleAiVoice = useCallback(async () => {
@@ -234,19 +284,26 @@ export default function ElderlyChat() {
     { key: "english", label: "English" },
   ] as const;
 
-  const voiceReplyLang = (
-    typeof preferences.voiceReplyLang === "string"
-      ? preferences.voiceReplyLang
-      : "cantonese"
-  ) as string;
-
   const currentLangLabel =
     LANG_OPTIONS.find((o) => o.key === voiceReplyLang)?.label ?? "粵語";
 
   const handleLangChange = useCallback(
     async (lang: string) => {
+      const nextPreferences = {
+        ...preferences,
+        voiceReplyLang: lang,
+      };
+      const error = await updatePreferences({
+        ...nextPreferences,
+        aiVoiceId: resolvePreferredAiVoiceId(nextPreferences, lang) || undefined,
+      });
+
+      if (error) {
+        Alert.alert("Unable to save language", error);
+        return;
+      }
+
       setLangMenuVisible(false);
-      await updatePreferences({ ...preferences, voiceReplyLang: lang });
     },
     [preferences, updatePreferences],
   );
@@ -329,7 +386,7 @@ export default function ElderlyChat() {
     })();
   }, []);
 
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const quickSuggestions = useMemo(
     () => [
@@ -341,34 +398,176 @@ export default function ElderlyChat() {
     [t],
   );
 
-  const tryHandleLocalDataRequest = async (userMessage: string) => {
-    const lower = userMessage.toLowerCase();
+  const resolveUiReplyLanguage = useCallback((): ReplyLanguage => {
+    const resolvedLanguage = i18n.resolvedLanguage || i18n.language;
+    if (resolvedLanguage === "zh-Hant") {
+      return "yue";
+    }
+    if (resolvedLanguage === "zh") {
+      return "zh";
+    }
+    return "en";
+  }, [i18n.language, i18n.resolvedLanguage]);
 
-    if (
-      lower.includes("medicine") ||
-      lower.includes("medication") ||
-      lower.includes("pill")
-    ) {
-      if (!user?.$id) return "I can't access your medication data right now.";
-      const lang =
-        voiceReplyLang === "cantonese"
-          ? "yue"
-          : voiceReplyLang === "mandarin"
-            ? "zh"
-            : "en";
+  const inferMessageReplyLanguage = useCallback(
+    (message: string): ReplyLanguage => {
+      const trimmed = message.trim();
+      if (!trimmed) {
+        return resolveUiReplyLanguage();
+      }
+
+      const hasCjk = /[\u3400-\u9FFF]/.test(trimmed);
+      const hasLatin = /[A-Za-z]/.test(trimmed);
+
+      if (!hasCjk) {
+        return hasLatin ? "en" : resolveUiReplyLanguage();
+      }
+
+      if (/(咩|啲|喺|嘅|咗|唔|冇|而家|點樣|邊個|乜|噉|嚟|呀|喇|咁|幫我|可唔可以)/.test(trimmed)) {
+        return "yue";
+      }
+
+      if (/(吗|呢|吧|这|那个|已经|还有|今天|现在|什么|請問)/.test(trimmed)) {
+        return "zh";
+      }
+
+      return resolveUiReplyLanguage();
+    },
+    [resolveUiReplyLanguage],
+  );
+
+  const getPreferredTextReplyLanguage = useCallback(
+    (message: string): ReplyLanguage => {
+      if (aiVoiceEnabled) {
+        return ttsReplyLang;
+      }
+      return inferMessageReplyLanguage(message);
+    },
+    [aiVoiceEnabled, inferMessageReplyLanguage, ttsReplyLang],
+  );
+
+  const decideIfNeedWebSearch = useCallback(
+    async (latestUserMessage: string): Promise<boolean> => {
+      const heuristicDecision = shouldSearch(latestUserMessage);
+      if (!heuristicDecision) {
+        return false;
+      }
+
+      if (!DASHSCOPE_API_KEY || !DASHSCOPE_API_URL || !DASHSCOPE_TEXT_MODEL) {
+        return heuristicDecision;
+      }
+
+      const recentConversation = messages
+        .slice(-4)
+        .map((msg) => {
+          const speaker = msg.isUser ? "User" : "Assistant";
+          return `${speaker}: ${msg.text.replace(/\s+/g, " ").trim().slice(0, 240)}`;
+        })
+        .join("\n");
+
+      const decisionController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        decisionController.abort();
+      }, 6000);
+
+      try {
+        const response = await fetch(`${DASHSCOPE_API_URL}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
+          },
+          signal: decisionController.signal,
+          body: JSON.stringify({
+            model: DASHSCOPE_TEXT_MODEL,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You decide whether a web search is needed before answering the user's latest message. Return exactly one token: SEARCH or NO_SEARCH. Choose SEARCH only when the latest message needs fresh or external factual information that is not already available in the recent conversation. Choose NO_SEARCH for small talk, subjective advice, app-local data, or follow-up questions already answerable from recent conversation.",
+              },
+              {
+                role: "user",
+                content: `Recent conversation:\n${recentConversation || "(none)"}\n\nLatest user message:\n${latestUserMessage}`,
+              },
+            ],
+            max_tokens: 4,
+            temperature: 0,
+            enable_thinking: false,
+          }),
+        });
+
+        const rawText = await response.text();
+        if (!response.ok) {
+          throw new Error(rawText || `Search decision failed: ${response.status}`);
+        }
+
+        const parsed: AIAPIResponse = rawText ? JSON.parse(rawText) : {};
+        const content = parsed.choices?.[0]?.message?.content;
+        const decisionText = typeof content === "string"
+          ? content
+          : Array.isArray(content)
+            ? content
+                .map((part) => (part.type === "text" ? part.text : ""))
+                .join(" ")
+            : "";
+        const normalizedDecision = decisionText.trim().toUpperCase();
+
+        if (normalizedDecision.startsWith("NO_SEARCH")) {
+          return false;
+        }
+        if (normalizedDecision.startsWith("SEARCH")) {
+          return true;
+        }
+      } catch (error) {
+        console.warn("Search decision check failed, falling back to heuristic:", error);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      return heuristicDecision;
+    },
+    [
+      DASHSCOPE_API_KEY,
+      DASHSCOPE_API_URL,
+      DASHSCOPE_TEXT_MODEL,
+      messages,
+    ],
+  );
+
+  const tryHandleLocalDataRequest = async (userMessage: string) => {
+    const normalizedMessage = userMessage.replace(/\[[^\]]+\]/g, " ").trim();
+    const lower = normalizedMessage.toLowerCase();
+    const replyLanguage = getPreferredTextReplyLanguage(normalizedMessage);
+    const isMedicationRequest =
+      /(medicine|medication|pill|drug|today.*med|what.*med|take.*med|食咩藥|食什么药|吃什麼藥|吃什么药|今日.*藥|今日.*药|今天.*藥|今天.*药|有咩藥未食|有什么药没吃|仲有咩藥未食|還有什麼藥沒吃|服藥|服药|藥單|药单)/i.test(
+        normalizedMessage,
+      );
+    const isScheduleRequest =
+      /(schedule|appointment|event|calendar|today.*schedule|行程|日程|時間表|时间表|今日.*(行程|日程|安排|約|约)|今天.*(行程|日程|安排|約|约)|有咩行程|有什么安排|覆診|复诊)/i.test(
+        normalizedMessage,
+      );
+
+    if (isMedicationRequest) {
+      if (!user?.$id) {
+        if (replyLanguage === "yue") {
+          return "我而家攞唔到你今日嘅食藥資料。";
+        }
+        if (replyLanguage === "zh") {
+          return "我现在拿不到你今天的用药资料。";
+        }
+        return "I can't access your medication data right now.";
+      }
+
       return await getFormattedTodayMedicationSummary(
         user.$id,
-        lang as "yue" | "zh" | "en",
+        replyLanguage,
       );
     }
 
-    if (
-      lower.includes("schedule") ||
-      lower.includes("appointment") ||
-      lower.includes("event")
-    ) {
+    if (isScheduleRequest) {
       const schedules = await fetchElderlySchedulesForUser(user?.$id);
-      return buildScheduleSummary(schedules);
+      return buildScheduleSummary(schedules, replyLanguage);
     }
 
     return null;
@@ -377,22 +576,23 @@ export default function ElderlyChat() {
   const buildConversationMessages = (
     latestUserMessage: string,
   ): ChatMessage[] => {
-    const history: ChatMessage[] = messages.slice(-8).map((msg) => ({
+    const history: ChatMessage[] = messages.slice(-4).map((msg) => ({
       role: msg.isUser ? "user" : "assistant",
       content: msg.text,
     }));
 
+    const textReplyLanguage = getPreferredTextReplyLanguage(latestUserMessage);
     const langInstruction =
-      voiceReplyLang === "cantonese"
+      textReplyLanguage === "yue"
         ? "You MUST reply in 香港粵語 (Hong Kong Cantonese written Chinese). Use informal Cantonese written style."
-        : voiceReplyLang === "mandarin"
+        : textReplyLanguage === "zh"
           ? "You MUST reply in 普通話 (Mandarin Chinese, simplified or traditional)."
           : "You MUST reply in English.";
 
     return [
       {
         role: "system",
-        content: `You are a helpful AI care assistant for elderly users. Provide clear, compassionate, and helpful responses about health, medication, and wellness. Always remind users to consult healthcare professionals for serious concerns.\n\nIMPORTANT: Keep your response concise — no more than 80 words. Be brief and to the point.\n\n${langInstruction}\n\nWhen the user's message contains [SEARCH RESULTS], you MUST base your answer strictly on those results. Do NOT make up or guess information — only use facts from the provided search data. Summarize the key points for the elderly user in a caring tone.\n\nYou also have a special ability: when the user sends a photo of medication (pills, tablets, capsules, medicine boxes, prescription labels, etc.), you should identify the medication in the image. Provide the medication name, common uses, dosage information, and any important warnings or side effects. If you are not confident in your identification, clearly state that and advise the user to consult a pharmacist or doctor.`,
+        content: `You are a caring AI assistant for elderly users. Be concise (max 50 words). ${langInstruction}\n\nIf [SEARCH RESULTS] are provided, answer ONLY using those facts. When user sends a medication photo, identify the medication name, uses, and warnings. For serious concerns, advise consulting a doctor.`,
       },
       ...history,
       {
@@ -507,8 +707,9 @@ export default function ElderlyChat() {
     const payload = {
       model: resolvedModel,
       messages: messagesPayload,
-      max_tokens: 200,
+      max_tokens: 120,
       temperature: hasSearchContext ? 0.2 : 0.7,
+      enable_thinking: false,
     };
 
     const maxAttempts = 3;
@@ -520,6 +721,7 @@ export default function ElderlyChat() {
           abortControllerRef.current?.abort();
         }, REQUEST_TIMEOUT_MS);
 
+        const fetchStart = Date.now();
         const response = await fetch(`${DASHSCOPE_API_URL}/chat/completions`, {
           method: "POST",
           headers: {
@@ -532,6 +734,7 @@ export default function ElderlyChat() {
 
         const rawText = await response.text();
         clearTimeout(timeoutId);
+        console.log(`[AI-TIMING] API fetch attempt ${attempt}: ${Date.now() - fetchStart}ms (model: ${resolvedModel})`);
 
         if (response.ok) {
           const data: AIAPIResponse = rawText ? JSON.parse(rawText) : {};
@@ -846,6 +1049,7 @@ export default function ElderlyChat() {
     Keyboard.dismiss();
 
     try {
+      const sendStart = Date.now();
       let messageForAPI: string;
       if (selectedImage) {
         const userText = userMessage.text;
@@ -860,21 +1064,29 @@ export default function ElderlyChat() {
         messageForAPI = userMessage.text;
       }
 
-      const localResponse = await tryHandleLocalDataRequest(messageForAPI);
+      const localResponse = selectedImage
+        ? null
+        : await tryHandleLocalDataRequest(userMessage.text);
 
-      // Selective search: only search when toggle is on AND query looks like it needs web info
+      // Selective search: the toggle only enables search; the model decides whether this turn needs it.
       let searchContext = "";
       let rawSearchResponse: Awaited<ReturnType<typeof searchWeb>> | null =
         null;
-      if (
+      const searchCandidate =
         searchEnabled &&
         !localResponse &&
         !selectedImage &&
-        shouldSearch(userMessage.text)
-      ) {
+        shouldSearch(userMessage.text);
+      const shouldUseWebSearch = searchCandidate
+        ? await decideIfNeedWebSearch(userMessage.text)
+        : false;
+
+      if (shouldUseWebSearch) {
         try {
+          const searchStart = Date.now();
           rawSearchResponse = await searchWeb(userMessage.text);
           searchContext = formatSearchResultsForContext(rawSearchResponse);
+          console.log(`[AI-TIMING] Web search: ${Date.now() - searchStart}ms`);
         } catch (e) {
           console.warn("Search failed, proceeding without:", e);
         }
@@ -909,9 +1121,13 @@ export default function ElderlyChat() {
           "[Search] Formatted context for AI (full):\n",
           searchContext,
         );
-      } else if (searchEnabled && shouldSearch(userMessage.text)) {
+      } else if (shouldUseWebSearch) {
         console.log(
           "[Search] No search context produced — search may have returned empty results",
+        );
+      } else if (searchCandidate) {
+        console.log(
+          "[Search] Skipped web search after AI relevance check",
         );
       }
 
@@ -929,6 +1145,7 @@ export default function ElderlyChat() {
 
       const aiResponse = await aiResponsePromise;
 
+      console.log(`[AI-TIMING] Total send-to-response: ${Date.now() - sendStart}ms`);
       console.log("[AI] Model reply (full):", aiResponse);
 
       const aiMessage: Message = {

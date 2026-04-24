@@ -52,6 +52,11 @@ export enum CustomVoiceStatus {
     FAILED = "failed"
 }
 
+export enum CustomVoiceSlot {
+    DEFAULT = "default",
+    CANTONESE = "cantonese"
+}
+
 export type Elderly = Models.Row & {
     user_id: string;
     name: string;
@@ -103,6 +108,7 @@ export type Schedule = Models.Row & {
     description: string | null;
     status: ScheduleStatus | null;
     type: ScheduleType | null;
+    remind_minutes: number | null;
     elderly: Elderly;
     scheduleCategory: ScheduleCategory;
 }
@@ -184,6 +190,7 @@ export type CustomVoice = Models.Row & {
     caregiver_name: string;
     elderly_id: string;
     voice_id: string;
+    voice_slot?: CustomVoiceSlot | null;
     status: CustomVoiceStatus;
     created_at: string | null;
     updated_at: string | null;
@@ -224,4 +231,15 @@ export type EmergencyAlert = Models.Row & {
     description: string | null;
     resolved_at: string | null;
     resolved_by: string | null;
+}
+
+export type ExpoPushToken = Models.Row & {
+    profile_id: string;
+    user_id: string;
+    role: string;
+    expo_push_token: string;
+    platform: string;
+    active: boolean;
+    last_seen_at: string | null;
+    updated_at: string | null;
 }

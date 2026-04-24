@@ -490,6 +490,15 @@
           ]
         },
         {
+          "key": "remind_minutes",
+          "type": "integer",
+          "required": false,
+          "array": false,
+          "default": null,
+          "min": 0,
+          "max": 10080
+        },
+        {
           "key": "elderly",
           "type": "relationship",
           "required": false,
@@ -1261,6 +1270,15 @@
           "size": 128,
           "default": null,
           "encrypt": false
+        },
+        {
+          "key": "voice_slot",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "default": "default",
+          "format": "enum",
+          "elements": ["default", "cantonese"]
         },
         {
           "key": "status",

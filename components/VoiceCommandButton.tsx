@@ -1,6 +1,6 @@
 // components/VoiceCommandButton.tsx
 // Floating voice command button for elderly users
-// Records audio → Qwen3.5-audio (recognition + intent) → Execute → CosyVoice-v2 (TTS response)
+// Records audio → Qwen audio understanding → Execute → Qwen personal/system TTS response
 
 import { useAuth } from "@/lib/auth-context";
 import { getElderlyByUserId } from "@/lib/elderly";
@@ -64,6 +64,16 @@ const MESSAGES_FOR_CANCEL: Record<string, string> = {
   zh: "好的，已取消。",
   en: "OK, cancelled.",
 };
+
+function inferAudioMimeTypeFromUri(uri: string): string {
+  const lowerUri = uri.toLowerCase();
+  if (lowerUri.endsWith(".wav")) return "audio/wav";
+  if (lowerUri.endsWith(".mp3")) return "audio/mpeg";
+  if (lowerUri.endsWith(".webm")) return "audio/webm";
+  if (lowerUri.endsWith(".3gp")) return "audio/3gpp";
+  if (lowerUri.endsWith(".caf")) return "audio/x-caf";
+  return "audio/m4a";
+}
 
 export default function VoiceCommandButton() {
   const theme = useTheme();
@@ -166,6 +176,7 @@ export default function VoiceCommandButton() {
       if (!uri) {
         throw new Error("No recording URI");
       }
+      const recordingMimeType = inferAudioMimeTypeFromUri(uri);
 
       // Read audio as base64
       const audioBase64 = await readAudioAsBase64(uri);
@@ -177,7 +188,7 @@ export default function VoiceCommandButton() {
       const recognitionResult = await recognizeVoiceCommand(
         audioBase64,
         language,
-        "audio/m4a",
+        recordingMimeType,
         conversationHistory.current,
       );
 
@@ -265,7 +276,7 @@ export default function VoiceCommandButton() {
         }, 2000);
       }
 
-      // Synthesize response with family voice using CosyVoice-v2
+      // Synthesize the response using the saved family voice or the default Qwen voice
       setVoiceState("speaking");
       await playTTSResponse(commandResult.message);
       setVoiceState("idle");
@@ -288,7 +299,7 @@ export default function VoiceCommandButton() {
     }
   }, [voiceState, recorder, user, elderlyProfileId, router]);
 
-  // Play TTS response using CosyVoice-v2
+  // Play the synthesized TTS response
   const playTTSResponse = useCallback(
     async (message: string) => {
       if (!elderlyProfileId) return;
@@ -304,7 +315,7 @@ export default function VoiceCommandButton() {
           // Write to temp file and play
           const tempPath = `${FileSystem.cacheDirectory}voice_cmd_${Date.now()}.mp3`;
           await FileSystem.writeAsStringAsync(tempPath, audioBase64, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: "base64" as any,
           });
 
           // Clean up previous player
@@ -317,14 +328,40 @@ export default function VoiceCommandButton() {
           playerRef.current = player;
 
           await new Promise<void>((resolve) => {
+            let settled = false;
+            let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+            const finishPlayback = () => {
+              if (settled) return;
+              settled = true;
+              if (fallbackTimer) {
+                clearTimeout(fallbackTimer);
+              }
+              resolve();
+            };
+
             player.addListener("playbackStatusUpdate", (status: any) => {
-              if (status.didJustFinish) {
-                resolve();
+              if (
+                status.didJustFinish ||
+                (status.isLoaded &&
+                  !status.playing &&
+                  status.currentTime > 0 &&
+                  status.duration > 0 &&
+                  status.currentTime >= status.duration - 0.2)
+              ) {
+                finishPlayback();
+                return;
+              }
+
+              if (!fallbackTimer && status.duration > 0) {
+                fallbackTimer = setTimeout(
+                  finishPlayback,
+                  Math.ceil(status.duration * 1000) + 1500,
+                );
               }
             });
             player.play();
-            // Timeout fallback
-            setTimeout(resolve, 15000);
+            fallbackTimer = setTimeout(finishPlayback, 12000);
           });
 
           // Clean up

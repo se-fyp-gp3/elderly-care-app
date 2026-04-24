@@ -8,6 +8,7 @@
 
 import {
     CAREGIVER_ELDERLY_TABLE_ID,
+    CAREGIVER_TABLE_ID,
     DATABASE_ID,
     ELDERLY_TABLE_ID,
     tablesDB,
@@ -15,7 +16,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { createEmergencyAlert } from "@/lib/emergency";
 import { sendImmediateNotification } from "@/lib/notifications";
-import type { CaregiverElderly, Elderly } from "@/types/appwrite";
+import type { Caregiver, CaregiverElderly, Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -26,7 +27,7 @@ import {
     View,
 } from "react-native";
 import { Query } from "react-native-appwrite";
-import { Button, Text, useTheme } from "react-native-paper";
+import { ActivityIndicator, Button, Text, useTheme } from "react-native-paper";
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
@@ -34,6 +35,157 @@ import Animated, {
 } from "react-native-reanimated";
 
 const COUNTDOWN_SECONDS = 15;
+const LOCATION_PERMISSION_TIMEOUT_MS = 5000;
+const LOCATION_LOOKUP_TIMEOUT_MS = 6000;
+const LOCATION_GEOCODE_TIMEOUT_MS = 4000;
+const LOCATION_SERVICES_TIMEOUT_MS = 2000;
+
+type EmergencyLocation = {
+  latitude?: number;
+  longitude?: number;
+  locationName?: string;
+};
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve(null);
+      }
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve(value);
+        }
+      })
+      .catch(() => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve(null);
+        }
+      });
+  });
+}
+
+async function resolveEmergencyLocation(): Promise<EmergencyLocation> {
+  const existingPermission = await withTimeout(
+    Location.getForegroundPermissionsAsync(),
+    LOCATION_PERMISSION_TIMEOUT_MS,
+  );
+  console.log("[FallSOS] Existing location permission:", existingPermission?.status ?? "unknown");
+
+  let permissionStatus = existingPermission?.status;
+  if (permissionStatus !== "granted") {
+    const requestedPermission = await withTimeout(
+      Location.requestForegroundPermissionsAsync(),
+      LOCATION_PERMISSION_TIMEOUT_MS,
+    );
+    permissionStatus = requestedPermission?.status;
+    console.log("[FallSOS] Requested location permission:", permissionStatus ?? "timeout");
+  }
+
+  const servicesEnabled = await withTimeout(
+    Location.hasServicesEnabledAsync(),
+    LOCATION_SERVICES_TIMEOUT_MS,
+  );
+  console.log("[FallSOS] Location services enabled:", servicesEnabled ?? "unknown");
+
+  if (permissionStatus !== "granted") {
+    console.warn("[FallSOS] Location permission not granted");
+    return {};
+  }
+
+  let location = await withTimeout(
+    Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+      mayShowUserSettingsDialog: true,
+    }),
+    LOCATION_LOOKUP_TIMEOUT_MS,
+  );
+
+  if (location) {
+    console.log("[FallSOS] Current position acquired", {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+      accuracy: location.coords.accuracy,
+    });
+  } else {
+    console.warn("[FallSOS] Current position unavailable, trying last known position");
+  }
+
+  if (!location) {
+    location = await withTimeout(
+      Location.getLastKnownPositionAsync({
+        maxAge: 24 * 60 * 60 * 1000,
+      }),
+      LOCATION_LOOKUP_TIMEOUT_MS,
+    );
+
+    if (location) {
+      console.log("[FallSOS] Using last known position", {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy,
+      });
+    } else {
+      console.warn("[FallSOS] Last known position unavailable, trying coarse fallback");
+    }
+  }
+
+  if (!location && servicesEnabled !== false) {
+    location = await withTimeout(
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Lowest,
+        mayShowUserSettingsDialog: true,
+      }),
+      LOCATION_LOOKUP_TIMEOUT_MS,
+    );
+
+    if (location) {
+      console.log("[FallSOS] Coarse current position acquired", {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy,
+      });
+    }
+  }
+
+  if (!location) {
+    console.warn("[FallSOS] Unable to resolve any location source");
+    return {};
+  }
+
+  const latitude = location.coords.latitude;
+  const longitude = location.coords.longitude;
+  let locationName: string | undefined;
+
+  const addresses = await withTimeout(
+    Location.reverseGeocodeAsync({ latitude, longitude }),
+    LOCATION_GEOCODE_TIMEOUT_MS,
+  );
+  const address = addresses?.[0];
+  if (address) {
+    locationName = [address.street, address.district, address.city]
+      .filter(Boolean)
+      .join(", ");
+    console.log("[FallSOS] Reverse geocode resolved", locationName);
+  } else {
+    console.warn("[FallSOS] Reverse geocode unavailable, falling back to coordinates");
+  }
+
+  if (!locationName) {
+    locationName = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+  }
+
+  return { latitude, longitude, locationName };
+}
 
 interface FallCountdownOverlayProps {
   visible: boolean;
@@ -67,43 +219,17 @@ export default function FallCountdownOverlay({
   }, [clearTimer, onDismiss, progress]);
 
   const sendSOS = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      onDismiss();
+      return;
+    }
+
     setSending(true);
     Vibration.cancel();
 
     try {
-      // Get GPS location
-      let latitude: number | undefined;
-      let longitude: number | undefined;
-      let locationName: string | undefined;
-
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === "granted") {
-        try {
-          const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          latitude = loc.coords.latitude;
-          longitude = loc.coords.longitude;
-
-          // Try reverse geocoding
-          try {
-            const [addr] = await Location.reverseGeocodeAsync({
-              latitude,
-              longitude,
-            });
-            if (addr) {
-              locationName = [addr.street, addr.district, addr.city]
-                .filter(Boolean)
-                .join(", ");
-            }
-          } catch {
-            // ignore geocoding errors
-          }
-        } catch {
-          // location unavailable
-        }
-      }
+      const { latitude, longitude, locationName } =
+        await resolveEmergencyLocation();
 
       // Get elderly profile
       const elderlyRows = await tablesDB.listRows<Elderly>({
@@ -115,41 +241,63 @@ export default function FallCountdownOverlay({
       const elderlyName = elderlyDoc?.name ?? user.name ?? "Unknown";
       const elderlyId = elderlyDoc?.$id ?? user.$id;
 
-      // Find all linked caregivers
+      // Find all linked caregivers and resolve their auth user_id
       const ceRows = await tablesDB.listRows<CaregiverElderly>({
         databaseId: DATABASE_ID,
         tableId: CAREGIVER_ELDERLY_TABLE_ID,
         queries: [Query.equal("elderly", elderlyId), Query.limit(100)],
       });
 
-      const caregiverIds: string[] = [];
+      const caregiverUserIds = new Set<string>();
       for (const row of ceRows.rows) {
         const cg = row.caregiver;
         if (typeof cg === "string") {
-          caregiverIds.push(cg);
-        } else if (cg && "$id" in cg) {
-          caregiverIds.push((cg as any).user_id ?? (cg as any).$id);
+          // cg is the caregiver profile $id – need to look up user_id
+          try {
+            const cgRows = await tablesDB.listRows<Caregiver>({
+              databaseId: DATABASE_ID,
+              tableId: CAREGIVER_TABLE_ID,
+              queries: [Query.equal("$id", cg), Query.limit(1)],
+            });
+            if (cgRows.rows.length > 0 && cgRows.rows[0].user_id) {
+              caregiverUserIds.add(cgRows.rows[0].user_id);
+            }
+          } catch {
+            // skip unresolvable caregiver
+          }
+        } else if (cg && typeof cg === "object" && "user_id" in cg) {
+          caregiverUserIds.add((cg as any).user_id);
         }
       }
 
       // Create emergency alert for each caregiver
-      for (const cgId of caregiverIds) {
-        await createEmergencyAlert({
+      const caregiverUserIdList = Array.from(caregiverUserIds);
+      console.log("[FallSOS] Sending emergency alerts", {
+        elderlyId,
+        caregiverCount: caregiverUserIdList.length,
+        latitude: latitude ?? null,
+        longitude: longitude ?? null,
+        locationName: locationName ?? null,
+      });
+      await Promise.all(
+        caregiverUserIdList.map((cgUserId) =>
+          createEmergencyAlert({
           type: "fall",
           elderly_id: elderlyId,
           elderly_name: elderlyName,
-          caregiver_user_id: cgId,
+          caregiver_user_id: cgUserId,
           latitude,
           longitude,
           location_name: locationName,
           description: "Fall detected by device sensors. No response from elderly within 15 seconds.",
-        });
-      }
+          }),
+        ),
+      );
 
       // Local notification
       await sendImmediateNotification(
         "🚨 SOS Sent",
-        `Fall detected – alert sent to ${caregiverIds.length} caregiver(s).`,
+        `Fall detected – alert sent to ${caregiverUserIdList.length} caregiver(s).`,
         { type: "fall_sos_sent" },
       );
     } catch (err) {
@@ -184,8 +332,8 @@ export default function FallCountdownOverlay({
       setSeconds((prev) => {
         if (prev <= 1) {
           clearTimer();
-          sendSOS();
-          return 0;
+          void sendSOS();
+          return 1;
         }
         return prev - 1;
       });
@@ -239,17 +387,28 @@ export default function FallCountdownOverlay({
 
           {/* Countdown */}
           <View style={styles.countdownContainer}>
-            <Text
-              style={[styles.countdownNumber, { color: theme.colors.error }]}
-            >
-              {seconds}
-            </Text>
-            <Text
-              variant="bodyMedium"
-              style={{ color: theme.colors.onErrorContainer }}
-            >
-              seconds remaining
-            </Text>
+            {sending ? (
+              <ActivityIndicator
+                animating
+                size="large"
+                color={theme.colors.error}
+                style={styles.sendingIndicator}
+              />
+            ) : (
+              <>
+                <Text
+                  style={[styles.countdownNumber, { color: theme.colors.error }]}
+                >
+                  {seconds}
+                </Text>
+                <Text
+                  variant="bodyMedium"
+                  style={{ color: theme.colors.onErrorContainer }}
+                >
+                  seconds remaining
+                </Text>
+              </>
+            )}
           </View>
 
           {/* Progress bar */}
@@ -317,6 +476,9 @@ const styles = StyleSheet.create({
     fontSize: 72,
     fontWeight: "bold",
     lineHeight: 80,
+  },
+  sendingIndicator: {
+    marginVertical: 16,
   },
   progressTrack: {
     width: "100%",

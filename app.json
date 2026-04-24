@@ -32,6 +32,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.elderlycareapp",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.health.READ_STEPS",
@@ -97,7 +98,9 @@
       ],
       "expo-sensors",
       "expo-task-manager",
-      "expo-localization"
+      "expo-localization",
+      "expo-notifications",
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -106,7 +109,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "3d422aed-12f0-497f-99bb-3cba235c693f"
+        "projectId": "42203bb5-6e7b-43f7-b032-f95660499271"
       }
     }
   }
