@@ -644,6 +644,19 @@ export default function ElderlyMessages() {
       const lastMsg = item.lastMsg;
       const time = lastMsg?.created_at ?? group.created_at;
       const preview = lastMsg?.body;
+      let displayPreview = preview;
+      if (lastMsg?.message_type === "system" && preview) {
+        try {
+          const sysMsg = JSON.parse(preview);
+          if (sysMsg.type === "created") displayPreview = t("chat.createdTheGroup", { name: sysMsg.name });
+          else if (sysMsg.type === "joined") displayPreview = t("chat.joinedTheGroup", { name: sysMsg.name });
+        } catch {
+          const createdMatch = preview.match(/^(.+) created the group$/);
+          const joinedMatch = preview.match(/^(.+) joined the group$/);
+          if (createdMatch) displayPreview = t("chat.createdTheGroup", { name: createdMatch[1] });
+          else if (joinedMatch) displayPreview = t("chat.joinedTheGroup", { name: joinedMatch[1] });
+        }
+      }
       return (
         <TouchableOpacity
           activeOpacity={0.7}
@@ -725,12 +738,12 @@ export default function ElderlyMessages() {
                 ]}
                 numberOfLines={1}
               >
-                {lastMsg?.sender_id === elderlyProfileId
+                {lastMsg?.message_type !== "system" && (lastMsg?.sender_id === elderlyProfileId
                   ? t("common.you")
-                  : `${lastMsg?.sender_name}: `}
+                  : `${lastMsg?.sender_name}: `)}
                 {lastMsg?.message_type === "voice"
                   ? t("common.voiceMessage")
-                  : preview}
+                  : displayPreview}
               </Text>
             ) : (
               <Text

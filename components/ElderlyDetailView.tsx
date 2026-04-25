@@ -3,22 +3,22 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    Linking,
-    ScrollView,
-    StyleSheet,
-    useColorScheme,
-    View,
+  Alert,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  useColorScheme,
+  View,
 } from "react-native";
 import {
-    Card,
-    Chip,
-    Divider,
-    IconButton,
-    List,
-    Surface,
-    Text,
-    useTheme,
+  Card,
+  Chip,
+  Divider,
+  IconButton,
+  List,
+  Surface,
+  Text,
+  useTheme,
 } from "react-native-paper";
 
 export interface ElderlyDetailData {
@@ -173,7 +173,12 @@ export default function ElderlyDetailView({
               >
                 {t("healthData.bloodPressure")}
               </Text>
-              <Text variant="titleLarge">{data.lastVitals?.bp || "N/A"}</Text>
+              <Text
+                variant="titleLarge"
+                style={data.lastVitals?.bp ? { paddingLeft: 16 } : undefined}
+              >
+                {data.lastVitals?.bp || "N/A"}
+              </Text>
             </View>
             <View
               style={[
@@ -338,6 +343,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 8,
+    paddingHorizontal: 8,
   },
   vitalItem: {
     alignItems: "center",
