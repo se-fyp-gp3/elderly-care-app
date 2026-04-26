@@ -763,7 +763,12 @@
     "activity": "Activity:",
     "stepsToday": "{{count}} steps today",
     "noData": "No data",
-    "active": "Active"
+    "active": "Active",
+    "unlinkElderly": "Unlink Elderly",
+    "unlinkElderlyConfirmTitle": "Confirm Unlink",
+    "unlinkElderlyConfirmMsg": "Are you sure you want to unlink {{name}}? You will no longer receive their health updates.",
+    "unlinkSuccess": "Successfully unlinked.",
+    "unlinkFailed": "Failed to unlink. Please try again."
   },
   "cancelledMedications": {
     "title": "Cancelled Medications",
@@ -982,6 +987,7 @@
     "caregiverNotFound": "Caregiver profile not found. Please complete your profile first.",
     "failedToLink": "Failed to link elderly",
     "accountFound": "Account Found",
+    "alreadyLinked": "This elderly is already linked.",
     "confirmLink": "Confirm Link"
   },
   "voiceCommand": {

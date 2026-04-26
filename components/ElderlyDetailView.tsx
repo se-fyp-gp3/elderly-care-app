@@ -3,22 +3,23 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    Linking,
-    ScrollView,
-    StyleSheet,
-    useColorScheme,
-    View,
+  Alert,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  useColorScheme,
+  View,
 } from "react-native";
 import {
-    Card,
-    Chip,
-    Divider,
-    IconButton,
-    List,
-    Surface,
-    Text,
-    useTheme,
+  Button,
+  Card,
+  Chip,
+  Divider,
+  IconButton,
+  List,
+  Surface,
+  Text,
+  useTheme,
 } from "react-native-paper";
 
 export interface ElderlyDetailData {
@@ -43,12 +44,14 @@ interface ElderlyDetailViewProps {
   data: ElderlyDetailData;
   onCall?: (phone: string) => void;
   onHealthData?: (id: string) => void;
+  onUnlink?: () => void;
 }
 
 export default function ElderlyDetailView({
   data,
   onCall,
   onHealthData,
+  onUnlink,
 }: ElderlyDetailViewProps) {
   const theme = useTheme();
   const colorScheme = useColorScheme();
@@ -173,7 +176,12 @@ export default function ElderlyDetailView({
               >
                 {t("healthData.bloodPressure")}
               </Text>
-              <Text variant="titleLarge">{data.lastVitals?.bp || "N/A"}</Text>
+              <Text
+                variant="titleLarge"
+                style={data.lastVitals?.bp ? { paddingLeft: 16 } : undefined}
+              >
+                {data.lastVitals?.bp || "N/A"}
+              </Text>
             </View>
             <View
               style={[
@@ -280,6 +288,20 @@ export default function ElderlyDetailView({
           />
         </Card.Content>
       </Card>
+
+      {/* Unlink Button */}
+      {onUnlink && (
+        <View style={{ paddingHorizontal: 16, marginBottom: 30 }}>
+          <Button
+            mode="outlined"
+            textColor={theme.colors.error}
+            style={{ borderColor: theme.colors.error }}
+            onPress={onUnlink}
+          >
+            {t("caregiverPanel.unlinkElderly")}
+          </Button>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -338,6 +360,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 8,
+    paddingHorizontal: 8,
   },
   vitalItem: {
     alignItems: "center",

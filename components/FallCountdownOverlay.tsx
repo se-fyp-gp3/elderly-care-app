@@ -7,11 +7,11 @@
  */
 
 import {
-    CAREGIVER_ELDERLY_TABLE_ID,
-    CAREGIVER_TABLE_ID,
-    DATABASE_ID,
-    ELDERLY_TABLE_ID,
-    tablesDB,
+  CAREGIVER_ELDERLY_TABLE_ID,
+  CAREGIVER_TABLE_ID,
+  DATABASE_ID,
+  ELDERLY_TABLE_ID,
+  tablesDB,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { createEmergencyAlert } from "@/lib/emergency";
@@ -21,17 +21,17 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Modal,
-    StyleSheet,
-    Vibration,
-    View,
+  Modal,
+  StyleSheet,
+  Vibration,
+  View,
 } from "react-native";
 import { Query } from "react-native-appwrite";
 import { ActivityIndicator, Button, Text, useTheme } from "react-native-paper";
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 
 const COUNTDOWN_SECONDS = 15;
@@ -245,7 +245,7 @@ export default function FallCountdownOverlay({
       const ceRows = await tablesDB.listRows<CaregiverElderly>({
         databaseId: DATABASE_ID,
         tableId: CAREGIVER_ELDERLY_TABLE_ID,
-        queries: [Query.equal("elderly", elderlyId), Query.limit(100)],
+        queries: [Query.equal("elderly", elderlyId), Query.equal("isConnection", true), Query.limit(100)],
       });
 
       const caregiverUserIds = new Set<string>();

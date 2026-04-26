@@ -1,9 +1,12 @@
+import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/lib/auth-context";
+import { getCaregiverByUserId } from "@/lib/caregiver";
+import { relationshipExists } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import {
-    cancelRegistrationRequest,
-    connectCaregiverToElderly,
-    getRegistrationRequest,
+  cancelRegistrationRequest,
+  connectCaregiverToElderly,
+  getRegistrationRequest,
 } from "@/lib/registration";
 import { Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -12,12 +15,11 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Button,
-    Card,
-    Text,
-    useTheme,
+  ActivityIndicator,
+  Button,
+  Card,
+  Text,
+  useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -34,6 +36,7 @@ export default function ConfirmConnectScreen() {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -86,10 +89,23 @@ export default function ConfirmConnectScreen() {
   }, [token]);
 
   const handleConfirm = async () => {
-    if (!user || !token) return;
+    if (!user || !token || !elderly) return;
     setConnecting(true);
     setError(null);
+    setInfo(null);
     try {
+      const caregiver = await getCaregiverByUserId(user.$id);
+      if (!caregiver) {
+        setError(t('linkElderly.caregiverNotFound'));
+        return;
+      }
+
+      const already = await relationshipExists(caregiver.$id, elderly.$id);
+      if (already) {
+        setInfo(t('linkElderly.alreadyLinked'));
+        return;
+      }
+
       await connectCaregiverToElderly({
         token,
         caregiverUserId: user.$id,
@@ -234,6 +250,19 @@ export default function ConfirmConnectScreen() {
               {t('confirmConnect.wantToLink')}
             </Text>
 
+            {info ? (
+              <Text
+                variant="bodyMedium"
+                style={{
+                  marginTop: 12,
+                  color: theme.colors.onSurfaceVariant,
+                  textAlign: "center",
+                }}
+              >
+                {info}
+              </Text>
+            ) : null}
+
             <Card
               style={[
                 styles.elderlyCard,
@@ -241,14 +270,11 @@ export default function ConfirmConnectScreen() {
               ]}
             >
               <Card.Content style={styles.elderlyCardContent}>
-                <Avatar.Text
+                <UserAvatar
+                  avatarFileId={elderly.avatar_file_id ?? undefined}
+                  name={elderly.name ?? "??"}
                   size={56}
-                  label={(elderly.name ?? "??").substring(0, 2).toUpperCase()}
-                  style={{ backgroundColor: theme.colors.primaryContainer }}
-                  labelStyle={{
-                    color: theme.colors.onPrimaryContainer,
-                    fontWeight: "600",
-                  }}
+                  role="elderly"
                 />
                 <View style={{ marginLeft: 16, flex: 1 }}>
                   <Text variant="titleLarge" style={{ fontWeight: "bold" }}>

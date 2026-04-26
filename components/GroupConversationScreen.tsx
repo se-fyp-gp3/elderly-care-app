@@ -1,22 +1,22 @@
 import { ID, storage, USER_ICON_BUCKET_ID, VOICE_MESSAGES_BUCKET_ID } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import {
-    fetchGroupMessages,
-    markGroupMessagesAsRead,
-    sendGroupMessage,
-    subscribeToGroupMessages,
-    updateGroupReadCursor,
+  fetchGroupMessages,
+  markGroupMessagesAsRead,
+  sendGroupMessage,
+  subscribeToGroupMessages,
+  updateGroupReadCursor,
 } from "@/lib/group-messaging";
 import { getGroupMembers } from "@/lib/groups";
 import { GroupMember, GroupMessage } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AudioPlayer } from "expo-audio";
 import {
-    createAudioPlayer,
-    RecordingPresets,
-    requestRecordingPermissionsAsync,
-    setAudioModeAsync,
-    useAudioRecorder,
+  createAudioPlayer,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
 } from "expo-audio";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
@@ -25,28 +25,28 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    FlatList,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    Modal as RNModal,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Modal as RNModal,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Divider,
-    IconButton,
-    Modal,
-    Portal,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Divider,
+  IconButton,
+  Modal,
+  Portal,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import UserAvatar from "./UserAvatar";
@@ -470,14 +470,25 @@ export default function GroupConversationScreen({
     const isSystem = item.message_type === "system";
 
     if (isSystem) {
-      // Translate hardcoded English system messages stored in the database
       let displayBody = item.body;
-      const createdMatch = item.body.match(/^(.+) created the group$/);
-      const joinedMatch = item.body.match(/^(.+) joined the group$/);
-      if (createdMatch) {
-        displayBody = t("chat.createdTheGroup", { name: createdMatch[1] });
-      } else if (joinedMatch) {
-        displayBody = t("chat.joinedTheGroup", { name: joinedMatch[1] });
+      try {
+        const sysMsg = JSON.parse(item.body);
+        if (sysMsg && typeof sysMsg === "object" && sysMsg.type) {
+          if (sysMsg.type === "created") {
+            displayBody = t("chat.createdTheGroup", { name: sysMsg.name });
+          } else if (sysMsg.type === "joined") {
+            displayBody = t("chat.joinedTheGroup", { name: sysMsg.name });
+          }
+        }
+      } catch {
+        // Fallback: legacy plain-English messages stored in database
+        const createdMatch = item.body.match(/^(.+) created the group$/);
+        const joinedMatch = item.body.match(/^(.+) joined the group$/);
+        if (createdMatch) {
+          displayBody = t("chat.createdTheGroup", { name: createdMatch[1] });
+        } else if (joinedMatch) {
+          displayBody = t("chat.joinedTheGroup", { name: joinedMatch[1] });
+        }
       }
       return (
         <View style={styles.systemMsgContainer}>

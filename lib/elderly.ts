@@ -1,25 +1,25 @@
 import {
-    Caregiver,
-    CaregiverElderly,
-    Elderly,
-    ElderlyMedication,
-    ElderlyMedicationStatus,
-    ElderlyStatus,
-    Medication,
-    Schedule,
+  Caregiver,
+  CaregiverElderly,
+  Elderly,
+  ElderlyMedication,
+  ElderlyMedicationStatus,
+  ElderlyStatus,
+  Medication,
+  Schedule,
 } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
-    CAREGIVER_ELDERLY_TABLE_ID,
-    CAREGIVER_TABLE_ID,
-    DATABASE_ID,
-    ELDERLY_MEDICATION_REMINDER_TABLE_ID,
-    ELDERLY_MEDICATION_TABLE_ID,
-    ELDERLY_TABLE_ID,
-    MEDICATION_LOGS_TABLE_ID,
-    MEDICATION_TABLE_ID,
-    SCHEDULE_TABLE_ID,
-    tablesDB,
+  CAREGIVER_ELDERLY_TABLE_ID,
+  CAREGIVER_TABLE_ID,
+  DATABASE_ID,
+  ELDERLY_MEDICATION_REMINDER_TABLE_ID,
+  ELDERLY_MEDICATION_TABLE_ID,
+  ELDERLY_TABLE_ID,
+  MEDICATION_LOGS_TABLE_ID,
+  MEDICATION_TABLE_ID,
+  SCHEDULE_TABLE_ID,
+  tablesDB,
 } from "./appwrite";
 import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
 
@@ -477,7 +477,7 @@ export async function fetchCaregiversForElderly(
     const response = await tablesDB.listRows<CaregiverElderly>({
       databaseId: DATABASE_ID,
       tableId: CAREGIVER_ELDERLY_TABLE_ID,
-      queries: [Query.equal("elderly", profile.$id)],
+      queries: [Query.equal("elderly", profile.$id), Query.equal("isConnection", true)],
     });
 
     const caregivers: Caregiver[] = [];
@@ -551,6 +551,7 @@ export async function getLinkedCaregivers(
       tableId: CAREGIVER_ELDERLY_TABLE_ID,
       queries: [
         Query.equal("elderly", elderlyDocId),
+        Query.equal("isConnection", true),
         Query.limit(100),
       ],
     });

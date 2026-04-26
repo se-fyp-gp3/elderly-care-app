@@ -763,7 +763,12 @@
     "activity": "活動：",
     "stepsToday": "{{count}} 步（今天）",
     "noData": "無資料",
-    "active": "活躍"
+    "active": "活躍",
+    "unlinkElderly": "取消關聯",
+    "unlinkElderlyConfirmTitle": "確認取消關聯",
+    "unlinkElderlyConfirmMsg": "確定要取消與{{name}}的關聯嗎？之後將不再收到其健康資料更新。",
+    "unlinkSuccess": "已成功取消關聯。",
+    "unlinkFailed": "取消關聯失敗，請重試。"
   },
   "cancelledMedications": {
     "title": "已取消的藥物",
@@ -981,7 +986,8 @@
     "noElderlyFound": "未找到該電話號碼的長者",
     "caregiverNotFound": "未找到照顧者資料。請先完善您的資料。",
     "failedToLink": "關聯長者失敗",
-    "accountFound": "找到帳戶",
+    "accountFound": "找到账户",
+    "alreadyLinked": "該長者已關聯。",
     "confirmLink": "確認關聯"
   },
   "voiceCommand": {

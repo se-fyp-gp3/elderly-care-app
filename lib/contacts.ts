@@ -1,20 +1,20 @@
 import i18n from "@/lib/i18n";
 import {
-    Caregiver,
-    CaregiverConnection,
-    CaregiverElderly,
-    Elderly,
-    ElderlyConnections,
+  Caregiver,
+  CaregiverConnection,
+  CaregiverElderly,
+  Elderly,
+  ElderlyConnections,
 } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
-    CAREGIVER_CONNECTIONS_TABLE_ID,
-    CAREGIVER_ELDERLY_TABLE_ID,
-    CAREGIVER_TABLE_ID,
-    DATABASE_ID,
-    ELDERLY_CONNECTIONS_TABLE_ID,
-    ELDERLY_TABLE_ID,
-    tablesDB,
+  CAREGIVER_CONNECTIONS_TABLE_ID,
+  CAREGIVER_ELDERLY_TABLE_ID,
+  CAREGIVER_TABLE_ID,
+  DATABASE_ID,
+  ELDERLY_CONNECTIONS_TABLE_ID,
+  ELDERLY_TABLE_ID,
+  tablesDB,
 } from "./appwrite";
 import { triggerProfilePush } from "./chat-push";
 
@@ -73,6 +73,7 @@ async function getElderlyContactsForCaregiver(
       tableId: CAREGIVER_ELDERLY_TABLE_ID,
       queries: [
         Query.equal("caregiver", caregiverId),
+        Query.equal("isConnection", true),
         Query.orderDesc("$createdAt"),
       ],
     });
@@ -132,6 +133,7 @@ export async function getContactsForElderly(
       tableId: CAREGIVER_ELDERLY_TABLE_ID,
       queries: [
         Query.equal("elderly", elderlyId),
+        Query.equal("isConnection", true),
         Query.orderDesc("$createdAt"),
       ],
     });
@@ -217,6 +219,7 @@ export async function relationshipExists(
       queries: [
         Query.equal("caregiver", caregiverId),
         Query.equal("elderly", elderlyId),
+        Query.equal("isConnection", true),
         Query.limit(1),
       ],
     });
@@ -236,8 +239,31 @@ export async function addCaregiverContact(
   elderlyId: string,
 ): Promise<boolean> {
   try {
+    // Check if an active connection already exists
     const exists = await relationshipExists(caregiverId, elderlyId);
     if (exists) return false;
+
+    // Check if a disabled (isConnection=false) row exists and re-enable it
+    const disabledResponse = await tablesDB.listRows<CaregiverElderly>({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_ELDERLY_TABLE_ID,
+      queries: [
+        Query.equal("caregiver", caregiverId),
+        Query.equal("elderly", elderlyId),
+        Query.equal("isConnection", false),
+        Query.limit(1),
+      ],
+    });
+
+    if (disabledResponse.total > 0) {
+      await tablesDB.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: CAREGIVER_ELDERLY_TABLE_ID,
+        rowId: disabledResponse.rows[0].$id,
+        data: { isConnection: true },
+      });
+      return true;
+    }
 
     await tablesDB.createRow({
       databaseId: DATABASE_ID,
@@ -246,6 +272,7 @@ export async function addCaregiverContact(
       data: {
         caregiver: caregiverId,
         elderly: elderlyId,
+        isConnection: true,
       },
     });
     return true;

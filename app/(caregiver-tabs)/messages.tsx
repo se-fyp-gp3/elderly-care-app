@@ -1,79 +1,79 @@
 import CreateGroupModal from "@/components/CreateGroupModal";
 import UserAvatar from "@/components/UserAvatar";
 import {
-    CAREGIVER_TABLE_ID,
-    clientReactNative,
-    DATABASE_ID,
-    DIRECT_MESSAGES_TABLE_ID,
-    ELDERLY_TABLE_ID,
-    GROUP_MEMBERS_TABLE_ID,
-    GROUP_MESSAGES_TABLE_ID,
-    safeSubscribe,
+  CAREGIVER_TABLE_ID,
+  clientReactNative,
+  DATABASE_ID,
+  DIRECT_MESSAGES_TABLE_ID,
+  ELDERLY_TABLE_ID,
+  GROUP_MEMBERS_TABLE_ID,
+  GROUP_MESSAGES_TABLE_ID,
+  safeSubscribe,
 } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import {
-    acceptCaregiverConnection,
-    addCaregiverConnection,
-    Contact,
-    formatRelativeTime,
-    getContactsForCaregiver,
-    getPendingCaregiverConnections,
-    rejectCaregiverConnection,
-    searchUserByPhone,
+  acceptCaregiverConnection,
+  addCaregiverConnection,
+  Contact,
+  formatRelativeTime,
+  getContactsForCaregiver,
+  getPendingCaregiverConnections,
+  rejectCaregiverConnection,
+  searchUserByPhone,
 } from "@/lib/contacts";
 import {
-    getGroupUnreadCount,
-    getLastGroupMessage,
+  getGroupUnreadCount,
+  getLastGroupMessage,
 } from "@/lib/group-messaging";
 import {
-    acceptGroupInvitation,
-    buildGroupAvatarUrl,
-    getGroupsForUser,
-    getPendingGroupInvitations,
-    rejectGroupInvitation,
+  acceptGroupInvitation,
+  buildGroupAvatarUrl,
+  getGroupsForUser,
+  getPendingGroupInvitations,
+  rejectGroupInvitation,
 } from "@/lib/groups";
 import {
-    buildConversationId,
-    getLastMessage,
-    getUnreadCountPerConversation,
+  buildConversationId,
+  getLastMessage,
+  getUnreadCountPerConversation,
 } from "@/lib/messaging";
 import { isUserOnline } from "@/lib/presence";
 import { Caregiver, Elderly } from "@/types/appwrite";
 import {
-    DirectMessage,
-    Group,
-    GroupMember,
-    GroupMessage,
+  DirectMessage,
+  Group,
+  GroupMember,
+  GroupMessage,
 } from "@/types/messaging";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Keyboard,
-    Linking,
-    Modal,
-    NativeScrollEvent,
-    NativeSyntheticEvent,
-    RefreshControl,
-    StyleSheet,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    useWindowDimensions,
-    View,
+  Alert,
+  FlatList,
+  Keyboard,
+  Linking,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Badge,
-    Button,
-    Menu,
-    Searchbar,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  Badge,
+  Button,
+  Menu,
+  Searchbar,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 import MomentsView from "@/components/MomentsView";
@@ -703,6 +703,19 @@ export default function CaregiverMessages() {
       const lastMsg = item.lastMsg;
       const time = lastMsg?.created_at ?? group.created_at;
       const preview = lastMsg?.body;
+      let displayPreview = preview;
+      if (lastMsg?.message_type === "system" && preview) {
+        try {
+          const sysMsg = JSON.parse(preview);
+          if (sysMsg.type === "created") displayPreview = t("chat.createdTheGroup", { name: sysMsg.name });
+          else if (sysMsg.type === "joined") displayPreview = t("chat.joinedTheGroup", { name: sysMsg.name });
+        } catch {
+          const createdMatch = preview.match(/^(.+) created the group$/);
+          const joinedMatch = preview.match(/^(.+) joined the group$/);
+          if (createdMatch) displayPreview = t("chat.createdTheGroup", { name: createdMatch[1] });
+          else if (joinedMatch) displayPreview = t("chat.joinedTheGroup", { name: joinedMatch[1] });
+        }
+      }
       return (
         <TouchableOpacity
           activeOpacity={0.7}
@@ -784,12 +797,12 @@ export default function CaregiverMessages() {
                 ]}
                 numberOfLines={1}
               >
-                {lastMsg?.sender_id === caregiverProfileId
+                {lastMsg?.message_type !== "system" && (lastMsg?.sender_id === caregiverProfileId
                   ? t("common.you")
-                  : `${lastMsg?.sender_name}: `}
+                  : `${lastMsg?.sender_name}: `)}
                 {lastMsg?.message_type === "voice"
                   ? t("common.voiceMessage")
-                  : preview}
+                  : displayPreview}
               </Text>
             ) : (
               <Text
