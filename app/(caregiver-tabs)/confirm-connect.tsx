@@ -1,8 +1,8 @@
 import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/lib/auth-context";
-import { getElderlyByUserId } from "@/lib/elderly";
 import { getCaregiverByUserId } from "@/lib/caregiver";
 import { relationshipExists } from "@/lib/contacts";
+import { getElderlyByUserId } from "@/lib/elderly";
 import {
   cancelRegistrationRequest,
   connectCaregiverToElderly,
