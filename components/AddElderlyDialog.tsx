@@ -9,7 +9,6 @@ import { useTranslation } from "react-i18next";
 import { Keyboard, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
-  Avatar,
   Button,
   Dialog,
   Divider,
@@ -19,6 +18,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
+import UserAvatar from "@/components/UserAvatar";
 
 interface AddElderlyDialogProps {
   visible: boolean;
@@ -172,18 +172,12 @@ export default function AddElderlyDialog({
             </>
           ) : (
             <View style={styles.resultContainer}>
-              <Avatar.Text
-                size={64}
-                label={
-                  foundElderly.name
-                    ? foundElderly.name.substring(0, 2).toUpperCase()
-                    : "??"
-                }
-                style={{
-                  backgroundColor: theme.colors.primaryContainer,
-                  marginBottom: 8,
-                }}
-              />
+                <UserAvatar
+                  avatarFileId={foundElderly.avatar_file_id ?? undefined}
+                  name={foundElderly.name || "??"}
+                  size={64}
+                  role="elderly"
+                />
               <Text variant="titleMedium">{foundElderly.name}</Text>
               <Text
                 variant="bodyMedium"

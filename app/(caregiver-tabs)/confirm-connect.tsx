@@ -13,12 +13,12 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import {
     ActivityIndicator,
-    Avatar,
     Button,
     Card,
     Text,
     useTheme,
 } from "react-native-paper";
+import UserAvatar from "@/components/UserAvatar";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ConfirmConnectScreen() {
@@ -241,14 +241,11 @@ export default function ConfirmConnectScreen() {
               ]}
             >
               <Card.Content style={styles.elderlyCardContent}>
-                <Avatar.Text
+                <UserAvatar
+                  avatarFileId={elderly.avatar_file_id ?? undefined}
+                  name={elderly.name ?? "??"}
                   size={56}
-                  label={(elderly.name ?? "??").substring(0, 2).toUpperCase()}
-                  style={{ backgroundColor: theme.colors.primaryContainer }}
-                  labelStyle={{
-                    color: theme.colors.onPrimaryContainer,
-                    fontWeight: "600",
-                  }}
+                  role="elderly"
                 />
                 <View style={{ marginLeft: 16, flex: 1 }}>
                   <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
