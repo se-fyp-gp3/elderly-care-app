@@ -1,6 +1,8 @@
 import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { getElderlyByUserId } from "@/lib/elderly";
+import { getCaregiverByUserId } from "@/lib/caregiver";
+import { relationshipExists } from "@/lib/contacts";
 import {
   cancelRegistrationRequest,
   connectCaregiverToElderly,
@@ -34,6 +36,7 @@ export default function ConfirmConnectScreen() {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -86,10 +89,23 @@ export default function ConfirmConnectScreen() {
   }, [token]);
 
   const handleConfirm = async () => {
-    if (!user || !token) return;
+    if (!user || !token || !elderly) return;
     setConnecting(true);
     setError(null);
+    setInfo(null);
     try {
+      const caregiver = await getCaregiverByUserId(user.$id);
+      if (!caregiver) {
+        setError(t('linkElderly.caregiverNotFound'));
+        return;
+      }
+
+      const already = await relationshipExists(caregiver.$id, elderly.$id);
+      if (already) {
+        setInfo(t('linkElderly.alreadyLinked'));
+        return;
+      }
+
       await connectCaregiverToElderly({
         token,
         caregiverUserId: user.$id,
@@ -233,6 +249,19 @@ export default function ConfirmConnectScreen() {
             >
               {t('confirmConnect.wantToLink')}
             </Text>
+
+            {info ? (
+              <Text
+                variant="bodyMedium"
+                style={{
+                  marginTop: 12,
+                  color: theme.colors.onSurfaceVariant,
+                  textAlign: "center",
+                }}
+              >
+                {info}
+              </Text>
+            ) : null}
 
             <Card
               style={[
