@@ -47,15 +47,56 @@ export async function linkCaregiverToElderly(
   caregiverId: string,
   elderlyId: string,
 ): Promise<void> {
-  await tablesDB.createRow({
-    databaseId: DATABASE_ID,
-    tableId: CAREGIVER_ELDERLY_TABLE_ID,
-    rowId: ID.unique(),
-    data: {
-      caregiver: caregiverId,
-      elderly: elderlyId,
-    },
-  });
+  try {
+    // If an active connection already exists, noop
+    const active = await tablesDB.listRows<CaregiverElderly>({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_ELDERLY_TABLE_ID,
+      queries: [
+        Query.equal("caregiver", caregiverId),
+        Query.equal("elderly", elderlyId),
+        Query.equal("isConnection", true),
+        Query.limit(1),
+      ],
+    });
+    if (active.total > 0) return;
+
+    // If a disabled connection exists, re-enable it
+    const disabled = await tablesDB.listRows<CaregiverElderly>({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_ELDERLY_TABLE_ID,
+      queries: [
+        Query.equal("caregiver", caregiverId),
+        Query.equal("elderly", elderlyId),
+        Query.equal("isConnection", false),
+        Query.limit(1),
+      ],
+    });
+    if (disabled.total > 0) {
+      await tablesDB.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: CAREGIVER_ELDERLY_TABLE_ID,
+        rowId: disabled.rows[0].$id,
+        data: { isConnection: true },
+      });
+      return;
+    }
+
+    // Otherwise create a fresh connection row
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_ELDERLY_TABLE_ID,
+      rowId: ID.unique(),
+      data: {
+        caregiver: caregiverId,
+        elderly: elderlyId,
+        isConnection: true,
+      },
+    });
+  } catch (error) {
+    console.error("Error linking caregiver to elderly:", error);
+    throw error;
+  }
 }
 
 export async function getLinkedElderly(
