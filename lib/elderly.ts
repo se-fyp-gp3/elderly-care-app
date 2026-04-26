@@ -477,7 +477,7 @@ export async function fetchCaregiversForElderly(
     const response = await tablesDB.listRows<CaregiverElderly>({
       databaseId: DATABASE_ID,
       tableId: CAREGIVER_ELDERLY_TABLE_ID,
-      queries: [Query.equal("elderly", profile.$id)],
+      queries: [Query.equal("elderly", profile.$id), Query.equal("isConnection", true)],
     });
 
     const caregivers: Caregiver[] = [];
@@ -551,6 +551,7 @@ export async function getLinkedCaregivers(
       tableId: CAREGIVER_ELDERLY_TABLE_ID,
       queries: [
         Query.equal("elderly", elderlyDocId),
+        Query.equal("isConnection", true),
         Query.limit(100),
       ],
     });

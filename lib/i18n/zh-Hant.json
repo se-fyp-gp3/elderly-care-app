@@ -763,7 +763,12 @@
     "activity": "活動：",
     "stepsToday": "{{count}} 步（今天）",
     "noData": "無資料",
-    "active": "活躍"
+    "active": "活躍",
+    "unlinkElderly": "取消關聯",
+    "unlinkElderlyConfirmTitle": "確認取消關聯",
+    "unlinkElderlyConfirmMsg": "確定要取消與{{name}}的關聯嗎？之後將不再收到其健康資料更新。",
+    "unlinkSuccess": "已成功取消關聯。",
+    "unlinkFailed": "取消關聯失敗，請重試。"
   },
   "cancelledMedications": {
     "title": "已取消的藥物",

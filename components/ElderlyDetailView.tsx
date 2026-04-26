@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import {
+  Button,
   Card,
   Chip,
   Divider,
@@ -43,12 +44,14 @@ interface ElderlyDetailViewProps {
   data: ElderlyDetailData;
   onCall?: (phone: string) => void;
   onHealthData?: (id: string) => void;
+  onUnlink?: () => void;
 }
 
 export default function ElderlyDetailView({
   data,
   onCall,
   onHealthData,
+  onUnlink,
 }: ElderlyDetailViewProps) {
   const theme = useTheme();
   const colorScheme = useColorScheme();
@@ -285,6 +288,20 @@ export default function ElderlyDetailView({
           />
         </Card.Content>
       </Card>
+
+      {/* Unlink Button */}
+      {onUnlink && (
+        <View style={{ paddingHorizontal: 16, marginBottom: 30 }}>
+          <Button
+            mode="outlined"
+            textColor={theme.colors.error}
+            style={{ borderColor: theme.colors.error }}
+            onPress={onUnlink}
+          >
+            {t("caregiverPanel.unlinkElderly")}
+          </Button>
+        </View>
+      )}
     </ScrollView>
   );
 }

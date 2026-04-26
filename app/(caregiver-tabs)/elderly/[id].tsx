@@ -2,13 +2,15 @@ import ElderlyDetailView, {
     ElderlyDetailData,
 } from "@/components/ElderlyDetailView";
 import { DATABASE_ID, ELDERLY_TABLE_ID, tablesDB } from "@/lib/appwrite";
+import { useAuth } from "@/lib/auth-context";
+import { getCaregiverByUserId, unlinkCaregiverFromElderly } from "@/lib/caregiver";
 import { getLatestMetrics } from "@/lib/health-data";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, TouchableOpacity, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 
 export default function ElderlyDetailPage() {
@@ -17,6 +19,7 @@ export default function ElderlyDetailPage() {
   const navigation = useNavigation();
   const theme = useTheme();
   const { t } = useTranslation();
+  const { user } = useAuth();
 
   // Ensure id is a string
   const docId = Array.isArray(id) ? id[0] : id;
@@ -120,6 +123,34 @@ export default function ElderlyDetailPage() {
     });
   }, [navigation, router, theme]);
 
+  const handleUnlink = async () => {
+    if (!user || !docId || !data) return;
+    const caregiver = await getCaregiverByUserId(user.$id);
+    if (!caregiver) return;
+
+    Alert.alert(
+      t("caregiverPanel.unlinkElderlyConfirmTitle"),
+      t("caregiverPanel.unlinkElderlyConfirmMsg", { name: data.name }),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("common.confirm"),
+          style: "destructive",
+          onPress: async () => {
+            const success = await unlinkCaregiverFromElderly(caregiver.$id, docId);
+            if (success) {
+              Alert.alert(t("common.success"), t("caregiverPanel.unlinkSuccess"), [
+                { text: t("common.confirm"), onPress: () => router.navigate("/caregiver") },
+              ]);
+            } else {
+              Alert.alert(t("common.error"), t("caregiverPanel.unlinkFailed"));
+            }
+          },
+        },
+      ],
+    );
+  };
+
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -145,6 +176,7 @@ export default function ElderlyDetailPage() {
           `/health-data?elderlyId=${elderlyId}&elderlyName=${encodeURIComponent(data.name)}` as any,
         )
       }
+      onUnlink={handleUnlink}
     />
   );
 }

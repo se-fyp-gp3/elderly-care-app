@@ -754,7 +754,12 @@
     "activity": "活动：",
     "stepsToday": "{{count}} 步（今天）",
     "noData": "无数据",
-    "active": "活跃"
+    "active": "活跃",
+    "unlinkElderly": "取消关联",
+    "unlinkElderlyConfirmTitle": "确认取消关联",
+    "unlinkElderlyConfirmMsg": "确定要取消与{{name}}的关联吗？之后将不再收到其健康数据更新。",
+    "unlinkSuccess": "已成功取消关联。",
+    "unlinkFailed": "取消关联失败，请重试。"
   },
   "cancelledMedications": {
     "title": "已取消的药物",

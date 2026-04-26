@@ -67,6 +67,7 @@ export async function getLinkedElderly(
       tableId: CAREGIVER_ELDERLY_TABLE_ID,
       queries: [
         Query.equal("caregiver", caregiverId),
+        Query.equal("isConnection", true),
         Query.orderDesc("$createdAt"),
       ],
     });
@@ -100,5 +101,34 @@ export async function getLinkedElderly(
   } catch (error) {
     console.error("Error fetching linked elderly:", error);
     return [];
+  }
+}
+
+export async function unlinkCaregiverFromElderly(
+  caregiverId: string,
+  elderlyId: string,
+): Promise<boolean> {
+  try {
+    const response = await tablesDB.listRows<CaregiverElderly>({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_ELDERLY_TABLE_ID,
+      queries: [
+        Query.equal("caregiver", caregiverId),
+        Query.equal("elderly", elderlyId),
+        Query.equal("isConnection", true),
+        Query.limit(1),
+      ],
+    });
+    if (response.total === 0) return false;
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: CAREGIVER_ELDERLY_TABLE_ID,
+      rowId: response.rows[0].$id,
+      data: { isConnection: false },
+    });
+    return true;
+  } catch (error) {
+    console.error("Error unlinking caregiver from elderly:", error);
+    return false;
   }
 }

@@ -48,7 +48,7 @@ async function getLinkedCaregiversForElderly(elderlyId: string): Promise<Caregiv
   const links = await tablesDB.listRows<CaregiverElderly>({
     databaseId: DATABASE_ID,
     tableId: CAREGIVER_ELDERLY_TABLE_ID,
-    queries: [Query.equal("elderly", elderlyId), Query.limit(100)],
+    queries: [Query.equal("elderly", elderlyId), Query.equal("isConnection", true), Query.limit(100)],
   });
 
   const caregivers: Caregiver[] = [];
