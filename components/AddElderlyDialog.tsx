@@ -1,3 +1,4 @@
+import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, linkCaregiverToElderly } from "@/lib/caregiver";
 import { relationshipExists } from "@/lib/contacts";
@@ -18,7 +19,6 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
-import UserAvatar from "@/components/UserAvatar";
 
 interface AddElderlyDialogProps {
   visible: boolean;

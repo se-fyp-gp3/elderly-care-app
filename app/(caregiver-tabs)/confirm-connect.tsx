@@ -1,9 +1,10 @@
+import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { getElderlyByUserId } from "@/lib/elderly";
 import {
-    cancelRegistrationRequest,
-    connectCaregiverToElderly,
-    getRegistrationRequest,
+  cancelRegistrationRequest,
+  connectCaregiverToElderly,
+  getRegistrationRequest,
 } from "@/lib/registration";
 import { Elderly } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -12,13 +13,12 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import {
-    ActivityIndicator,
-    Button,
-    Card,
-    Text,
-    useTheme,
+  ActivityIndicator,
+  Button,
+  Card,
+  Text,
+  useTheme,
 } from "react-native-paper";
-import UserAvatar from "@/components/UserAvatar";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ConfirmConnectScreen() {
