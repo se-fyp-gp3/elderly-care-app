@@ -1,12 +1,12 @@
 import { Caregiver, CaregiverElderly, Elderly, EmergencyAlert } from "@/types/appwrite";
 import { ID, Query } from "react-native-appwrite";
 import {
-    CAREGIVER_ELDERLY_TABLE_ID,
-    CAREGIVER_TABLE_ID,
-    DATABASE_ID,
-    ELDERLY_TABLE_ID,
-    EMERGENCY_ALERTS_TABLE_ID,
-    tablesDB,
+  CAREGIVER_ELDERLY_TABLE_ID,
+  CAREGIVER_TABLE_ID,
+  DATABASE_ID,
+  ELDERLY_TABLE_ID,
+  EMERGENCY_ALERTS_TABLE_ID,
+  tablesDB,
 } from "./appwrite";
 import { triggerUserPush } from "./chat-push";
 
