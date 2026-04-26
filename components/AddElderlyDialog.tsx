@@ -1,5 +1,6 @@
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, linkCaregiverToElderly } from "@/lib/caregiver";
+import { relationshipExists } from "@/lib/contacts";
 import { getElderlyByPhone } from "@/lib/elderly";
 import { Elderly } from "@/types/appwrite";
 import { useRouter } from "expo-router";
@@ -7,16 +8,16 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Keyboard, StyleSheet, View } from "react-native";
 import {
-    ActivityIndicator,
-    Avatar,
-    Button,
-    Dialog,
-    Divider,
-    HelperText,
-    Portal,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Avatar,
+  Button,
+  Dialog,
+  Divider,
+  HelperText,
+  Portal,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 interface AddElderlyDialogProps {
@@ -39,6 +40,7 @@ export default function AddElderlyDialog({
   const [error, setError] = useState<string | null>(null);
   const [foundElderly, setFoundElderly] = useState<Elderly | null>(null);
   const [linking, setLinking] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
 
   const handleSearch = async () => {
     if (!phone.trim()) {
@@ -48,6 +50,7 @@ export default function AddElderlyDialog({
 
     setLoading(true);
     setError(null);
+    setInfo(null);
     setFoundElderly(null);
     Keyboard.dismiss();
 
@@ -77,8 +80,14 @@ export default function AddElderlyDialog({
         return;
       }
 
-      // Check if already linked happens implicitly or we can rely on DB unique constraints if set
-      // For now, just try to link
+      // If already linked, show a simple message instead of attempting to create
+      const already = await relationshipExists(caregiver.$id, foundElderly.$id);
+      if (already) {
+        setInfo(t('linkElderly.alreadyLinked'));
+        return;
+      }
+
+      // Otherwise perform the link (this will reuse disabled rows or create a new one)
       await linkCaregiverToElderly(caregiver.$id, foundElderly.$id);
 
       onSuccess();
@@ -94,6 +103,7 @@ export default function AddElderlyDialog({
   const handleDismiss = () => {
     setPhone("");
     setError(null);
+    setInfo(null);
     setFoundElderly(null);
     onDismiss();
   };
@@ -142,6 +152,7 @@ export default function AddElderlyDialog({
                 onChangeText={(text) => {
                   setPhone(text);
                   setError(null);
+                  setInfo(null);
                 }}
                 mode="outlined"
                 keyboardType="phone-pad"
@@ -199,6 +210,15 @@ export default function AddElderlyDialog({
               style={{ textAlign: "center" }}
             >
               {error}
+            </HelperText>
+          )}
+          {info && (
+            <HelperText
+              type="info"
+              visible={!!info}
+              style={{ textAlign: "center" }}
+            >
+              {info}
             </HelperText>
           )}
         </Dialog.Content>

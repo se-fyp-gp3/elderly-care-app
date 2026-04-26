@@ -987,6 +987,7 @@
     "caregiverNotFound": "Caregiver profile not found. Please complete your profile first.",
     "failedToLink": "Failed to link elderly",
     "accountFound": "Account Found",
+    "alreadyLinked": "This elderly is already linked.",
     "confirmLink": "Confirm Link"
   },
   "voiceCommand": {

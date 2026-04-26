@@ -978,6 +978,7 @@
     "caregiverNotFound": "未找到照顾者资料。请先完善您的资料。",
     "failedToLink": "关联长者失败",
     "accountFound": "找到账户",
+    "alreadyLinked": "该长者已关联。",
     "confirmLink": "确认关联"
   },
   "voiceCommand": {

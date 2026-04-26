@@ -986,7 +986,8 @@
     "noElderlyFound": "未找到該電話號碼的長者",
     "caregiverNotFound": "未找到照顧者資料。請先完善您的資料。",
     "failedToLink": "關聯長者失敗",
-    "accountFound": "找到帳戶",
+    "accountFound": "找到账户",
+    "alreadyLinked": "該長者已關聯。",
     "confirmLink": "確認關聯"
   },
   "voiceCommand": {
