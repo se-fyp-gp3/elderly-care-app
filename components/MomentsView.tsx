@@ -6,13 +6,13 @@ import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import { getElderlyByUserId } from "@/lib/elderly";
 import { useUnreadBadge } from "@/lib/hooks/useUnreadBadge";
 import {
-    addAIResponse,
-    createMoment,
-    deleteMoment,
-    getLatestComments,
-    getMoments,
-    getVisibleCommentCount,
-    likeMoment,
+  addAIResponse,
+  createMoment,
+  deleteMoment,
+  getLatestComments,
+  getMoments,
+  getVisibleCommentCount,
+  likeMoment,
 } from "@/lib/moments";
 import { Moment, MomentComment, MomentMediaInput } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -21,26 +21,26 @@ import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    FlatList,
-    Image,
-    Keyboard,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  Keyboard,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Button,
-    FAB,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Button,
+  FAB,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 
 const MAX_MEDIA = 4;
@@ -61,7 +61,9 @@ export default function MomentsView() {
   const [posting, setPosting] = useState(false);
   const [enableAI, setEnableAI] = useState(true);
   const [currentUserName, setCurrentUserName] = useState("");
-  const [currentUserAvatarFileId, setCurrentUserAvatarFileId] = useState<string | undefined>();
+  const [currentUserAvatarFileId, setCurrentUserAvatarFileId] = useState<
+    string | undefined
+  >();
   const [avatarMap, setAvatarMap] = useState<Record<string, string>>({});
   const [commentMomentId, setCommentMomentId] = useState<string | null>(null);
   const [allowedIds, setAllowedIds] = useState<string[]>([]);
@@ -369,6 +371,17 @@ export default function MomentsView() {
         momentAuthorId={
           moments.find((m) => m.$id === commentMomentId)?.author_id
         }
+        momentContent={moments.find((m) => m.$id === commentMomentId)?.content}
+        momentImageUrl={(() => {
+          const m = moments.find((mm) => mm.$id === commentMomentId);
+          if (!m) return undefined;
+          const firstImage = (m.parsedMediaItems || []).find(
+            (it) => it.type === "image" && it.url,
+          );
+          if (firstImage?.url) return firstImage.url;
+          if (m.media_type === "image" && m.media_url) return m.media_url;
+          return undefined;
+        })()}
         onClose={() => setCommentMomentId(null)}
         currentUserId={user?.$id || ""}
         currentUserName={currentUserName || user?.name || "Anonymous"}
@@ -408,7 +421,9 @@ export default function MomentsView() {
                   onChangeText={setNewPostContent}
                   style={{
                     marginBottom: 16,
-                    ...(Platform.OS === "android" && { textAlignVertical: "top" }),
+                    ...(Platform.OS === "android" && {
+                      textAlignVertical: "top",
+                    }),
                   }}
                 />
                 <View style={styles.mediaRow}>
@@ -497,7 +512,11 @@ export default function MomentsView() {
                   />
                   <Text
                     variant="bodyMedium"
-                    style={{ marginLeft: 8, flex: 1, color: theme.colors.onSurface }}
+                    style={{
+                      marginLeft: 8,
+                      flex: 1,
+                      color: theme.colors.onSurface,
+                    }}
                   >
                     {t("moments.enableAIDiscuss")}
                   </Text>

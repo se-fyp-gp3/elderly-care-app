@@ -1,20 +1,24 @@
-import { generateAIResponse } from "@/lib/ai";
 import {
-    clientReactNative,
-    DATABASE_ID,
-    MOMENTS_COMMENTS_TABLE_ID,
-    MOMENTS_MEDIA_BUCKET_ID,
-    MOMENTS_TABLE_ID,
-    storage,
+  AICommentReplyContext,
+  generateAICommentReply,
+  generateAIResponse,
+} from "@/lib/ai";
+import {
+  clientReactNative,
+  DATABASE_ID,
+  MOMENTS_COMMENTS_TABLE_ID,
+  MOMENTS_MEDIA_BUCKET_ID,
+  MOMENTS_TABLE_ID,
+  storage,
 } from "@/lib/appwrite";
 import { triggerProfilePush } from "@/lib/chat-push";
 import { getContactsForCaregiver, getContactsForElderly } from "@/lib/contacts";
 import i18n from "@/lib/i18n";
 import {
-    MediaItem,
-    Moment,
-    MomentComment,
-    MomentMediaInput,
+  MediaItem,
+  Moment,
+  MomentComment,
+  MomentMediaInput,
 } from "@/types/moments";
 import * as FileSystem from "expo-file-system";
 import * as VideoThumbnails from "expo-video-thumbnails";
@@ -120,7 +124,10 @@ export async function createMoment(
     );
   }
 
-  const recipientProfileIds = await getMomentRecipientProfileIds(userId, userRole);
+  const recipientProfileIds = await getMomentRecipientProfileIds(
+    userId,
+    userRole,
+  );
   if (recipientProfileIds.length > 0) {
     triggerProfilePush({
       mode: "profiles",
@@ -143,9 +150,10 @@ async function getMomentRecipientProfileIds(
   authorId: string,
   userRole: "elderly" | "caregiver",
 ): Promise<string[]> {
-  const contacts = userRole === "caregiver"
-    ? await getContactsForCaregiver(authorId)
-    : await getContactsForElderly(authorId);
+  const contacts =
+    userRole === "caregiver"
+      ? await getContactsForCaregiver(authorId)
+      : await getContactsForElderly(authorId);
 
   return Array.from(
     new Set(
@@ -485,11 +493,14 @@ export async function addComment(
 
   if (recipientProfileIds.length > 0) {
     const isReply =
-      !!options?.replyToUserId && options.replyToUserId !== options.momentAuthorId;
+      !!options?.replyToUserId &&
+      options.replyToUserId !== options.momentAuthorId;
     triggerProfilePush({
       mode: "profiles",
       recipientProfileIds,
-      title: isReply ? `${userName} replied to your comment` : `${userName} commented on your moment`,
+      title: isReply
+        ? `${userName} replied to your comment`
+        : `${userName} commented on your moment`,
       body: content.trim() || "New comment on your moment",
       data: {
         type: "moment_comment",
@@ -544,6 +555,76 @@ export async function addAIResponse(
     console.error("Error generating AI response:", error);
     throw error;
   }
+}
+
+export async function addAICommentReply(
+  momentId: string,
+  parentComment: MomentComment,
+  ctx: AICommentReplyContext,
+): Promise<MomentComment> {
+  const aiContent = await generateAICommentReply(ctx);
+
+  const data: Record<string, any> = {
+    moment_id: momentId,
+    content: aiContent,
+    author_id: "ai-assistant",
+    author_name: i18n.t("moments.aiAssistant"),
+    author_role: "ai",
+    likes: [],
+    reply_to_comment_id: parentComment.$id,
+    reply_to_user_id: parentComment.author_id,
+    reply_to_user_name: parentComment.author_name,
+  };
+  if (parentComment.moment_author_id) {
+    data.moment_author_id = parentComment.moment_author_id;
+  }
+
+  const created = await databases.createDocument(
+    DATABASE_ID,
+    MOMENTS_COMMENTS_TABLE_ID,
+    ID.unique(),
+    data,
+  );
+
+  // Increment comments_count on the moment
+  try {
+    const moment = await databases.getDocument(
+      DATABASE_ID,
+      MOMENTS_TABLE_ID,
+      momentId,
+    );
+    await databases.updateDocument(DATABASE_ID, MOMENTS_TABLE_ID, momentId, {
+      comments_count: (moment.comments_count || 0) + 1,
+    });
+  } catch {
+    // Non-critical
+  }
+
+  // Notify parent comment author (and the moment author if different and not the same person)
+  const recipientProfileIds = Array.from(
+    new Set(
+      [parentComment.author_id, parentComment.moment_author_id].filter(
+        (id): id is string => !!id && id !== "ai-assistant",
+      ),
+    ),
+  );
+  if (recipientProfileIds.length > 0) {
+    triggerProfilePush({
+      mode: "profiles",
+      recipientProfileIds,
+      title: `${i18n.t("moments.aiAssistant")} replied to your comment`,
+      body: aiContent.trim() || "New reply on your comment",
+      data: {
+        type: "moment_comment",
+        momentId,
+        actorName: i18n.t("moments.aiAssistant"),
+        previewText: aiContent.trim() || null,
+        isReply: true,
+      },
+    });
+  }
+
+  return created as unknown as MomentComment;
 }
 
 export async function deleteMoment(

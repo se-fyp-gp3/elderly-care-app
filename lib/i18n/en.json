@@ -662,8 +662,13 @@
     "oct": "Oct",
     "nov": "Nov",
     "dec": "Dec",
-    "sun": "Sun", "mon": "Mon", "tue": "Tue", "wed": "Wed",
-    "thu": "Thu", "fri": "Fri", "sat": "Sat"
+    "sun": "Sun",
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "sat": "Sat"
   },
   "healthData": {
     "myHealthData": "My Health Data",
@@ -986,6 +991,9 @@
     "deletePost": "Delete Post",
     "confirmDeletePost": "Are you sure you want to delete this post?",
     "aiAssistant": "AI Assistant",
+    "askAI": "Ask AI",
+    "aiReplying": "AI is thinking…",
+    "aiReplyFailed": "AI reply failed",
     "roleCaregiverLabel": "Caregiver",
     "roleElderlyLabel": "Elderly",
     "roleAiLabel": "AI"
