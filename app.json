@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.elderlycareapp",
+      "bundleIdentifier": "com.se-fyp-gp3.elderly-care-app",
       "infoPlist": {
         "NSHealthShareUsageDescription": "This app needs access to your Health data to display your daily step count.",
         "NSHealthUpdateUsageDescription": "This app needs access to update your Health data.",
