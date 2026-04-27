@@ -20,6 +20,17 @@ import {
 import { emitCaregiverActivityAlerts } from "./caregiver-activity-alerts";
 import { triggerProfilePush } from "./chat-push";
 
+function getResolvedTimeZone(): string | null {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return typeof timeZone === "string" && timeZone.trim().length > 0
+      ? timeZone.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Translate a medication unit string (e.g. "tablet" → "片") using i18n. */
 export function translateUnit(unit: string): string {
   if (!unit) return "";
@@ -691,6 +702,7 @@ export async function createScheduleTask(params: {
   typeName: string;
   categoryId?: string;
   remindMinutes?: number;
+  scheduledTimeZone?: string;
   notifyConnectedCaregivers?: boolean;
   notificationAudience?: "caregivers" | "elderly" | "none";
 }): Promise<void> {
@@ -702,11 +714,13 @@ export async function createScheduleTask(params: {
     typeName,
     categoryId,
     remindMinutes,
+    scheduledTimeZone,
     notifyConnectedCaregivers,
     notificationAudience,
   } = params;
   const resolvedAudience =
     notificationAudience ?? (notifyConnectedCaregivers ? "caregivers" : "none");
+  const resolvedTimeZone = scheduledTimeZone ?? getResolvedTimeZone();
 
   const data: Record<string, any> = {
     title,
@@ -727,6 +741,7 @@ export async function createScheduleTask(params: {
         description: `${title} at ${datetime.toLocaleString()}`,
         scheduleTitle: title,
         scheduledAt: datetime.toISOString(),
+        scheduledTimeZone: resolvedTimeZone ?? undefined,
       });
       return;
     }
@@ -743,6 +758,8 @@ export async function createScheduleTask(params: {
           action: "added",
           scheduleTitle: title,
           scheduledAt: datetime.toISOString(),
+          scheduledTimeZone: resolvedTimeZone ?? null,
+          remindMinutes: remindMinutes ?? 0,
         },
       });
     }
@@ -759,14 +776,15 @@ export async function createScheduleTask(params: {
   } catch (error: any) {
     const errorMessage = error?.message || "";
     const hasSchemaMismatch =
-      /Unknown attribute:\s*"remind_minutes"/i.test(errorMessage);
+      /remind_minutes/i.test(errorMessage) &&
+      /(Unknown attribute|not yet available|not available)/i.test(errorMessage);
 
     if (!hasSchemaMismatch) {
       throw error;
     }
 
     console.warn(
-      "[Schedule] schedule.remind_minutes is missing on the server, retrying without reminder column.",
+      "[Schedule] schedule.remind_minutes is not available on the server yet, retrying without reminder column.",
     );
 
     const { remind_minutes: _ignored, ...fallbackData } = data;

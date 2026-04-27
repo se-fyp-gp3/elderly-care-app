@@ -258,7 +258,11 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
         console.warn("[Notifications] Failed to register Expo push token", error);
       }
 
-      enableChatBackgroundNotifications(myProfileId).catch(() => {});
+      if (hasSystemPushNotifications) {
+        disableChatBackgroundNotifications().catch(() => {});
+      } else {
+        enableChatBackgroundNotifications(myProfileId).catch(() => {});
+      }
 
       await refreshRealtimeContext();
 
@@ -270,16 +274,18 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
         const payload = response.payload as DirectMessage;
 
         if (payload.receiver_id === myProfileId && payload.sender_id !== myProfileId) {
-          await sendImmediateNotification(
-            payload.sender_name || "New Message",
-            payload.message_type === "voice" ? "Sent a voice message" : (payload.body || "Sent a message"),
-            {
-              type: "direct_message",
-              contactId: payload.sender_id,
-              contactName: payload.sender_name,
-              contactRole: payload.sender_role,
-            }
-          );
+          if (!hasSystemPushNotifications) {
+            await sendImmediateNotification(
+              payload.sender_name || "New Message",
+              payload.message_type === "voice" ? "Sent a voice message" : (payload.body || "Sent a message"),
+              {
+                type: "direct_message",
+                contactId: payload.sender_id,
+                contactName: payload.sender_name,
+                contactRole: payload.sender_role,
+              }
+            );
+          }
           await markDirectMessageNotificationSeen(payload.$id);
         }
         },
@@ -302,11 +308,13 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
                 ? payload.body || "Group updated"
                 : `${payload.sender_name}: ${payload.body || "Sent a message"}`;
 
-          await sendImmediateNotification(groupName, messageBody, {
-            type: "group_message",
-            groupId: payload.group_id,
-            groupName,
-          });
+          if (!hasSystemPushNotifications) {
+            await sendImmediateNotification(groupName, messageBody, {
+              type: "group_message",
+              groupId: payload.group_id,
+              groupName,
+            });
+          }
           await markGroupMessageNotificationSeen(payload.$id);
         },
       );

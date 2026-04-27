@@ -241,7 +241,15 @@
     "fallCheckRunning": "執行中",
     "fallCheckNotRunning": "未執行",
     "fallCheckYes": "是",
-    "fallCheckNo": "否"
+    "fallCheckNo": "否",
+    "fallCheckDevice": "裝置",
+    "fallCheckProfile": "設定檔",
+    "fallCheckSensorInterval": "感測器間隔",
+    "fallCheckAccelerometer": "加速度感測器",
+    "fallCheckGyroscope": "陀螺儀",
+    "fallCheckDetectorRunning": "偵測器執行中",
+    "fallCheckBackgroundService": "背景服務",
+    "fallCheckGForceUnits": "重力加速度單位"
   },
   "home": {
     "hello": "你好，{{name}}！",
@@ -289,6 +297,7 @@
     "generatingVoice": "正在產生語音...",
     "playingVoice": "正在播放語音...",
     "voiceError": "語音錯誤：{{error}}",
+    "voicePlaybackFailed": "語音播放失敗。",
     "addPhoto": "新增照片",
     "chooseOption": "選擇一個選項",
     "takePhoto": "拍照",
@@ -551,7 +560,16 @@
     "activeAlertsCount": "{{count}} 個活躍警報",
     "statusActive": "活躍",
     "statusInvestigating": "處理中",
-    "statusResolved": "已解決"
+    "statusResolved": "已解決",
+    "allClear": "一切正常",
+    "noActiveAlerts": "目前沒有活躍警報。",
+    "searchAlerts": "搜尋警報...",
+    "noAlertsFound": "未找到警報",
+    "gpsLabel": "GPS：",
+    "noDescriptionAvailable": "暫無描述。",
+    "openMap": "開啟地圖",
+    "failedResolveAlert": "處理警報失敗。",
+    "failedUpdateAlertStatus": "更新警報狀態失敗。"
   },
   "schedule": {
     "mySchedule": "我的日程",

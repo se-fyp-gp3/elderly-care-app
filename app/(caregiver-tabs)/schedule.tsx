@@ -105,11 +105,15 @@ export default function SchedulePage() {
   const [tempPickerDate, setTempPickerDate] = useState(new Date());
   const [tempPickerTime, setTempPickerTime] = useState(new Date());
   const [tempNewTaskDate, setTempNewTaskDate] = useState(new Date());
+  const [remindPickerVisible, setRemindPickerVisible] = useState(false);
+  const [remindPickerMode, setRemindPickerMode] = useState<"date" | "time">("date");
+  const [tempRemindDate, setTempRemindDate] = useState(new Date());
   const [newTask, setNewTask] = useState<NewTaskData>({
     title: "",
     description: "",
     date: new Date(),
     time: "",
+    remindAt: null,
     type: "Activity",
     elderlyName: "Select Elderly",
     elderlyId: "",
@@ -343,6 +347,46 @@ export default function SchedulePage() {
     setNewTask((prev) => ({ ...prev, date: tempNewTaskDate }));
   };
 
+  const onChangeRemind = (_event: any, selectedDate?: Date) => {
+    if (Platform.OS !== "ios") {
+      if (remindPickerMode === "date" && selectedDate) {
+        setTempRemindDate(selectedDate);
+        setRemindPickerMode("time");
+      } else if (remindPickerMode === "time" && selectedDate) {
+        const merged = new Date(tempRemindDate);
+        merged.setHours(selectedDate.getHours(), selectedDate.getMinutes(), 0, 0);
+        setNewTask((prev) => ({ ...prev, remindAt: merged }));
+        setRemindPickerVisible(false);
+      } else {
+        setRemindPickerVisible(false);
+      }
+    } else if (selectedDate) {
+      setTempRemindDate(selectedDate);
+    }
+  };
+
+  const onConfirmRemindDone = () => {
+    if (remindPickerMode === "date") {
+      setRemindPickerMode("time");
+    } else {
+      setNewTask((prev) => ({ ...prev, remindAt: tempRemindDate }));
+      setRemindPickerVisible(false);
+    }
+  };
+
+  const getDefaultReminderDate = (): Date => {
+    if (newTask.time) {
+      const [hours, minutes] = newTask.time.split(":").map(Number);
+      if (Number.isFinite(hours) && Number.isFinite(minutes)) {
+        const eventDate = new Date(newTask.date);
+        eventDate.setHours(hours, minutes, 0, 0);
+        return new Date(eventDate.getTime() - 15 * 60 * 1000);
+      }
+    }
+
+    return new Date(Date.now() + 15 * 60 * 1000);
+  };
+
   const handleMonthSelect = (monthIndex: number) => {
     const newDate = new Date(pickerYear, monthIndex, 1);
     setReferenceDate(newDate);
@@ -548,6 +592,14 @@ export default function SchedulePage() {
       const combinedDatetime = new Date(newTask.date);
       const [hours, minutes] = newTask.time.split(":").map(Number);
       combinedDatetime.setHours(hours, minutes, 0, 0);
+      const remindMinutes = newTask.remindAt
+        ? Math.max(
+            0,
+            Math.round(
+              (combinedDatetime.getTime() - newTask.remindAt.getTime()) / 60000,
+            ),
+          )
+        : 0;
 
       await createScheduleTask({
         title: newTask.title,
@@ -556,6 +608,7 @@ export default function SchedulePage() {
         elderlyId: newTask.elderlyId,
         typeName: newTask.type,
         categoryId: newTask.typeId,
+        remindMinutes,
         notificationAudience: "elderly",
       });
 
@@ -565,6 +618,7 @@ export default function SchedulePage() {
         description: "",
         date: new Date(),
         time: "",
+        remindAt: null,
         type: "Activity",
         elderlyName: "All",
         elderlyId: "",
@@ -809,6 +863,35 @@ export default function SchedulePage() {
         )
       )}
 
+      {Platform.OS === "ios" ? (
+        <Modal visible={remindPickerVisible} transparent animationType="slide">
+          <View style={styles.pickerOverlay}>
+            <View style={[styles.pickerSheet, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.pickerHeader}>
+                <Button onPress={() => setRemindPickerVisible(false)}>{t('common.cancel')}</Button>
+                <Button onPress={onConfirmRemindDone}>{t('common.done')}</Button>
+              </View>
+              <DateTimePicker
+                value={tempRemindDate}
+                mode={remindPickerMode}
+                display="spinner"
+                onChange={onChangeRemind}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        remindPickerVisible && (
+          <DateTimePicker
+            value={tempRemindDate}
+            mode={remindPickerMode}
+            display="default"
+            onChange={onChangeRemind}
+          />
+        )
+      )}
+
       {/* Custom Month Picker Dialog */}
       <ScheduleMonthPicker
         visible={monthPickerVisible}
@@ -844,6 +927,21 @@ export default function SchedulePage() {
           setTempPickerTime(new Date());
           setTimePickerVisible(true);
         }}
+        onToggleReminder={() => {
+          if (newTask.remindAt) {
+            setNewTask((prev) => ({ ...prev, remindAt: null }));
+            return;
+          }
+
+          setNewTask((prev) => ({ ...prev, remindAt: getDefaultReminderDate() }));
+        }}
+        onOpenReminderPicker={() => {
+          const initialReminder = newTask.remindAt ?? getDefaultReminderDate();
+          setTempRemindDate(initialReminder);
+          setRemindPickerMode("date");
+          setRemindPickerVisible(true);
+        }}
+        dateLocale={dateLocale}
         onRetryCategories={fetchCategories}
       />
     </View>

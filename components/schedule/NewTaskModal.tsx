@@ -1,10 +1,12 @@
 import { Elderly, ScheduleCategory, ScheduleStatus } from "@/types/appwrite";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import {
     Avatar,
     Button,
+    Chip,
     Divider,
     IconButton,
     Modal,
@@ -20,6 +22,7 @@ export interface NewTaskData {
   description: string;
   date: Date;
   time: string;
+  remindAt?: Date | null;
   type: string;
   typeId?: string;
   elderlyName: string;
@@ -42,6 +45,9 @@ interface NewTaskModalProps {
   onSave: () => void;
   onOpenDatePicker: () => void;
   onOpenTimePicker: () => void;
+  onToggleReminder?: () => void;
+  onOpenReminderPicker?: () => void;
+  dateLocale?: string;
   onRetryCategories: () => void;
 }
 
@@ -60,9 +66,21 @@ export default function NewTaskModal({
   onSave,
   onOpenDatePicker,
   onOpenTimePicker,
+  onToggleReminder,
+  onOpenReminderPicker,
+  dateLocale,
   onRetryCategories,
 }: NewTaskModalProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
+
+  const formattedDate = newTask.date.toLocaleDateString(dateLocale);
+  const selectedElderlyLabel = newTask.elderlyId
+    ? newTask.elderlyName
+    : t("schedule.selectElderly");
+  const selectedTypeLabel = newTask.typeId
+    ? newTask.type
+    : t("schedule.typeActivity");
 
   return (
     <Portal>
@@ -80,12 +98,12 @@ export default function NewTaskModal({
               variant="headlineSmall"
               style={{ marginBottom: 20, fontWeight: "bold" }}
             >
-              New Task
+              {t("schedule.newTask")}
             </Text>
 
             <TextInput
               mode="outlined"
-              label="Title"
+              label={t("schedule.title")}
               value={newTask.title}
               onChangeText={(text) =>
                 onNewTaskChange({ ...newTask, title: text })
@@ -95,7 +113,7 @@ export default function NewTaskModal({
 
             <TextInput
               mode="outlined"
-              label="Description"
+              label={t("schedule.descriptionLabel")}
               value={newTask.description}
               onChangeText={(text) =>
                 onNewTaskChange({ ...newTask, description: text })
@@ -116,8 +134,8 @@ export default function NewTaskModal({
               >
                 <TextInput
                   mode="outlined"
-                  label="Date"
-                  value={newTask.date.toLocaleDateString()}
+                  label={t("schedule.date")}
+                  value={formattedDate}
                   editable={false}
                   style={styles.input}
                   right={
@@ -132,7 +150,7 @@ export default function NewTaskModal({
               <TouchableOpacity onPress={onOpenTimePicker} style={{ flex: 1 }}>
                 <TextInput
                   mode="outlined"
-                  label="Time"
+                  label={t("schedule.time")}
                   value={newTask.time}
                   editable={false}
                   style={styles.input}
@@ -146,8 +164,8 @@ export default function NewTaskModal({
             <TouchableOpacity onPress={() => onSelectionModeChange("elderly")}>
               <TextInput
                 mode="outlined"
-                label="Who is this for?"
-                value={newTask.elderlyName}
+                label={t("schedule.whoIsThisFor")}
+                value={selectedElderlyLabel}
                 editable={false}
                 style={styles.input}
                 right={
@@ -162,8 +180,8 @@ export default function NewTaskModal({
             <TouchableOpacity onPress={() => onSelectionModeChange("type")}>
               <TextInput
                 mode="outlined"
-                label="Type"
-                value={newTask.type}
+                label={t("schedule.typeLabel")}
+                value={selectedTypeLabel}
                 editable={false}
                 style={styles.input}
                 right={
@@ -175,6 +193,63 @@ export default function NewTaskModal({
               />
             </TouchableOpacity>
 
+            {typeof onToggleReminder === "function" &&
+            typeof onOpenReminderPicker === "function" ? (
+              <>
+                <Text variant="labelLarge" style={{ marginBottom: 8 }}>
+                  {t("schedule.setReminder")}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  <Chip
+                    selected={newTask.remindAt != null}
+                    onPress={onToggleReminder}
+                    style={{
+                      backgroundColor: newTask.remindAt
+                        ? theme.colors.primaryContainer
+                        : theme.colors.surfaceVariant,
+                    }}
+                    icon={newTask.remindAt ? "bell" : "bell-off"}
+                  >
+                    {newTask.remindAt
+                      ? t("schedule.reminderOn")
+                      : t("schedule.noReminder")}
+                  </Chip>
+                </View>
+                {newTask.remindAt ? (
+                  <TouchableOpacity
+                    onPress={onOpenReminderPicker}
+                    style={{ marginBottom: 16 }}
+                  >
+                    <TextInput
+                      mode="outlined"
+                      label={t("schedule.reminderTime")}
+                      value={newTask.remindAt.toLocaleString(dateLocale, {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      editable={false}
+                      style={styles.input}
+                      right={
+                        <TextInput.Icon
+                          icon="bell-ring"
+                          onPress={onOpenReminderPicker}
+                        />
+                      }
+                    />
+                  </TouchableOpacity>
+                ) : null}
+              </>
+            ) : null}
+
             <Button
               mode="contained"
               onPress={onSave}
@@ -182,7 +257,7 @@ export default function NewTaskModal({
               loading={loading}
               disabled={loading}
             >
-              Save Task
+              {t("schedule.saveTask")}
             </Button>
           </ScrollView>
         ) : (
@@ -199,14 +274,16 @@ export default function NewTaskModal({
                 onPress={() => onSelectionModeChange("form")}
               />
               <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-                {selectionMode === "elderly" ? "Select Elderly" : "Select Type"}
+                {selectionMode === "elderly"
+                  ? t("schedule.selectElderly")
+                  : t("schedule.selectType")}
               </Text>
             </View>
             <Divider />
             {selectionMode === "elderly" && (
               <View style={{ paddingVertical: 10 }}>
                 <Searchbar
-                  placeholder="Search"
+                  placeholder={t("common.search")}
                   onChangeText={onSearchChange}
                   value={searchQuery}
                   style={{
@@ -281,7 +358,7 @@ export default function NewTaskModal({
                     onPress={() => {
                       onNewTaskChange({
                         ...newTask,
-                        type: cat.name || "Activity",
+                        type: cat.name || t("schedule.typeActivity"),
                         typeId: cat.$id,
                       });
                       onSelectionModeChange("form");
@@ -297,7 +374,7 @@ export default function NewTaskModal({
                     />
                     <View>
                       <Text variant="titleMedium">
-                        {cat.name || "Activity"}
+                        {cat.name || t("schedule.typeActivity")}
                       </Text>
                     </View>
                     {newTask.typeId === cat.$id && (
@@ -318,10 +395,10 @@ export default function NewTaskModal({
                       color: theme.colors.secondary,
                     }}
                   >
-                    No categories found.
+                    {t("schedule.noCategoriesFound")}
                   </Text>
                   <Button mode="outlined" onPress={onRetryCategories}>
-                    Retry Loading
+                    {t("schedule.retryLoading")}
                   </Button>
                 </View>
               )}

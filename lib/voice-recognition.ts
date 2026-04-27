@@ -134,6 +134,25 @@ export interface VoiceRecognitionResult {
 
 type RecognitionAudioFormat = "wav" | "mp3";
 
+type RecognitionContentItem =
+  | {
+      type: "input_audio";
+      input_audio: {
+        data: string;
+        format: RecognitionAudioFormat;
+      };
+    }
+  | {
+      type: "audio_url";
+      audio_url: {
+        url: string;
+      };
+    }
+  | {
+      type: "text";
+      text: string;
+    };
+
 function assertConfigured() {
   if (!DASHSCOPE_API_KEY) {
     throw new Error("EXPO_PUBLIC_DASHSCOPE_API_KEY is not configured.");
@@ -151,6 +170,68 @@ function inferRecognitionAudioFormat(
     return "mp3";
   }
   return null;
+}
+
+function getRecognitionAudioMimeType(
+  format: RecognitionAudioFormat,
+): string {
+  return format === "mp3" ? "audio/mpeg" : "audio/wav";
+}
+
+function buildRecognitionDataUri(
+  audioBase64: string,
+  format: RecognitionAudioFormat,
+): string {
+  return `data:${getRecognitionAudioMimeType(format)};base64,${audioBase64}`;
+}
+
+function buildRecognitionAudioVariants(
+  audioBase64: string,
+  format: RecognitionAudioFormat,
+): RecognitionContentItem[][] {
+  const dataUri = buildRecognitionDataUri(audioBase64, format);
+
+  return [
+    [
+      {
+        type: "input_audio",
+        input_audio: {
+          data: audioBase64,
+          format,
+        },
+      },
+    ],
+    [
+      {
+        type: "input_audio",
+        input_audio: {
+          data: dataUri,
+          format,
+        },
+      },
+    ],
+    [
+      {
+        type: "audio_url",
+        audio_url: {
+          url: dataUri,
+        },
+      },
+    ],
+  ];
+}
+
+function shouldRetryRecognitionWithAlternateAudioShape(
+  status: number,
+  errorText: string,
+): boolean {
+  if (status !== 400) {
+    return false;
+  }
+
+  return /provided url does not appear to be valid|invalidparameter|invalid_parameter_error|audio_url/i.test(
+    errorText,
+  );
 }
 
 async function normalizeAudioForRecognition(
@@ -241,7 +322,10 @@ export async function recognizeVoiceCommand(
   );
 
   // Use DashScope multimodal API (compatible mode) for Qwen audio model
-  const apiUrl = `${process.env.EXPO_PUBLIC_DASHSCOPE_API_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1"}/chat/completions`;
+  const baseUrl =
+    process.env.EXPO_PUBLIC_DASHSCOPE_API_URL?.trim().replace(/\/+$/, "") ||
+    "https://dashscope.aliyuncs.com/compatible-mode/v1";
+  const apiUrl = `${baseUrl}/chat/completions`;
 
   // Build messages with conversation history for multi-turn support
   const messages: any[] = [
@@ -259,52 +343,79 @@ export async function recognizeVoiceCommand(
     });
   }
 
-  // Add current audio input
-  messages.push({
-    role: "user",
-    content: [
-      {
-        type: "input_audio",
-        input_audio: {
-          data: normalizedAudio.audioBase64,
-          format: normalizedAudio.format,
-        },
-      },
+  const audioVariants = buildRecognitionAudioVariants(
+    normalizedAudio.audioBase64,
+    normalizedAudio.format,
+  );
+  let data: any = null;
+  let lastError: Error | null = null;
+  const voiceStart = Date.now();
+
+  for (let index = 0; index < audioVariants.length; index += 1) {
+    const content: RecognitionContentItem[] = [
+      ...audioVariants[index],
       {
         type: "text",
         text: "請聽我講嘅嘢，識別意圖，用JSON回覆",
       },
-    ],
-  });
+    ];
 
-  const requestBody = {
-    model: DASHSCOPE_AUDIO_MODEL,
-    messages,
-    max_tokens: 500,
-    temperature: 0.3,
-    modalities: ["text"],
-    audio: { voice: "Chelsie", format: "wav" },
-    enable_thinking: false,
-  };
+    const requestBody = {
+      model: DASHSCOPE_AUDIO_MODEL,
+      messages: [
+        ...messages,
+        {
+          role: "user",
+          content,
+        },
+      ],
+      max_tokens: 500,
+      temperature: 0.3,
+      modalities: ["text"],
+      enable_thinking: false,
+    };
 
-  const voiceStart = Date.now();
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
-    },
-    body: JSON.stringify(requestBody),
-  });
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
 
-  if (!response.ok) {
+    if (response.ok) {
+      data = await response.json();
+      if (index > 0) {
+        console.warn(
+          `[voice-recognition] DashScope accepted fallback audio payload variant ${index + 1}.`,
+        );
+      }
+      break;
+    }
+
     const errText = await response.text().catch(() => "");
-    throw new Error(
+    lastError = new Error(
       `Voice recognition failed (${response.status}): ${errText}`,
     );
+
+    if (
+      index < audioVariants.length - 1 &&
+      shouldRetryRecognitionWithAlternateAudioShape(response.status, errText)
+    ) {
+      console.warn(
+        `[voice-recognition] Retrying DashScope audio recognition with alternate audio payload shape after variant ${index + 1} failed.`,
+      );
+      continue;
+    }
+
+    throw lastError;
   }
 
-  const data = await response.json();
+  if (!data) {
+    throw lastError || new Error("Voice recognition failed with no response.");
+  }
+
   console.log(`[AI-TIMING] Voice recognition API: ${Date.now() - voiceStart}ms`);
   const rawContent =
     data?.choices?.[0]?.message?.content ||
