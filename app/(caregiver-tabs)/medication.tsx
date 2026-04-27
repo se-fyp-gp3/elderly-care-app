@@ -1,9 +1,10 @@
 import { AddMedicationDialog, MedicationFormData } from "@/components/AddMedicationDialog";
 import ElderlyGroupSummary from "@/components/ElderlyGroupSummary";
 import {
-    ConfirmMedicationDialog,
-    ElderlyFilterDialog,
-    StatusFilterDialog,
+  ConfirmMedicationDialog,
+  DayFilter,
+  ElderlyFilterDialog,
+  StatusFilterDialog,
 } from "@/components/MedFilterDialogs";
 import { MedicationItem } from "@/components/MedicationCard";
 import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
@@ -11,14 +12,15 @@ import MedStatsCard from "@/components/MedStatsCard";
 import TimeSlotCard from "@/components/TimeSlotCard";
 import { useAuth } from "@/lib/auth-context";
 import {
-    addMedication,
-    confirmMedicationTaking,
-    ElderlyGroup,
-    fetchCaregiverMedicationData,
-    fetchCaregiverPendingCancelReminders,
-    markMedicationProcessed,
-    PendingCancelReminder,
-    undoMedicationTaking,
+  addMedication,
+  confirmMedicationTaking,
+  ElderlyGroup,
+  fetchCaregiverMedicationData,
+  fetchCaregiverPendingCancelReminders,
+  fetchCaregiverUpcomingMedicationData,
+  markMedicationProcessed,
+  PendingCancelReminder,
+  undoMedicationTaking,
 } from "@/lib/medication";
 import { Elderly } from "@/types/appwrite";
 import Constants, { ExecutionEnvironment } from "expo-constants";
@@ -27,21 +29,21 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    AppState,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    View,
+  Alert,
+  AppState,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
 import {
-    Button,
-    Divider,
-    FAB,
-    IconButton,
-    Portal,
-    Text,
-    useTheme,
+  Button,
+  Divider,
+  FAB,
+  IconButton,
+  Portal,
+  Text,
+  useTheme,
 } from "react-native-paper";
 
 // Start notification handler
@@ -78,7 +80,7 @@ export default function MedicationManagement() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     new Set(),
   );
-  const [viewingYesterday, setViewingYesterday] = useState(false);
+  const [dayFilter, setDayFilter] = useState<DayFilter>("today");
   const [undoVisible, setUndoVisible] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [selectedMedicationDetails, setSelectedMedicationDetails] = useState<{
@@ -151,8 +153,22 @@ export default function MedicationManagement() {
     if (!user) return;
     setLoading(true);
     try {
-      const targetDate = viewingYesterday ? (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d; })() : undefined;
-      const result = await fetchCaregiverMedicationData(user.$id, targetDate);
+      let result;
+      if (dayFilter === "all") {
+        result = await fetchCaregiverUpcomingMedicationData(user.$id, 7);
+      } else {
+        let targetDate: Date | undefined;
+        if (dayFilter === "yesterday") {
+          const d = new Date();
+          d.setDate(d.getDate() - 1);
+          targetDate = d;
+        } else if (dayFilter === "tomorrow") {
+          const d = new Date();
+          d.setDate(d.getDate() + 1);
+          targetDate = d;
+        }
+        result = await fetchCaregiverMedicationData(user.$id, targetDate);
+      }
       setLinkedElderly(result.linkedElderly);
       setElderlyGroups(result.elderlyGroups);
 
@@ -164,7 +180,7 @@ export default function MedicationManagement() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user, viewingYesterday]);
+  }, [user, dayFilter]);
 
   useFocusEffect(
     useCallback(() => {
@@ -172,10 +188,10 @@ export default function MedicationManagement() {
     }, [fetchData]),
   );
 
-  // Re-fetch when toggling between today/yesterday
+  // Re-fetch when toggling between today/yesterday/tomorrow/all
   useEffect(() => {
     fetchData();
-  }, [viewingYesterday]);
+  }, [dayFilter]);
 
   useEffect(() => {
     // Add AppState listener to refresh data when app returns to foreground
@@ -257,12 +273,15 @@ export default function MedicationManagement() {
 
   // Let's refine: If we have groups, we show them. If a filter hides all meds in a group, hide the group.
 
-  const totalCount = allMeds.length;
-  const pendingCount = allMeds.filter((m) => m.status === "pending").length;
-  const completedCount = allMeds.filter(
+  // Flatten currently-filtered meds for stats (follows elderly + status + search filters)
+  const statsMeds = filteredGroups.flatMap((g) => g.medications);
+
+  const totalCount = statsMeds.length;
+  const pendingCount = statsMeds.filter((m) => m.status === "pending").length;
+  const completedCount = statsMeds.filter(
     (m) => m.status === "completed" || m.status === "taken",
   ).length;
-  const missedCount = allMeds.filter(
+  const missedCount = statsMeds.filter(
     (m) => m.status === "missed" || m.status === "overdue",
   ).length;
   const baseStatusLabel =
@@ -487,7 +506,13 @@ export default function MedicationManagement() {
             }}
           >
             <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-              {viewingYesterday ? t('medication.yesterdaysPlan') : t('medication.todaysPlan')}
+              {dayFilter === "yesterday"
+                ? t('medication.yesterdaysPlan')
+                : dayFilter === "tomorrow"
+                  ? t('medication.tomorrowsPlan')
+                  : dayFilter === "all"
+                    ? t('medication.allPlans')
+                    : t('medication.todaysPlan')}
             </Text>
             <View style={{ flexDirection: "row" }}>
               <Button
@@ -644,9 +669,9 @@ export default function MedicationManagement() {
           visible={statusFilterVisible}
           onDismiss={() => setStatusFilterVisible(false)}
           statusFilter={statusFilter}
-          viewingYesterday={viewingYesterday}
+          dayFilter={dayFilter}
           onSelectDay={(value) => {
-            setViewingYesterday(value);
+            setDayFilter(value);
             setStatusFilterVisible(false);
           }}
           onSelect={(status) => {

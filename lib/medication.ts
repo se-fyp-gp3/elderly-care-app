@@ -413,6 +413,59 @@ export async function fetchCaregiverMedicationData(
   return { elderlyGroups: groups, linkedElderly: elderlyList };
 }
 
+/**
+ * Fetch all upcoming medication plans for a caregiver, starting from today.
+ * Iterates day-by-day for `daysAhead` days (default 7), prefixes the time field
+ * with a short date label (M/D), and merges all per-day groups into one.
+ * Pending status is computed against the actual scheduled date/time.
+ */
+export async function fetchCaregiverUpcomingMedicationData(
+  userId: string,
+  daysAhead = 7,
+): Promise<FetchMedicationResult> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const merged = new Map<string, ElderlyGroup>();
+  let linkedElderlyOut: Elderly[] = [];
+
+  for (let i = 0; i < daysAhead; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+
+    const dayResult = await fetchCaregiverMedicationData(userId, date);
+    if (i === 0) linkedElderlyOut = dayResult.linkedElderly;
+
+    const dateLabel = `${date.getMonth() + 1}/${date.getDate()}`;
+
+    dayResult.elderlyGroups.forEach((group) => {
+      // Re-key per-day items so they don't collide across days
+      const taggedMeds: MedicationItem[] = group.medications.map((m) => ({
+        ...m,
+        id: `${m.id}_d${i}`,
+        time: `${dateLabel} ${m.time}`,
+      }));
+
+      const existing = merged.get(group.elderlyId);
+      if (existing) {
+        existing.medications.push(...taggedMeds);
+      } else {
+        merged.set(group.elderlyId, {
+          elderlyId: group.elderlyId,
+          elderlyName: group.elderlyName,
+          medications: taggedMeds,
+        });
+      }
+    });
+  }
+
+  const elderlyGroups = Array.from(merged.values()).filter(
+    (g) => g.medications.length > 0,
+  );
+
+  return { elderlyGroups, linkedElderly: linkedElderlyOut };
+}
+
 export async function fetchCaregiverPendingCancelReminders(
   userId: string,
 ): Promise<PendingCancelReminder[]> {
