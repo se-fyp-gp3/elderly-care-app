@@ -109,8 +109,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "42203bb5-6e7b-43f7-b032-f95660499271"
+        "projectId": "fa53a2e0-c8e4-4865-ab49-5da2f98900b5"
       }
-    }
+    },
+    "owner": "se-fyp-gp3"
   }
 }
