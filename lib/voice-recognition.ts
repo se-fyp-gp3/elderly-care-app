@@ -172,9 +172,7 @@ function inferRecognitionAudioFormat(
   return null;
 }
 
-function getRecognitionAudioMimeType(
-  format: RecognitionAudioFormat,
-): string {
+function getRecognitionAudioMimeType(format: RecognitionAudioFormat): string {
   return format === "mp3" ? "audio/mpeg" : "audio/wav";
 }
 
@@ -416,7 +414,9 @@ export async function recognizeVoiceCommand(
     throw lastError || new Error("Voice recognition failed with no response.");
   }
 
-  console.log(`[AI-TIMING] Voice recognition API: ${Date.now() - voiceStart}ms`);
+  console.log(
+    `[AI-TIMING] Voice recognition API: ${Date.now() - voiceStart}ms`,
+  );
   const rawContent =
     data?.choices?.[0]?.message?.content ||
     data?.output?.choices?.[0]?.message?.content ||
@@ -440,27 +440,27 @@ export async function recognizeVoiceCommand(
  * Map Chinese intent names to English intent names.
  */
 const INTENT_MAP: Record<string, string> = {
-  "記錄食藥": "record_medication",
-  "记录吃药": "record_medication",
-  "記錄吃藥": "record_medication",
-  "新增藥物": "add_medication",
-  "新增药物": "add_medication",
-  "加藥": "add_medication",
-  "加药": "add_medication",
-  "打電話": "call_contact",
-  "打电话": "call_contact",
-  "打電話畀人": "call_contact",
-  "打电话给人": "call_contact",
-  "查詢藥物": "check_medication",
-  "查询药物": "check_medication",
-  "檢查藥物": "check_medication",
-  "检查药物": "check_medication",
-  "設定日程": "set_schedule",
-  "设定日程": "set_schedule",
-  "一般對話": "general_chat",
-  "一般对话": "general_chat",
-  "闲聊": "general_chat",
-  "閒聊": "general_chat",
+  記錄食藥: "record_medication",
+  记录吃药: "record_medication",
+  記錄吃藥: "record_medication",
+  新增藥物: "add_medication",
+  新增药物: "add_medication",
+  加藥: "add_medication",
+  加药: "add_medication",
+  打電話: "call_contact",
+  打电话: "call_contact",
+  打電話畀人: "call_contact",
+  打电话给人: "call_contact",
+  查詢藥物: "check_medication",
+  查询药物: "check_medication",
+  檢查藥物: "check_medication",
+  检查药物: "check_medication",
+  設定日程: "set_schedule",
+  设定日程: "set_schedule",
+  一般對話: "general_chat",
+  一般对话: "general_chat",
+  闲聊: "general_chat",
+  閒聊: "general_chat",
 };
 
 /**
@@ -468,14 +468,24 @@ const INTENT_MAP: Record<string, string> = {
  * Falls back gracefully if the model doesn't return valid JSON.
  * Handles Chinese intent names and nested JSON in reply field.
  */
-function parseRecognitionResponse(
-  rawText: string,
-): VoiceRecognitionResult {
+function parseRecognitionResponse(rawText: string): VoiceRecognitionResult {
   // Strip <think>...</think> blocks that some models emit
   let cleanedText = rawText.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 
   // Strip markdown code fences if present (```json ... ```)
-  cleanedText = cleanedText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  cleanedText = cleanedText
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  // Normalize smart/curly quotes that some models emit (e.g. `”` instead of `"`).
+  // These break JSON.parse even though the structure is otherwise correct.
+  const normalizeSmartQuotes = (str: string): string =>
+    str
+      .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+      .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
+
+  cleanedText = normalizeSmartQuotes(cleanedText);
 
   // Try to extract JSON from the response
   const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
@@ -484,18 +494,19 @@ function parseRecognitionResponse(
 
     // Helper: attempt JSON.parse, also trying unescape if first attempt fails
     const tryParse = (str: string): any | null => {
-      try {
-        return JSON.parse(str);
-      } catch {
-        // AI sometimes returns escaped JSON (literal \" instead of ")
-        // Unescape and retry
-        const unescaped = str.replace(/\\"/g, '"').replace(/\\\\"/g, '"');
+      const candidates = [
+        str,
+        normalizeSmartQuotes(str),
+        normalizeSmartQuotes(str).replace(/\\"/g, '"').replace(/\\\\"/g, '"'),
+      ];
+      for (const candidate of candidates) {
         try {
-          return JSON.parse(unescaped);
+          return JSON.parse(candidate);
         } catch {
-          return null;
+          // try next
         }
       }
+      return null;
     };
 
     const parsed = tryParse(jsonStr);
@@ -526,7 +537,11 @@ function parseRecognitionResponse(
 
       // Fix params: check if any param value looks like a reply instead of data
       const params = parsed.params || {};
-      if (params.new_medicine && typeof params.new_medicine === "string" && params.new_medicine.length > 50) {
+      if (
+        params.new_medicine &&
+        typeof params.new_medicine === "string" &&
+        params.new_medicine.length > 50
+      ) {
         // This is likely a reply stuffed into params, not actual medication data
         if (!reply) reply = params.new_medicine;
         delete params.new_medicine;
@@ -542,8 +557,32 @@ function parseRecognitionResponse(
         }
       }
 
+      // Sanitize: if reply is still JSON-looking garbage (e.g. nested-JSON
+      // unwrap failed due to malformed quotes), don't feed it to TTS.
+      // Also strip any residual { } markers that aren't natural language.
+      const looksLikeJsonGarbage =
+        typeof reply === "string" &&
+        (reply.includes('"intent"') ||
+          reply.includes('"transcript"') ||
+          reply.includes('"params"') ||
+          /^[\s{[]*[{[]/.test(reply));
+      if (looksLikeJsonGarbage) {
+        reply = "好嘅，我聽到啦。";
+      }
+
+      // Sanitize transcript the same way — never let JSON garbage be displayed.
+      let transcript = parsed.transcript;
+      if (
+        typeof transcript === "string" &&
+        (transcript.includes('"intent"') ||
+          transcript.includes('"transcript"') ||
+          transcript.includes('"params"'))
+      ) {
+        transcript = "";
+      }
+
       return {
-        transcript: parsed.transcript || reply || rawText,
+        transcript: transcript || reply || rawText,
         intent,
         params,
         reply: reply || rawText,

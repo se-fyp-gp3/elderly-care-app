@@ -1,35 +1,37 @@
 import UserAvatar from "@/components/UserAvatar";
 import { formatRelativeTime } from "@/lib/contacts";
 import {
-    addComment,
-    deleteComment,
-    getComments,
-    likeComment,
+  addAICommentReply,
+  addComment,
+  deleteComment,
+  getComments,
+  likeComment,
 } from "@/lib/moments";
 import { MomentComment } from "@/types/moments";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    Animated,
-    Dimensions,
-    FlatList,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    TextInput as RNTextInput,
-    StyleSheet,
-    View,
+  Alert,
+  Animated,
+  Dimensions,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  TextInput as RNTextInput,
+  StyleSheet,
+  View,
 } from "react-native";
-import {
-    ActivityIndicator,
-    Divider,
-    Text,
-    useTheme
-} from "react-native-paper";
+import { ActivityIndicator, Divider, Text, useTheme } from "react-native-paper";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.7;
@@ -38,6 +40,8 @@ interface CommentSheetProps {
   visible: boolean;
   momentId: string;
   momentAuthorId?: string;
+  momentContent?: string;
+  momentImageUrl?: string;
   onClose: () => void;
   currentUserId: string;
   currentUserName: string;
@@ -55,6 +59,8 @@ function CommentItem({
   onReply,
   onLike,
   onDelete,
+  onAskAI,
+  aiLoading,
   avatarFileId,
 }: {
   comment: MomentComment;
@@ -63,6 +69,8 @@ function CommentItem({
   onReply: (comment: MomentComment) => void;
   onLike: (comment: MomentComment) => void;
   onDelete: (commentId: string) => void;
+  onAskAI: (comment: MomentComment) => void;
+  aiLoading: boolean;
   avatarFileId?: string;
 }) {
   const theme = useTheme();
@@ -90,12 +98,7 @@ function CommentItem({
   };
 
   return (
-    <View
-      style={[
-        styles.commentItem,
-        isReply && styles.replyCommentItem,
-      ]}
-    >
+    <View style={[styles.commentItem, isReply && styles.replyCommentItem]}>
       <UserAvatar
         avatarFileId={avatarFileId}
         name={comment.author_name}
@@ -185,6 +188,31 @@ function CommentItem({
               </Text>
             </Pressable>
           )}
+          {comment.author_role !== "ai" && (
+            <Pressable
+              onPress={() => !aiLoading && onAskAI(comment)}
+              hitSlop={8}
+              style={[styles.footerBtn, aiLoading && { opacity: 0.5 }]}
+              disabled={aiLoading}
+              accessibilityLabel={t("moments.askAI")}
+            >
+              {aiLoading ? (
+                <ActivityIndicator size={12} color={theme.colors.primary} />
+              ) : (
+                <MaterialCommunityIcons
+                  name="creation"
+                  size={14}
+                  color={theme.colors.primary}
+                />
+              )}
+              <Text
+                variant="labelSmall"
+                style={{ marginLeft: 2, color: theme.colors.primary }}
+              >
+                {aiLoading ? t("moments.aiReplying") : t("moments.askAI")}
+              </Text>
+            </Pressable>
+          )}
           <Pressable
             onPress={() => onLike(comment)}
             hitSlop={8}
@@ -216,6 +244,8 @@ export default function CommentSheet({
   visible,
   momentId,
   momentAuthorId,
+  momentContent,
+  momentImageUrl,
   onClose,
   currentUserId,
   currentUserName,
@@ -231,17 +261,23 @@ export default function CommentSheet({
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [replyTarget, setReplyTarget] = useState<MomentComment | null>(null);
+  const [aiLoadingCommentId, setAiLoadingCommentId] = useState<string | null>(
+    null,
+  );
   const inputRef = useRef<RNTextInput>(null);
   const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const { t } = useTranslation();
 
   const threadedComments = useMemo(() => {
-    const commentById = new Map(comments.map((comment) => [comment.$id, comment]));
+    const commentById = new Map(
+      comments.map((comment) => [comment.$id, comment]),
+    );
     const childrenByParent = new Map<string, MomentComment[]>();
     const roots: MomentComment[] = [];
 
     const sortedComments = [...comments].sort(
-      (a, b) => new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime(),
+      (a, b) =>
+        new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime(),
     );
 
     sortedComments.forEach((comment) => {
@@ -261,7 +297,8 @@ export default function CommentSheet({
     const appendThread = (comment: MomentComment, depth: number) => {
       flattened.push({ comment, depth });
       const children = [...(childrenByParent.get(comment.$id) || [])].sort(
-        (a, b) => new Date(a.$createdAt).getTime() - new Date(b.$createdAt).getTime(),
+        (a, b) =>
+          new Date(a.$createdAt).getTime() - new Date(b.$createdAt).getTime(),
       );
       children.forEach((child) => appendThread(child, depth + 1));
     };
@@ -390,6 +427,54 @@ export default function CommentSheet({
     }
   };
 
+  const handleAskAI = async (parent: MomentComment) => {
+    if (aiLoadingCommentId) return;
+    setAiLoadingCommentId(parent.$id);
+    try {
+      // Build ancestor chain (oldest -> parent) by walking reply_to_comment_id
+      const byId = new Map(comments.map((c) => [c.$id, c]));
+      const chain: MomentComment[] = [];
+      let cursor: MomentComment | undefined = parent;
+      const seen = new Set<string>();
+      while (cursor && !seen.has(cursor.$id)) {
+        seen.add(cursor.$id);
+        chain.unshift(cursor);
+        const parentId = cursor.reply_to_comment_id;
+        cursor = parentId ? byId.get(parentId) : undefined;
+      }
+
+      const parentWithMomentAuthor: MomentComment = {
+        ...parent,
+        moment_author_id: parent.moment_author_id || momentAuthorId,
+      };
+
+      const newComment = await addAICommentReply(
+        momentId,
+        parentWithMomentAuthor,
+        {
+          momentContent: momentContent || "",
+          momentImageUrl,
+          thread: chain.map((c) => ({
+            authorName:
+              c.author_id === "ai-assistant"
+                ? t("moments.aiAssistant")
+                : c.author_name,
+            authorRole: c.author_role,
+            content: c.content,
+          })),
+        },
+      );
+      setComments((prev) => [newComment, ...prev]);
+      onCommentAdded?.();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error("AI reply failed:", e);
+      Alert.alert(t("moments.aiReplyFailed"), message);
+    } finally {
+      setAiLoadingCommentId(null);
+    }
+  };
+
   if (!visible) return null;
 
   return (
@@ -459,6 +544,8 @@ export default function CommentSheet({
                   onReply={handleReply}
                   onLike={handleLikeComment}
                   onDelete={handleDeleteComment}
+                  onAskAI={handleAskAI}
+                  aiLoading={aiLoadingCommentId === item.comment.$id}
                   avatarFileId={avatarMap?.[item.comment.author_id]}
                 />
               )}

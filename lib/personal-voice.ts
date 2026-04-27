@@ -1,6 +1,12 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { ExecutionMethod, ID } from "react-native-appwrite";
-import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, functions, storage, VOICE_CLONE_FUNCTION_ID } from "./appwrite";
+import {
+    APPWRITE_ENDPOINT,
+    APPWRITE_PROJECT_ID,
+    functions,
+    storage,
+    VOICE_CLONE_FUNCTION_ID,
+} from "./appwrite";
 
 // ── DashScope config ──
 const DASHSCOPE_API_KEY =
@@ -50,32 +56,42 @@ function isQwenPersonalVoice(voice: string): boolean {
   return /^qwen-tts-vc-/i.test(voice);
 }
 
+function isLegacyCosyVoice(voice: string): boolean {
+  return /^cosyvoice/i.test(cleanConfigValue(voice));
+}
+
 function isRealtimeModel(model?: string | null): boolean {
   return /-realtime(?:-|$)/i.test(cleanConfigValue(model));
 }
 
 function resolveRequestedModel(voice: string, requestedModel?: string): string {
   if (isQwenPersonalVoice(voice)) {
-    return isRealtimeModel(requestedModel) ? cleanConfigValue(requestedModel) : VC_MODEL;
+    return isRealtimeModel(requestedModel)
+      ? cleanConfigValue(requestedModel)
+      : VC_MODEL;
   }
+  // Legacy CosyVoice clones are no longer supported — synthesis falls back
+  // to the default Qwen preset voice/model further down the pipeline.
   return normalizeStandardModel(requestedModel);
 }
 
 // TTS model for synthesis (known-working)
-const TTS_MODEL =
-  normalizeStandardModel(process.env.EXPO_PUBLIC_DASHSCOPE_TTS_MODEL);
+const TTS_MODEL = normalizeStandardModel(
+  process.env.EXPO_PUBLIC_DASHSCOPE_TTS_MODEL,
+);
 
 // Voice-clone model for enrollment/training
-const VC_MODEL =
-  normalizeVcModel(process.env.EXPO_PUBLIC_DASHSCOPE_VC_MODEL);
+const VC_MODEL = normalizeVcModel(process.env.EXPO_PUBLIC_DASHSCOPE_VC_MODEL);
 
 // Default preset voice (fallback when no custom voice)
-const DEFAULT_VOICE =
-  normalizePresetVoice(process.env.EXPO_PUBLIC_DASHSCOPE_TTS_VOICE);
+const DEFAULT_VOICE = normalizePresetVoice(
+  process.env.EXPO_PUBLIC_DASHSCOPE_TTS_VOICE,
+);
 
 // Storage bucket for reference audio
 const VOICE_CLONE_BUCKET =
-  process.env.EXPO_PUBLIC_VOICE_CLONE_BUCKET_ID?.trim() || "69ba654e003c3aa1b2c8";
+  process.env.EXPO_PUBLIC_VOICE_CLONE_BUCKET_ID?.trim() ||
+  "69ba654e003c3aa1b2c8";
 
 // ── Endpoints ──
 const VOICE_CLONE_URL =
@@ -126,7 +142,9 @@ export async function createPersonalVoice(
 
   if (totalBase64Bytes < SIZE_THRESHOLD) {
     // ── Small file: send base64 directly in function body ──
-    console.log(`[voice] Small payload (${(totalBase64Bytes / 1024).toFixed(0)} KB), sending base64 directly...`);
+    console.log(
+      `[voice] Small payload (${(totalBase64Bytes / 1024).toFixed(0)} KB), sending base64 directly...`,
+    );
     const fnResult = await functions.createExecution({
       functionId: VOICE_CLONE_FUNCTION_ID,
       body: JSON.stringify({
@@ -140,11 +158,15 @@ export async function createPersonalVoice(
     try {
       clonePayload = JSON.parse(fnResult.responseBody);
     } catch {
-      throw new Error(`Voice clone function returned invalid JSON: ${fnResult.responseBody}`);
+      throw new Error(
+        `Voice clone function returned invalid JSON: ${fnResult.responseBody}`,
+      );
     }
   } else {
     // ── Large file: upload to Storage → function converts internally → result in Storage ──
-    console.log(`[voice] Large payload (${(totalBase64Bytes / 1024).toFixed(0)} KB), using clone_storage mode...`);
+    console.log(
+      `[voice] Large payload (${(totalBase64Bytes / 1024).toFixed(0)} KB), using clone_storage mode...`,
+    );
 
     const uploadedFileIds: string[] = [];
 
@@ -157,7 +179,8 @@ export async function createPersonalVoice(
         });
 
         const fileInfo = await FileSystem.getInfoAsync(tmpPath);
-        if (!fileInfo.exists) throw new Error("Failed to write temp audio file");
+        if (!fileInfo.exists)
+          throw new Error("Failed to write temp audio file");
 
         const fileId = ID.unique();
 
@@ -183,10 +206,14 @@ export async function createPersonalVoice(
         );
         if (!uploadRes.ok) {
           const errText = await uploadRes.text();
-          throw new Error(`Storage upload failed (${uploadRes.status}): ${errText}`);
+          throw new Error(
+            `Storage upload failed (${uploadRes.status}): ${errText}`,
+          );
         }
         uploadedFileIds.push(fileId);
-        console.log(`[voice] Uploaded sample ${i + 1}/${samplesBase64.length}: ${fileId}`);
+        console.log(
+          `[voice] Uploaded sample ${i + 1}/${samplesBase64.length}: ${fileId}`,
+        );
 
         await FileSystem.deleteAsync(tmpPath, { idempotent: true });
       }
@@ -214,16 +241,22 @@ export async function createPersonalVoice(
       );
       if (!execRes.ok) {
         const errText = await execRes.text();
-        throw new Error(`Function execution failed (${execRes.status}): ${errText}`);
+        throw new Error(
+          `Function execution failed (${execRes.status}): ${errText}`,
+        );
       }
       const fnResult = await execRes.json();
-      console.log(`[voice] Function execution ${fnResult.$id}: status=${fnResult.status}`);
+      console.log(
+        `[voice] Function execution ${fnResult.$id}: status=${fnResult.status}`,
+      );
 
       let storagePayload: any;
       try {
         storagePayload = JSON.parse(fnResult.responseBody);
       } catch {
-        throw new Error(`Voice clone function returned invalid JSON: ${fnResult.responseBody}`);
+        throw new Error(
+          `Voice clone function returned invalid JSON: ${fnResult.responseBody}`,
+        );
       }
       if (!storagePayload?.success) {
         throw new Error(storagePayload?.error || "Voice clone function failed");
@@ -239,14 +272,18 @@ export async function createPersonalVoice(
       // The function already uploaded the normalized reference audio to storage.
       // Use resultFileIds[0] as the reference audio for DashScope registration.
       const referenceStorageFileId = resultFileIds[0];
-      console.log(`[voice] Converted reference audio in storage: ${referenceStorageFileId}`);
+      console.log(
+        `[voice] Converted reference audio in storage: ${referenceStorageFileId}`,
+      );
 
       // Register voice clone using the reference file's public download URL.
       const publicAudioUrl = `${APPWRITE_ENDPOINT}/storage/buckets/${VOICE_CLONE_BUCKET}/files/${referenceStorageFileId}/download?project=${APPWRITE_PROJECT_ID}`;
       console.log(`[voice] Public audio URL for DashScope: ${publicAudioUrl}`);
 
       try {
-        console.log(`[voice] Attempting DashScope voice clone (${VC_MODEL})...`);
+        console.log(
+          `[voice] Attempting DashScope voice clone (${VC_MODEL})...`,
+        );
         const dashScopeVoiceId = await registerVoiceWithDashScope(
           publicAudioUrl,
           speakerName,
@@ -338,7 +375,10 @@ export async function createPersonalVoice(
     // Clean up temp file
     await FileSystem.deleteAsync(tempPath, { idempotent: true });
   } catch (uploadErr) {
-    console.warn("[voice] Storage upload failed, continuing without:", uploadErr);
+    console.warn(
+      "[voice] Storage upload failed, continuing without:",
+      uploadErr,
+    );
   }
 
   // ── Step 3: Register voice clone using Appwrite Storage public URL ──
@@ -385,10 +425,11 @@ async function registerVoiceWithDashScope(
   speakerName: string,
   options: VoiceEnrollmentOptions = {},
 ): Promise<string> {
-  const prefix = speakerName
-    .replace(/[^a-z0-9]/gi, "")
-    .toLowerCase()
-    .slice(0, 10) || "voice";
+  const prefix =
+    speakerName
+      .replace(/[^a-z0-9]/gi, "")
+      .toLowerCase()
+      .slice(0, 10) || "voice";
   const transcript = options.transcript?.trim();
   const sampleLanguage = options.language?.trim() || "zh";
 
@@ -406,9 +447,13 @@ async function registerVoiceWithDashScope(
     },
   };
 
-  console.log(`[voice] Voice clone request: model=qwen-voice-enrollment, target_model=${VC_MODEL}, preferred_name=${prefix}`);
+  console.log(
+    `[voice] Voice clone request: model=qwen-voice-enrollment, target_model=${VC_MODEL}, preferred_name=${prefix}`,
+  );
   console.log(`[voice] Audio URL: ${audioUrl}`);
-  console.log(`[voice] Transcript attached: ${transcript ? "yes" : "no"}, sample language: ${sampleLanguage}`);
+  console.log(
+    `[voice] Transcript attached: ${transcript ? "yes" : "no"}, sample language: ${sampleLanguage}`,
+  );
 
   // Retry up to 3 times for transient 5xx failures.
   const MAX_RETRIES = 3;
@@ -426,17 +471,23 @@ async function registerVoiceWithDashScope(
     });
 
     rawText = await response.text();
-    console.log(`[voice] Voice clone response attempt ${attempt} (${response.status}): ${rawText.slice(0, 500)}`);
+    console.log(
+      `[voice] Voice clone response attempt ${attempt} (${response.status}): ${rawText.slice(0, 500)}`,
+    );
 
     if (response.ok || response.status < 500) break; // success or non-retryable error
     if (attempt < MAX_RETRIES) {
-      console.log(`[voice] Retrying voice clone in 3s (attempt ${attempt}/${MAX_RETRIES})...`);
+      console.log(
+        `[voice] Retrying voice clone in 3s (attempt ${attempt}/${MAX_RETRIES})...`,
+      );
       await new Promise((r) => setTimeout(r, 3000));
     }
   }
 
   if (!response || !response.ok) {
-    throw new Error(`DashScope voice clone failed (${response?.status}): ${rawText}`);
+    throw new Error(
+      `DashScope voice clone failed (${response?.status}): ${rawText}`,
+    );
   }
 
   let data: any;
@@ -448,7 +499,9 @@ async function registerVoiceWithDashScope(
 
   const voiceId = data?.output?.voice || data?.output?.voice_id;
   if (!voiceId) {
-    throw new Error(`DashScope voice clone returned no voice identifier: ${rawText}`);
+    throw new Error(
+      `DashScope voice clone returned no voice identifier: ${rawText}`,
+    );
   }
 
   console.log(`[voice] Voice created: ${voiceId}`);
@@ -471,7 +524,15 @@ export async function synthesizePersonalVoice(
 ): Promise<{ audioBase64?: string; audioUrl?: string }> {
   assertDashScopeConfigured();
 
-  const resolvedVoice = cleanConfigValue(voice) || DEFAULT_VOICE;
+  let resolvedVoice = cleanConfigValue(voice) || DEFAULT_VOICE;
+
+  // ── Legacy CosyVoice clones are no longer supported \u2014 fall back to default preset ──
+  if (isLegacyCosyVoice(resolvedVoice)) {
+    console.warn(
+      `[voice] Legacy CosyVoice ID "${resolvedVoice}" is unsupported; falling back to ${DEFAULT_VOICE}.`,
+    );
+    resolvedVoice = DEFAULT_VOICE;
+  }
 
   // ── Reference-based (zero-shot) cloning via Appwrite function ──
   if (isReferenceVoice(resolvedVoice)) {
@@ -516,9 +577,31 @@ async function synthesizeDirect(
         async: false,
       });
 
-      if (execution.status !== "completed" || execution.responseStatusCode !== 200) {
+      // If the function ran but returned a non-2xx, surface the JSON `error` field
+      // from the response body instead of the opaque status code.
+      if (
+        execution.status === "completed" &&
+        execution.responseStatusCode !== 200
+      ) {
+        let upstreamError = "";
+        try {
+          const parsed = JSON.parse(execution.responseBody);
+          upstreamError = parsed?.error || "";
+        } catch {
+          upstreamError = (execution.responseBody || "").slice(0, 300);
+        }
         throw new Error(
-          `TTS execution failed (status=${execution.status}, code=${execution.responseStatusCode}): ${execution.errors || "unknown"}`
+          `TTS upstream error (HTTP ${execution.responseStatusCode}): ${upstreamError || "no details"}`,
+        );
+      }
+
+      // Appwrite reports status=failed when the function process crashed or
+      // hit the sync execution timeout. `execution.errors` is often empty in
+      // that case, so we cannot rely on a "timeout" substring — treat any
+      // failed execution as transient and retry.
+      if (execution.status !== "completed") {
+        throw new Error(
+          `TTS execution did not complete (status=${execution.status}, code=${execution.responseStatusCode}): ${execution.errors || "no error message (likely sync timeout or cold-start crash)"}`,
         );
       }
 
@@ -526,7 +609,9 @@ async function synthesizeDirect(
       try {
         payload = JSON.parse(execution.responseBody);
       } catch {
-        throw new Error(`Appwrite TTS function returned invalid JSON: ${execution.responseBody}`);
+        throw new Error(
+          `Appwrite TTS function returned invalid JSON: ${execution.responseBody}`,
+        );
       }
 
       if (!payload?.success) {
@@ -539,9 +624,17 @@ async function synthesizeDirect(
 
       throw new Error("Appwrite TTS function returned no audio");
     } catch (err: any) {
-      const isTimeout = /timed?\s*out|408|timeout/i.test(err?.message || "");
-      if (isTimeout && attempt < maxAttempts) {
-        console.warn(`[voice] TTS attempt ${attempt}/${maxAttempts} timed out, retrying...`);
+      const message = String(err?.message || "");
+      const isRetryable =
+        /timed?\s*out|408|timeout|did not complete|status=failed/i.test(
+          message,
+        );
+      if (isRetryable && attempt < maxAttempts) {
+        const backoffMs = 500 * attempt;
+        console.warn(
+          `[voice] TTS attempt ${attempt}/${maxAttempts} failed (${message.slice(0, 120)}), retrying in ${backoffMs}ms...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
         continue;
       }
       throw err;
@@ -560,7 +653,9 @@ async function synthesizeWithReference(
   model: string,
   language?: string,
 ): Promise<{ audioBase64?: string; audioUrl?: string }> {
-  console.warn(`[voice] Reference-based TTS not supported for ${storageFileId}, using default voice`);
+  console.warn(
+    `[voice] Reference-based TTS not supported for ${storageFileId}, using default voice`,
+  );
   return synthesizeDirect(text, DEFAULT_VOICE, model, language);
 }
 
@@ -572,4 +667,3 @@ export async function readAudioFileAsBase64(uri: string): Promise<string> {
 }
 
 export { DEFAULT_VOICE, TTS_MODEL, VC_MODEL, VOICE_CLONE_BUCKET };
-
