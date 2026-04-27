@@ -106,6 +106,7 @@ export default function ElderlyChat() {
   const theme = useTheme();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const { t, i18n } = useTranslation();
   const { user, preferences, updatePreferences } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
@@ -247,21 +248,21 @@ export default function ElderlyChat() {
         const reason =
           error instanceof Error && error.message
             ? error.message
-            : "Voice playback failed.";
+            : t("chat.voicePlaybackFailed");
         setVoiceError(reason);
         setIsVoiceSpeaking(false);
       } finally {
         setIsVoiceSynthesizing(false);
       }
     },
-    [aiVoiceEnabled, selectedVoiceId, stopAiVoicePlayback, ttsReplyLang],
+    [aiVoiceEnabled, selectedVoiceId, stopAiVoicePlayback, t, ttsReplyLang],
   );
 
   const handleToggleAiVoice = useCallback(async () => {
     if (!aiVoiceEnabled && !selectedVoiceId) {
       Alert.alert(
-        "No voice selected",
-        "Please select a caregiver voice in Settings first.",
+        t("chat.noVoiceSelected"),
+        t("chat.selectVoiceInSettings"),
       );
       return;
     }
@@ -276,16 +277,23 @@ export default function ElderlyChat() {
       stopAiVoicePlayback();
       setVoiceError(null);
     }
-  }, [aiVoiceEnabled, preferences, stopAiVoicePlayback, updatePreferences]);
+  }, [
+    aiVoiceEnabled,
+    preferences,
+    stopAiVoicePlayback,
+    t,
+    updatePreferences,
+  ]);
 
   const LANG_OPTIONS = [
-    { key: "cantonese", label: "粵語" },
-    { key: "mandarin", label: "普通話" },
-    { key: "english", label: "English" },
+    { key: "cantonese", label: t("settings.cantonese") },
+    { key: "mandarin", label: t("settings.mandarin") },
+    { key: "english", label: t("settings.english") },
   ] as const;
 
   const currentLangLabel =
-    LANG_OPTIONS.find((o) => o.key === voiceReplyLang)?.label ?? "粵語";
+    LANG_OPTIONS.find((o) => o.key === voiceReplyLang)?.label ??
+    t("settings.cantonese");
 
   const handleLangChange = useCallback(
     async (lang: string) => {
@@ -299,13 +307,13 @@ export default function ElderlyChat() {
       });
 
       if (error) {
-        Alert.alert("Unable to save language", error);
+        Alert.alert(t("common.error"), error);
         return;
       }
 
       setLangMenuVisible(false);
     },
-    [preferences, updatePreferences],
+    [preferences, t, updatePreferences],
   );
 
   useEffect(() => {
@@ -334,6 +342,7 @@ export default function ElderlyChat() {
         timestamp: string;
         imageUri?: string;
       }>;
+
       return arr.map((m) => ({
         id: m.id,
         text: m.text,
@@ -385,8 +394,6 @@ export default function ElderlyChat() {
       }
     })();
   }, []);
-
-  const { t, i18n } = useTranslation();
 
   const quickSuggestions = useMemo(
     () => [

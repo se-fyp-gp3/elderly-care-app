@@ -13,11 +13,13 @@
       "bundleIdentifier": "com.anonymous.elderlycareapp",
       "infoPlist": {
         "NSHealthShareUsageDescription": "This app needs access to your Health data to display your daily step count.",
-        "NSHealthUpdateUsageDescription": "This app needs access to update your Health data."
+        "NSHealthUpdateUsageDescription": "This app needs access to update your Health data.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,
         "com.apple.developer.healthkit.access": [
+          "health-records",
           "health-records"
         ]
       }

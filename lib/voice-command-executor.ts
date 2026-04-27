@@ -5,17 +5,17 @@
 import { Linking } from "react-native";
 import { getContactsForElderly, getElderlyContacts } from "./contacts";
 import {
-    getCustomVoicesForElderly,
-    getResolvedCustomVoiceId,
-    resolveCustomVoiceSlotFromLanguage,
-    selectBestCustomVoiceForSlot,
+  getCustomVoicesForElderly,
+  getResolvedCustomVoiceId,
+  resolveCustomVoiceSlotFromLanguage,
+  selectBestCustomVoiceForSlot,
 } from "./custom-voice";
 import { createElderlyMedicationWithReminder, getElderlyByUserId } from "./elderly";
 import {
-    fetchActiveMedicationReminders,
-    fetchDailyMedicationLogs,
-    getFormattedTodayMedicationSummary,
-    logMedicationAction,
+  fetchActiveMedicationReminders,
+  fetchDailyMedicationLogs,
+  getFormattedTodayMedicationSummary,
+  logMedicationAction,
 } from "./medication_tracking";
 import { DEFAULT_VOICE, synthesizePersonalVoice } from "./personal-voice";
 import { createScheduleTask } from "./schedule";
@@ -94,6 +94,13 @@ const MESSAGES: Record<VoiceLanguage, Record<string, string>> = {
   },
 };
 
+interface ResolvedScheduleDraft {
+  title: string;
+  description: string;
+  datetime: Date | null;
+  datetimeText: string;
+}
+
 /**
  * Execute a voice command based on recognition result.
  *
@@ -123,7 +130,7 @@ export async function executeVoiceCommand(
         return await handleCallContact(userId, msg, result.params);
 
       case "set_schedule":
-        return await handleSetSchedule(userId, msg, result.params, language);
+        return await handleSetSchedule(userId, msg, result, language);
 
       case "general_chat":
       default:
@@ -141,6 +148,201 @@ export async function executeVoiceCommand(
       action: "error",
     };
   }
+}
+
+function getScheduleLocale(language: VoiceLanguage): string {
+  switch (language) {
+    case "en":
+      return "en-US";
+    case "zh":
+      return "zh-CN";
+    case "yue":
+    default:
+      return "zh-HK";
+  }
+}
+
+function formatScheduleDateTime(date: Date, language: VoiceLanguage): string {
+  try {
+    return new Intl.DateTimeFormat(getScheduleLocale(language), {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  } catch {
+    return date.toLocaleString();
+  }
+}
+
+function parseAbsoluteDateCandidate(value: string): Date | null {
+  const normalized = value.trim();
+  if (!normalized) return null;
+
+  if (!/^\d{4}-\d{1,2}-\d{1,2}|^\d{4}\/\d{1,2}\/\d{1,2}|T\d{2}:\d{2}|Z$|[+-]\d{2}:?\d{2}$/.test(normalized)) {
+    return null;
+  }
+
+  const parsed = Date.parse(normalized);
+  return Number.isNaN(parsed) ? null : new Date(parsed);
+}
+
+function getExplicitDayOffset(text: string): number | null {
+  if (!text) return null;
+
+  if (/(大後日|大后天)/i.test(text)) return 3;
+  if (/(後天|后天|day after tomorrow)/i.test(text)) return 2;
+  if (/(聽朝|听朝|聽日|听日|明天|明日|明早|明朝|tomorrow)/i.test(text)) return 1;
+  if (/(今日|今天|今朝|今晚|today|tonight|this morning|this afternoon|this evening)/i.test(text)) {
+    return 0;
+  }
+
+  return null;
+}
+
+function applyTimeOfDayHint(hours: number, text: string): number {
+  const hasPmHint = /(下午|下晝|晚上|今晚|夜晚|傍晚|pm|afternoon|evening|tonight)/i.test(text);
+  const hasAmHint = /(朝早|早上|上午|清晨|凌晨|am|morning)/i.test(text);
+  const hasNoonHint = /(中午|noon)/i.test(text);
+
+  if (hasNoonHint) {
+    if (hours === 0) return 12;
+    if (hours < 11) return hours + 12;
+  }
+
+  if (hasPmHint && hours < 12) {
+    return hours + 12;
+  }
+
+  if (hasAmHint && hours === 12) {
+    return 0;
+  }
+
+  return hours;
+}
+
+function extractTimeParts(text: string): { hours: number; minutes: number } | null {
+  if (!text) return null;
+
+  const normalized = text.replace(/：/g, ":");
+  const halfMatch = normalized.match(/(\d{1,2})\s*(?:點半|点半)/i);
+  if (halfMatch) {
+    const hours = Number.parseInt(halfMatch[1], 10);
+    if (!Number.isNaN(hours)) {
+      return {
+        hours: applyTimeOfDayHint(hours, normalized),
+        minutes: 30,
+      };
+    }
+  }
+
+  const chineseMatch = normalized.match(
+    /(\d{1,2})\s*(?:點鐘|点钟|點|点|時|时|:)\s*(\d{1,2})?\s*(?:分)?/i,
+  );
+  if (chineseMatch) {
+    const hours = Number.parseInt(chineseMatch[1], 10);
+    const minutes = Number.parseInt(chineseMatch[2] || "0", 10);
+    if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
+      return {
+        hours: applyTimeOfDayHint(hours, normalized),
+        minutes,
+      };
+    }
+  }
+
+  const englishMatch = normalized.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  if (englishMatch) {
+    let hours = Number.parseInt(englishMatch[1], 10);
+    const minutes = Number.parseInt(englishMatch[2] || "0", 10);
+    const meridiem = englishMatch[3].toLowerCase();
+    if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
+      if (meridiem === "pm" && hours < 12) hours += 12;
+      if (meridiem === "am" && hours === 12) hours = 0;
+      return { hours, minutes };
+    }
+  }
+
+  return null;
+}
+
+function parseSpokenScheduleDate(text: string, reference: Date = new Date()): Date | null {
+  if (!text) return null;
+
+  const timeParts = extractTimeParts(text);
+  if (!timeParts) return null;
+
+  const date = new Date(reference);
+  date.setSeconds(0, 0);
+  date.setHours(timeParts.hours, timeParts.minutes, 0, 0);
+
+  const explicitDayOffset = getExplicitDayOffset(text);
+  if (explicitDayOffset !== null) {
+    date.setDate(date.getDate() + explicitDayOffset);
+    return date;
+  }
+
+  if (date.getTime() <= reference.getTime()) {
+    date.setDate(date.getDate() + 1);
+  }
+
+  return date;
+}
+
+function extractScheduleTitle(text: string): string {
+  if (!text) return "";
+
+  let title = text;
+  title = title.replace(/[，。,.!?！？]/g, " ");
+  title = title.replace(/\b(confirm|confirmed|ok|okay|sure|please|set|schedule|appointment|tomorrow|today|tonight|this morning|this afternoon|this evening|am|pm)\b/gi, " ");
+  title = title.replace(/(確認|确认|確定|确定|請|请|幫我|帮我|安排|新增|添加|設定|设定|日程|行程|預約|预约|時間|时间|喺|在|於|于|聽朝|听朝|聽日|听日|明天|明日|明早|明朝|今日|今天|今朝|今晚|後天|后天|朝早|早上|上午|下晝|下午|晚上|夜晚|中午|凌晨)/g, " ");
+  title = title.replace(/(\d{1,2})\s*(?:點鐘|点钟|點半|点半|點|点|時|时|:)\s*(\d{1,2})?\s*(?:分)?/g, " ");
+  title = title.replace(/\s+/g, " ").trim();
+
+  return title;
+}
+
+function resolveScheduleDraft(
+  params: Record<string, any>,
+  transcript: string,
+  reply: string,
+  fallback?: Partial<{
+    title: string;
+    description: string;
+    datetime: string;
+    datetimeIso: string;
+  }>,
+): ResolvedScheduleDraft {
+  const transcriptText = typeof transcript === "string" ? transcript.trim() : "";
+  const replyText = typeof reply === "string" ? reply.trim() : "";
+  const explicitTitle = String(params.title || params.event || fallback?.title || "").trim();
+  const explicitDescription = String(params.description || fallback?.description || "").trim();
+  const explicitDateText = String(
+    params.datetime || params.time || params.date || fallback?.datetime || fallback?.datetimeIso || "",
+  ).trim();
+
+  const candidateTexts = [transcriptText, replyText].filter(Boolean);
+
+  let datetime = candidateTexts
+    .map((text) => parseSpokenScheduleDate(text))
+    .find((value): value is Date => value instanceof Date && !Number.isNaN(value.getTime())) || null;
+
+  if (!datetime && explicitDateText) {
+    datetime =
+      parseSpokenScheduleDate(explicitDateText) ||
+      parseAbsoluteDateCandidate(explicitDateText);
+  }
+
+  const title =
+    explicitTitle ||
+    candidateTexts
+      .map((text) => extractScheduleTitle(text))
+      .find(Boolean) ||
+    "";
+
+  return {
+    title,
+    description: explicitDescription,
+    datetime,
+    datetimeText: explicitDateText,
+  };
 }
 
 // ── Record Medication ──
@@ -469,7 +671,7 @@ async function handleCallContact(
 async function handleSetSchedule(
   userId: string,
   msg: Record<string, string>,
-  params: Record<string, any>,
+  result: VoiceRecognitionResult,
   language: VoiceLanguage = "yue",
 ): Promise<CommandResult> {
   try {
@@ -478,11 +680,13 @@ async function handleSetSchedule(
       return { success: false, message: msg.schedule_error, action: "set_schedule" };
     }
 
-    const title = params.title || params.event || "";
-    const datetimeStr = params.datetime || params.time || params.date || "";
-    const description = params.description || "";
+    const draft = resolveScheduleDraft(
+      result.params || {},
+      result.transcript || "",
+      result.reply || "",
+    );
 
-    if (!title || !datetimeStr) {
+    if (!draft.title || !draft.datetime) {
       return {
         success: true,
         message: msg.schedule_missing_info,
@@ -492,11 +696,12 @@ async function handleSetSchedule(
     }
 
     // All params valid — ask for confirmation before creating
+    const formattedDatetime = formatScheduleDateTime(draft.datetime, language);
     const confirmMsg = language === "yue"
-      ? `確認設定日程「${title}」喺 ${datetimeStr}？講「確認」或者「取消」。`
+      ? `確認設定日程「${draft.title}」喺 ${formattedDatetime}？講「確認」或者「取消」。`
       : language === "zh"
-        ? `确认设定日程「${title}」在 ${datetimeStr}？说「确认」或「取消」。`
-        : `Set schedule "${title}" at ${datetimeStr}? Say "confirm" or "cancel".`;
+        ? `确认设定日程「${draft.title}」在 ${formattedDatetime}？说「确认」或「取消」。`
+        : `Set schedule "${draft.title}" at ${formattedDatetime}? Say "confirm" or "cancel".`;
 
     return {
       success: true,
@@ -506,9 +711,10 @@ async function handleSetSchedule(
       confirmationData: {
         readyToExecute: true,
         action: "set_schedule",
-        title,
-        description,
-        datetime: datetimeStr,
+        title: draft.title,
+        description: draft.description,
+        datetime: draft.datetimeText || draft.datetime.toISOString(),
+        datetimeIso: draft.datetime.toISOString(),
         elderlyId: elderly.$id,
       },
     };
@@ -529,6 +735,7 @@ export async function executePendingAction(
   pendingData: any,
   userId: string,
   language: VoiceLanguage = "yue",
+  latestRecognition?: Pick<VoiceRecognitionResult, "params" | "transcript" | "reply">,
 ): Promise<CommandResult> {
   const msg = MESSAGES[language] || MESSAGES.yue;
   const addMsg = ADD_MED_MESSAGES[language] || ADD_MED_MESSAGES.yue;
@@ -578,18 +785,21 @@ export async function executePendingAction(
       }
 
       case "set_schedule": {
-        let datetime: Date;
-        const parsed = Date.parse(pendingData.datetime);
-        if (!isNaN(parsed)) {
-          datetime = new Date(parsed);
-        } else {
-          datetime = new Date();
-          datetime.setHours(datetime.getHours() + 1, 0, 0, 0);
+        const draft = resolveScheduleDraft(
+          latestRecognition?.params || {},
+          latestRecognition?.transcript || "",
+          latestRecognition?.reply || "",
+          pendingData,
+        );
+        const datetime = draft.datetime || parseAbsoluteDateCandidate(String(pendingData.datetimeIso || pendingData.datetime || ""));
+
+        if (!datetime) {
+          return { success: false, message: msg.schedule_missing_info, action: "set_schedule" };
         }
 
         await createScheduleTask({
-          title: pendingData.title,
-          description: pendingData.description || "",
+          title: draft.title || pendingData.title,
+          description: draft.description || pendingData.description || "",
           datetime,
           elderlyId: pendingData.elderlyId,
           typeName: "appointment",
@@ -597,10 +807,10 @@ export async function executePendingAction(
         });
 
         const schedMsg = language === "yue"
-          ? `好嘅，已經幫你設定咗日程「${pendingData.title}」。`
+          ? `好嘅，已經幫你設定咗日程「${draft.title || pendingData.title}」。`
           : language === "zh"
-            ? `好的，已经帮你设定了日程「${pendingData.title}」。`
-            : `OK, I've set the schedule "${pendingData.title}".`;
+            ? `好的，已经帮你设定了日程「${draft.title || pendingData.title}」。`
+            : `OK, I've set the schedule "${draft.title || pendingData.title}".`;
 
         return { success: true, message: schedMsg, action: "set_schedule" };
       }

@@ -1,38 +1,38 @@
 import { useAuth } from "@/lib/auth-context";
 import { getCaregiverByUserId, getLinkedElderly } from "@/lib/caregiver";
 import {
-  deleteCustomVoiceRecord,
-  getCustomVoicesForCaregiver,
-  getResolvedCustomVoiceId,
-  normalizeCustomVoiceSlot,
-  saveCustomVoiceRecord,
-  updateCustomVoiceRecord,
+    deleteCustomVoiceRecord,
+    getCustomVoicesForCaregiver,
+    getResolvedCustomVoiceId,
+    normalizeCustomVoiceSlot,
+    saveCustomVoiceRecord,
+    updateCustomVoiceRecord,
 } from "@/lib/custom-voice";
 import { useFontSize } from "@/lib/font-size-context";
 import { useLanguage } from "@/lib/language-context";
 import { createPersonalVoice, readAudioFileAsBase64 } from "@/lib/personal-voice";
 import {
-  buildAvatarUrl,
-  isProfileAvatarSchemaMissing,
-  updateProfileAvatar,
-  uploadAvatar,
+    buildAvatarUrl,
+    isProfileAvatarSchemaMissing,
+    updateProfileAvatar,
+    uploadAvatar,
 } from "@/lib/user";
 import {
-  Caregiver,
-  CustomVoice,
-  CustomVoiceSlot,
-  CustomVoiceStatus,
-  Elderly,
+    Caregiver,
+    CustomVoice,
+    CustomVoiceSlot,
+    CustomVoiceStatus,
+    Elderly,
 } from "@/types/appwrite";
 import { FontSize } from "@/types/user";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
-  createAudioPlayer,
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  useAudioRecorder,
-  type AudioPlayer,
+    createAudioPlayer,
+    RecordingPresets,
+    requestRecordingPermissionsAsync,
+    setAudioModeAsync,
+    useAudioRecorder,
+    type AudioPlayer,
 } from "expo-audio";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -41,20 +41,20 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import {
-  ActivityIndicator,
-  Avatar,
-  Banner,
-  Button,
-  Card,
-  Chip,
-  Divider,
-  IconButton,
-  List,
-  SegmentedButtons,
-  Switch,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Avatar,
+    Banner,
+    Button,
+    Card,
+    Chip,
+    Divider,
+    IconButton,
+    List,
+    SegmentedButtons,
+    Switch,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 
 type VoiceCreationStep = "idle" | "recording" | "converting" | "cloning" | "done" | "error";
@@ -77,11 +77,6 @@ export default function Settings() {
   const { fontSize, setFontSize, scaledSize } = useFontSize();
   const { language, setLanguage } = useLanguage();
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-
-  const [newPreference, setNewPreference] = useState({
-    key: "",
-    value: "",
-  });
   const [caregiverProfile, setCaregiverProfile] = useState<Caregiver | null>(null);
   const [linkedElderly, setLinkedElderly] = useState<Elderly[]>([]);
   const [selectedElderlyId, setSelectedElderlyId] = useState<string | null>(null);
@@ -476,32 +471,6 @@ export default function Settings() {
     }
   };
 
-  const handleAddPreference = async () => {
-    if (!newPreference.key.trim()) return;
-
-    try {
-      let parsedValue: any = newPreference.value;
-      try {
-        parsedValue = JSON.parse(newPreference.value);
-      } catch {}
-
-      await handleSetPreference(newPreference.key, parsedValue);
-      setNewPreference({ key: "", value: "" });
-    } catch (error) {
-      console.error("Error adding preference:", error);
-    }
-  };
-
-  const handleRemovePreference = async (key: string) => {
-    try {
-      const newPrefs = { ...preferences };
-      delete newPrefs[key];
-      await updatePreferences(newPrefs);
-    } catch (error) {
-      console.error("Error removing preference:", error);
-    }
-  };
-
   const isCreatingVoice = voiceStep !== "idle" && voiceStep !== "done" && voiceStep !== "error";
 
   // Helper: get elderly name for a voice
@@ -788,7 +757,7 @@ export default function Settings() {
       <Text variant="titleLarge" style={styles.sectionTitle}>
         {t('settings.notifications')}
       </Text>
-      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+      <Card style={[styles.card, { backgroundColor: theme.colors.surface }] }>
         <List.Item
           title={t('settings.pushNotifications')}
           titleStyle={styles.listTitle}
@@ -1091,7 +1060,7 @@ export default function Settings() {
           <Text variant="titleSmall" style={styles.voiceSectionLabel}>
             {t('settings.existingVoices')}{" "}
             {selectedElderlyId
-              ? `${t('settings.for')} ${getElderlyName(selectedElderlyId)}`
+              ? `${t('settings.for')} ${getElderlyName(selectedElderlyId!)}`
               : ""}
           </Text>
 
@@ -1237,105 +1206,6 @@ export default function Settings() {
             );
           })}
         </View>
-      </Card>
-
-      {/* ── Custom Settings ── */}
-      <Text variant="titleLarge" style={styles.sectionTitle}>
-        {t('settings.customSettings')}
-      </Text>
-      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-        <Card.Content style={{ paddingVertical: 20 }}>
-          <View style={styles.sectionHeaderRow}>
-            <MaterialCommunityIcons
-              name="cog-outline"
-              size={22}
-              color={theme.colors.primary}
-            />
-            <Text
-              variant="titleMedium"
-              style={{ marginLeft: 8, fontWeight: "600" }}
-            >
-              {t('settings.addCustomSetting')}
-            </Text>
-          </View>
-          <TextInput
-            label={t('settings.settingItemName')}
-            value={newPreference.key}
-            onChangeText={(text) =>
-              setNewPreference((prev) => ({ ...prev, key: text }))
-            }
-            mode="outlined"
-            style={styles.input}
-          />
-          <TextInput
-            label={t('settings.setValueJson')}
-            value={newPreference.value}
-            onChangeText={(text) =>
-              setNewPreference((prev) => ({ ...prev, value: text }))
-            }
-            mode="outlined"
-            style={styles.input}
-            multiline
-          />
-          <Button
-            mode="contained"
-            onPress={handleAddPreference}
-            disabled={!newPreference.key.trim()}
-            icon="plus"
-            style={{ borderRadius: 12 }}
-          >
-            {t('settings.addSetting')}
-          </Button>
-        </Card.Content>
-      </Card>
-
-      {/* ── Current Settings ── */}
-      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-        <Card.Content style={{ paddingVertical: 20 }}>
-          <View style={styles.sectionHeaderRow}>
-            <MaterialCommunityIcons
-              name="format-list-bulleted"
-              size={22}
-              color={theme.colors.primary}
-            />
-            <Text
-              variant="titleMedium"
-              style={{ marginLeft: 8, fontWeight: "600" }}
-            >
-              {t('settings.currentSettings')}
-            </Text>
-          </View>
-          {Object.entries(preferences).map(([key, value]) => (
-            <View key={key} style={styles.preferenceItem}>
-              <View style={styles.preferenceText}>
-                <Text variant="bodyMedium" style={styles.preferenceKey}>
-                  {key}:
-                </Text>
-                <Text variant="bodyMedium" style={styles.preferenceValue}>
-                  {typeof value === "object"
-                    ? JSON.stringify(value)
-                    : String(value)}
-                </Text>
-              </View>
-              {!["role", "fontSize", "voiceTone", "notifications"].includes(
-                key,
-              ) && (
-                <Button
-                  mode="outlined"
-                  compact
-                  onPress={() => handleRemovePreference(key)}
-                  icon="delete"
-                  style={{ borderRadius: 12 }}
-                >
-                  {t('common.delete')}
-                </Button>
-              )}
-            </View>
-          ))}
-          {Object.keys(preferences).length === 0 && (
-            <Text style={styles.noPreferences}>{t('settings.noCustomSettings')}</Text>
-          )}
-        </Card.Content>
       </Card>
 
       {/* ── About ── */}

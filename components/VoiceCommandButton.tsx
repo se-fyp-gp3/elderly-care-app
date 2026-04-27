@@ -65,6 +65,54 @@ const MESSAGES_FOR_CANCEL: Record<string, string> = {
   en: "OK, cancelled.",
 };
 
+const SPEECH_PEAK_THRESHOLD = 0.015;
+const SILENCE_PEAK_THRESHOLD = 0.004;
+const TRAILING_SILENCE_MS = 550;
+
+function getSamplePeakAmplitude(sample: any): number {
+  if (!sample || !Array.isArray(sample.channels)) {
+    return 0;
+  }
+
+  let peak = 0;
+  for (const channel of sample.channels) {
+    if (!channel || !Array.isArray(channel.frames)) continue;
+    for (const frame of channel.frames) {
+      const amplitude = Math.abs(Number(frame) || 0);
+      if (amplitude > peak) {
+        peak = amplitude;
+      }
+    }
+  }
+
+  return peak;
+}
+
+function normalizeVoiceIntentText(...parts: Array<string | null | undefined>): string {
+  return parts
+    .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+    .join(" ")
+    .replace(/[“”"'`’‘.,!?！？。]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function isExplicitConfirmation(text: string): boolean {
+  if (!text) return false;
+
+  return /^(確認|确认|confirm|yes|ok|okay|sure|得|係|是)(\s|$)/i.test(text) ||
+    /(講|说|say).*(確認|确认|confirm).*(取消|cancel)/i.test(text) ||
+    /\b(confirm|yes|ok|okay|sure)\b/i.test(text);
+}
+
+function isExplicitCancellation(text: string): boolean {
+  if (!text) return false;
+
+  return /^(取消|cancel|唔好|不要|不用|唔使|算)(\s|$)/i.test(text) ||
+    /\b(cancel|stop|never mind)\b/i.test(text);
+}
+
 function inferAudioMimeTypeFromUri(uri: string): string {
   const lowerUri = uri.toLowerCase();
   if (lowerUri.endsWith(".wav")) return "audio/wav";
@@ -208,15 +256,25 @@ export default function VoiceCommandButton() {
 
       // Check if there's a pending action waiting for confirmation
       if (pendingAction.current) {
-        // Combine all text from AI response to detect confirm/cancel signals
-        const allText = [recognitionResult.transcript, recognitionResult.reply]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
+        const transcriptText = normalizeVoiceIntentText(recognitionResult.transcript);
+        const replyText = normalizeVoiceIntentText(recognitionResult.reply);
+        const allText = normalizeVoiceIntentText(
+          recognitionResult.transcript,
+          recognitionResult.reply,
+        );
+        const isConfirm = isExplicitConfirmation(transcriptText) || isExplicitConfirmation(allText);
+        const isCancel = !isConfirm && (
+          isExplicitCancellation(transcriptText) || isExplicitCancellation(replyText)
+        );
 
-        const isCancel = /取消|cancel|唔好|不要|不用|唔使|算/.test(allText);
-
-        if (isCancel) {
+        if (isConfirm) {
+          commandResult = await executePendingAction(
+            pendingAction.current,
+            user.$id,
+            language,
+          );
+          pendingAction.current = null;
+        } else if (isCancel) {
           pendingAction.current = null;
           const cancelMsg = (MESSAGES_FOR_CANCEL as any)[language] || "好嘅，取消咗。";
           commandResult = { success: true, message: cancelMsg, action: "cancelled" };
@@ -226,14 +284,7 @@ export default function VoiceCommandButton() {
             pendingAction.current,
             user.$id,
             language,
-          );
-          pendingAction.current = null;
-        } else if (/確認|确认|yes|ok|okay|confirm|sure|得/.test(allText)) {
-          // Explicit confirmation keywords found
-          commandResult = await executePendingAction(
-            pendingAction.current,
-            user.$id,
-            language,
+            recognitionResult,
           );
           pendingAction.current = null;
         } else {
@@ -277,8 +328,15 @@ export default function VoiceCommandButton() {
       }
 
       // Synthesize the response using the saved family voice or the default Qwen voice
-      setVoiceState("speaking");
-      await playTTSResponse(commandResult.message);
+      await playTTSResponse(
+        commandResult.message,
+        () => {
+          setVoiceState("speaking");
+        },
+        () => {
+          setVoiceState("idle");
+        },
+      );
       setVoiceState("idle");
     } catch (err) {
       console.error("[voice-btn] Processing error:", err);
@@ -301,7 +359,11 @@ export default function VoiceCommandButton() {
 
   // Play the synthesized TTS response
   const playTTSResponse = useCallback(
-    async (message: string) => {
+    async (
+      message: string,
+      onPlaybackStart?: () => void,
+      onPlaybackEnd?: () => void,
+    ) => {
       if (!elderlyProfileId) return;
 
       try {
@@ -330,38 +392,161 @@ export default function VoiceCommandButton() {
           await new Promise<void>((resolve) => {
             let settled = false;
             let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+            let playbackPollTimer: ReturnType<typeof setInterval> | null = null;
+            let hasStartedPlaying = false;
+            let hasHeardSpeech = false;
+            let lastNonSilentAt = Date.now();
+            let lastProgressAt = Date.now();
+            let lastObservedTime = 0;
+            let playbackListener: { remove?: () => void } | null = null;
+            let sampleListener: { remove?: () => void } | null = null;
+
+            const clearFallbackTimer = () => {
+              if (fallbackTimer) {
+                clearTimeout(fallbackTimer);
+                fallbackTimer = null;
+              }
+            };
+
+            const clearPlaybackPollTimer = () => {
+              if (playbackPollTimer) {
+                clearInterval(playbackPollTimer);
+                playbackPollTimer = null;
+              }
+            };
+
+            const scheduleFallback = (timeoutMs: number) => {
+              clearFallbackTimer();
+              fallbackTimer = setTimeout(
+                finishPlayback,
+                Math.max(250, timeoutMs),
+              );
+            };
 
             const finishPlayback = () => {
               if (settled) return;
               settled = true;
-              if (fallbackTimer) {
-                clearTimeout(fallbackTimer);
+              clearFallbackTimer();
+              clearPlaybackPollTimer();
+              playbackListener?.remove?.();
+              sampleListener?.remove?.();
+              if (player.isAudioSamplingSupported) {
+                try {
+                  player.setAudioSamplingEnabled(false);
+                } catch {}
               }
+              onPlaybackEnd?.();
               resolve();
             };
 
-            player.addListener("playbackStatusUpdate", (status: any) => {
+            const checkPlayerState = () => {
+              const now = Date.now();
+              const currentTime = Number(player.currentTime || 0);
+              const duration = Number(player.duration || 0);
+              const isNearEnd = duration > 0 && currentTime >= duration - 0.05;
+
+              if (currentTime > lastObservedTime + 0.02) {
+                lastObservedTime = currentTime;
+                lastProgressAt = now;
+              }
+
+              if (player.playing) {
+                hasStartedPlaying = true;
+              }
+
               if (
-                status.didJustFinish ||
-                (status.isLoaded &&
-                  !status.playing &&
-                  status.currentTime > 0 &&
-                  status.duration > 0 &&
-                  status.currentTime >= status.duration - 0.2)
+                !player.playing &&
+                ((hasStartedPlaying && currentTime > 0) || isNearEnd)
               ) {
                 finishPlayback();
                 return;
               }
 
-              if (!fallbackTimer && status.duration > 0) {
-                fallbackTimer = setTimeout(
-                  finishPlayback,
-                  Math.ceil(status.duration * 1000) + 1500,
+              if (
+                !player.playing &&
+                hasStartedPlaying &&
+                currentTime > 0 &&
+                now - lastProgressAt >= 700
+              ) {
+                finishPlayback();
+                return;
+              }
+
+              if (duration > 0) {
+                scheduleFallback(
+                  Math.ceil(Math.max(0, duration - currentTime) * 1000) + 150,
+                );
+              }
+            };
+
+            playbackListener = player.addListener("playbackStatusUpdate", (status: any) => {
+              const now = Date.now();
+              const currentTime = Number(status.currentTime || 0);
+              const duration = Number(status.duration || 0);
+
+              if (currentTime > lastObservedTime + 0.02) {
+                lastObservedTime = currentTime;
+                lastProgressAt = now;
+              }
+
+              if (status.playing) {
+                hasStartedPlaying = true;
+              }
+
+              if (
+                status.didJustFinish ||
+                (hasStartedPlaying && status.isLoaded && !status.playing && currentTime > 0) ||
+                (status.isLoaded &&
+                  !status.playing &&
+                  currentTime > 0 &&
+                  duration > 0 &&
+                  currentTime >= duration - 0.05)
+              ) {
+                finishPlayback();
+                return;
+              }
+
+              if (duration > 0) {
+                scheduleFallback(
+                  Math.ceil(Math.max(0, duration - currentTime) * 1000) + 250,
                 );
               }
             });
+
+            if (player.isAudioSamplingSupported) {
+              try {
+                player.setAudioSamplingEnabled(true);
+                sampleListener = player.addListener("audioSampleUpdate", (sample: any) => {
+                  const peak = getSamplePeakAmplitude(sample);
+                  const now = Date.now();
+                  const currentTime = Number(player.currentTime || 0);
+                  const duration = Number(player.duration || 0);
+
+                  if (peak >= SPEECH_PEAK_THRESHOLD) {
+                    hasHeardSpeech = true;
+                    lastNonSilentAt = now;
+                    return;
+                  }
+
+                  if (!hasHeardSpeech || peak > SILENCE_PEAK_THRESHOLD) {
+                    return;
+                  }
+
+                  const nearEnd = duration > 0
+                    ? currentTime >= Math.max(0.6, duration - 0.9)
+                    : currentTime >= 1.2;
+
+                  if (nearEnd && now - lastNonSilentAt >= TRAILING_SILENCE_MS) {
+                    finishPlayback();
+                  }
+                });
+              } catch {}
+            }
+
+            onPlaybackStart?.();
             player.play();
-            fallbackTimer = setTimeout(finishPlayback, 12000);
+            playbackPollTimer = setInterval(checkPlayerState, 100);
+            scheduleFallback(2500);
           });
 
           // Clean up

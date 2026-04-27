@@ -819,7 +819,7 @@ export default function EmergencyPage() {
         </View>
       ),
     });
-  }, [navigation, router, theme]);
+  }, [navigation, router, t, theme]);
 
   /* ── Filtering ── */
   const filtered = useMemo(() => {
@@ -865,7 +865,7 @@ export default function EmergencyPage() {
       setSelectedAlert(null);
       loadAlerts();
     } catch (err) {
-      Alert.alert("Error", "Failed to resolve alert.");
+      Alert.alert(t("common.error"), t("emergency.failedResolveAlert"));
     }
   };
 
@@ -906,7 +906,10 @@ export default function EmergencyPage() {
       setSelectedAlert(null);
       loadAlerts();
     } catch (err) {
-      Alert.alert("Error", "Failed to update alert status.");
+      Alert.alert(
+        t("common.error"),
+        t("emergency.failedUpdateAlertStatus"),
+      );
     }
   };
 
@@ -1095,7 +1098,7 @@ export default function EmergencyPage() {
               >
                 {activeCount > 0
                   ? t("emergency.alertSystemActive")
-                  : "All Clear"}
+                  : t("emergency.allClear")}
               </Text>
               <Text
                 variant="bodyMedium"
@@ -1108,7 +1111,7 @@ export default function EmergencyPage() {
               >
                 {activeCount > 0
                   ? t("emergency.unresolvedAlerts", { count: activeCount })
-                  : "No active alerts at this time."}
+                  : t("emergency.noActiveAlerts")}
               </Text>
             </View>
           </View>
@@ -1131,7 +1134,7 @@ export default function EmergencyPage() {
         {/* Search & Filter */}
         <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
           <Searchbar
-            placeholder="Search alerts..."
+            placeholder={t("emergency.searchAlerts")}
             value={search}
             onChangeText={setSearch}
             style={{ borderRadius: 12, elevation: 1 }}
@@ -1139,7 +1142,7 @@ export default function EmergencyPage() {
         </View>
         <View style={[styles.sectionHeader, { marginTop: 4 }]}>
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            Alert Logs ({filtered.length})
+            {t("emergency.recentLogs")} ({filtered.length})
           </Text>
           <Menu
             visible={filterMenuVisible}
@@ -1152,35 +1155,38 @@ export default function EmergencyPage() {
                 icon="filter-variant"
               >
                 {filterStatus === "all"
-                  ? "All"
-                  : filterStatus.charAt(0).toUpperCase() +
-                    filterStatus.slice(1)}
+                  ? t("common.all")
+                  : filterStatus === "active"
+                    ? t("emergency.statusActive")
+                    : filterStatus === "investigating"
+                      ? t("emergency.statusInvestigating")
+                      : t("emergency.statusResolved")}
               </Button>
             }
           >
             <Menu.Item
-              title="All"
+              title={t("common.all")}
               onPress={() => {
                 setFilterStatus("all");
                 setFilterMenuVisible(false);
               }}
             />
             <Menu.Item
-              title="Active"
+              title={t("emergency.statusActive")}
               onPress={() => {
                 setFilterStatus("active");
                 setFilterMenuVisible(false);
               }}
             />
             <Menu.Item
-              title="Investigating"
+              title={t("emergency.statusInvestigating")}
               onPress={() => {
                 setFilterStatus("investigating");
                 setFilterMenuVisible(false);
               }}
             />
             <Menu.Item
-              title="Resolved"
+              title={t("emergency.statusResolved")}
               onPress={() => {
                 setFilterStatus("resolved");
                 setFilterMenuVisible(false);
@@ -1197,7 +1203,7 @@ export default function EmergencyPage() {
               color="#ccc"
             />
             <Text variant="bodyLarge" style={{ color: "#999", marginTop: 12 }}>
-              No alerts found
+              {t("emergency.noAlertsFound")}
             </Text>
           </View>
         ) : (
@@ -1266,7 +1272,9 @@ export default function EmergencyPage() {
                   {selectedAlert.latitude != null &&
                     selectedAlert.longitude != null && (
                       <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>GPS:</Text>
+                        <Text style={styles.detailLabel}>
+                          {t("emergency.gpsLabel")}
+                        </Text>
                         <Text style={styles.detailValue}>
                           {selectedAlert.latitude.toFixed(5)},{" "}
                           {selectedAlert.longitude.toFixed(5)}
@@ -1284,7 +1292,8 @@ export default function EmergencyPage() {
                   {t("emergency.description")}
                 </Text>
                 <Text variant="bodyMedium" style={{ lineHeight: 20 }}>
-                  {selectedAlert.description ?? "No description available."}
+                  {selectedAlert.description ??
+                    t("emergency.noDescriptionAvailable")}
                 </Text>
 
                 <Divider style={{ marginVertical: 16 }} />
@@ -1294,17 +1303,11 @@ export default function EmergencyPage() {
                 <View
                   style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}
                 >
-                  <Chip icon="phone" onPress={() => handleCallEmergency("999")}>
-                    {t("emergency.call999")}
-                  </Chip>
                   <Chip
                     icon="phone"
                     onPress={() => handleCallEmergency("12345678")}
                   >
                     {t("emergency.callFamily")}
-                  </Chip>
-                  <Chip icon="video" onPress={() => {}}>
-                    {t("emergency.viewCamera")}
                   </Chip>
                   {selectedAlert.latitude != null &&
                     selectedAlert.longitude != null && (
@@ -1316,7 +1319,7 @@ export default function EmergencyPage() {
                           )
                         }
                       >
-                        Open Map
+                        {t("emergency.openMap")}
                       </Chip>
                     )}
                 </View>
@@ -1332,7 +1335,7 @@ export default function EmergencyPage() {
                 mode="outlined"
                 onPress={() => handleInvestigate(selectedAlert!)}
               >
-                Investigating
+                {t("emergency.statusInvestigating")}
               </Button>
             )}
             {selectedAlert?.status !== "resolved" && (

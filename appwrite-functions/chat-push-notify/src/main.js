@@ -446,7 +446,7 @@ function joinLocalizedList(items, language) {
   return filteredItems.join(normalizeLanguage(language) === "en" ? ", " : "、");
 }
 
-function formatDateTimeForLanguage(value, language) {
+function formatDateTimeForLanguage(value, language, timeZone) {
   const isoDate = getNonEmptyString(value);
   if (!isoDate) return null;
 
@@ -454,9 +454,17 @@ function formatDateTimeForLanguage(value, language) {
   if (Number.isNaN(date.getTime())) return null;
 
   try {
-    return new Intl.DateTimeFormat(getLocaleForLanguage(language), {
+    const formatterOptions = {
       dateStyle: "medium",
       timeStyle: "short",
+    };
+    const normalizedTimeZone = getNonEmptyString(timeZone);
+    if (normalizedTimeZone) {
+      formatterOptions.timeZone = normalizedTimeZone;
+    }
+
+    return new Intl.DateTimeFormat(getLocaleForLanguage(language), {
+      ...formatterOptions,
     }).format(date);
   } catch {
     return date.toISOString();
@@ -751,7 +759,11 @@ function buildLocalizedScheduleActionMessage(data, language) {
   const normalizedLanguage = normalizeLanguage(language);
   const copy = getNotificationCopy(language);
   const scheduleTitle = getNonEmptyString(data?.scheduleTitle);
-  const scheduledAt = formatDateTimeForLanguage(data?.scheduledAt, language);
+  const scheduledAt = formatDateTimeForLanguage(
+    data?.scheduledAt,
+    language,
+    data?.scheduledTimeZone,
+  );
 
   if (normalizedLanguage === "en") {
     return {
@@ -823,7 +835,11 @@ function buildLocalizedCaregiverActivityMessage(data, language) {
   const medicationName = getNonEmptyString(data?.medicationName);
   const reminderTimesText = joinLocalizedList(getStringArray(data?.reminderTimes), language);
   const scheduleTitle = getNonEmptyString(data?.scheduleTitle);
-  const scheduledAt = formatDateTimeForLanguage(data?.scheduledAt, language);
+  const scheduledAt = formatDateTimeForLanguage(
+    data?.scheduledAt,
+    language,
+    data?.scheduledTimeZone,
+  );
 
   if (activityType === "cg_sched_add") {
     if (normalizedLanguage === "en") {
@@ -1104,27 +1120,35 @@ async function deactivateTokenRows(tablesDB, rowIds) {
   );
 }
 
+function isMixedProjectBatchErrorMessage(message) {
+  return typeof message === "string"
+    && /same request must be for the same project/i.test(message);
+}
+
+async function postExpoPushBatch(batch) {
+  const response = await fetch(EXPO_PUSH_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "Accept-encoding": "gzip, deflate",
+    },
+    body: JSON.stringify(batch.map((entry) => entry.message)),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.errors?.[0]?.message || `Expo push request failed (${response.status})`);
+  }
+
+  return Array.isArray(payload?.data) ? payload.data : [];
+}
+
 async function sendExpoPushMessages(tablesDB, envelopes) {
   const invalidRowIds = [];
   let sent = 0;
 
-  for (const batch of chunk(envelopes, 100)) {
-    const response = await fetch(EXPO_PUSH_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "Accept-encoding": "gzip, deflate",
-      },
-      body: JSON.stringify(batch.map((entry) => entry.message)),
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload?.errors?.[0]?.message || `Expo push request failed (${response.status})`);
-    }
-
-    const results = Array.isArray(payload?.data) ? payload.data : [];
+  const handleResults = (batch, results) => {
     results.forEach((result, index) => {
       if (result?.status === "ok") {
         sent += 1;
@@ -1135,6 +1159,29 @@ async function sendExpoPushMessages(tablesDB, envelopes) {
         invalidRowIds.push(batch[index]?.rowId);
       }
     });
+  };
+
+  for (const batch of chunk(envelopes, 100)) {
+    try {
+      const results = await postExpoPushBatch(batch);
+      handleResults(batch, results);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (batch.length > 1 && isMixedProjectBatchErrorMessage(message)) {
+        console.warn(
+          `[chat-push] Mixed Expo project tokens detected in a batch of ${batch.length}; retrying individually.`,
+        );
+
+        for (const entry of batch) {
+          const singleResults = await postExpoPushBatch([entry]);
+          handleResults([entry], singleResults);
+        }
+
+        continue;
+      }
+
+      throw error;
+    }
   }
 
   if (invalidRowIds.length > 0) {

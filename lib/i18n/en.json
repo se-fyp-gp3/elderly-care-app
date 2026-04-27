@@ -241,7 +241,15 @@
     "fallCheckRunning": "Running",
     "fallCheckNotRunning": "Not running",
     "fallCheckYes": "Yes",
-    "fallCheckNo": "No"
+    "fallCheckNo": "No",
+    "fallCheckDevice": "Device",
+    "fallCheckProfile": "Profile",
+    "fallCheckSensorInterval": "Sensor interval",
+    "fallCheckAccelerometer": "Accelerometer",
+    "fallCheckGyroscope": "Gyroscope",
+    "fallCheckDetectorRunning": "Detector running",
+    "fallCheckBackgroundService": "Background service",
+    "fallCheckGForceUnits": "g-force units"
   },
   "home": {
     "hello": "Hello, {{name}}!",
@@ -289,6 +297,7 @@
     "generatingVoice": "Generating voice...",
     "playingVoice": "Playing voice...",
     "voiceError": "Voice error: {{error}}",
+    "voicePlaybackFailed": "Voice playback failed.",
     "addPhoto": "Add Photo",
     "chooseOption": "Choose an option",
     "takePhoto": "Take Photo",
@@ -554,7 +563,16 @@
     "activeAlertsCount": "{{count}} active alert(s)",
     "statusActive": "Active",
     "statusInvestigating": "Investigating",
-    "statusResolved": "Resolved"
+    "statusResolved": "Resolved",
+    "allClear": "All Clear",
+    "noActiveAlerts": "No active alerts at this time.",
+    "searchAlerts": "Search alerts...",
+    "noAlertsFound": "No alerts found",
+    "gpsLabel": "GPS:",
+    "noDescriptionAvailable": "No description available.",
+    "openMap": "Open Map",
+    "failedResolveAlert": "Failed to resolve alert.",
+    "failedUpdateAlertStatus": "Failed to update alert status."
   },
   "schedule": {
     "mySchedule": "My Schedule",

@@ -257,7 +257,7 @@ export default function ElderlySettings() {
 
     Alert.alert(
       t("settings.fallCheckTitle"),
-      `Device: ${diagnostics.deviceModel || "Unknown"}\nProfile: ${diagnostics.profileName}\nSensor interval: ${diagnostics.sensorIntervalMs} ms\nAccelerometer: ${diagnostics.accelerometerAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")} (g-force units)\nGyroscope: ${diagnostics.gyroscopeAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")}\nDetector running: ${diagnostics.isRunning ? t("settings.fallCheckYes") : t("settings.fallCheckNo")}\nBackground service: ${diagnostics.backgroundServiceRunning ? t("settings.fallCheckRunning") : t("settings.fallCheckNotRunning")}\n\n${notes.join("\n")}`,
+      `${t("settings.fallCheckDevice")}: ${diagnostics.deviceModel || t("common.unknown")}\n${t("settings.fallCheckProfile")}: ${diagnostics.profileName}\n${t("settings.fallCheckSensorInterval")}: ${diagnostics.sensorIntervalMs} ms\n${t("settings.fallCheckAccelerometer")}: ${diagnostics.accelerometerAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")} (${t("settings.fallCheckGForceUnits")})\n${t("settings.fallCheckGyroscope")}: ${diagnostics.gyroscopeAvailable ? t("settings.fallCheckAvailable") : t("settings.fallCheckUnavailable")}\n${t("settings.fallCheckDetectorRunning")}: ${diagnostics.isRunning ? t("settings.fallCheckYes") : t("settings.fallCheckNo")}\n${t("settings.fallCheckBackgroundService")}: ${diagnostics.backgroundServiceRunning ? t("settings.fallCheckRunning") : t("settings.fallCheckNotRunning")}\n\n${notes.join("\n")}`,
     );
   }, [t]);
 
@@ -538,7 +538,7 @@ export default function ElderlySettings() {
             titleStyle={styles.listTitle}
             description={
               emergencyContact
-                ? `${selectedCaregiverName ?? "Caregiver"} (${emergencyContact})`
+                ? `${selectedCaregiverName ?? t("common.caregiver")} (${emergencyContact})`
                 : t("settings.emergencyNotSetDesc")
             }
             descriptionStyle={styles.listDescription}
@@ -1173,7 +1173,7 @@ export default function ElderlySettings() {
               >
                 <View style={styles.modalHeader}>
                   <Text variant="titleLarge" style={{ fontWeight: "700" }}>
-                    Select Emergency
+                    {t("settings.selectEmergencyContact")}
                   </Text>
                   <TouchableOpacity onPress={() => setPickerVisible(false)}>
                     <MaterialCommunityIcons
@@ -1191,7 +1191,7 @@ export default function ElderlySettings() {
                     marginBottom: 16,
                   }}
                 >
-                  Choose from your linked caregivers
+                  {t("settings.chooseFromCaregivers")}
                 </Text>
 
                 {linkedCaregivers.length === 0 ? (
