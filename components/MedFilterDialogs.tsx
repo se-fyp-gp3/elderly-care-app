@@ -135,13 +135,15 @@ export function ElderlyFilterDialog({
 
 /* ─── Status Filter Dialog ─── */
 
+export type DayFilter = "yesterday" | "today" | "tomorrow" | "all";
+
 interface StatusFilterDialogProps {
   visible: boolean;
   onDismiss: () => void;
   statusFilter: string;
   onSelect: (status: string) => void;
-  viewingYesterday: boolean;
-  onSelectDay: (value: boolean) => void;
+  dayFilter: DayFilter;
+  onSelectDay: (value: DayFilter) => void;
 }
 
 export function StatusFilterDialog({
@@ -149,7 +151,7 @@ export function StatusFilterDialog({
   onDismiss,
   statusFilter,
   onSelect,
-  viewingYesterday,
+  dayFilter,
   onSelectDay,
 }: StatusFilterDialogProps) {
   const theme = useTheme();
@@ -165,18 +167,32 @@ export function StatusFilterDialog({
       <Dialog.Content>
         {[
           {
-            key: "today",
-            icon: "calendar-today",
-            label: t('medication.todaysPlan'),
-            selected: !viewingYesterday,
-            onPress: () => onSelectDay(false),
-          },
-          {
             key: "yesterday",
             icon: "calendar-arrow-left",
             label: t('medication.yesterday'),
-            selected: viewingYesterday,
-            onPress: () => onSelectDay(true),
+            selected: dayFilter === "yesterday",
+            onPress: () => onSelectDay("yesterday"),
+          },
+          {
+            key: "today",
+            icon: "calendar-today",
+            label: t('medication.todaysPlan'),
+            selected: dayFilter === "today",
+            onPress: () => onSelectDay("today"),
+          },
+          {
+            key: "tomorrow",
+            icon: "calendar-arrow-right",
+            label: t('medication.tomorrow'),
+            selected: dayFilter === "tomorrow",
+            onPress: () => onSelectDay("tomorrow"),
+          },
+          {
+            key: "all",
+            icon: "calendar-multiple",
+            label: t('medication.allPlans'),
+            selected: dayFilter === "all",
+            onPress: () => onSelectDay("all"),
           },
         ].map((item) => (
           <TouchableOpacity
