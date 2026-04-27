@@ -1,10 +1,10 @@
 import { AddMedicationDialog, MedicationFormData } from "@/components/AddMedicationDialog";
 import ElderlyGroupSummary from "@/components/ElderlyGroupSummary";
 import {
-    ConfirmMedicationDialog,
-    DayFilter,
-    ElderlyFilterDialog,
-    StatusFilterDialog,
+  ConfirmMedicationDialog,
+  DayFilter,
+  ElderlyFilterDialog,
+  StatusFilterDialog,
 } from "@/components/MedFilterDialogs";
 import { MedicationItem } from "@/components/MedicationCard";
 import MedicationDetailsModal, { MedicationDetailField } from "@/components/MedicationDetailsModal";
@@ -12,15 +12,15 @@ import MedStatsCard from "@/components/MedStatsCard";
 import TimeSlotCard from "@/components/TimeSlotCard";
 import { useAuth } from "@/lib/auth-context";
 import {
-    addMedication,
-    confirmMedicationTaking,
-    ElderlyGroup,
-    fetchCaregiverMedicationData,
-    fetchCaregiverPendingCancelReminders,
-    fetchCaregiverUpcomingMedicationData,
-    markMedicationProcessed,
-    PendingCancelReminder,
-    undoMedicationTaking,
+  addMedication,
+  confirmMedicationTaking,
+  ElderlyGroup,
+  fetchCaregiverMedicationData,
+  fetchCaregiverPendingCancelReminders,
+  fetchCaregiverUpcomingMedicationData,
+  markMedicationProcessed,
+  PendingCancelReminder,
+  undoMedicationTaking,
 } from "@/lib/medication";
 import { Elderly } from "@/types/appwrite";
 import Constants, { ExecutionEnvironment } from "expo-constants";
@@ -29,21 +29,21 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    Alert,
-    AppState,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    View,
+  Alert,
+  AppState,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
 import {
-    Button,
-    Divider,
-    FAB,
-    IconButton,
-    Portal,
-    Text,
-    useTheme,
+  Button,
+  Divider,
+  FAB,
+  IconButton,
+  Portal,
+  Text,
+  useTheme,
 } from "react-native-paper";
 
 // Start notification handler
